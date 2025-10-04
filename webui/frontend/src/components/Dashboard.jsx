@@ -123,7 +123,6 @@ function Dashboard() {
         toast.success("Script force killed", {
           duration: 3000,
           position: "top-right",
-          icon: "⚠️",
         });
       } else {
         toast.error(data.message, {
@@ -150,10 +149,9 @@ function Dashboard() {
       const data = await response.json();
 
       if (data.success) {
-        toast.success("Running file deleted! You can now start the script.", {
+        toast.success("Running file deleted!", {
           duration: 4000,
           position: "top-right",
-          icon: "✅",
         });
         fetchStatus();
       } else {
@@ -163,7 +161,7 @@ function Dashboard() {
         });
       }
     } catch (error) {
-      toast.error(`Error deleting running file: ${error.message}`, {
+      toast.error(`Error: ${error.message}`, {
         duration: 5000,
         position: "top-right",
       });
@@ -171,10 +169,8 @@ function Dashboard() {
   };
 
   const parseLogLine = (line) => {
-    // Parse format: [2025-10-04 13:06:27] [INFO] |L.228 | message
     const logPattern = /^\[([^\]]+)\]\s*\[([^\]]+)\]\s*\|L\.(\d+)\s*\|\s*(.*)$/;
     const match = line.match(logPattern);
-
     if (match) {
       return {
         timestamp: match[1],
@@ -183,34 +179,18 @@ function Dashboard() {
         message: match[4],
       };
     }
-
     return { raw: line };
   };
 
-  const getLogLevelColor = (level) => {
-    if (!level) return "text-gray-300";
-    const lowerLevel = level.toLowerCase();
-
-    if (lowerLevel === "error") return "text-red-400";
-    if (lowerLevel === "warning" || lowerLevel === "warn")
-      return "text-yellow-400";
-    if (lowerLevel === "info") return "text-blue-400";
-    if (lowerLevel === "success") return "text-green-400";
-
-    return "text-gray-300";
-  };
-
-  const getLogLevelBadge = (level) => {
-    if (!level) return "bg-gray-700/50";
-    const lowerLevel = level.toLowerCase();
-
-    if (lowerLevel === "error") return "bg-red-900/40";
-    if (lowerLevel === "warning" || lowerLevel === "warn")
-      return "bg-yellow-900/40";
-    if (lowerLevel === "info") return "bg-blue-900/40";
-    if (lowerLevel === "success") return "bg-green-900/40";
-
-    return "bg-gray-700/50";
+  const getLevelColor = (level) => {
+    if (!level) return null;
+    const l = level.toLowerCase();
+    if (l === "error") return { color: "#f87171" };
+    if (l === "warning" || l === "warn") return { color: "#fbbf24" };
+    if (l === "info") return { color: "#22d3ee" };
+    if (l === "success") return { color: "#4ade80" };
+    if (l === "debug") return { color: "#c084fc" };
+    return { color: "#9ca3af" };
   };
 
   return (
@@ -219,7 +199,6 @@ function Dashboard() {
 
       <h1 className="text-3xl font-bold mb-8 text-purple-400">Dashboard</h1>
 
-      {/* Already Running Warning */}
       {status.already_running_detected && (
         <div className="mb-6 bg-yellow-900/30 border-2 border-yellow-600/50 rounded-lg p-4">
           <div className="flex items-start">
@@ -229,15 +208,15 @@ function Dashboard() {
                 Another Posterizarr Instance Already Running
               </h3>
               <p className="text-yellow-200 text-sm mb-3">
-                The script detected another instance is already running. If this
-                is a false positive, you can delete the running file.
+                The script detected another instance. If this is a false
+                positive, delete the running file.
               </p>
               <button
                 onClick={deleteRunningFile}
                 className="flex items-center px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium transition-colors text-sm"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete Posterizarr.Running File
+                Delete Running File
               </button>
             </div>
           </div>
@@ -310,7 +289,7 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Last 10 Log Entries */}
+      {/* Compact Log Viewer - Terminal Style */}
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-purple-400">
@@ -324,9 +303,9 @@ function Dashboard() {
           </button>
         </div>
 
-        <div className="bg-gray-900 rounded overflow-hidden">
+        <div className="bg-black rounded overflow-hidden border border-gray-900">
           {status.last_logs && status.last_logs.length > 0 ? (
-            <div className="divide-y divide-gray-700/50">
+            <div className="font-mono text-[10px] leading-tight tracking-tighter">
               {status.last_logs.map((line, index) => {
                 const parsed = parseLogLine(line);
 
@@ -334,7 +313,7 @@ function Dashboard() {
                   return (
                     <div
                       key={index}
-                      className="px-3 py-2 font-mono text-xs text-gray-300 hover:bg-gray-700/30"
+                      className="px-2 py-0.5 text-gray-400 hover:bg-gray-900/50"
                     >
                       {parsed.raw}
                     </div>
@@ -344,41 +323,31 @@ function Dashboard() {
                 return (
                   <div
                     key={index}
-                    className="px-3 py-2 flex items-start gap-2 hover:bg-gray-700/30 font-mono text-xs"
+                    className="px-2 py-0.5 hover:bg-gray-900/50 flex items-center gap-2"
                   >
-                    <span className="text-gray-600 min-w-[2rem] text-right">
-                      {index + 1}
-                    </span>
-                    <span className="text-gray-500 min-w-[9rem] text-[10px]">
-                      {parsed.timestamp}
-                    </span>
+                    <span className="text-gray-600">[{parsed.timestamp}]</span>
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase min-w-[3.5rem] text-center ${getLogLevelBadge(
-                        parsed.level
-                      )} ${getLogLevelColor(parsed.level)}`}
+                      className="font-bold"
+                      style={getLevelColor(parsed.level)}
                     >
-                      {parsed.level}
+                      [{parsed.level}]
                     </span>
-                    <span className="text-gray-600 text-[10px] min-w-[2.5rem]">
-                      L.{parsed.lineNum}
-                    </span>
-                    <span className="flex-1 text-gray-200 break-all">
-                      {parsed.message}
-                    </span>
+                    <span className="text-gray-700">|L.{parsed.lineNum}</span>
+                    <span className="text-gray-300">| {parsed.message}</span>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="px-3 py-8 text-center text-gray-500 text-sm">
-              No logs available - start a script to see output here
+            <div className="px-3 py-8 text-center text-gray-600 text-xs">
+              No logs - start a script to see output
             </div>
           )}
         </div>
 
-        <div className="mt-3 text-xs text-gray-500 flex justify-between items-center">
-          <span>Auto-refreshes every 3 seconds</span>
-          <span>Showing last 10 entries</span>
+        <div className="mt-2 text-[10px] text-gray-600 flex justify-between">
+          <span>Auto-refresh: 3s</span>
+          <span>Last 10 entries</span>
         </div>
       </div>
 

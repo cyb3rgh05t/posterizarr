@@ -222,8 +222,8 @@ async def run_script(mode: str):
         current_process = subprocess.Popen(
             commands[mode],
             cwd=str(BASE_DIR),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=None,  # ← GEÄNDERT!
+            stderr=None,  # ← GEÄNDERT!
             text=True,
         )
         logger.info(

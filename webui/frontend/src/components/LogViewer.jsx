@@ -13,63 +13,31 @@ function LogViewer() {
   const logContainerRef = useRef(null);
   const wsRef = useRef(null);
 
-  // Parse log line
   const parseLogLine = (line) => {
-    // [2025-10-04 13:06:27] [INFO] |L.228 | message
     const logPattern = /^\[([^\]]+)\]\s*\[([^\]]+)\]\s*\|L\.(\d+)\s*\|\s*(.*)$/;
     const match = line.match(logPattern);
-
     if (match) {
       return {
-        timestamp: match[1].split(" ")[1], // Just time
-        date: match[1].split(" ")[0], // Just date
+        timestamp: match[1],
         level: match[2].trim(),
         lineNum: match[3],
         message: match[4],
       };
     }
-
     return { raw: line };
   };
 
-  // Get level styling
-  const getLevelStyle = (level) => {
-    if (!level) return { text: "text-gray-400", bg: "bg-gray-700" };
+  const getLevelColor = (level) => {
+    if (!level) return null;
     const l = level.toLowerCase();
-
-    if (l === "error")
-      return {
-        text: "text-red-300",
-        bg: "bg-red-950",
-        border: "border-l-red-500",
-      };
-    if (l === "warning" || l === "warn")
-      return {
-        text: "text-yellow-300",
-        bg: "bg-yellow-950",
-        border: "border-l-yellow-500",
-      };
-    if (l === "info")
-      return {
-        text: "text-blue-300",
-        bg: "bg-blue-950",
-        border: "border-l-blue-500",
-      };
-    if (l === "success")
-      return {
-        text: "text-green-300",
-        bg: "bg-green-950",
-        border: "border-l-green-500",
-      };
-
-    return {
-      text: "text-gray-400",
-      bg: "bg-gray-800",
-      border: "border-l-gray-600",
-    };
+    if (l === "error") return { color: "#f87171" };
+    if (l === "warning" || l === "warn") return { color: "#fbbf24" };
+    if (l === "info") return { color: "#22d3ee" };
+    if (l === "success") return { color: "#4ade80" };
+    if (l === "debug") return { color: "#c084fc" };
+    return { color: "#9ca3af" };
   };
 
-  // Fetch log files
   const fetchAvailableLogs = async () => {
     try {
       const response = await fetch(`${API_URL}/logs`);
@@ -80,10 +48,9 @@ function LogViewer() {
     }
   };
 
-  // Fetch specific log
   const fetchLogFile = async (logName) => {
     try {
-      const response = await fetch(`${API_URL}/logs/${logName}?tail=100`);
+      const response = await fetch(`${API_URL}/logs/${logName}?tail=500`);
       const data = await response.json();
       setLogs(data.content);
     } catch (error) {
@@ -91,7 +58,6 @@ function LogViewer() {
     }
   };
 
-  // WebSocket connection
   const connectWebSocket = () => {
     if (wsRef.current) {
       wsRef.current.close();
@@ -205,7 +171,7 @@ function LogViewer() {
             setSelectedLog(e.target.value);
             fetchLogFile(e.target.value);
           }}
-          className="px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+          className="px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm"
         >
           {availableLogs.map((log) => (
             <option key={log.name} value={log.name}>
@@ -215,69 +181,58 @@ function LogViewer() {
         </select>
       </div>
 
-      {/* Log container - SIMPLE & READABLE */}
-      <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
-        <div ref={logContainerRef} className="h-[650px] overflow-y-auto p-3">
+      {/* Compact Terminal-Style Log Container */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+        <div
+          ref={logContainerRef}
+          className="h-[700px] overflow-y-auto bg-black p-2"
+          style={{ scrollbarWidth: "thin" }}
+        >
           {logs.length === 0 ? (
-            <div className="text-gray-500 text-center py-12">
+            <div className="text-gray-600 text-center py-12 text-xs">
               No logs to display
             </div>
           ) : (
-            logs.map((line, index) => {
-              const parsed = parseLogLine(line);
+            <div className="font-mono text-[10px] leading-tight tracking-tighter">
+              {logs.map((line, index) => {
+                const parsed = parseLogLine(line);
 
-              // Unparsed line - simple display
-              if (parsed.raw) {
+                if (parsed.raw) {
+                  return (
+                    <div
+                      key={index}
+                      className="px-1 py-0.5 text-gray-400 hover:bg-gray-900/50"
+                    >
+                      {parsed.raw}
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={index}
-                    className="mb-1 p-2 bg-gray-800/50 rounded text-gray-300 font-mono text-sm hover:bg-gray-700/50"
+                    className="px-1 py-0.5 hover:bg-gray-900/50 flex items-center gap-2"
                   >
-                    {parsed.raw}
+                    <span className="text-gray-600">[{parsed.timestamp}]</span>
+                    <span
+                      className="font-bold"
+                      style={getLevelColor(parsed.level)}
+                    >
+                      [{parsed.level}]
+                    </span>
+                    <span className="text-gray-700">|L.{parsed.lineNum}</span>
+                    <span className="text-gray-300">| {parsed.message}</span>
                   </div>
                 );
-              }
-
-              // Parsed line - clean, readable format
-              const style = getLevelStyle(parsed.level);
-
-              return (
-                <div
-                  key={index}
-                  className={`mb-1.5 p-2 rounded border-l-4 ${style.border} ${style.bg} hover:brightness-110 transition-all`}
-                >
-                  <div className="flex items-start gap-3 font-mono">
-                    {/* Time */}
-                    <span className="text-gray-500 text-xs font-semibold min-w-[70px]">
-                      {parsed.timestamp}
-                    </span>
-
-                    {/* Level badge */}
-                    <span
-                      className={`${style.text} font-bold text-xs uppercase px-2 py-0.5 rounded min-w-[65px] text-center`}
-                    >
-                      {parsed.level}
-                    </span>
-
-                    {/* Line number */}
-                    <span className="text-gray-600 text-xs min-w-[45px]">
-                      L.{parsed.lineNum}
-                    </span>
-
-                    {/* Message */}
-                    <span className="flex-1 text-gray-200 text-sm leading-relaxed">
-                      {parsed.message}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
+              })}
+            </div>
           )}
         </div>
       </div>
 
-      <div className="mt-4 text-sm text-gray-400 text-right">
-        {logs.length} log entries
+      <div className="mt-3 text-[10px] text-gray-500 flex justify-between">
+        <span>{logs.length} log entries</span>
+        <span>Last 500 lines loaded</span>
       </div>
     </div>
   );
