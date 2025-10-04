@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import json
 import subprocess
@@ -62,6 +63,11 @@ async def startup_event():
     LOGS_DIR.mkdir(exist_ok=True)
     ASSETS_DIR.mkdir(exist_ok=True)
     TEMP_DIR.mkdir(exist_ok=True)
+
+    # Mount static files for assets after directories are created
+    if ASSETS_DIR.exists():
+        app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+        logger.info(f"Mounted static files at /assets for directory: {ASSETS_DIR}")
 
 
 class ConfigUpdate(BaseModel):
@@ -222,8 +228,8 @@ async def run_script(mode: str):
         current_process = subprocess.Popen(
             commands[mode],
             cwd=str(BASE_DIR),
-            stdout=None,  # ← GEÄNDERT!
-            stderr=None,  # ← GEÄNDERT!
+            stdout=None,
+            stderr=None,
             text=True,
         )
         logger.info(
@@ -367,7 +373,7 @@ async def websocket_logs(websocket: WebSocket):
 
 @app.get("/api/gallery")
 async def get_gallery():
-    """Get poster gallery from assets directory"""
+    """Get poster gallery from assets directory with image URLs"""
     if not ASSETS_DIR.exists():
         return {"images": []}
 
@@ -379,11 +385,14 @@ async def get_gallery():
             if image_path.suffix.lower() in image_extensions:
                 try:
                     relative_path = image_path.relative_to(ASSETS_DIR)
+                    # Create URL path with forward slashes
+                    url_path = str(relative_path).replace("\\", "/")
                     images.append(
                         {
                             "path": str(relative_path),
                             "name": image_path.name,
                             "size": image_path.stat().st_size,
+                            "url": f"/assets/{url_path}",  # NEW: Add URL for accessing the image
                         }
                     )
                 except Exception as e:

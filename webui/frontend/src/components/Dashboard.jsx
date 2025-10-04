@@ -182,15 +182,26 @@ function Dashboard() {
     return { raw: line };
   };
 
-  const getLevelColor = (level) => {
-    if (!level) return null;
-    const l = level.toLowerCase();
-    if (l === "error") return { color: "#f87171" };
-    if (l === "warning" || l === "warn") return { color: "#fbbf24" };
-    if (l === "info") return { color: "#22d3ee" };
-    if (l === "success") return { color: "#4ade80" };
-    if (l === "debug") return { color: "#c084fc" };
-    return { color: "#9ca3af" };
+  // Render log level with EXPLICIT classes (no dynamic strings!)
+  const LogLevel = ({ level }) => {
+    const levelLower = level.toLowerCase();
+
+    if (levelLower === "error") {
+      return <span className="font-bold text-red-400">[{level}]</span>;
+    }
+    if (levelLower === "warning" || levelLower === "warn") {
+      return <span className="font-bold text-yellow-400">[{level}]</span>;
+    }
+    if (levelLower === "info") {
+      return <span className="font-bold text-cyan-400">[{level}]</span>;
+    }
+    if (levelLower === "success") {
+      return <span className="font-bold text-green-400">[{level}]</span>;
+    }
+    if (levelLower === "debug") {
+      return <span className="font-bold text-purple-400">[{level}]</span>;
+    }
+    return <span className="font-bold text-gray-400">[{level}]</span>;
   };
 
   return (
@@ -313,7 +324,7 @@ function Dashboard() {
                   return (
                     <div
                       key={index}
-                      className="px-2 py-0.5 text-gray-400 hover:bg-gray-900/50"
+                      className="px-2 py-0.5 hover:bg-gray-900/50 text-gray-400"
                     >
                       {parsed.raw}
                     </div>
@@ -325,14 +336,9 @@ function Dashboard() {
                     key={index}
                     className="px-2 py-0.5 hover:bg-gray-900/50 flex items-center gap-2"
                   >
-                    <span className="text-gray-600">[{parsed.timestamp}]</span>
-                    <span
-                      className="font-bold"
-                      style={getLevelColor(parsed.level)}
-                    >
-                      [{parsed.level}]
-                    </span>
-                    <span className="text-gray-700">|L.{parsed.lineNum}</span>
+                    <span className="text-gray-500">[{parsed.timestamp}]</span>
+                    <LogLevel level={parsed.level} />
+                    <span className="text-gray-600">|L.{parsed.lineNum}</span>
                     <span className="text-gray-300">| {parsed.message}</span>
                   </div>
                 );

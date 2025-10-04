@@ -130,8 +130,26 @@ function Gallery() {
                   onClick={() => setSelectedImage(image)}
                   className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden cursor-pointer hover:border-purple-500 transition-colors group"
                 >
-                  <div className="aspect-[2/3] bg-gray-900 flex items-center justify-center relative">
-                    <ImageIcon className="w-12 h-12 text-gray-700 group-hover:text-gray-600 transition-colors" />
+                  <div className="aspect-[2/3] bg-gray-900 flex items-center justify-center relative overflow-hidden">
+                    {/* Display actual image instead of icon */}
+                    <img
+                      src={`http://localhost:8000${image.url}`}
+                      alt={image.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to icon if image fails to load
+                        e.target.style.display = "none";
+                        e.target.nextSibling.style.display = "flex";
+                      }}
+                    />
+                    {/* Fallback icon (hidden by default) */}
+                    <div
+                      className="absolute inset-0 flex items-center justify-center"
+                      style={{ display: "none" }}
+                    >
+                      <ImageIcon className="w-12 h-12 text-gray-700 group-hover:text-gray-600 transition-colors" />
+                    </div>
+                    {/* Hover overlay with name */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
                       <p className="p-3 text-white text-xs font-medium truncate w-full">
                         {image.name}
@@ -173,8 +191,19 @@ function Gallery() {
               <p className="text-sm text-gray-400">{selectedImage.path}</p>
             </div>
             <div className="p-4 bg-gray-900 flex items-center justify-center">
-              <div className="aspect-[2/3] bg-gray-800 rounded-lg flex items-center justify-center max-h-[70vh]">
-                <div className="text-center">
+              <div className="max-h-[70vh] flex items-center justify-center">
+                <img
+                  src={`http://localhost:8000${selectedImage.url}`}
+                  alt={selectedImage.name}
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                  onError={(e) => {
+                    // Fallback if image fails to load in modal
+                    e.target.style.display = "none";
+                    e.target.nextSibling.style.display = "block";
+                  }}
+                />
+                {/* Fallback message (hidden by default) */}
+                <div className="text-center" style={{ display: "none" }}>
                   <ImageIcon className="w-24 h-24 text-gray-700 mx-auto mb-4" />
                   <p className="text-gray-500 text-sm">
                     Image preview not available
