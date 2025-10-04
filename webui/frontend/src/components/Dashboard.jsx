@@ -300,8 +300,82 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Compact Log Viewer - Terminal Style */}
+      {/* Control Buttons - MOVED ABOVE LOG VIEWER */}
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-8">
+        <h2 className="text-xl font-semibold mb-4 text-purple-400">
+          Script Controls
+        </h2>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <button
+            onClick={() => runScript("normal")}
+            disabled={loading || status.running}
+            className="flex items-center justify-center px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
+          >
+            <Play className="w-5 h-5 mr-2" />
+            Run Normal
+          </button>
+
+          <button
+            onClick={() => runScript("testing")}
+            disabled={loading || status.running}
+            className="flex items-center justify-center px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
+          >
+            <RefreshCw className="w-5 h-5 mr-2" />
+            Testing Mode
+          </button>
+
+          <button
+            onClick={() => runScript("manual")}
+            disabled={loading || status.running}
+            className="flex items-center justify-center px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
+          >
+            <Settings className="w-5 h-5 mr-2" />
+            Manual Mode
+          </button>
+
+          <button
+            onClick={() => runScript("backup")}
+            disabled={loading || status.running}
+            className="flex items-center justify-center px-4 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
+          >
+            <Save className="w-5 h-5 mr-2" />
+            Backup
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={stopScript}
+            disabled={loading || !status.running}
+            className="flex items-center justify-center px-4 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors shadow-lg shadow-red-900/50 border-2 border-red-500"
+          >
+            <Square className="w-5 h-5 mr-2" />
+            Stop Script
+          </button>
+
+          <button
+            onClick={forceKillScript}
+            disabled={loading || !status.running}
+            className="flex items-center justify-center px-4 py-3 bg-red-800 hover:bg-red-900 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors border border-red-600"
+          >
+            <AlertTriangle className="w-5 h-5 mr-2" />
+            Force Kill
+          </button>
+
+          <button
+            onClick={deleteRunningFile}
+            disabled={loading}
+            className="flex items-center justify-center px-4 py-3 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
+          >
+            <Trash2 className="w-5 h-5 mr-2" />
+            Delete Running File
+          </button>
+        </div>
+      </div>
+
+      {/* Compact Log Viewer - Terminal Style - NOW BELOW BUTTONS */}
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-purple-400">
             Last 10 Log Entries
@@ -354,80 +428,6 @@ function Dashboard() {
         <div className="mt-2 text-[10px] text-gray-600 flex justify-between">
           <span>Auto-refresh: 3s</span>
           <span>Last 10 entries</span>
-        </div>
-      </div>
-
-      {/* Control Buttons */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h2 className="text-xl font-semibold mb-4 text-purple-400">
-          Script Controls
-        </h2>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <button
-            onClick={() => runScript("normal")}
-            disabled={loading || status.running}
-            className="flex items-center justify-center px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-          >
-            <Play className="w-5 h-5 mr-2" />
-            Run Normal
-          </button>
-
-          <button
-            onClick={() => runScript("testing")}
-            disabled={loading || status.running}
-            className="flex items-center justify-center px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-          >
-            <RefreshCw className="w-5 h-5 mr-2" />
-            Testing Mode
-          </button>
-
-          <button
-            onClick={() => runScript("manual")}
-            disabled={loading || status.running}
-            className="flex items-center justify-center px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-          >
-            <Settings className="w-5 h-5 mr-2" />
-            Manual Mode
-          </button>
-
-          <button
-            onClick={() => runScript("backup")}
-            disabled={loading || status.running}
-            className="flex items-center justify-center px-4 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-          >
-            <Save className="w-5 h-5 mr-2" />
-            Backup
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button
-            onClick={stopScript}
-            disabled={loading || !status.running}
-            className="flex items-center justify-center px-4 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-          >
-            <Square className="w-5 h-5 mr-2" />
-            Stop Script
-          </button>
-
-          <button
-            onClick={forceKillScript}
-            disabled={loading || !status.running}
-            className="flex items-center justify-center px-4 py-3 bg-red-800 hover:bg-red-900 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors border border-red-600"
-          >
-            <AlertTriangle className="w-5 h-5 mr-2" />
-            Force Kill
-          </button>
-
-          <button
-            onClick={deleteRunningFile}
-            disabled={loading}
-            className="flex items-center justify-center px-4 py-3 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-          >
-            <Trash2 className="w-5 h-5 mr-2" />
-            Delete Running File
-          </button>
         </div>
       </div>
     </div>

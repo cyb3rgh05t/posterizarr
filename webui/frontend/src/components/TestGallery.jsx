@@ -4,7 +4,7 @@ import toast, { Toaster } from "react-hot-toast";
 
 const API_URL = "http://localhost:8000/api";
 
-function Gallery() {
+function TestGallery() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -15,7 +15,7 @@ function Gallery() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/gallery`);
+      const response = await fetch(`${API_URL}/test-gallery`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -23,16 +23,16 @@ function Gallery() {
       setImages(data.images || []);
 
       if (showToast && data.images && data.images.length > 0) {
-        toast.success(`Loaded ${data.images.length} posters`, {
+        toast.success(`Loaded ${data.images.length} test posters`, {
           duration: 2000,
           position: "top-right",
         });
       }
     } catch (error) {
-      console.error("Error fetching images:", error);
+      console.error("Error fetching test images:", error);
       setError(error.message);
       setImages([]);
-      toast.error("Failed to load gallery", {
+      toast.error("Failed to load test gallery", {
         duration: 4000,
         position: "top-right",
       });
@@ -56,7 +56,7 @@ function Gallery() {
       <Toaster />
 
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 space-y-4 md:space-y-0">
-        <h1 className="text-3xl font-bold text-purple-400">Poster Gallery</h1>
+        <h1 className="text-3xl font-bold text-purple-400">Test Gallery</h1>
 
         <button
           onClick={() => fetchImages(true)}
@@ -77,7 +77,7 @@ function Gallery() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search posters..."
+              placeholder="Search test posters..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -94,32 +94,26 @@ function Gallery() {
         <div className="bg-red-900/30 border border-red-700 rounded-lg p-6 text-center">
           <ImageIcon className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-red-400 mb-2">
-            Error Loading Gallery
+            Error Loading Test Gallery
           </h3>
-          <p className="text-red-300 text-sm mb-4">{error}</p>
-          <button
-            onClick={() => fetchImages(true)}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors"
-          >
-            Try Again
-          </button>
+          <p className="text-red-300 text-sm">{error}</p>
         </div>
       ) : filteredImages.length === 0 ? (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center">
           <ImageIcon className="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-400 mb-2">
-            {searchTerm ? "No Matching Posters" : "No Posters Found"}
+            No Test Posters Found
           </h3>
           <p className="text-gray-500 text-sm">
             {searchTerm
-              ? "Try adjusting your search terms"
-              : "Posters will appear here after running Posterizarr"}
+              ? "No test posters match your search"
+              : "Run the script in Testing mode to generate sample posters"}
           </p>
         </div>
       ) : (
         <>
           <div className="mb-4 text-sm text-gray-400">
-            Showing {filteredImages.length} of {images.length} posters
+            Showing {filteredImages.length} of {images.length} test posters
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -226,4 +220,4 @@ function Gallery() {
   );
 }
 
-export default Gallery;
+export default TestGallery;

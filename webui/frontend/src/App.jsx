@@ -1,20 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import ConfigEditor from './components/ConfigEditor';
-import LogViewer from './components/LogViewer';
-import Dashboard from './components/Dashboard';
-import Gallery from './components/Gallery';
-import { Menu, Settings, Image, FileText, Activity } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Link,
+  useLocation,
+} from "react-router-dom";
+import ConfigEditor from "./components/ConfigEditor";
+import LogViewer from "./components/LogViewer";
+import Dashboard from "./components/Dashboard";
+import Gallery from "./components/Gallery";
+import TestGallery from "./components/TestGallery";
+import {
+  Menu,
+  Settings,
+  Image,
+  FileText,
+  Activity,
+  TestTube,
+} from "lucide-react";
 
 function Navigation() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { path: '/', icon: Activity, label: 'Dashboard' },
-    { path: '/config', icon: Settings, label: 'Configuration' },
-    { path: '/logs', icon: FileText, label: 'Logs' },
-    { path: '/gallery', icon: Image, label: 'Gallery' },
+    { path: "/", icon: Activity, label: "Dashboard" },
+
+    { path: "/test-gallery", icon: TestTube, label: "Test Poster" },
+    { path: "/gallery", icon: Image, label: "Poster Gallery" },
+    { path: "/config", icon: Settings, label: "Configuration" },
+    { path: "/logs", icon: FileText, label: "Logs" },
   ];
 
   return (
@@ -23,7 +39,9 @@ function Navigation() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <h1 className="text-2xl font-bold text-purple-400">Posterizarr</h1>
+              <h1 className="text-2xl font-bold text-purple-400">
+                Posterizarr
+              </h1>
             </div>
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-4">
@@ -36,8 +54,8 @@ function Navigation() {
                       to={item.path}
                       className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         isActive
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                          ? "bg-gray-900 text-white"
+                          : "text-gray-300 hover:bg-gray-700 hover:text-white"
                       }`}
                     >
                       <Icon className="w-4 h-4 mr-2" />
@@ -72,8 +90,8 @@ function Navigation() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
                     isActive
-                      ? 'bg-gray-900 text-white'
-                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                      ? "bg-gray-900 text-white"
+                      : "text-gray-300 hover:bg-gray-700 hover:text-white"
                   }`}
                 >
                   <Icon className="w-5 h-5 mr-3" />
@@ -96,9 +114,10 @@ function App() {
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/test-gallery" element={<TestGallery />} />
+            <Route path="/gallery" element={<Gallery />} />
             <Route path="/config" element={<ConfigEditor />} />
             <Route path="/logs" element={<LogViewer />} />
-            <Route path="/gallery" element={<Gallery />} />
           </Routes>
         </main>
       </div>

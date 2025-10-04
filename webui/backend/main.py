@@ -33,6 +33,7 @@ CONFIG_EXAMPLE_PATH = BASE_DIR / "config.example.json"
 SCRIPT_PATH = BASE_DIR / "Posterizarr.ps1"
 LOGS_DIR = BASE_DIR / "Logs"
 ASSETS_DIR = BASE_DIR / "assets"
+TEST_DIR = BASE_DIR / "test"
 TEMP_DIR = BASE_DIR / "temp"
 RUNNING_FILE = TEMP_DIR / "Posterizarr.Running"
 
@@ -56,18 +57,25 @@ async def startup_event():
     logger.info(f"Script Path: {SCRIPT_PATH} (exists: {SCRIPT_PATH.exists()})")
     logger.info(f"Logs Directory: {LOGS_DIR} (exists: {LOGS_DIR.exists()})")
     logger.info(f"Assets Directory: {ASSETS_DIR} (exists: {ASSETS_DIR.exists()})")
+    logger.info(f"Test Directory: {TEST_DIR} (exists: {TEST_DIR.exists()})")
     logger.info(f"Temp Directory: {TEMP_DIR} (exists: {TEMP_DIR.exists()})")
     logger.info("=" * 60)
 
     # Create directories if they don't exist
     LOGS_DIR.mkdir(exist_ok=True)
     ASSETS_DIR.mkdir(exist_ok=True)
+    TEST_DIR.mkdir(exist_ok=True)
     TEMP_DIR.mkdir(exist_ok=True)
 
     # Mount static files for assets after directories are created
     if ASSETS_DIR.exists():
         app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
         logger.info(f"Mounted static files at /assets for directory: {ASSETS_DIR}")
+
+    # Mount static files for test directory
+    if TEST_DIR.exists():
+        app.mount("/test", StaticFiles(directory=str(TEST_DIR)), name="test")
+        logger.info(f"Mounted static files at /test for directory: {TEST_DIR}")
 
 
 class ConfigUpdate(BaseModel):
@@ -404,6 +412,42 @@ async def get_gallery():
         return {"images": images[:200]}  # Limit to 200 for performance
     except Exception as e:
         logger.error(f"Error scanning gallery: {e}")
+        return {"images": []}
+
+
+@app.get("/api/test-gallery")
+async def get_test_gallery():
+    """Get poster gallery from test directory with image URLs"""
+    if not TEST_DIR.exists():
+        return {"images": []}
+
+    images = []
+    image_extensions = {".jpg", ".jpeg", ".png", ".webp"}
+
+    try:
+        for image_path in TEST_DIR.rglob("*"):
+            if image_path.suffix.lower() in image_extensions:
+                try:
+                    relative_path = image_path.relative_to(TEST_DIR)
+                    # Create URL path with forward slashes
+                    url_path = str(relative_path).replace("\\", "/")
+                    images.append(
+                        {
+                            "path": str(relative_path),
+                            "name": image_path.name,
+                            "size": image_path.stat().st_size,
+                            "url": f"/test/{url_path}",
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Error processing test image {image_path}: {e}")
+                    continue
+
+        # Sort by name and limit
+        images.sort(key=lambda x: x["name"])
+        return {"images": images[:200]}  # Limit to 200 for performance
+    except Exception as e:
+        logger.error(f"Error scanning test gallery: {e}")
         return {"images": []}
 
 
