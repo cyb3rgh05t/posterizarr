@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Save, RefreshCw, AlertCircle } from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
 
 const API_URL = "http://localhost:8000/api";
 
@@ -31,6 +32,10 @@ function ConfigEditor() {
       }
     } catch (err) {
       setError(err.message);
+      toast.error("Failed to load configuration", {
+        duration: 4000,
+        position: "top-right",
+      });
     } finally {
       setLoading(false);
     }
@@ -51,12 +56,23 @@ function ConfigEditor() {
       const data = await response.json();
 
       if (data.success) {
-        alert("Configuration saved successfully!");
+        toast.success("Configuration saved successfully!", {
+          duration: 3000,
+          position: "top-right",
+        });
       } else {
         setError("Failed to save config");
+        toast.error("Failed to save configuration", {
+          duration: 4000,
+          position: "top-right",
+        });
       }
     } catch (err) {
       setError(err.message);
+      toast.error(`Error: ${err.message}`, {
+        duration: 4000,
+        position: "top-right",
+      });
     } finally {
       setSaving(false);
     }
@@ -130,14 +146,11 @@ function ConfigEditor() {
     }
 
     // Determine if this should be a number input
-    // Only treat as number if it's actually a number OR if it's a numeric string
-    // in a field that should be numeric (like width, height, size, etc.)
     const isNumericField =
       type === "number" ||
       (type === "string" &&
-        !isNaN(value) &&
-        value !== "" &&
-        // Only treat as number if key name suggests it should be numeric
+        !isNaN(parseFloat(stringValue)) &&
+        stringValue !== "" &&
         (keyLower.includes("width") ||
           keyLower.includes("height") ||
           keyLower.includes("size") ||
@@ -150,17 +163,38 @@ function ConfigEditor() {
           keyLower === "loglevel"));
 
     if (isNumericField) {
+      // For numeric fields, allow +, -, and numbers
+      // Don't clean the + sign - it's valid for offsets!
+
       return (
         <input
-          type="number"
+          type="text"
+          inputMode="numeric"
           value={stringValue}
-          onChange={(e) => updateValue(section, key, e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          onChange={(e) => {
+            const newValue = e.target.value;
+            // Allow +, -, numbers, and empty string
+            // Only allow + or - at the beginning
+            if (newValue === "" || newValue === "+" || newValue === "-") {
+              updateValue(section, key, newValue);
+            } else if (/^[+-]?\d+$/.test(newValue)) {
+              updateValue(section, key, newValue);
+            }
+          }}
+          onBlur={(e) => {
+            // Clean up incomplete values on blur
+            const val = e.target.value;
+            if (val === "+" || val === "-") {
+              updateValue(section, key, "0");
+            }
+          }}
+          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+          placeholder="e.g., +400, -50, 100"
         />
       );
     }
 
-    // Determine if this should be a textarea (based on field name for paths/files)
+    // Determine if this should be a textarea
     const isPathOrFileField =
       keyLower.includes("path") ||
       keyLower.includes("file") ||
@@ -206,6 +240,7 @@ function ConfigEditor() {
   if (error) {
     return (
       <div className="px-4 py-6">
+        <Toaster />
         <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 flex items-center">
           <AlertCircle className="w-6 h-6 text-red-400 mr-3" />
           <div>
@@ -219,6 +254,8 @@ function ConfigEditor() {
 
   return (
     <div className="px-4 py-6">
+      <Toaster />
+
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-purple-400">Configuration</h1>
         <div className="flex space-x-3">

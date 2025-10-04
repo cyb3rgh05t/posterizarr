@@ -32,6 +32,8 @@ CONFIG_EXAMPLE_PATH = BASE_DIR / "config.example.json"
 SCRIPT_PATH = BASE_DIR / "Posterizarr.ps1"
 LOGS_DIR = BASE_DIR / "Logs"
 ASSETS_DIR = BASE_DIR / "assets"
+TEMP_DIR = BASE_DIR / "temp"
+RUNNING_FILE = TEMP_DIR / "Posterizarr.Running"
 
 # Use config.example.json if config.json doesn't exist
 if not CONFIG_PATH.exists() and CONFIG_EXAMPLE_PATH.exists():
@@ -53,11 +55,13 @@ async def startup_event():
     logger.info(f"Script Path: {SCRIPT_PATH} (exists: {SCRIPT_PATH.exists()})")
     logger.info(f"Logs Directory: {LOGS_DIR} (exists: {LOGS_DIR.exists()})")
     logger.info(f"Assets Directory: {ASSETS_DIR} (exists: {ASSETS_DIR.exists()})")
+    logger.info(f"Temp Directory: {TEMP_DIR} (exists: {TEMP_DIR.exists()})")
     logger.info("=" * 60)
 
     # Create directories if they don't exist
     LOGS_DIR.mkdir(exist_ok=True)
     ASSETS_DIR.mkdir(exist_ok=True)
+    TEMP_DIR.mkdir(exist_ok=True)
 
 
 class ConfigUpdate(BaseModel):
@@ -101,14 +105,8 @@ async def update_config(data: ConfigUpdate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/status")
-async def get_status():
-    """Get script status"""
-    global current_process
-    is_running = current_process is not None and current_process.poll() is None
-
-    # Get last log entry - try multiple log files
-    last_log = "No logs available"
+def get_last_log_lines(count=10):
+    """Get last N lines from log files"""
     log_files_to_check = ["Scriptlog.log", "Testinglog.log", "Manuallog.log"]
 
     for log_filename in log_files_to_check:
@@ -117,43 +115,70 @@ async def get_status():
             try:
                 with open(scriptlog_path, "r", encoding="utf-8", errors="ignore") as f:
                     all_lines = f.readlines()
-                    # Filter out empty lines and decorative lines (like ====, ASCII art, etc.)
+                    # Filter out empty lines and decorative lines
                     lines = []
                     for line in all_lines:
                         stripped = line.strip()
-                        # Skip empty lines, separator lines, and ASCII art
                         if (
                             stripped
                             and not stripped.startswith("=====")
                             and not stripped.startswith("_____")
-                            and not stripped.startswith("|")
                             and not all(c in "=-_| " for c in stripped)
                         ):
                             lines.append(stripped)
 
                     if lines:
-                        last_log = lines[-1]
-                        logger.debug(
-                            f"Found last log from {log_filename}: {last_log[:100]}"
-                        )
-                        break  # Found a log entry, stop searching
+                        return lines[-count:]  # Return last N lines
             except Exception as e:
                 logger.error(f"Error reading log file {log_filename}: {e}")
                 continue
 
-    # If still no logs and script is running, show that
-    if last_log == "No logs available" and is_running:
-        last_log = (
-            f"Script is running (PID: {current_process.pid}), waiting for log output..."
-        )
+    return []
+
+
+@app.get("/api/status")
+async def get_status():
+    """Get script status with last 10 log lines"""
+    global current_process
+    is_running = current_process is not None and current_process.poll() is None
+
+    # Get last 10 log lines
+    last_logs = get_last_log_lines(10)
+
+    # Check for "already running" warning
+    already_running = False
+    for line in last_logs[-5:]:  # Check last 5 lines
+        if "Another Posterizarr instance already running" in line:
+            already_running = True
+            break
+
+    # Check if running file exists
+    running_file_exists = RUNNING_FILE.exists()
 
     return {
         "running": is_running,
-        "last_log": last_log,
+        "last_logs": last_logs,
         "script_exists": SCRIPT_PATH.exists(),
         "config_exists": CONFIG_PATH.exists(),
         "pid": current_process.pid if is_running else None,
+        "already_running_detected": already_running,
+        "running_file_exists": running_file_exists,
     }
+
+
+@app.delete("/api/running-file")
+async def delete_running_file():
+    """Delete the Posterizarr.Running file"""
+    try:
+        if RUNNING_FILE.exists():
+            RUNNING_FILE.unlink()
+            logger.info("Deleted Posterizarr.Running file")
+            return {"success": True, "message": "Running file deleted successfully"}
+        else:
+            return {"success": False, "message": "Running file does not exist"}
+    except Exception as e:
+        logger.error(f"Error deleting running file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/run/{mode}")
@@ -168,11 +193,10 @@ async def run_script(mode: str):
     if not SCRIPT_PATH.exists():
         raise HTTPException(status_code=404, detail="Posterizarr.ps1 not found")
 
-    # Determine PowerShell command (try pwsh first, fallback to powershell on Windows)
+    # Determine PowerShell command
     import platform
 
     if platform.system() == "Windows":
-        # Try pwsh first (PowerShell 7+), fallback to powershell (Windows PowerShell 5.1)
         ps_command = "pwsh"
         try:
             subprocess.run([ps_command, "-v"], capture_output=True, check=True)
@@ -221,7 +245,7 @@ async def run_script(mode: str):
 
 @app.post("/api/stop")
 async def stop_script():
-    """Stop running script"""
+    """Stop running script gracefully"""
     global current_process
 
     if not current_process or current_process.poll() is not None:
@@ -235,10 +259,31 @@ async def stop_script():
     except subprocess.TimeoutExpired:
         current_process.kill()
         current_process = None
-        return {"success": True, "message": "Script force killed"}
+        return {"success": True, "message": "Script force killed after timeout"}
     except Exception as e:
         logger.error(f"Error stopping script: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/force-kill")
+async def force_kill_script():
+    """Force kill running script immediately"""
+    global current_process
+
+    if not current_process or current_process.poll() is not None:
+        return {"success": False, "message": "No script is running"}
+
+    try:
+        current_process.kill()
+        current_process.wait(timeout=2)
+        current_process = None
+        logger.warning("Script was force killed")
+        return {"success": True, "message": "Script force killed"}
+    except Exception as e:
+        logger.error(f"Error force killing script: {e}")
+        # Try to set to None anyway
+        current_process = None
+        return {"success": True, "message": "Script process cleared"}
 
 
 @app.get("/api/logs")
@@ -268,7 +313,6 @@ async def get_log_content(log_name: str, tail: int = 100):
     try:
         with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
-            # Return last N lines
             return {"content": lines[-tail:] if tail else lines}
     except Exception as e:
         logger.error(f"Error reading log: {e}")
@@ -287,7 +331,7 @@ async def websocket_logs(websocket: WebSocket):
         # Send initial logs
         if scriptlog_path.exists():
             with open(scriptlog_path, "r", encoding="utf-8", errors="ignore") as f:
-                lines = f.readlines()[-50:]  # Last 50 lines
+                lines = f.readlines()[-50:]
                 for line in lines:
                     await websocket.send_json({"type": "log", "content": line.strip()})
 
@@ -302,23 +346,21 @@ async def websocket_logs(websocket: WebSocket):
 
                 if current_size > last_position:
                     with open(
-                        scriptlog_path, "r", encoding="utf-8", errors="ignore"
+                        scriptlog_path,
+                        "r",
+                        encoding="utf-8",
+                        errors="ignore",
                     ) as f:
                         f.seek(last_position)
                         new_lines = f.readlines()
-
                         for line in new_lines:
                             await websocket.send_json(
                                 {"type": "log", "content": line.strip()}
                             )
-
-                        last_position = current_size
-                elif current_size < last_position:
-                    # Log file was truncated or rotated
-                    last_position = 0
+                    last_position = current_size
 
     except WebSocketDisconnect:
-        logger.info("WebSocket connection closed")
+        logger.info("WebSocket disconnected")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
 
@@ -332,18 +374,28 @@ async def get_gallery():
     images = []
     image_extensions = {".jpg", ".jpeg", ".png", ".webp"}
 
-    for image_path in ASSETS_DIR.rglob("*"):
-        if image_path.suffix.lower() in image_extensions:
-            relative_path = image_path.relative_to(ASSETS_DIR)
-            images.append(
-                {
-                    "path": str(relative_path),
-                    "name": image_path.name,
-                    "size": image_path.stat().st_size,
-                }
-            )
+    try:
+        for image_path in ASSETS_DIR.rglob("*"):
+            if image_path.suffix.lower() in image_extensions:
+                try:
+                    relative_path = image_path.relative_to(ASSETS_DIR)
+                    images.append(
+                        {
+                            "path": str(relative_path),
+                            "name": image_path.name,
+                            "size": image_path.stat().st_size,
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Error processing image {image_path}: {e}")
+                    continue
 
-    return {"images": images[:100]}  # Limit to 100 for performance
+        # Sort by name and limit
+        images.sort(key=lambda x: x["name"])
+        return {"images": images[:200]}  # Limit to 200 for performance
+    except Exception as e:
+        logger.error(f"Error scanning gallery: {e}")
+        return {"images": []}
 
 
 if __name__ == "__main__":
