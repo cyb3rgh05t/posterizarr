@@ -1,0 +1,352 @@
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+import json
+import subprocess
+import asyncio
+import os
+from pathlib import Path
+from typing import Optional
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="Posterizarr Web UI")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Paths
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+CONFIG_PATH = BASE_DIR / "config.json"
+CONFIG_EXAMPLE_PATH = BASE_DIR / "config.example.json"
+SCRIPT_PATH = BASE_DIR / "Posterizarr.ps1"
+LOGS_DIR = BASE_DIR / "Logs"
+ASSETS_DIR = BASE_DIR / "assets"
+
+# Use config.example.json if config.json doesn't exist
+if not CONFIG_PATH.exists() and CONFIG_EXAMPLE_PATH.exists():
+    logger.warning(f"config.json not found, using config.example.json as fallback")
+    CONFIG_PATH = CONFIG_EXAMPLE_PATH
+
+# Global process tracker
+current_process: Optional[subprocess.Popen] = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Log important paths on startup"""
+    logger.info("=" * 60)
+    logger.info("Posterizarr Web UI - Backend Started")
+    logger.info("=" * 60)
+    logger.info(f"Base Directory: {BASE_DIR}")
+    logger.info(f"Config Path: {CONFIG_PATH} (exists: {CONFIG_PATH.exists()})")
+    logger.info(f"Script Path: {SCRIPT_PATH} (exists: {SCRIPT_PATH.exists()})")
+    logger.info(f"Logs Directory: {LOGS_DIR} (exists: {LOGS_DIR.exists()})")
+    logger.info(f"Assets Directory: {ASSETS_DIR} (exists: {ASSETS_DIR.exists()})")
+    logger.info("=" * 60)
+
+    # Create directories if they don't exist
+    LOGS_DIR.mkdir(exist_ok=True)
+    ASSETS_DIR.mkdir(exist_ok=True)
+
+
+class ConfigUpdate(BaseModel):
+    config: dict
+
+
+@app.get("/")
+async def root():
+    return {"message": "Posterizarr Web UI API", "status": "running"}
+
+
+@app.get("/api/config")
+async def get_config():
+    """Get current config.json"""
+    try:
+        if not CONFIG_PATH.exists():
+            error_msg = f"Config file not found at: {CONFIG_PATH}\n"
+            error_msg += f"Base directory: {BASE_DIR}\n"
+            error_msg += "Please create config.json from config.example.json"
+            raise HTTPException(status_code=404, detail=error_msg)
+
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        return {"success": True, "config": config}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error reading config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/config")
+async def update_config(data: ConfigUpdate):
+    """Update config.json"""
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(data.config, f, indent=2, ensure_ascii=False)
+        return {"success": True, "message": "Config updated successfully"}
+    except Exception as e:
+        logger.error(f"Error updating config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/status")
+async def get_status():
+    """Get script status"""
+    global current_process
+    is_running = current_process is not None and current_process.poll() is None
+
+    # Get last log entry - try multiple log files
+    last_log = "No logs available"
+    log_files_to_check = ["Scriptlog.log", "Testinglog.log", "Manuallog.log"]
+
+    for log_filename in log_files_to_check:
+        scriptlog_path = LOGS_DIR / log_filename
+        if scriptlog_path.exists() and scriptlog_path.stat().st_size > 0:
+            try:
+                with open(scriptlog_path, "r", encoding="utf-8", errors="ignore") as f:
+                    all_lines = f.readlines()
+                    # Filter out empty lines and decorative lines (like ====, ASCII art, etc.)
+                    lines = []
+                    for line in all_lines:
+                        stripped = line.strip()
+                        # Skip empty lines, separator lines, and ASCII art
+                        if (
+                            stripped
+                            and not stripped.startswith("=====")
+                            and not stripped.startswith("_____")
+                            and not stripped.startswith("|")
+                            and not all(c in "=-_| " for c in stripped)
+                        ):
+                            lines.append(stripped)
+
+                    if lines:
+                        last_log = lines[-1]
+                        logger.debug(
+                            f"Found last log from {log_filename}: {last_log[:100]}"
+                        )
+                        break  # Found a log entry, stop searching
+            except Exception as e:
+                logger.error(f"Error reading log file {log_filename}: {e}")
+                continue
+
+    # If still no logs and script is running, show that
+    if last_log == "No logs available" and is_running:
+        last_log = (
+            f"Script is running (PID: {current_process.pid}), waiting for log output..."
+        )
+
+    return {
+        "running": is_running,
+        "last_log": last_log,
+        "script_exists": SCRIPT_PATH.exists(),
+        "config_exists": CONFIG_PATH.exists(),
+        "pid": current_process.pid if is_running else None,
+    }
+
+
+@app.post("/api/run/{mode}")
+async def run_script(mode: str):
+    """Run Posterizarr script in different modes"""
+    global current_process
+
+    # Check if already running
+    if current_process and current_process.poll() is None:
+        raise HTTPException(status_code=400, detail="Script is already running")
+
+    if not SCRIPT_PATH.exists():
+        raise HTTPException(status_code=404, detail="Posterizarr.ps1 not found")
+
+    # Determine PowerShell command (try pwsh first, fallback to powershell on Windows)
+    import platform
+
+    if platform.system() == "Windows":
+        # Try pwsh first (PowerShell 7+), fallback to powershell (Windows PowerShell 5.1)
+        ps_command = "pwsh"
+        try:
+            subprocess.run([ps_command, "-v"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            ps_command = "powershell"
+            logger.info("pwsh not found, using powershell instead")
+    else:
+        ps_command = "pwsh"
+
+    # Determine command based on mode
+    commands = {
+        "normal": [ps_command, "-File", str(SCRIPT_PATH)],
+        "testing": [ps_command, "-File", str(SCRIPT_PATH), "-Testing"],
+        "manual": [ps_command, "-File", str(SCRIPT_PATH), "-Manual"],
+        "backup": [ps_command, "-File", str(SCRIPT_PATH), "-Backup"],
+    }
+
+    if mode not in commands:
+        raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
+
+    try:
+        logger.info(f"Running command: {' '.join(commands[mode])}")
+        current_process = subprocess.Popen(
+            commands[mode],
+            cwd=str(BASE_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        logger.info(
+            f"Started Posterizarr in {mode} mode with PID {current_process.pid}"
+        )
+        return {
+            "success": True,
+            "message": f"Started in {mode} mode",
+            "pid": current_process.pid,
+        }
+    except FileNotFoundError as e:
+        error_msg = f"PowerShell not found. Please install PowerShell 7+ (pwsh) or ensure Windows PowerShell is in PATH. Error: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
+    except Exception as e:
+        logger.error(f"Error starting script: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stop")
+async def stop_script():
+    """Stop running script"""
+    global current_process
+
+    if not current_process or current_process.poll() is not None:
+        return {"success": False, "message": "No script is running"}
+
+    try:
+        current_process.terminate()
+        current_process.wait(timeout=5)
+        current_process = None
+        return {"success": True, "message": "Script stopped"}
+    except subprocess.TimeoutExpired:
+        current_process.kill()
+        current_process = None
+        return {"success": True, "message": "Script force killed"}
+    except Exception as e:
+        logger.error(f"Error stopping script: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/logs")
+async def get_logs():
+    """Get available log files"""
+    if not LOGS_DIR.exists():
+        return {"logs": []}
+
+    log_files = []
+    for log_file in LOGS_DIR.glob("*.log"):
+        stat = log_file.stat()
+        log_files.append(
+            {"name": log_file.name, "size": stat.st_size, "modified": stat.st_mtime}
+        )
+
+    return {"logs": sorted(log_files, key=lambda x: x["modified"], reverse=True)}
+
+
+@app.get("/api/logs/{log_name}")
+async def get_log_content(log_name: str, tail: int = 100):
+    """Get log file content"""
+    log_path = LOGS_DIR / log_name
+
+    if not log_path.exists():
+        raise HTTPException(status_code=404, detail="Log file not found")
+
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+            # Return last N lines
+            return {"content": lines[-tail:] if tail else lines}
+    except Exception as e:
+        logger.error(f"Error reading log: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.websocket("/ws/logs")
+async def websocket_logs(websocket: WebSocket):
+    """WebSocket endpoint for real-time log streaming"""
+    await websocket.accept()
+    logger.info("WebSocket connection established")
+
+    scriptlog_path = LOGS_DIR / "Scriptlog.log"
+
+    try:
+        # Send initial logs
+        if scriptlog_path.exists():
+            with open(scriptlog_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()[-50:]  # Last 50 lines
+                for line in lines:
+                    await websocket.send_json({"type": "log", "content": line.strip()})
+
+        # Monitor log file for changes
+        last_position = scriptlog_path.stat().st_size if scriptlog_path.exists() else 0
+
+        while True:
+            await asyncio.sleep(1)
+
+            if scriptlog_path.exists():
+                current_size = scriptlog_path.stat().st_size
+
+                if current_size > last_position:
+                    with open(
+                        scriptlog_path, "r", encoding="utf-8", errors="ignore"
+                    ) as f:
+                        f.seek(last_position)
+                        new_lines = f.readlines()
+
+                        for line in new_lines:
+                            await websocket.send_json(
+                                {"type": "log", "content": line.strip()}
+                            )
+
+                        last_position = current_size
+                elif current_size < last_position:
+                    # Log file was truncated or rotated
+                    last_position = 0
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket connection closed")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+
+
+@app.get("/api/gallery")
+async def get_gallery():
+    """Get poster gallery from assets directory"""
+    if not ASSETS_DIR.exists():
+        return {"images": []}
+
+    images = []
+    image_extensions = {".jpg", ".jpeg", ".png", ".webp"}
+
+    for image_path in ASSETS_DIR.rglob("*"):
+        if image_path.suffix.lower() in image_extensions:
+            relative_path = image_path.relative_to(ASSETS_DIR)
+            images.append(
+                {
+                    "path": str(relative_path),
+                    "name": image_path.name,
+                    "size": image_path.stat().st_size,
+                }
+            )
+
+    return {"images": images[:100]}  # Limit to 100 for performance
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
