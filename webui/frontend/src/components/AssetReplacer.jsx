@@ -56,6 +56,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
   const [isPosterizarrRunning, setIsPosterizarrRunning] = useState(false);
   const [previews, setPreviews] = useState({ tmdb: [], tvdb: [], fanart: [] });
   const [selectedPreview, setSelectedPreview] = useState(null);
+  const [dbData, setDbData] = useState(asset._dbData || null); // Store database data in state
   const [languageOrder, setLanguageOrder] = useState({
     poster: [],
     background: [],
@@ -99,6 +100,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     console.log("Asset path:", asset.path);
     console.log("Asset type:", asset.type);
     console.log("Asset _dbData:", asset._dbData);
+    console.log("State dbData:", dbData);
 
     // Extract metadata from path including provider IDs if present
     let title = null;
@@ -298,7 +300,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     let episodeNumber = null;
 
     // Check if we have DB data (from AssetOverview)
-    const dbTitle = asset._dbData?.Title || "";
+    const dbTitle = dbData?.Title || "";
 
     if (dbTitle) {
       // Extract from DB Title field
@@ -347,40 +349,52 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       }
     }
 
-    // Extract provider IDs from folder name if present
+    // Priority 1: Use provider IDs from database (most reliable source of truth)
+    // Database fields: tmdbid, tvdbid, imdbid (from ImageChoices.db)
+    if (dbData?.tmdbid) {
+      tmdb_id = dbData.tmdbid;
+      console.log(`Using TMDB ID from database: ${tmdb_id}`);
+    }
+    if (dbData?.tvdbid) {
+      tvdb_id = dbData.tvdbid;
+      console.log(`Using TVDB ID from database: ${tvdb_id}`);
+    }
+    // IMDB ID from database (if available)
+    if (dbData?.imdbid && !imdb_id) {
+      imdb_id = dbData.imdbid;
+      console.log(`Using IMDB ID from database: ${imdb_id}`);
+    }
+
+    // Priority 2: Fallback to extracting IDs from folder name if not in database
     // Supports formats: {tmdb-123}, [tmdb-123], (tmdb-123), {tvdb-456}, [tvdb-456], {imdb-tt123}, etc.
     if (folderName) {
-      // TMDB ID - match various bracket formats
-      const tmdbMatch = folderName.match(/[\[{(]tmdb-(\d+)[\]})]/i);
-      if (tmdbMatch) {
-        tmdb_id = tmdbMatch[1];
-        console.log(`Extracted TMDB ID from folder: ${tmdb_id}`);
+      // TMDB ID - match various bracket formats (only if not already set from DB)
+      if (!tmdb_id) {
+        const tmdbMatch = folderName.match(/[\[{(]tmdb-(\d+)[\]})]/i);
+        if (tmdbMatch) {
+          tmdb_id = tmdbMatch[1];
+          console.log(`Extracted TMDB ID from folder: ${tmdb_id}`);
+        }
       }
 
-      // TVDB ID - match various bracket formats
-      const tvdbMatch = folderName.match(/[\[{(]tvdb-(\d+)[\]})]/i);
-      if (tvdbMatch) {
-        tvdb_id = tvdbMatch[1];
-        console.log(`Extracted TVDB ID from folder: ${tvdb_id}`);
+      // TVDB ID - match various bracket formats (only if not already set from DB)
+      if (!tvdb_id) {
+        const tvdbMatch = folderName.match(/[\[{(]tvdb-(\d+)[\]})]/i);
+        if (tvdbMatch) {
+          tvdb_id = tvdbMatch[1];
+          console.log(`Extracted TVDB ID from folder: ${tvdb_id}`);
+        }
       }
 
       // IMDB ID - match various bracket formats (format: tt1234567)
-      const imdbMatch = folderName.match(/[\[{(]imdb-(tt\d+)[\]})]/i);
-      if (imdbMatch) {
-        imdb_id = imdbMatch[1];
-        console.log(`Extracted IMDB ID from folder: ${imdb_id}`);
+      // Note: IMDB ID typically not in database, so always check folder
+      if (!imdb_id) {
+        const imdbMatch = folderName.match(/[\[{(]imdb-(tt\d+)[\]})]/i);
+        if (imdbMatch) {
+          imdb_id = imdbMatch[1];
+          console.log(`Extracted IMDB ID from folder: ${imdb_id}`);
+        }
       }
-    }
-
-    // Fallback: Use provider IDs from database if not found in folder name
-    // Database fields: tmdb_id, tvdb_id (from ImageChoices.db)
-    if (!tmdb_id && asset._dbData?.tmdb_id) {
-      tmdb_id = asset._dbData.tmdb_id;
-      console.log(`Using TMDB ID from database: ${tmdb_id}`);
-    }
-    if (!tvdb_id && asset._dbData?.tvdb_id) {
-      tvdb_id = asset._dbData.tvdb_id;
-      console.log(`Using TVDB ID from database: ${tvdb_id}`);
     }
 
     const metadata = {
@@ -415,8 +429,8 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
   };
 
   // Determine if we should use horizontal layout (backgrounds and titlecards)
-  // Use useMemo to recalculate metadata only when asset changes
-  const metadata = React.useMemo(() => extractMetadata(), [asset]);
+  // Use useMemo to recalculate metadata only when asset or dbData changes
+  const metadata = React.useMemo(() => extractMetadata(), [asset, dbData]);
   const useHorizontalLayout =
     metadata.asset_type === "background" || metadata.asset_type === "titlecard";
 
@@ -540,6 +554,107 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     fetchLanguageOrder();
   }, []);
 
+  // Fetch database data if not provided (e.g., when opened from FolderView)
+  useEffect(() => {
+    const fetchDatabaseData = async () => {
+      if (dbData !== null) {
+        // Already have database data
+        console.log("Already have database data, skipping fetch");
+        return;
+      }
+
+      try {
+        console.log("Fetching database data for asset:", asset.path);
+
+        // Query all database records
+        const response = await fetch(`${API_URL}/imagechoices`);
+
+        if (response.ok) {
+          const allRecords = await response.json();
+          console.log(`Fetched ${allRecords.length} database records`);
+
+          // Find matching asset by comparing paths
+          // asset.path format: "TestMovies\A View to a Kill (1985)\poster.jpg"
+          // Need to match against LibraryName + Rootfolder
+
+          const pathParts = asset.path?.split(/[\/\\]/).filter(Boolean);
+          if (pathParts && pathParts.length >= 2) {
+            const libraryName = pathParts[0];
+            const rootfolder = pathParts[1];
+            const filename = pathParts[pathParts.length - 1]; // e.g., "Season01.jpg", "S03E09.jpg", "poster.jpg"
+
+            console.log(
+              `Looking for match: LibraryName="${libraryName}", Rootfolder="${rootfolder}", File="${filename}"`
+            );
+
+            // Debug: Show a few sample records from the same library
+            const sampleRecords = allRecords
+              .filter((r) => r.LibraryName === libraryName)
+              .slice(0, 3)
+              .map((r) => ({
+                LibraryName: r.LibraryName,
+                Rootfolder: r.Rootfolder,
+                Type: r.Type,
+              }));
+            if (sampleRecords.length > 0) {
+              console.log(
+                `Sample records from "${libraryName}" library:`,
+                sampleRecords
+              );
+            }
+
+            // Find matching record - prefer show-level records (not episodes)
+            const matchingRecords = allRecords.filter((record) => {
+              return (
+                record.LibraryName === libraryName &&
+                record.Rootfolder === rootfolder
+              );
+            });
+
+            // Prioritize: Show/Movie records > Season records > Episode records
+            const matchingRecord =
+              matchingRecords.find(
+                (r) => r.Type?.includes("Show") || r.Type?.includes("Movie")
+              ) ||
+              matchingRecords.find(
+                (r) =>
+                  r.Type?.includes("Season") && !r.Type?.includes("Episode")
+              ) ||
+              matchingRecords.find((r) => r.Type?.includes("Background")) ||
+              matchingRecords[0]; // Fallback to first match
+
+            if (matchingRecord) {
+              console.log("✓ Found matching database record:", {
+                Type: matchingRecord.Type,
+                Title: matchingRecord.Title,
+                tmdbid: matchingRecord.tmdbid,
+                tvdbid: matchingRecord.tvdbid,
+                imdbid: matchingRecord.imdbid,
+              });
+              setDbData(matchingRecord);
+            } else {
+              console.log("✗ No matching database record found for:", {
+                libraryName,
+                rootfolder,
+              });
+            }
+          } else {
+            console.log(
+              "✗ Cannot parse path - insufficient segments:",
+              pathParts
+            );
+          }
+        } else {
+          console.error("Failed to fetch database records:", response.status);
+        }
+      } catch (error) {
+        console.error("Error fetching database data:", error);
+      }
+    };
+
+    fetchDatabaseData();
+  }, [asset.path, dbData]);
+
   // Initialize season number from metadata
   useEffect(() => {
     if (metadata.season_number) {
@@ -580,7 +695,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       // Extract episode title from DB if available
       // Format: "S04E01 | Episode Title"
       let episodeTitleName = "";
-      const dbTitle = asset._dbData?.Title || "";
+      const dbTitle = dbData?.Title || "";
       if (dbTitle && dbTitle.includes("|")) {
         const parts = dbTitle.split("|");
         if (parts.length >= 2) {
@@ -600,7 +715,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         episodeNumber: String(metadata.episode_number),
       }));
     }
-  }, [metadata.episode_number, asset._dbData]);
+  }, [metadata.episode_number, dbData]);
 
   // Initialize title text from metadata
   useEffect(() => {
@@ -688,10 +803,10 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         ...metadata,
         title: searchTitle.trim(),
         year: searchYear ? parseInt(searchYear) : null,
-        // Keep IDs from folder name if they exist, otherwise null
-        tmdb_id: metadata.tmdb_id || null,
-        tvdb_id: metadata.tvdb_id || null,
-        imdb_id: metadata.imdb_id || null,
+        // Clear IDs when doing manual search - we want to search by title
+        tmdb_id: null,
+        tvdb_id: null,
+        imdb_id: null,
         season_number: manualSearchForm.seasonNumber
           ? parseInt(manualSearchForm.seasonNumber)
           : metadata.season_number,
