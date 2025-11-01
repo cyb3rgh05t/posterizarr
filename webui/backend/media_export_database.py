@@ -618,6 +618,7 @@ class MediaExportDatabase:
     def import_latest_csvs(self) -> Dict[str, int]:
         """
         Import the latest CSV files from the Logs directory
+        Only imports if the CSV file has been modified since the last import
 
         Returns:
             Dictionary with import counts
@@ -625,26 +626,98 @@ class MediaExportDatabase:
         library_csv = LOGS_DIR / "PlexLibexport.csv"
         episode_csv = LOGS_DIR / "PlexEpisodeExport.csv"
 
-        # Use current timestamp for this import run
-        run_timestamp = datetime.now().isoformat()
-
         results = {
             "library_count": 0,
             "episode_count": 0,
-            "run_timestamp": run_timestamp,
+            "run_timestamp": None,
+            "already_imported": False,
         }
 
+        # Check if CSV files have been modified since last import
         if library_csv.exists():
-            results["library_count"] = self.import_library_csv(
-                library_csv, run_timestamp
-            )
+            csv_mtime = datetime.fromtimestamp(library_csv.stat().st_mtime).isoformat()
+
+            # Check if this exact timestamp already exists in database
+            try:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) FROM plex_library_export WHERE run_timestamp = ?",
+                    (csv_mtime,),
+                )
+                exists = cursor.fetchone()[0] > 0
+                conn.close()
+
+                if exists:
+                    logger.info(
+                        f"PlexLibexport.csv already imported (timestamp: {csv_mtime})"
+                    )
+                    results["already_imported"] = True
+                    results["run_timestamp"] = csv_mtime
+                    # Still return the count from existing import
+                    conn = sqlite3.connect(self.db_path)
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM plex_library_export WHERE run_timestamp = ?",
+                        (csv_mtime,),
+                    )
+                    results["library_count"] = cursor.fetchone()[0]
+                    conn.close()
+                else:
+                    # Import with CSV file modification timestamp
+                    results["library_count"] = self.import_library_csv(
+                        library_csv, csv_mtime
+                    )
+                    results["run_timestamp"] = csv_mtime
+                    logger.info(
+                        f"Imported PlexLibexport.csv with timestamp: {csv_mtime}"
+                    )
+            except Exception as e:
+                logger.error(f"Error checking/importing library CSV: {e}")
         else:
             logger.warning(f"PlexLibexport.csv not found at {library_csv}")
 
         if episode_csv.exists():
-            results["episode_count"] = self.import_episode_csv(
-                episode_csv, run_timestamp
-            )
+            csv_mtime = datetime.fromtimestamp(episode_csv.stat().st_mtime).isoformat()
+
+            # Check if this exact timestamp already exists in database
+            try:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) FROM plex_episode_export WHERE run_timestamp = ?",
+                    (csv_mtime,),
+                )
+                exists = cursor.fetchone()[0] > 0
+                conn.close()
+
+                if exists:
+                    logger.info(
+                        f"PlexEpisodeExport.csv already imported (timestamp: {csv_mtime})"
+                    )
+                    if not results["already_imported"]:
+                        results["already_imported"] = True
+                    # Still return the count from existing import
+                    conn = sqlite3.connect(self.db_path)
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM plex_episode_export WHERE run_timestamp = ?",
+                        (csv_mtime,),
+                    )
+                    results["episode_count"] = cursor.fetchone()[0]
+                    conn.close()
+                else:
+                    # Import with CSV file modification timestamp
+                    results["episode_count"] = self.import_episode_csv(
+                        episode_csv, csv_mtime
+                    )
+                    if not results["run_timestamp"]:
+                        results["run_timestamp"] = csv_mtime
+                    logger.info(
+                        f"Imported PlexEpisodeExport.csv with timestamp: {csv_mtime}"
+                    )
+            except Exception as e:
+                logger.error(f"Error checking/importing episode CSV: {e}")
         else:
             logger.warning(f"PlexEpisodeExport.csv not found at {episode_csv}")
 
@@ -828,6 +901,7 @@ class MediaExportDatabase:
     def import_other_latest_csvs(self) -> Dict[str, int]:
         """
         Import the latest OtherMedia CSV files from the Logs directory
+        Only imports if the CSV file has been modified since the last import
 
         Returns:
             Dictionary with import counts
@@ -835,26 +909,98 @@ class MediaExportDatabase:
         library_csv = LOGS_DIR / "OtherMediaServerLibExport.csv"
         episode_csv = LOGS_DIR / "OtherMediaServerEpisodeExport.csv"
 
-        # Use current timestamp for this import run
-        run_timestamp = datetime.now().isoformat()
-
         results = {
             "library_count": 0,
             "episode_count": 0,
-            "run_timestamp": run_timestamp,
+            "run_timestamp": None,
+            "already_imported": False,
         }
 
+        # Check if CSV files have been modified since last import
         if library_csv.exists():
-            results["library_count"] = self.import_other_library_csv(
-                library_csv, run_timestamp
-            )
+            csv_mtime = datetime.fromtimestamp(library_csv.stat().st_mtime).isoformat()
+
+            # Check if this exact timestamp already exists in database
+            try:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) FROM other_media_library_export WHERE run_timestamp = ?",
+                    (csv_mtime,),
+                )
+                exists = cursor.fetchone()[0] > 0
+                conn.close()
+
+                if exists:
+                    logger.info(
+                        f"OtherMediaServerLibExport.csv already imported (timestamp: {csv_mtime})"
+                    )
+                    results["already_imported"] = True
+                    results["run_timestamp"] = csv_mtime
+                    # Still return the count from existing import
+                    conn = sqlite3.connect(self.db_path)
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM other_media_library_export WHERE run_timestamp = ?",
+                        (csv_mtime,),
+                    )
+                    results["library_count"] = cursor.fetchone()[0]
+                    conn.close()
+                else:
+                    # Import with CSV file modification timestamp
+                    results["library_count"] = self.import_other_library_csv(
+                        library_csv, csv_mtime
+                    )
+                    results["run_timestamp"] = csv_mtime
+                    logger.info(
+                        f"Imported OtherMediaServerLibExport.csv with timestamp: {csv_mtime}"
+                    )
+            except Exception as e:
+                logger.error(f"Error checking/importing other media library CSV: {e}")
         else:
             logger.warning(f"OtherMediaServerLibExport.csv not found at {library_csv}")
 
         if episode_csv.exists():
-            results["episode_count"] = self.import_other_episode_csv(
-                episode_csv, run_timestamp
-            )
+            csv_mtime = datetime.fromtimestamp(episode_csv.stat().st_mtime).isoformat()
+
+            # Check if this exact timestamp already exists in database
+            try:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) FROM other_media_episode_export WHERE run_timestamp = ?",
+                    (csv_mtime,),
+                )
+                exists = cursor.fetchone()[0] > 0
+                conn.close()
+
+                if exists:
+                    logger.info(
+                        f"OtherMediaServerEpisodeExport.csv already imported (timestamp: {csv_mtime})"
+                    )
+                    if not results["already_imported"]:
+                        results["already_imported"] = True
+                    # Still return the count from existing import
+                    conn = sqlite3.connect(self.db_path)
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM other_media_episode_export WHERE run_timestamp = ?",
+                        (csv_mtime,),
+                    )
+                    results["episode_count"] = cursor.fetchone()[0]
+                    conn.close()
+                else:
+                    # Import with CSV file modification timestamp
+                    results["episode_count"] = self.import_other_episode_csv(
+                        episode_csv, csv_mtime
+                    )
+                    if not results["run_timestamp"]:
+                        results["run_timestamp"] = csv_mtime
+                    logger.info(
+                        f"Imported OtherMediaServerEpisodeExport.csv with timestamp: {csv_mtime}"
+                    )
+            except Exception as e:
+                logger.error(f"Error checking/importing other media episode CSV: {e}")
         else:
             logger.warning(
                 f"OtherMediaServerEpisodeExport.csv not found at {episode_csv}"

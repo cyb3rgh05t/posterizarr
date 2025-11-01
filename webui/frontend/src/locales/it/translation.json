@@ -1881,7 +1881,7 @@
     "totalRuns": "Esecuzioni totali",
     "libraryRecords": "Record libreria",
     "episodeRecords": "Record episodi",
-    "latestRun": "Ultima esecuzione",
+    "latestRun": "Ultimo import",
     "noData": "Nessun dato",
     "selectRun": "Seleziona esecuzione",
     "search": "Cerca...",
@@ -1908,7 +1908,9 @@
     "episodeNumbers": "Numeri episodi",
     "episodeTitles": "Titoli episodi",
     "resolutions": "Risoluzioni",
-    "importedAt": "Importato il"
+    "importedAt": "Importato il",
+    "alreadyImported": "Dati già importati",
+    "importSuccess": "Importazione riuscita"
   },
   "mediaServerExport": {
     "pageTitle": "Cronologia esportazioni server multimediale",

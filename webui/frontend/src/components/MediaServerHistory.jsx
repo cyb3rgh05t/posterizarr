@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useToast } from "../context/ToastContext";
 import {
   Database,
   RefreshCw,
@@ -21,10 +22,12 @@ const API_URL = "/api";
 
 function MediaServerHistory() {
   const { t } = useTranslation();
+  const { showSuccess, showInfo } = useToast();
   const [mediaServer, setMediaServer] = useState("plex"); // 'plex' or 'other'
   const [statistics, setStatistics] = useState(null);
   const [libraryData, setLibraryData] = useState([]);
   const [episodeData, setEpisodeData] = useState([]);
+  const [runs, setRuns] = useState([]);
   const [selectedRun, setSelectedRun] = useState(null);
   const [activeTab, setActiveTab] = useState("library"); // 'library' or 'episodes'
   const [libraryTypeFilter, setLibraryTypeFilter] = useState("all"); // 'all', 'movie', 'show'
@@ -160,6 +163,16 @@ function MediaServerHistory() {
 
       const data = await response.json();
       if (data.success) {
+        // Check if data was already imported
+        if (data.already_imported) {
+          showInfo(
+            t("plexExport.alreadyImported", "Data already imported"),
+            3000
+          );
+        } else {
+          showSuccess(t("plexExport.importSuccess", "Import successful"), 3000);
+        }
+
         // Refresh statistics first
         await fetchStatistics(true);
 

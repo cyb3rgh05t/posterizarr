@@ -1883,7 +1883,7 @@
     "totalRuns": "Total Runs",
     "libraryRecords": "Library Records",
     "episodeRecords": "Episode Records",
-    "latestRun": "Latest Run",
+    "latestRun": "Latest Import",
     "noData": "No data",
     "selectRun": "Select Run",
     "search": "Search...",
@@ -1910,7 +1910,9 @@
     "episodeNumbers": "Episode Numbers",
     "episodeTitles": "Episode Titles",
     "resolutions": "Resolutions",
-    "importedAt": "Imported At"
+    "importedAt": "Imported At",
+    "alreadyImported": "Data already imported",
+    "importSuccess": "Import successful"
   },
   "mediaServerExport": {
     "pageTitle": "Media Server Export History",

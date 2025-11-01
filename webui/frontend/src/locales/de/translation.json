@@ -1934,7 +1934,7 @@
     "totalRuns": "Gesamte Durchläufe",
     "libraryRecords": "Bibliothekseinträge",
     "episodeRecords": "Episodeneinträge",
-    "latestRun": "Letzter Durchlauf",
+    "latestRun": "Letzter Import",
     "noData": "Keine Daten",
     "selectRun": "Durchlauf auswählen",
     "search": "Suchen...",
@@ -1961,7 +1961,9 @@
     "episodeNumbers": "Episodennummern",
     "episodeTitles": "Episodentitel",
     "resolutions": "Auflösungen",
-    "importedAt": "Importiert am"
+    "importedAt": "Importiert am",
+    "alreadyImported": "Daten bereits importiert",
+    "importSuccess": "Import erfolgreich"
   },
   "mediaServerExport": {
     "pageTitle": "Medienserver-Exportverlauf",
