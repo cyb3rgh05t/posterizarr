@@ -52,10 +52,28 @@ const LibraryExclusionSelector = ({
           setCachedExclusions(data.excluded);
           setExcludedLibraries(data.excluded);
           onChange(data.excluded);
+        } else if (!data.libraries || data.libraries.length === 0) {
+          // Database is empty, but config might have exclusions
+          // Show them in the excluded box until user fetches libraries
+          if (Array.isArray(value) && value.length > 0) {
+            console.log(
+              `Database empty for ${mediaServerType}, using config exclusions:`,
+              value
+            );
+            setCachedExclusions(value);
+          }
         }
       }
     } catch (err) {
       console.log("No cached data in database");
+      // If DB query fails and config has exclusions, show them
+      if (Array.isArray(value) && value.length > 0) {
+        console.log(
+          `Database error for ${mediaServerType}, using config exclusions:`,
+          value
+        );
+        setCachedExclusions(value);
+      }
     }
   };
 
