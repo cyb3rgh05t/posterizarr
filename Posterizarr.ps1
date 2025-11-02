@@ -231,10 +231,14 @@ function Output-ConfigJson {
     }
     function RedactKey($value) {
         if ($null -eq $value) { return $null }
-        if ($value.Length -le 7) { return $value }
-        return ($value[0..6] -join '') + '****'
+        # If the string is 1 character or less, return it as-is.
+        if ($value.Length -le 1) { 
+            return $value 
+        }
+        # For any string longer than 1 char, show the first char and then redact.
+        return $value.Substring(0, 1) + '****'
     }
-    $redactKeys = @("tvdbapi", "tmdbtoken", "fanarttvapikey", "plextoken", "jellyfinapikey", "embyapikey", "embyurl", "jellyfinurl", "discord", "plexurl", "UptimeKumaUrl", "AppriseUrl", "basicAuthPassword")
+    $redactKeys = @("tvdbapi", "tmdbtoken", "fanarttvapikey", "plextoken", "jellyfinapikey", "embyapikey", "embyurl", "jellyfinurl", "discord", "plexurl", "UptimeKumaUrl", "AppriseUrl", "basicAuthPassword","basicAuthUsername")
     $indent = '  ' * $indentLevel
 
     if ($indentLevel -eq 0) {
@@ -7141,6 +7145,7 @@ $SkipTBA = $config.PrerequisitePart.SkipTBA.tolower()
 $SkipJapTitle = $config.PrerequisitePart.SkipJapTitle.tolower()
 $AssetCleanup = $config.PrerequisitePart.AssetCleanup.tolower()
 $NewLineOnSpecificSymbols = $config.PrerequisitePart.NewLineOnSpecificSymbols.tolower()
+$SymbolsToKeepOnNewLine = $config.PrerequisitePart.SymbolsToKeepOnNewLine.tolower()
 $NewLineSymbols = $config.PrerequisitePart.NewLineSymbols
 
 # Resolution Part
@@ -7808,30 +7813,46 @@ if ($Manual) {
     $specialsPattern = '^(?:Specials|Extras|Spéciaux|0{1,2}|[Ss]eason ?0{1,2})$' # Add any other language keywords here
 
     if ([string]::IsNullOrEmpty($PicturePath)) {
-        $PicturePath = Read-Host "Enter local path or url to source picture"
         $TriggeredViaCli = 'true'
-    }
-    if ([string]::IsNullOrEmpty($PicturePath)) {
-        if (-not $PSBoundParameters.ContainsKey('SeasonPoster')) {
-            $response = Read-Host "Create Season Poster? (y/n)"
-            if ($response.ToLower() -eq 'y') { $SeasonPoster = $true }
-        }
-        if (-not $PSBoundParameters.ContainsKey('TitleCard')) {
-            $response = Read-Host "Create TitleCard? (y/n)"
-            if ($response.ToLower() -eq 'y') { $TitleCard = $true }
-        }
-        if (-not $PSBoundParameters.ContainsKey('CollectionCard')) {
-            $response = Read-Host "Create Collection? (y/n)"
-            if ($response.ToLower() -eq 'y') { $CollectionCard = $true }
-        }
-        if (-not $PSBoundParameters.ContainsKey('BackgroundCard')) {
-            $response = Read-Host "Create Background? (y/n)"
-            if ($response.ToLower() -eq 'y') { $BackgroundCard = $true }
+        $PicturePath = Read-Host "Enter local path or url to source picture"
+
+        # 1. Define all poster-related parameters
+        $posterParams = @(
+            'SeasonPoster', 'MoviePosterCard', 'ShowPosterCard', 
+            'TitleCard', 'CollectionCard', 'BackgroundCard'
+        )
+
+        # 2. Check if *any* of them were provided when the script was run
+        $anyPosterParamBound = $posterParams.Where({ $PSBoundParameters.ContainsKey($_) }).Count -gt 0
+
+        # 3. Only ask questions if *none* were provided
+        if (-not $anyPosterParamBound) {
+            Write-Host "No poster types specified. Please select which to create."
+            
+            # Define the variable names and their prompts
+            $posterPrompts = [Ordered]@{
+                'SeasonPoster'     = "Create Season Poster?"
+                'MoviePosterCard'  = "Create Movie Poster?"
+                'ShowPosterCard'   = "Create Show Poster?"
+                'TitleCard'        = "Create TitleCard?"
+                'CollectionCard'   = "Create Collection?"
+                'BackgroundCard'   = "Create Background?"
+            }
+
+            # Loop through each and ask the user
+            foreach ($item in $posterPrompts.GetEnumerator()) {
+                $response = Read-Host "$($item.Value) (y/n)"
+                if ($response.ToLower() -eq 'y') {
+                    # This sets the variable (e.g., $SeasonPoster) to $true
+                    Set-Variable -Name $item.Key -Value $true
+                }
+            }
         }
 
-        # Error handling for missing selection
-        if (-not ($SeasonPoster -or $TitleCard -or $CollectionCard -or $BackgroundCard)) {
+        # Error handling for missing selection (CORRECTED to check all types)
+        if (-not ($SeasonPoster -or $MoviePosterCard -or $ShowPosterCard -or $TitleCard -or $CollectionCard -or $BackgroundCard)) {
             Write-Entry -Message "No poster type selected. Please select at least one type." -Path $global:ScriptRoot\Logs\Manuallog.log -Color Red -log Error
+            
             if (Test-Path $CurrentlyRunning) {
                 try {
                     Remove-Item -LiteralPath $CurrentlyRunning -ErrorAction Stop | Out-Null
@@ -7842,6 +7863,7 @@ if ($Manual) {
                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                 }
             }
+            
             if ($global:UptimeKumaUrl) {
                 Send-UptimeKumaWebhook -status "down" -msg "No poster type selected"
             }
@@ -7870,7 +7892,7 @@ if ($Manual) {
 
     # Starting to gather more info
     if ($CollectionCard) {
-        if ($Titletext -eq $null) {
+        if ([string]::IsNullOrEmpty($Titletext)) {
             $Titletext = Read-Host "Enter Movie/Show/Collection Title"
         }
         $FolderName = $Titletext
@@ -7879,7 +7901,7 @@ if ($Manual) {
         if ([string]::IsNullOrEmpty($FolderName)) {
             $FolderName = Read-Host "Enter Media Foldername (how plex sees it)"
         }
-        if ($Titletext -eq $null) {
+        if ([string]::IsNullOrEmpty($Titletext)) {
             $Titletext = Read-Host "Enter Movie/Show/Background Title"
         }
     }
@@ -8341,7 +8363,28 @@ if ($Manual) {
                     # Loop through each symbol and replace it with a newline
                     if ($NewLineOnSpecificSymbols -eq 'true') {
                         foreach ($symbol in $NewLineSymbols) {
-                            $ShowjoinedTitle = $ShowjoinedTitle -replace [regex]::Escape($symbol), "`n"
+                            # Default: Replace the symbol with a newline
+                            $replacementString = "`n"
+
+                            # Check if the symbol should be kept
+                            $keepThisSymbol = $false
+                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                    if ($symbol -like "*$k*") {
+                                        $keepThisSymbol = $true
+                                        break # Match found, no need to keep checking
+                                    }
+                                }
+                            }
+
+                            # If it's a "keep" symbol, change the replacement string
+                            if ($keepThisSymbol) {
+                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                $replacementString = $symbol + "`n"
+                            }
+                            $ShowjoinedTitle = $ShowjoinedTitle -replace [regex]::Escape($symbol), $replacementString
                         }
                     }
                     $ShowjoinedTitlePointSize = $ShowjoinedTitle -replace '""', '""""'
@@ -8354,7 +8397,28 @@ if ($Manual) {
                     # Loop through each symbol and replace it with a newline
                     if ($NewLineOnSpecificSymbols -eq 'true') {
                         foreach ($symbol in $NewLineSymbols) {
-                            $CollectionjoinedTitle = $CollectionjoinedTitle -replace [regex]::Escape($symbol), "`n"
+                            # Default: Replace the symbol with a newline
+                            $replacementString = "`n"
+
+                            # Check if the symbol should be kept
+                            $keepThisSymbol = $false
+                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                    if ($symbol -like "*$k*") {
+                                        $keepThisSymbol = $true
+                                        break # Match found, no need to keep checking
+                                    }
+                                }
+                            }
+
+                            # If it's a "keep" symbol, change the replacement string
+                            if ($keepThisSymbol) {
+                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                $replacementString = $symbol + "`n"
+                            }
+                            $CollectionjoinedTitle = $CollectionjoinedTitle -replace [regex]::Escape($symbol), $replacementString
                         }
                     }
                     $CollectionjoinedTitlePointSize = $CollectionjoinedTitle -replace '""', '""""'
@@ -8372,7 +8436,28 @@ if ($Manual) {
                 # Loop through each symbol and replace it with a newline
                 if ($NewLineOnSpecificSymbols -eq 'true') {
                     foreach ($symbol in $NewLineSymbols) {
-                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                        # Default: Replace the symbol with a newline
+                        $replacementString = "`n"
+
+                        # Check if the symbol should be kept
+                        $keepThisSymbol = $false
+                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                if ($symbol -like "*$k*") {
+                                    $keepThisSymbol = $true
+                                    break # Match found, no need to keep checking
+                                }
+                            }
+                        }
+
+                        # If it's a "keep" symbol, change the replacement string
+                        if ($keepThisSymbol) {
+                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                            $replacementString = $symbol + "`n"
+                        }
+                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                     }
                 }
 
@@ -10543,7 +10628,28 @@ Elseif ($Tautulli) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -10984,7 +11090,28 @@ Elseif ($Tautulli) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -11513,7 +11640,28 @@ Elseif ($Tautulli) {
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -11965,7 +12113,28 @@ Elseif ($Tautulli) {
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -12517,9 +12686,30 @@ Elseif ($Tautulli) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                         if ($AddShowTitletoSeason -eq 'true') {
-                                                            $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                            $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
                                                 }
@@ -13126,7 +13316,28 @@ Elseif ($Tautulli) {
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -13687,7 +13898,28 @@ Elseif ($Tautulli) {
                                                                 # Loop through each symbol and replace it with a newline
                                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                     foreach ($symbol in $NewLineSymbols) {
-                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                        # Default: Replace the symbol with a newline
+                                                                        $replacementString = "`n"
+
+                                                                        # Check if the symbol should be kept
+                                                                        $keepThisSymbol = $false
+                                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                if ($symbol -like "*$k*") {
+                                                                                    $keepThisSymbol = $true
+                                                                                    break # Match found, no need to keep checking
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        # If it's a "keep" symbol, change the replacement string
+                                                                        if ($keepThisSymbol) {
+                                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                            $replacementString = $symbol + "`n"
+                                                                        }
+                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -15048,7 +15280,28 @@ Elseif ($ArrTrigger) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -15451,7 +15704,28 @@ Elseif ($ArrTrigger) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -15936,7 +16210,28 @@ Elseif ($ArrTrigger) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -16351,7 +16646,28 @@ Elseif ($ArrTrigger) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -16866,9 +17182,30 @@ Elseif ($ArrTrigger) {
                                                         # Loop through each symbol and replace it with a newline
                                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                                             foreach ($symbol in $NewLineSymbols) {
-                                                                $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                                # Default: Replace the symbol with a newline
+                                                                $replacementString = "`n"
+
+                                                                # Check if the symbol should be kept
+                                                                $keepThisSymbol = $false
+                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                        if ($symbol -like "*$k*") {
+                                                                            $keepThisSymbol = $true
+                                                                            break # Match found, no need to keep checking
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                # If it's a "keep" symbol, change the replacement string
+                                                                if ($keepThisSymbol) {
+                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                    $replacementString = $symbol + "`n"
+                                                                }
+                                                                $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                                 if ($AddShowTitletoSeason -eq 'true') {
-                                                                    $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                                    $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                                 }
                                                             }
                                                         }
@@ -17366,7 +17703,28 @@ Elseif ($ArrTrigger) {
                                                                         # Loop through each symbol and replace it with a newline
                                                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                             foreach ($symbol in $NewLineSymbols) {
-                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                                # Default: Replace the symbol with a newline
+                                                                                $replacementString = "`n"
+
+                                                                                # Check if the symbol should be kept
+                                                                                $keepThisSymbol = $false
+                                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                        if ($symbol -like "*$k*") {
+                                                                                            $keepThisSymbol = $true
+                                                                                            break # Match found, no need to keep checking
+                                                                                        }
+                                                                                    }
+                                                                                }
+
+                                                                                # If it's a "keep" symbol, change the replacement string
+                                                                                if ($keepThisSymbol) {
+                                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                    $replacementString = $symbol + "`n"
+                                                                                }
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                             }
                                                                         }
                                                                         $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -17833,7 +18191,28 @@ Elseif ($ArrTrigger) {
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -19051,7 +19430,28 @@ Elseif ($ArrTrigger) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -19492,7 +19892,28 @@ Elseif ($ArrTrigger) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -20021,7 +20442,28 @@ Elseif ($ArrTrigger) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -20473,7 +20915,28 @@ Elseif ($ArrTrigger) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -21025,9 +21488,30 @@ Elseif ($ArrTrigger) {
                                                     # Loop through each symbol and replace it with a newline
                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                         foreach ($symbol in $NewLineSymbols) {
-                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                             if ($AddShowTitletoSeason -eq 'true') {
-                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                             }
                                                         }
                                                     }
@@ -21633,7 +22117,28 @@ Elseif ($ArrTrigger) {
                                                                         # Loop through each symbol and replace it with a newline
                                                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                             foreach ($symbol in $NewLineSymbols) {
-                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                                # Default: Replace the symbol with a newline
+                                                                                $replacementString = "`n"
+
+                                                                                # Check if the symbol should be kept
+                                                                                $keepThisSymbol = $false
+                                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                        if ($symbol -like "*$k*") {
+                                                                                            $keepThisSymbol = $true
+                                                                                            break # Match found, no need to keep checking
+                                                                                        }
+                                                                                    }
+                                                                                }
+
+                                                                                # If it's a "keep" symbol, change the replacement string
+                                                                                if ($keepThisSymbol) {
+                                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                    $replacementString = $symbol + "`n"
+                                                                                }
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                             }
                                                                         }
                                                                         $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -22194,7 +22699,28 @@ Elseif ($ArrTrigger) {
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -24879,7 +25405,28 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -25282,7 +25829,28 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -25767,7 +26335,28 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -26182,7 +26771,28 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -26711,9 +27321,30 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     # Loop through each symbol and replace it with a newline
                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                         foreach ($symbol in $NewLineSymbols) {
-                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                             if ($AddShowTitletoSeason -eq 'true') {
-                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                             }
                                                         }
                                                     }
@@ -27211,7 +27842,28 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -27678,7 +28330,28 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 # Loop through each symbol and replace it with a newline
                                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                     foreach ($symbol in $NewLineSymbols) {
-                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                        # Default: Replace the symbol with a newline
+                                                                        $replacementString = "`n"
+
+                                                                        # Check if the symbol should be kept
+                                                                        $keepThisSymbol = $false
+                                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                if ($symbol -like "*$k*") {
+                                                                                    $keepThisSymbol = $true
+                                                                                    break # Match found, no need to keep checking
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        # If it's a "keep" symbol, change the replacement string
+                                                                        if ($keepThisSymbol) {
+                                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                            $replacementString = $symbol + "`n"
+                                                                        }
+                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -29425,7 +30098,28 @@ else {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -29910,7 +30604,28 @@ else {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -30485,7 +31200,28 @@ else {
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -30984,7 +31720,28 @@ else {
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -31586,9 +32343,30 @@ else {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                         if ($AddShowTitletoSeason -eq 'true') {
-                                                            $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                            $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
                                                 }
@@ -32235,7 +33013,28 @@ else {
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -32833,7 +33632,28 @@ else {
                                                                 # Loop through each symbol and replace it with a newline
                                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                     foreach ($symbol in $NewLineSymbols) {
-                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                        # Default: Replace the symbol with a newline
+                                                                        $replacementString = "`n"
+
+                                                                        # Check if the symbol should be kept
+                                                                        $keepThisSymbol = $false
+                                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                if ($symbol -like "*$k*") {
+                                                                                    $keepThisSymbol = $true
+                                                                                    break # Match found, no need to keep checking
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        # If it's a "keep" symbol, change the replacement string
+                                                                        if ($keepThisSymbol) {
+                                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                            $replacementString = $symbol + "`n"
+                                                                        }
+                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""' -replace '`', ''
