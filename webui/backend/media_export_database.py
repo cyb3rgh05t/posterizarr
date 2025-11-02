@@ -67,7 +67,7 @@ class MediaExportDatabase:
                     tvdbid TEXT,
                     imdbid TEXT,
                     tmdbid TEXT,
-                    rating_key TEXT,
+                    rating_key TEXT UNIQUE,
                     path TEXT,
                     root_foldername TEXT,
                     extra_folder TEXT,
@@ -77,7 +77,7 @@ class MediaExportDatabase:
                     plex_season_urls TEXT,
                     labels TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(run_timestamp, rating_key)
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """
             )
@@ -101,7 +101,8 @@ class MediaExportDatabase:
                     plex_titlecard_urls TEXT,
                     resolutions TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(run_timestamp, show_name, season_number)
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(show_name, season_number)
                 )
             """
             )
@@ -116,7 +117,7 @@ class MediaExportDatabase:
                     library_name TEXT,
                     library_type TEXT,
                     library_language TEXT,
-                    media_id TEXT,
+                    media_id TEXT UNIQUE,
                     title TEXT NOT NULL,
                     original_title TEXT,
                     year TEXT,
@@ -131,7 +132,7 @@ class MediaExportDatabase:
                     other_media_background_url TEXT,
                     labels TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(run_timestamp, media_id)
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """
             )
@@ -156,7 +157,8 @@ class MediaExportDatabase:
                     other_media_titlecard_urls TEXT,
                     resolutions TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(run_timestamp, show_name, season_number)
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(show_name, season_number)
                 )
             """
             )
@@ -186,11 +188,285 @@ class MediaExportDatabase:
             conn.close()
 
             logger.info("✓ Plex export database initialized successfully")
+
+            # Run migration to remove duplicates from old schema
+            self._migrate_remove_duplicates()
+
             logger.info("=" * 60)
 
         except sqlite3.Error as e:
             logger.error(f"Error initializing database: {e}")
             raise
+
+    def _migrate_remove_duplicates(self):
+        """
+        Migration: Remove duplicate entries from old schema where UNIQUE was (run_timestamp, rating_key)
+        Keep only the most recent entry for each rating_key/media_id
+        Also recreate tables with new UNIQUE constraints
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            # Check if migration is needed by looking for a migration marker
+            cursor.execute(
+                "CREATE TABLE IF NOT EXISTS migration_info (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)"
+            )
+
+            cursor.execute(
+                "SELECT value FROM migration_info WHERE key = 'schema_v2_unique_keys'"
+            )
+            result = cursor.fetchone()
+
+            if result and result[0] == "true":
+                logger.debug("Schema v2 migration (unique keys) already completed")
+                conn.close()
+                return
+
+            logger.info(
+                "Running migration: Updating schema to enforce unique rating_keys/media_ids..."
+            )
+
+            # Check if old schema exists
+            cursor.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='plex_library_export'"
+            )
+            current_schema = cursor.fetchone()
+
+            if (
+                current_schema
+                and "UNIQUE(run_timestamp, rating_key)" in current_schema[0]
+            ):
+                logger.info(
+                    "Old schema detected - recreating tables with new constraints..."
+                )
+
+                # Recreate plex_library_export table
+                logger.debug("Migrating plex_library_export...")
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS plex_library_export_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        run_timestamp TEXT NOT NULL,
+                        library_name TEXT,
+                        library_type TEXT,
+                        library_language TEXT,
+                        title TEXT NOT NULL,
+                        resolution TEXT,
+                        original_title TEXT,
+                        season_names TEXT,
+                        season_numbers TEXT,
+                        season_rating_keys TEXT,
+                        year TEXT,
+                        tvdbid TEXT,
+                        imdbid TEXT,
+                        tmdbid TEXT,
+                        rating_key TEXT UNIQUE,
+                        path TEXT,
+                        root_foldername TEXT,
+                        extra_folder TEXT,
+                        multiple_versions TEXT,
+                        plex_poster_url TEXT,
+                        plex_background_url TEXT,
+                        plex_season_urls TEXT,
+                        labels TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """
+                )
+
+                # Copy data, keeping only most recent entry for each rating_key
+                cursor.execute(
+                    """
+                    INSERT INTO plex_library_export_new 
+                    SELECT * FROM (
+                        SELECT *, ROW_NUMBER() OVER (PARTITION BY rating_key ORDER BY id DESC) as rn
+                        FROM plex_library_export
+                    ) WHERE rn = 1
+                """
+                )
+                plex_lib_count = cursor.rowcount
+
+                cursor.execute("DROP TABLE plex_library_export")
+                cursor.execute(
+                    "ALTER TABLE plex_library_export_new RENAME TO plex_library_export"
+                )
+
+                # Recreate plex_episode_export table
+                logger.debug("Migrating plex_episode_export...")
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS plex_episode_export_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        run_timestamp TEXT NOT NULL,
+                        show_name TEXT NOT NULL,
+                        type TEXT,
+                        tvdbid TEXT,
+                        tmdbid TEXT,
+                        library_name TEXT,
+                        season_number TEXT,
+                        episodes TEXT,
+                        title TEXT,
+                        rating_keys TEXT,
+                        plex_titlecard_urls TEXT,
+                        resolutions TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(show_name, season_number)
+                    )
+                """
+                )
+
+                cursor.execute(
+                    """
+                    INSERT INTO plex_episode_export_new 
+                    SELECT * FROM (
+                        SELECT *, ROW_NUMBER() OVER (PARTITION BY show_name, season_number ORDER BY id DESC) as rn
+                        FROM plex_episode_export
+                    ) WHERE rn = 1
+                """
+                )
+                plex_ep_count = cursor.rowcount
+
+                cursor.execute("DROP TABLE plex_episode_export")
+                cursor.execute(
+                    "ALTER TABLE plex_episode_export_new RENAME TO plex_episode_export"
+                )
+
+                # Recreate other_media_library_export table
+                logger.debug("Migrating other_media_library_export...")
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS other_media_library_export_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        run_timestamp TEXT NOT NULL,
+                        library_name TEXT,
+                        library_type TEXT,
+                        library_language TEXT,
+                        media_id TEXT UNIQUE,
+                        title TEXT NOT NULL,
+                        original_title TEXT,
+                        year TEXT,
+                        resolution TEXT,
+                        imdbid TEXT,
+                        tmdbid TEXT,
+                        tvdbid TEXT,
+                        path TEXT,
+                        root_foldername TEXT,
+                        extra_folder TEXT,
+                        other_media_poster_url TEXT,
+                        other_media_background_url TEXT,
+                        labels TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """
+                )
+
+                cursor.execute(
+                    """
+                    INSERT INTO other_media_library_export_new 
+                    SELECT * FROM (
+                        SELECT *, ROW_NUMBER() OVER (PARTITION BY media_id ORDER BY id DESC) as rn
+                        FROM other_media_library_export
+                    ) WHERE rn = 1
+                """
+                )
+                other_lib_count = cursor.rowcount
+
+                cursor.execute("DROP TABLE other_media_library_export")
+                cursor.execute(
+                    "ALTER TABLE other_media_library_export_new RENAME TO other_media_library_export"
+                )
+
+                # Recreate other_media_episode_export table
+                logger.debug("Migrating other_media_episode_export...")
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS other_media_episode_export_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        run_timestamp TEXT NOT NULL,
+                        show_name TEXT NOT NULL,
+                        type TEXT,
+                        tvdbid TEXT,
+                        tmdbid TEXT,
+                        imdbid TEXT,
+                        library_name TEXT,
+                        season_number TEXT,
+                        episodes TEXT,
+                        title TEXT,
+                        rating_keys TEXT,
+                        other_media_titlecard_urls TEXT,
+                        resolutions TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(show_name, season_number)
+                    )
+                """
+                )
+
+                cursor.execute(
+                    """
+                    INSERT INTO other_media_episode_export_new 
+                    SELECT * FROM (
+                        SELECT *, ROW_NUMBER() OVER (PARTITION BY show_name, season_number ORDER BY id DESC) as rn
+                        FROM other_media_episode_export
+                    ) WHERE rn = 1
+                """
+                )
+                other_ep_count = cursor.rowcount
+
+                cursor.execute("DROP TABLE other_media_episode_export")
+                cursor.execute(
+                    "ALTER TABLE other_media_episode_export_new RENAME TO other_media_episode_export"
+                )
+
+                # Recreate indexes
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_library_run ON plex_library_export(run_timestamp)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_library_tmdbid ON plex_library_export(tmdbid)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_other_library_run ON other_media_library_export(run_timestamp)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_other_library_tmdbid ON other_media_library_export(tmdbid)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_episode_run ON plex_episode_export(run_timestamp)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_episode_tmdbid ON plex_episode_export(tmdbid)"
+                )
+
+                logger.info(f"✓ Schema migration complete:")
+                logger.info(f"  - Plex Library: {plex_lib_count} records migrated")
+                logger.info(f"  - Plex Episodes: {plex_ep_count} records migrated")
+                logger.info(
+                    f"  - Other Media Library: {other_lib_count} records migrated"
+                )
+                logger.info(
+                    f"  - Other Media Episodes: {other_ep_count} records migrated"
+                )
+
+            # Mark migration as complete
+            cursor.execute(
+                "INSERT OR REPLACE INTO migration_info (key, value, updated_at) VALUES (?, ?, ?)",
+                ("schema_v2_unique_keys", "true", datetime.now().isoformat()),
+            )
+
+            conn.commit()
+            conn.close()
+
+            logger.debug("Schema v2 migration marked as complete")
+
+        except Exception as e:
+            logger.error(f"Error during schema migration: {e}")
+            logger.exception("Full traceback:")
+            # Don't raise - let the app continue with whatever schema exists
 
     def import_library_csv(
         self, csv_path: Path, run_timestamp: Optional[str] = None
@@ -250,7 +526,7 @@ class MediaExportDatabase:
 
                         cursor.execute(
                             """
-                            INSERT OR IGNORE INTO plex_library_export (
+                            INSERT OR REPLACE INTO plex_library_export (
                                 run_timestamp, library_name, library_type, library_language,
                                 title, resolution, original_title, season_names, season_numbers,
                                 season_rating_keys, year, tvdbid, imdbid, tmdbid, rating_key,
@@ -364,7 +640,7 @@ class MediaExportDatabase:
 
                         cursor.execute(
                             """
-                            INSERT OR IGNORE INTO plex_episode_export (
+                            INSERT OR REPLACE INTO plex_episode_export (
                                 run_timestamp, show_name, type, tvdbid, tmdbid,
                                 library_name, season_number, episodes, title,
                                 rating_keys, plex_titlecard_urls, resolutions
@@ -463,7 +739,7 @@ class MediaExportDatabase:
 
                         cursor.execute(
                             """
-                            INSERT OR IGNORE INTO other_media_library_export (
+                            INSERT OR REPLACE INTO other_media_library_export (
                                 run_timestamp, library_name, library_type, library_language,
                                 media_id, title, original_title, year, resolution,
                                 imdbid, tmdbid, tvdbid, path, root_foldername,
@@ -571,7 +847,7 @@ class MediaExportDatabase:
 
                         cursor.execute(
                             """
-                            INSERT OR IGNORE INTO other_media_episode_export (
+                            INSERT OR REPLACE INTO other_media_episode_export (
                                 run_timestamp, show_name, type, tvdbid, tmdbid, imdbid,
                                 library_name, season_number, episodes, title,
                                 rating_keys, other_media_titlecard_urls, resolutions
