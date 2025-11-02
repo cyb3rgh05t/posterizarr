@@ -11,6 +11,9 @@ import {
   ChevronDown,
   Activity,
   Square,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Notification from "./Notification";
@@ -44,6 +47,10 @@ function LogViewer() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [levelFilter, setLevelFilter] = useState("All log levels");
+  const [linesPerPage, setLinesPerPage] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [status, setStatus] = useState({
     running: false,
@@ -412,57 +419,65 @@ function LogViewer() {
   const displayStatus = getDisplayStatus();
   const StatusIcon = displayStatus.icon;
 
+  // Filter and paginate logs (reversed so newest are first)
+  const filteredLogs = logs
+    .slice()
+    .reverse()
+    .filter((line) => {
+      const parsed = parseLogLine(line);
+      if (parsed.raw === null) return false;
+
+      // Apply level filter
+      if (levelFilter !== "All log levels") {
+        if (parsed.raw) return false;
+        if (parsed.level?.toLowerCase() !== levelFilter.toLowerCase())
+          return false;
+      }
+
+      // Apply search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        if (parsed.raw) {
+          return parsed.raw.toLowerCase().includes(searchLower);
+        }
+        return (
+          parsed.message?.toLowerCase().includes(searchLower) ||
+          parsed.level?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      return true;
+    });
+
+  const totalPages = Math.ceil(filteredLogs.length / linesPerPage);
+  const startIndex = (currentPage - 1) * linesPerPage;
+  const paginatedLogs = filteredLogs.slice(
+    startIndex,
+    startIndex + linesPerPage
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, levelFilter, linesPerPage]);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-end">
-        {/* Connection Status Badge */}
-        <div
-          className={`flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-card border ${
-            connected
-              ? "border-green-500/50"
-              : isReconnecting
-              ? "border-yellow-500/50"
-              : "border-red-500/50"
-          } shadow-sm`}
-        >
-          <div className="relative">
-            <div
-              className={`w-3 h-3 rounded-full ${displayStatus.color} ${
-                connected || isReconnecting ? "animate-pulse" : ""
-              }`}
-            ></div>
-            {(connected || isReconnecting) && (
-              <div
-                className={`absolute inset-0 w-3 h-3 rounded-full ${
-                  displayStatus.color
-                } ${connected || isReconnecting ? "animate-ping" : ""}`}
-              ></div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <StatusIcon className="w-4 h-4 text-theme-muted" />
-            <span className="text-sm font-medium text-theme-text">
-              {displayStatus.text}
-            </span>
-          </div>
-        </div>
-      </div>
-
+      {/* Script Running Alert */}
       {status.running && (
-        <div className="bg-orange-950/40 rounded-xl p-4 border border-orange-600/50">
+        <div className="bg-orange-500/10 rounded-xl p-4 border border-orange-500/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-600/20">
+              <div className="p-2 rounded-lg bg-orange-500/20">
                 <Activity className="w-5 h-5 text-orange-400" />
               </div>
               <div>
-                <p className="font-medium text-orange-200">
+                <p className="font-medium text-theme-text">
                   {t("logViewer.scriptRunning")}
                 </p>
-                <p className="text-sm text-orange-300/80">
+                <p className="text-sm text-theme-muted">
                   {status.current_mode && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-200 mr-2">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-400 mr-2">
                       {t("logViewer.mode")}: {status.current_mode}
                     </span>
                   )}
@@ -473,7 +488,7 @@ function LogViewer() {
             <button
               onClick={stopScript}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 rounded-lg font-medium transition-all shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-theme-muted disabled:cursor-not-allowed disabled:opacity-50 rounded-lg font-medium transition-all shadow-sm text-white"
             >
               {loading ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -486,240 +501,252 @@ function LogViewer() {
         </div>
       )}
 
-      {/* Controls Section */}
-      <div className="bg-theme-card rounded-xl p-6 border border-theme shadow-sm">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          {/* Log Selector */}
-          <div className="flex-1 w-full lg:max-w-md">
-            <label className="block text-sm font-medium text-theme-text mb-2">
-              {t("logViewer.selectLogFile")}
-            </label>
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="w-full px-4 py-3 bg-theme-bg border border-theme rounded-lg text-theme-text text-sm flex items-center justify-between hover:bg-theme-hover hover:border-theme-primary/50 transition-all shadow-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-theme-primary" />
-                  <span className="font-medium">{selectedLog}</span>
-                  <span className="text-theme-muted text-xs">
-                    (
-                    {availableLogs.find((l) => l.name === selectedLog)
-                      ? (
-                          availableLogs.find((l) => l.name === selectedLog)
-                            .size / 1024
-                        ).toFixed(2)
-                      : "0.00"}{" "}
-                    KB)
-                  </span>
-                </div>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    dropdownOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
+      {/* Log File Tabs Card */}
+      <div className="bg-theme-card rounded-lg shadow-md">
+        <div className="flex gap-2 p-2">
+          {availableLogs.map((log) => (
+            <button
+              key={log.name}
+              onClick={() => {
+                console.log(`User selected log tab: ${log.name}`);
+                setSelectedLog(log.name);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm font-medium whitespace-nowrap ${
+                selectedLog === log.name
+                  ? "bg-theme-primary text-white scale-105"
+                  : "bg-theme-hover hover:bg-theme-primary/70 border border-theme text-theme-text"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              {log.name.replace(".log", "")}
+            </button>
+          ))}
+        </div>
+      </div>
 
-              {dropdownOpen && (
-                <div className="absolute z-10 w-full mt-2 bg-theme-card border border-theme-primary rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {availableLogs.map((log) => (
-                    <button
-                      key={log.name}
-                      onClick={() => {
-                        console.log(`User selected log: ${log.name}`);
-                        setSelectedLog(log.name);
-                        setDropdownOpen(false);
-                      }}
-                      className={`w-full px-4 py-3 text-left text-sm transition-all ${
-                        selectedLog === log.name
-                          ? "bg-theme-primary text-white"
-                          : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{log.name}</span>
-                        <span className="text-xs opacity-80">
-                          {(log.size / 1024).toFixed(2)} KB
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+      {/* Controls Card */}
+      <div className="bg-theme-card rounded-lg shadow-md p-4">
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex items-center gap-3">
+            {/* Lines per page */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-theme-muted">Show</span>
+              <select
+                value={linesPerPage}
+                onChange={(e) => setLinesPerPage(Number(e.target.value))}
+                className="px-3 py-1.5 bg-theme-hover border border-theme rounded-lg text-sm text-theme-text focus:outline-none focus:border-theme-primary"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+                <option value={500}>500</option>
+              </select>
+              <span className="text-sm text-theme-muted">lines per page</span>
+            </div>
+
+            {/* Level Filter */}
+            <select
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value)}
+              className="px-3 py-1.5 bg-theme-hover border border-theme rounded-lg text-sm text-theme-text focus:outline-none focus:border-theme-primary"
+            >
+              <option>All log levels</option>
+              <option>ERROR</option>
+              <option>WARNING</option>
+              <option>WARN</option>
+              <option>INFO</option>
+              <option>SUCCESS</option>
+              <option>DEBUG</option>
+            </select>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-4 py-2 bg-theme-hover border border-theme rounded-lg text-sm text-theme-text placeholder-theme-muted focus:outline-none focus:border-theme-primary w-64"
+              />
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Auto-scroll Toggle Switch */}
-            <label className="flex items-center gap-3 px-4 py-2 bg-theme-bg border border-theme rounded-lg cursor-pointer hover:bg-theme-hover transition-all">
-              <span className="text-sm text-theme-text font-medium">
-                {t("logViewer.autoScroll")}
-              </span>
-              <div className="relative inline-block w-11 h-6">
-                <input
-                  type="checkbox"
-                  checked={autoScroll}
-                  onChange={(e) => setAutoScroll(e.target.checked)}
-                  className="peer sr-only"
-                />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-theme-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-primary"></div>
-              </div>
-            </label>
+          <div className="flex items-center gap-2">
+            {/* Connection Status */}
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium ${
+                connected
+                  ? "border-green-500/50 bg-green-500/10 text-green-400"
+                  : isReconnecting
+                  ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-400"
+                  : "border-red-500/50 bg-red-500/10 text-red-400"
+              }`}
+            >
+              <div
+                className={`w-2 h-2 rounded-full ${displayStatus.color} ${
+                  connected || isReconnecting ? "animate-pulse" : ""
+                }`}
+              ></div>
+              <StatusIcon className="w-3.5 h-3.5" />
+              <span>{displayStatus.text}</span>
+            </div>
 
-            {/* Refresh Button */}
             <button
               onClick={() => fetchAvailableLogs(true)}
               disabled={isRefreshing}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-bg hover:bg-theme-hover border border-theme disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-all hover:scale-[1.02] shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                className={`w-4 h-4 text-theme-primary ${
+                  isRefreshing ? "animate-spin" : ""
+                }`}
               />
-              {t("logViewer.refresh")}
+              <span className="text-theme-text">{t("logViewer.refresh")}</span>
             </button>
 
-            {/* Download Button */}
             <button
               onClick={downloadLogs}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all hover:scale-[1.02] shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
             >
               <Download className="w-4 h-4 text-theme-primary" />
-              {t("logViewer.download")}
+              <span className="text-theme-text">{t("logViewer.download")}</span>
             </button>
 
-            {/* Clear Button */}
             <button
               onClick={clearLogs}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-red-500/50 rounded-lg text-theme-text text-sm font-medium transition-all hover:scale-[1.02] shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
             >
-              <Trash2 className="w-4 h-4 text-red-400" />
-              {t("logViewer.clear")}
+              <Trash2 className="w-4 h-4 text-theme-primary" />
+              <span className="text-theme-text">{t("logViewer.clear")}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Log Display Section */}
-      <div className="bg-theme-card rounded-xl border border-theme shadow-sm overflow-hidden">
-        {/* Log Container Header */}
-        <div className="bg-theme-bg px-6 py-3 border-b border-theme flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded bg-theme-primary/10">
-              <FileText className="w-4 h-4 text-theme-primary" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-theme-text">
-                {selectedLog}
-              </h3>
-              <p className="text-xs text-theme-muted">
-                {t("logViewer.showingLast")}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-theme-muted">
-            <span className="font-mono">
-              {t("logViewer.entries", { count: logs.length })}
-            </span>
-            {connected && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 border border-green-500/30 rounded text-green-400">
-                <CheckCircle className="w-3 h-3" />
-                <span>{t("logViewer.status.live")}</span>
-              </div>
-            )}
-            {isReconnecting && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400 animate-pulse">
-                <RefreshCw className="w-3 h-3 animate-spin" />
-                <span>{t("logViewer.status.reconnecting")}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Terminal-Style Log Container */}
-        <div
-          ref={logContainerRef}
-          className="h-[700px] overflow-y-auto bg-black p-4"
-          style={{ scrollbarWidth: "thin" }}
-        >
-          {logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <FileText className="w-16 h-16 text-gray-700 mb-4" />
-              <p className="text-gray-500 font-medium mb-2">
-                {t("logViewer.noLogs")}
-              </p>
-              <p className="text-gray-600 text-sm">
-                {t("logViewer.startScript")}
-              </p>
-            </div>
-          ) : (
-            <div className="font-mono text-[11px] leading-relaxed">
-              {logs.map((line, index) => {
-                const parsed = parseLogLine(line);
-
-                if (parsed.raw === null) {
-                  return null;
-                }
-
-                if (parsed.raw) {
-                  return (
-                    <div
-                      key={index}
-                      className="px-2 py-1 hover:bg-gray-900/50 transition-colors rounded border-l-2 border-transparent hover:border-theme-primary/50"
-                      style={{ color: "#9ca3af" }}
-                    >
-                      {parsed.raw}
+      {/* Logs Table Card */}
+      <div className="bg-theme-card rounded-lg shadow-md overflow-hidden">
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-theme">
+                <th className="text-left py-3 px-4 text-theme-muted text-sm font-medium w-48">
+                  Timestamp
+                </th>
+                <th className="text-left py-3 px-4 text-theme-muted text-sm font-medium w-32">
+                  Level
+                </th>
+                <th className="text-left py-3 px-4 text-theme-muted text-sm font-medium">
+                  Message
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-theme">
+              {paginatedLogs.length === 0 ? (
+                <tr>
+                  <td colSpan="3" className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <FileText className="w-12 h-12 text-theme-muted/50 mb-3" />
+                      <p className="text-theme-muted font-medium">
+                        {searchTerm || levelFilter !== "All log levels"
+                          ? t(
+                              "logViewer.noMatchingLogs",
+                              "No matching logs found"
+                            )
+                          : t("logViewer.noLogs")}
+                      </p>
                     </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedLogs.map((line, index) => {
+                  const parsed = parseLogLine(line);
+
+                  if (parsed.raw === null) {
+                    return null;
+                  }
+
+                  if (parsed.raw) {
+                    return (
+                      <tr
+                        key={startIndex + index}
+                        className="hover:bg-theme-hover transition-colors"
+                      >
+                        <td
+                          colSpan="3"
+                          className="px-4 py-2 text-xs text-theme-muted font-mono"
+                        >
+                          {parsed.raw}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return (
+                    <tr
+                      key={startIndex + index}
+                      className="hover:bg-theme-hover transition-colors"
+                    >
+                      <td className="px-4 py-2 text-xs text-theme-muted font-mono whitespace-nowrap">
+                        {parsed.timestamp}
+                      </td>
+                      <td className="px-4 py-2 text-xs whitespace-nowrap">
+                        <LogLevel level={parsed.level} />
+                      </td>
+                      <td className="px-4 py-2 text-xs text-theme-text font-mono break-all">
+                        <span className="text-theme-muted mr-2">
+                          L.{parsed.lineNum}
+                        </span>
+                        {parsed.message}
+                      </td>
+                    </tr>
                   );
-                }
-
-                const logColor = getLogColor(parsed.level);
-
-                return (
-                  <div
-                    key={index}
-                    className="px-2 py-1 hover:bg-gray-900/50 transition-colors flex items-center gap-2 rounded border-l-2 border-transparent hover:border-theme-primary/50"
-                  >
-                    <span style={{ color: "#6b7280" }} className="text-[10px]">
-                      [{parsed.timestamp}]
-                    </span>
-                    <LogLevel level={parsed.level} />
-                    <span style={{ color: "#4b5563" }} className="text-[10px]">
-                      |L.{parsed.lineNum}|
-                    </span>
-                    <span style={{ color: logColor }}>{parsed.message}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                })
+              )}
+            </tbody>
+          </table>
         </div>
 
-        {/* Footer */}
-        <div className="bg-theme-bg px-6 py-3 border-t border-theme flex items-center justify-between text-xs text-theme-muted">
-          <div className="flex items-center gap-4">
-            <span className="font-mono">
-              {t("logViewer.logEntries", { count: logs.length })}
-            </span>
-            <span>•</span>
-            <span>
-              {t("logViewer.autoScrollStatus", {
-                status: autoScroll ? t("logViewer.on") : t("logViewer.off"),
-              })}
-            </span>
+        {/* Pagination Footer */}
+        <div className="bg-theme-hover border-t border-theme px-4 py-3">
+          <div className="flex items-center justify-between text-sm">
+            <div className="text-theme-muted">
+              Showing {paginatedLogs.length > 0 ? startIndex + 1 : 0} to{" "}
+              {Math.min(startIndex + linesPerPage, filteredLogs.length)} of{" "}
+              {filteredLogs.length} entries
+              {searchTerm || levelFilter !== "All log levels"
+                ? ` (filtered from ${logs.length} total)`
+                : ""}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded border border-theme hover:bg-theme-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all text-theme-text"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                <span className="text-theme-text font-medium px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded border border-theme hover:bg-theme-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all text-theme-text"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
-          {connected && (
-            <div className="flex items-center gap-2 text-green-400">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-              <span>{t("logViewer.receivingUpdates")}</span>
-            </div>
-          )}
-          {isReconnecting && (
-            <div className="flex items-center gap-2 text-yellow-400">
-              <RefreshCw className="w-3 h-3 animate-spin" />
-              <span>{t("logViewer.status.reconnecting")}</span>
-            </div>
-          )}
         </div>
       </div>
     </div>
