@@ -4075,16 +4075,34 @@ function CheckJsonPaths {
         [string]$Backgroundoverlay4k,
         [string]$Backgroundoverlay1080p,
         [string]$TCoverlay4k,
-        [string]$TCoverlay1080p
+        [string]$TCoverlay1080p,
+        [string]$Posteroverlay4KDoVi,
+        [string]$Posteroverlay4KHDR10,
+        [string]$Posteroverlay4KDoViHDR10,
+        [string]$Backgroundoverlay4KDoVi,
+        [string]$Backgroundoverlay4KHDR10,
+        [string]$Backgroundoverlay4KDoViHDR10,
+        [string]$TCoverlay4KDoVi,
+        [string]$TCoverlay4KHDR10,
+        [string]$TCoverlay4KDoViHDR10
     )
 
-    $paths = @($font, $RTLfont, $backgroundfont, $titlecardfont, $Posteroverlay, $Collectionoverlay, $Backgroundoverlay, $titlecardoverlay, $Seasonoverlay, $Posteroverlay4k, $Posteroverlay1080p, $Backgroundoverlay4k, $Backgroundoverlay1080p, $TCoverlay4k, $TCoverlay1080p)
+    $paths = @(
+        $font, $RTLfont, $backgroundfont, $titlecardfont, $Posteroverlay, 
+        $Collectionoverlay, $Backgroundoverlay, $titlecardoverlay, $Seasonoverlay, 
+        $Posteroverlay4k, $Posteroverlay1080p, $Backgroundoverlay4k, 
+        $Backgroundoverlay1080p, $TCoverlay4k, $TCoverlay1080p,$Posteroverlay4KDoVi, $Posteroverlay4KHDR10, $Posteroverlay4KDoViHDR10,
+        $Backgroundoverlay4KDoVi, $Backgroundoverlay4KHDR10, $Backgroundoverlay4KDoViHDR10,
+        $TCoverlay4KDoVi, $TCoverlay4KHDR10, $TCoverlay4KDoViHDR10
+    )
+    
     foreach ($path in $paths) {
-        if (-not (Test-Path -LiteralPath $path.TrimEnd())) {
+        # Only check the path if it's not null or empty.
+        # This allows optional overlays (set to null in config) to pass.
+        if ((-not [string]::IsNullOrEmpty($path)) -and (-not (Test-Path -LiteralPath $path.TrimEnd()))) {
             Write-Entry -Message "Could not find file in: $path" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
             Write-Entry -Subtext "Check config for typos and make sure that the file is present in scriptroot." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
         }
     }
 
@@ -4398,108 +4416,75 @@ function CheckOverlayDimensions {
         [string]$TCoverlay4k,
         [string]$TCoverlay1080p,
         [string]$PosterSize,
-        [string]$BackgroundSize
+        [string]$BackgroundSize,
+        [string]$Posteroverlay4KDoVi,
+        [string]$Posteroverlay4KHDR10,
+        [string]$Posteroverlay4KDoViHDR10,
+        [string]$Backgroundoverlay4KDoVi,
+        [string]$Backgroundoverlay4KHDR10,
+        [string]$Backgroundoverlay4KDoViHDR10,
+        [string]$TCoverlay4KDoVi,
+        [string]$TCoverlay4KHDR10,
+        [string]$TCoverlay4KDoViHDR10
     )
+    # This function checks a single overlay's dimensions
+    function Test-Dimension {
+        param (
+            [string]$OverlayPath,
+            [string]$ExpectedSize,
+            [string]$OverlayName
+        )
 
-    # Use magick to check dimensions
-    $Posteroverlaydimensions = & $magick $Posteroverlay -format "%wx%h" info:
-    $Seasonoverlaydimensions = & $magick $Seasonoverlay -format "%wx%h" info:
-    $Collectionverlaydimensions = & $magick $Collectionoverlay -format "%wx%h" info:
-    $Backgroundoverlaydimensions = & $magick $Backgroundoverlay -format "%wx%h" info:
-    $Titlecardoverlaydimensions = & $magick $Titlecardoverlay -format "%wx%h" info:
-    $4kPosteroverlaydimensions = & $magick $Posteroverlay4k -format "%wx%h" info:
-    $1080pPosteroverlaydimensions = & $magick $Posteroverlay1080p -format "%wx%h" info:
-    $4kBackgroundoverlaydimensions = & $magick $Backgroundoverlay4k -format "%wx%h" info:
-    $1080pBackgroundoverlaydimensions = & $magick $Backgroundoverlay1080p -format "%wx%h" info:
-    $4kTCoverlaydimensions = & $magick $TCoverlay4k -format "%wx%h" info:
-    $1080pTCoverlaydimensions = & $magick $TCoverlay1080p -format "%wx%h" info:
+        # If the path is $null or empty (i.e., optional overlay not configured), 
+        if ([string]::IsNullOrEmpty($OverlayPath)) {
+            return
+        }
 
-    # Check Poster Overlay Size
-    if ($Posteroverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "Poster overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "Poster overlay is NOT correctly sized at: $Postersize. Actual dimensions: $Posteroverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-
-    # Check Season Poster Overlay Size
-    if ($Seasonoverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "Season overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "Season overlay is NOT correctly sized at: $Postersize. Actual dimensions: $Seasonoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-
-    # Check Collection Poster Overlay Size
-    if ($Collectionverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "Collection overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "Collection overlay is NOT correctly sized at: $Postersize. Actual dimensions: $Collectionverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+        try {
+            $actualDimensions = & $magick $OverlayPath -format "%wx%h" info:
+            
+            if ($actualDimensions -eq $ExpectedSize) {
+                Write-Entry -Subtext "$OverlayName is correctly sized at: $ExpectedSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
+            }
+            else {
+                Write-Entry -Subtext "$OverlayName is NOT correctly sized at: $ExpectedSize. Actual dimensions: $actualDimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+            }
+        }
+        catch {
+            Write-Entry -Subtext "Failed to check dimensions for $OverlayName at path $OverlayPath. Error: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+        }
     }
 
-    # Check Background Overlay Size
-    if ($Backgroundoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "Background overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "Background overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $Backgroundoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+    # Standard Poster Types (expect PosterSize)
+    Test-Dimension -OverlayPath $Posteroverlay -ExpectedSize $PosterSize -OverlayName "Poster overlay"
+    Test-Dimension -OverlayPath $Seasonoverlay -ExpectedSize $PosterSize -OverlayName "Season overlay"
+    Test-Dimension -OverlayPath $Collectionoverlay -ExpectedSize $PosterSize -OverlayName "Collection overlay"
+    Test-Dimension -OverlayPath $Posteroverlay4k -ExpectedSize $PosterSize -OverlayName "4K Poster overlay"
+    Test-Dimension -OverlayPath $Posteroverlay1080p -ExpectedSize $PosterSize -OverlayName "1080p Poster overlay"
+    
+    # Standard Background/TC Types (expect BackgroundSize)
+    Test-Dimension -OverlayPath $Backgroundoverlay -ExpectedSize $BackgroundSize -OverlayName "Background overlay"
+    Test-Dimension -OverlayPath $Titlecardoverlay -ExpectedSize $BackgroundSize -OverlayName "TitleCard overlay"
+    Test-Dimension -OverlayPath $Backgroundoverlay4k -ExpectedSize $BackgroundSize -OverlayName "4K Background overlay"
+    Test-Dimension -OverlayPath $Backgroundoverlay1080p -ExpectedSize $BackgroundSize -OverlayName "1080p Background overlay"
+    Test-Dimension -OverlayPath $TCoverlay4k -ExpectedSize $BackgroundSize -OverlayName "4K TitleCard overlay"
+    Test-Dimension -OverlayPath $TCoverlay1080p -ExpectedSize $BackgroundSize -OverlayName "1080p TitleCard overlay"
 
-    # Check TitleCard Overlay Size
-    if ($Titlecardoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "TitleCard overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "TitleCard overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $Titlecardoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+    # New 4K Poster Types (expect PosterSize)
+    Test-Dimension -OverlayPath $Posteroverlay4KDoVi -ExpectedSize $PosterSize -OverlayName "4K DoVi Poster overlay"
+    Test-Dimension -OverlayPath $Posteroverlay4KHDR10 -ExpectedSize $PosterSize -OverlayName "4K HDR10 Poster overlay"
+    Test-Dimension -OverlayPath $Posteroverlay4KDoViHDR10 -ExpectedSize $PosterSize -OverlayName "4K DoVi/HDR10 Poster overlay"
 
-    # Check 4K Poster Overlay Size
-    if ($4kPosteroverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "4K Poster overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "4K Poster overlay is NOT correctly sized at: $Postersize. Actual dimensions: $4kPosteroverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+    # New 4K Background Types (expect BackgroundSize)
+    Test-Dimension -OverlayPath $Backgroundoverlay4KDoVi -ExpectedSize $BackgroundSize -OverlayName "4K DoVi Background overlay"
+    Test-Dimension -OverlayPath $Backgroundoverlay4KHDR10 -ExpectedSize $BackgroundSize -OverlayName "4K HDR10 Background overlay"
+    Test-Dimension -OverlayPath $Backgroundoverlay4KDoViHDR10 -ExpectedSize $BackgroundSize -OverlayName "4K DoVi/HDR10 Background overlay"
 
-    # Check 1080p Poster Overlay Size
-    if ($1080pPosteroverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "1080p Poster overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "1080p Poster overlay is NOT correctly sized at: $Postersize. Actual dimensions: $1080pPosteroverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-
-    # Check 4K Background Overlay Size
-    if ($4kBackgroundoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "4K Background overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "4K Background overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $4kBackgroundoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-
-    # Check 1080p Background Overlay Size
-    if ($1080pBackgroundoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "1080p Background overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "1080p Background overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $1080pBackgroundoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-
-    # Check 4K TitleCard Overlay Size
-    if ($4kTCoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "4K TitleCard overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "4K TitleCard overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $4kTCoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-    # Check 1080p TitleCard Overlay Size
-    if ($1080pTCoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "1080p TitleCard overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "1080p TitleCard overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $1080pTCoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+    # New 4K TC Types (expect BackgroundSize)
+    Test-Dimension -OverlayPath $TCoverlay4KDoVi -ExpectedSize $BackgroundSize -OverlayName "4K DoVi TitleCard overlay"
+    Test-Dimension -OverlayPath $TCoverlay4KHDR10 -ExpectedSize $BackgroundSize -OverlayName "4K HDR10 TitleCard overlay"
+    Test-Dimension -OverlayPath $TCoverlay4KDoViHDR10 -ExpectedSize $BackgroundSize -OverlayName "4K DoVi/HDR10 TitleCard overlay"
 }
 function InvokeMagickCommand {
     param (
@@ -7160,6 +7145,19 @@ $1080pBackground = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $confi
 $4kTC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.TC4k -join $($joinsymbol))
 $1080pTC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.TC1080p -join $($joinsymbol))
 
+# Optional 4k
+$4KDoVi = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoVi' -join $($joinsymbol))
+$4KHDR10 = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KHDR10' -join $($joinsymbol))
+$4KDoViHDR10 = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViHDR10' -join $($joinsymbol))
+
+$4KDoViBackground = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViBackground' -join $($joinsymbol))
+$4KHDR10Background = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KHDR10Background' -join $($joinsymbol))
+$4KDoViHDR10Background = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViHDR10Background' -join $($joinsymbol))
+
+$4KDoViTC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViTC' -join $($joinsymbol))
+$4KHDR10TC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KHDR10TC' -join $($joinsymbol))
+$4KDoViHDR10TC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViHDR10TC' -join $($joinsymbol))
+
 # Poster Overlay Part
 $global:ImageProcessing = $config.OverlayPart.ImageProcessing.tolower()
 $global:outputQuality = $config.OverlayPart.outputQuality
@@ -7644,7 +7642,7 @@ if ($files.Extension -match "\.(ttf|otf)$" -and $env:POSTERIZARR_NON_ROOT -eq 'T
     & fc-cache -fv 1> $null 2> $null
 }
 
-CheckJsonPaths -font "$font" -RTLfont "$RTLfont" -backgroundfont "$backgroundfont "-titlecardfont "$titlecardfont" -Posteroverlay "$Posteroverlay" -Backgroundoverlay "$Backgroundoverlay" -titlecardoverlay "$titlecardoverlay" -Collectionoverlay "$collectionoverlay" -Seasonoverlay "$Seasonoverlay" -Posteroverlay4k "$4kposter" -Posteroverlay1080p "$1080pPoster" -Backgroundoverlay4k "$4kBackground" -Backgroundoverlay1080p "$1080pBackground" -TCoverlay4k "$4kTC" -TCoverlay1080p "$1080pTC"
+CheckJsonPaths -font "$font" -RTLfont "$RTLfont" -backgroundfont "$backgroundfont" -titlecardfont "$titlecardfont" -Posteroverlay "$Posteroverlay" -Backgroundoverlay "$Backgroundoverlay" -titlecardoverlay "$titlecardoverlay" -Collectionoverlay "$collectionoverlay" -Seasonoverlay "$Seasonoverlay" -Posteroverlay4k "$4kposter" -Posteroverlay1080p "$1080pPoster" -Backgroundoverlay4k "$4kBackground" -Backgroundoverlay1080p "$1080pBackground" -TCoverlay4k "$4kTC" -TCoverlay1080p "$1080pTC" -Posteroverlay4KDoVi "$4KDoVi" -Posteroverlay4KHDR10 "$4KHDR10" -Posteroverlay4KDoViHDR10 "$4KDoViHDR10" -Backgroundoverlay4KDoVi "$4KDoViBackground" -Backgroundoverlay4KHDR10 "$4KHDR10Background" -Backgroundoverlay4KDoViHDR10 "$4KDoViHDR10Background" -TCoverlay4KDoVi "$4KDoViTC" -TCoverlay4KHDR10 "$4KHDR10TC" -TCoverlay4KDoViHDR10 "$4KDoViHDR10TC"
 # Check Plex now:
 if (!$SyncJelly -and !$SyncEmby) {
     if ($UsePlex -eq 'true') {
@@ -7662,7 +7660,7 @@ if (!$SyncJelly -and !$SyncEmby) {
 }
 # Check overlay artwork for poster, background, and titlecard dimensions
 Write-Entry -Message "Checking size of overlay files..." -Path $configLogging -Color White -log Info
-CheckOverlayDimensions -Posteroverlay "$Posteroverlay" -Backgroundoverlay "$Backgroundoverlay" -Titlecardoverlay "$titlecardoverlay" -PosterSize "$PosterSize" -BackgroundSize "$BackgroundSize" -Collectionoverlay "$collectionoverlay" -Seasonoverlay "$Seasonoverlay" -Posteroverlay4k "$4kposter" -Posteroverlay1080p "$1080pPoster" -Backgroundoverlay4k "$4kBackground" -Backgroundoverlay1080p "$1080pBackground" -TCoverlay4k "$4kTC" -TCoverlay1080p "$1080pTC"
+CheckOverlayDimensions -Posteroverlay "$Posteroverlay" -Backgroundoverlay "$Backgroundoverlay" -Titlecardoverlay "$titlecardoverlay" -PosterSize "$PosterSize" -BackgroundSize "$BackgroundSize" -Collectionoverlay "$collectionoverlay" -Seasonoverlay "$Seasonoverlay" -Posteroverlay4k "$4kposter" -Posteroverlay1080p "$1080pPoster" -Backgroundoverlay4k "$4kBackground" -Backgroundoverlay1080p "$1080pBackground" -TCoverlay4k "$4kTC" -TCoverlay1080p "$1080pTC" -Posteroverlay4KDoVi "$4KDoVi" -Posteroverlay4KHDR10 "$4KHDR10" -Posteroverlay4KDoViHDR10 "$4KDoViHDR10" -Backgroundoverlay4KDoVi "$4KDoViBackground" -Backgroundoverlay4KHDR10 "$4KHDR10Background" -Backgroundoverlay4KDoViHDR10 "$4KDoViHDR10Background" -TCoverlay4KDoVi "$4KDoViTC" -TCoverlay4KHDR10 "$4KHDR10TC" -TCoverlay4KDoViHDR10 "$4KDoViHDR10TC"
 
 # Check if the FanartTvAPI module is installed
 $module = Get-Module -ListAvailable -Name FanartTvAPI
@@ -10590,8 +10588,11 @@ Elseif ($Tautulli) {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
@@ -11052,8 +11053,11 @@ Elseif ($Tautulli) {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $backgroundoverlay = $4kBackground }
-                                                '1080p' { $backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
@@ -11602,8 +11606,11 @@ Elseif ($Tautulli) {
                                 if (!$global:ImageMagickError -eq 'true') {
                                     if ($UsePosterResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $Posteroverlay = $4kposter }
-                                            '1080p' { $Posteroverlay = $1080pPoster }
+                                            '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                            '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                            '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                            '4K'            { $Posteroverlay = $4kposter }
+                                            '1080p'         { $Posteroverlay = $1080pPoster }
                                             Default { $Posteroverlay = $Posteroverlay }
                                         }
                                     }
@@ -12075,8 +12082,11 @@ Elseif ($Tautulli) {
                                 if (!$global:ImageMagickError -eq 'true') {
                                     if ($UseBackgroundResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $Backgroundoverlay = $4kBackground }
-                                            '1080p' { $Backgroundoverlay = $1080pBackground }
+                                            '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                            '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                            '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                            '4K'            { $backgroundoverlay = $4kBackground }
+                                            '1080p'         { $backgroundoverlay = $1080pBackground }
                                             Default { $Backgroundoverlay = $Backgroundoverlay }
                                         }
                                     }
@@ -13275,8 +13285,11 @@ Elseif ($Tautulli) {
                                                             if (!$global:ImageMagickError -eq 'true') {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
@@ -13857,8 +13870,11 @@ Elseif ($Tautulli) {
                                                         if (!$global:ImageMagickError -eq 'true') {
                                                             if ($UseTCResolutionOverlays -eq 'true') {
                                                                 switch ($global:EPResolution) {
-                                                                    '4K' { $TitleCardoverlay = $4kTC }
-                                                                    '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                    '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                    '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                    '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                    '4K'            { $TitleCardoverlay = $4kTC }
+                                                                    '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                     Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                 }
                                                             }
@@ -15243,8 +15259,11 @@ Elseif ($ArrTrigger) {
                                         if (!$global:ImageMagickError -eq 'True') {
                                             if ($UsePosterResolutionOverlays -eq 'true') {
                                                 switch ($entry.Resolution) {
-                                                    '4K' { $Posteroverlay = $4kposter }
-                                                    '1080p' { $Posteroverlay = $1080pPoster }
+                                                    '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                    '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                    '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                    '4K'            { $Posteroverlay = $4kposter }
+                                                    '1080p'         { $Posteroverlay = $1080pPoster }
                                                     Default { $Posteroverlay = $Posteroverlay }
                                                 }
                                             }
@@ -15667,8 +15686,11 @@ Elseif ($ArrTrigger) {
                                         if (!$global:ImageMagickError -eq 'True') {
                                             if ($UseBackgroundResolutionOverlays -eq 'true') {
                                                 switch ($entry.Resolution) {
-                                                    '4K' { $backgroundoverlay = $4kBackground }
-                                                    '1080p' { $backgroundoverlay = $1080pBackground }
+                                                    '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                    '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                    '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                    '4K'            { $backgroundoverlay = $4kBackground }
+                                                    '1080p'         { $backgroundoverlay = $1080pBackground }
                                                     Default { $backgroundoverlay = $backgroundoverlay }
                                                 }
                                             }
@@ -16173,8 +16195,11 @@ Elseif ($ArrTrigger) {
                                     if (!$global:ImageMagickError -eq 'True') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
@@ -16609,8 +16634,11 @@ Elseif ($ArrTrigger) {
                                     if (!$global:ImageMagickError -eq 'True') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $backgroundoverlay = $4kBackground }
-                                                '1080p' { $backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
@@ -17663,8 +17691,11 @@ Elseif ($ArrTrigger) {
                                                                 if (!$global:ImageMagickError -eq 'True') {
                                                                     if ($UseTCResolutionOverlays -eq 'true') {
                                                                         switch ($global:EPResolution) {
-                                                                            '4K' { $TitleCardoverlay = $4kTC }
-                                                                            '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                            '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                            '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                            '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                            '4K'            { $TitleCardoverlay = $4kTC }
+                                                                            '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                             Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                         }
                                                                     }
@@ -18151,8 +18182,11 @@ Elseif ($ArrTrigger) {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     Write-Entry -Subtext "Queried Overlay Resolution: $global:EPResolution" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
@@ -19392,8 +19426,11 @@ Elseif ($ArrTrigger) {
                                         if (!$global:ImageMagickError -eq 'true') {
                                             if ($UsePosterResolutionOverlays -eq 'true') {
                                                 switch ($entry.Resolution) {
-                                                    '4K' { $Posteroverlay = $4kposter }
-                                                    '1080p' { $Posteroverlay = $1080pPoster }
+                                                    '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                    '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                    '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                    '4K'            { $Posteroverlay = $4kposter }
+                                                    '1080p'         { $Posteroverlay = $1080pPoster }
                                                     Default { $Posteroverlay = $Posteroverlay }
                                                 }
                                             }
@@ -19854,8 +19891,11 @@ Elseif ($ArrTrigger) {
                                         if (!$global:ImageMagickError -eq 'true') {
                                             if ($UseBackgroundResolutionOverlays -eq 'true') {
                                                 switch ($entry.Resolution) {
-                                                    '4K' { $backgroundoverlay = $4kBackground }
-                                                    '1080p' { $backgroundoverlay = $1080pBackground }
+                                                    '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                    '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                    '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                    '4K'            { $backgroundoverlay = $4kBackground }
+                                                    '1080p'         { $backgroundoverlay = $1080pBackground }
                                                     Default { $backgroundoverlay = $backgroundoverlay }
                                                 }
                                             }
@@ -20404,8 +20444,11 @@ Elseif ($ArrTrigger) {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
@@ -20877,8 +20920,11 @@ Elseif ($ArrTrigger) {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Backgroundoverlay = $4kBackground }
-                                                '1080p' { $Backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $Backgroundoverlay = $Backgroundoverlay }
                                             }
                                         }
@@ -22076,8 +22122,11 @@ Elseif ($ArrTrigger) {
                                                                 if (!$global:ImageMagickError -eq 'true') {
                                                                     if ($UseTCResolutionOverlays -eq 'true') {
                                                                         switch ($global:EPResolution) {
-                                                                            '4K' { $TitleCardoverlay = $4kTC }
-                                                                            '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                            '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                            '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                            '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                            '4K'            { $TitleCardoverlay = $4kTC }
+                                                                            '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                             Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                         }
                                                                     }
@@ -22658,8 +22707,11 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:ImageMagickError -eq 'true') {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
@@ -25368,8 +25420,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     if (!$global:ImageMagickError -eq 'True') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
@@ -25792,8 +25847,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     if (!$global:ImageMagickError -eq 'True') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $backgroundoverlay = $4kBackground }
-                                                '1080p' { $backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
@@ -26298,8 +26356,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 if (!$global:ImageMagickError -eq 'True') {
                                     if ($UsePosterResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $Posteroverlay = $4kposter }
-                                            '1080p' { $Posteroverlay = $1080pPoster }
+                                            '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                            '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                            '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                            '4K'            { $Posteroverlay = $4kposter }
+                                            '1080p'         { $Posteroverlay = $1080pPoster }
                                             Default { $Posteroverlay = $Posteroverlay }
                                         }
                                     }
@@ -26734,8 +26795,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 if (!$global:ImageMagickError -eq 'True') {
                                     if ($UseBackgroundResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $backgroundoverlay = $4kBackground }
-                                            '1080p' { $backgroundoverlay = $1080pBackground }
+                                            '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                            '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                            '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                            '4K'            { $backgroundoverlay = $4kBackground }
+                                            '1080p'         { $backgroundoverlay = $1080pBackground }
                                             Default { $backgroundoverlay = $backgroundoverlay }
                                         }
                                     }
@@ -27802,8 +27866,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             if (!$global:ImageMagickError -eq 'True') {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
@@ -28290,8 +28357,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             if ($UseTCResolutionOverlays -eq 'true') {
                                                                 Write-Entry -Subtext "Queried Overlay Resolution: $global:EPResolution" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 switch ($global:EPResolution) {
-                                                                    '4K' { $TitleCardoverlay = $4kTC }
-                                                                    '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                    '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                    '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                    '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                    '4K'            { $TitleCardoverlay = $4kTC }
+                                                                    '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                     Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                 }
                                                             }
@@ -30060,8 +30130,11 @@ else {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
@@ -30566,8 +30639,11 @@ else {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $backgroundoverlay = $4kBackground }
-                                                '1080p' { $backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
@@ -31162,8 +31238,11 @@ else {
                                 if (!$global:ImageMagickError -eq 'true') {
                                     if ($UsePosterResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $Posteroverlay = $4kposter }
-                                            '1080p' { $Posteroverlay = $1080pPoster }
+                                            '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                            '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                            '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                            '4K'            { $Posteroverlay = $4kposter }
+                                            '1080p'         { $Posteroverlay = $1080pPoster }
                                             Default { $Posteroverlay = $Posteroverlay }
                                         }
                                     }
@@ -31682,8 +31761,11 @@ else {
                                 if (!$global:ImageMagickError -eq 'true') {
                                     if ($UseBackgroundResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $backgroundoverlay = $4kBackground }
-                                            '1080p' { $backgroundoverlay = $1080pBackground }
+                                            '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                            '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                            '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                            '4K'            { $backgroundoverlay = $4kBackground }
+                                            '1080p'         { $backgroundoverlay = $1080pBackground }
                                             Default { $backgroundoverlay = $backgroundoverlay }
                                         }
                                     }
@@ -32972,8 +33054,11 @@ else {
                                                             if (!$global:ImageMagickError -eq 'true') {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
@@ -33592,8 +33677,11 @@ else {
                                                         if (!$global:ImageMagickError -eq 'true') {
                                                             if ($UseTCResolutionOverlays -eq 'true') {
                                                                 switch ($global:EPResolution) {
-                                                                    '4K' { $TitleCardoverlay = $4kTC }
-                                                                    '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                    '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                    '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                    '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                    '4K'            { $TitleCardoverlay = $4kTC }
+                                                                    '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                     Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                 }
                                                             }
