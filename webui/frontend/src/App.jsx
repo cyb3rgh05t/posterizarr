@@ -209,7 +209,7 @@ function AppContent() {
 
         <main
           className={`pt-16 transition-all duration-300 ${
-            isCollapsed ? "md:ml-20" : "md:ml-64"
+            isCollapsed ? "md:ml-20" : "md:ml-80"
           }`}
         >
           {/* Extra padding on mobile for sidebar menu */}

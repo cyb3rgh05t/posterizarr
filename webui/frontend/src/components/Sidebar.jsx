@@ -352,7 +352,7 @@ const Sidebar = () => {
       {/* Desktop Sidebar */}
       <div
         className={`hidden md:flex flex-col fixed left-0 top-0 h-screen bg-theme-card border-r border-theme transition-all duration-300 z-50 ${
-          isCollapsed ? "w-20" : "w-64"
+          isCollapsed ? "w-20" : "w-80"
         }`}
       >
         <div className="flex items-center p-4 h-20">
