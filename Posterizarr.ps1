@@ -7130,8 +7130,14 @@ $global:TitleCards = $config.PrerequisitePart.TitleCards.tolower()
 $SkipTBA = $config.PrerequisitePart.SkipTBA.tolower()
 $SkipJapTitle = $config.PrerequisitePart.SkipJapTitle.tolower()
 $AssetCleanup = $config.PrerequisitePart.AssetCleanup.tolower()
-$NewLineOnSpecificSymbols = $config.PrerequisitePart.NewLineOnSpecificSymbols.tolower()
-$SymbolsToKeepOnNewLine = $config.PrerequisitePart.SymbolsToKeepOnNewLine.tolower()
+$NewLineOnSpecificSymbols = $config.PrerequisitePart.NewLineOnSpecificSymbols
+if ($NewLineOnSpecificSymbols) {
+    $NewLineOnSpecificSymbols = $NewLineOnSpecificSymbols.tolower()
+}
+$SymbolsToKeepOnNewLine = $config.PrerequisitePart.SymbolsToKeepOnNewLine
+if ($SymbolsToKeepOnNewLine) {
+    $SymbolsToKeepOnNewLine = $SymbolsToKeepOnNewLine.tolower()
+}
 $NewLineSymbols = $config.PrerequisitePart.NewLineSymbols
 
 # Resolution Part
