@@ -2388,7 +2388,7 @@ function ConfigEditor() {
   const initialAuthStatus = useRef(null); // Track initial auth status when config is loaded
 
   // Auto-save state
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const autoSaveTimerRef = useRef(null);
   const lastSavedConfigRef = useRef(null);
