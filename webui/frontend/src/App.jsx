@@ -36,7 +36,8 @@ import SchedulerSettings from "./components/SchedulerSettings";
 import RunModes from "./components/RunModes";
 import AssetOverview from "./components/AssetOverview";
 import RuntimeHistory from "./components/RuntimeHistory";
-import MediaServerHistory from "./components/MediaServerHistory";
+import PlexExport from "./components/PlexExport";
+import JellyfinEmbyExport from "./components/JellyfinEmbyExport";
 import Sidebar from "./components/Sidebar";
 import TopNavbar from "./components/TopNavbar";
 import LoginScreen from "./components/LoginScreen";
@@ -224,7 +225,15 @@ function AppContent() {
                 <Route path="/runtime-history" element={<RuntimeHistory />} />
                 <Route
                   path="/media-server-export"
-                  element={<MediaServerHistory />}
+                  element={<Navigate to="/media-server-export/plex" replace />}
+                />
+                <Route
+                  path="/media-server-export/plex"
+                  element={<PlexExport />}
+                />
+                <Route
+                  path="/media-server-export/jellyfin-emby"
+                  element={<JellyfinEmbyExport />}
                 />
 
                 <Route

@@ -14,16 +14,15 @@ import {
   Info,
   X,
   Search,
-  Server,
 } from "lucide-react";
 import { formatDateToLocale } from "../utils/timeUtils";
 
 const API_URL = "/api";
+const API_PREFIX = "other-media-export";
 
-function MediaServerHistory() {
+function JellyfinEmbyExport() {
   const { t } = useTranslation();
   const { showSuccess, showInfo } = useToast();
-  const [mediaServer, setMediaServer] = useState("plex"); // 'plex' or 'other'
   const [statistics, setStatistics] = useState(null);
   const [libraryData, setLibraryData] = useState([]);
   const [episodeData, setEpisodeData] = useState([]);
@@ -41,17 +40,12 @@ function MediaServerHistory() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Get API endpoint prefix based on selected media server
-  const getApiPrefix = () => {
-    return mediaServer === "plex" ? "plex-export" : "other-media-export";
-  };
-
   // Fetch statistics
   const fetchStatistics = async (silent = false) => {
     if (!silent) setRefreshing(true);
 
     try {
-      const response = await fetch(`${API_URL}/${getApiPrefix()}/statistics`);
+      const response = await fetch(`${API_URL}/${API_PREFIX}/statistics`);
       if (!response.ok) {
         console.error("Failed to fetch statistics:", response.status);
         return;
@@ -71,7 +65,7 @@ function MediaServerHistory() {
   // Fetch all runs
   const fetchRuns = async (autoSelectLatest = false) => {
     try {
-      const response = await fetch(`${API_URL}/${getApiPrefix()}/runs`);
+      const response = await fetch(`${API_URL}/${API_PREFIX}/runs`);
       if (!response.ok) {
         console.error("Failed to fetch runs:", response.status);
         return;
@@ -82,10 +76,6 @@ function MediaServerHistory() {
         const newRuns = data.runs;
         setRuns(newRuns);
 
-        // Auto-select latest run if:
-        // 1. No run selected yet, OR
-        // 2. autoSelectLatest is true (from auto-refresh), OR
-        // 3. A new run appeared (different latest timestamp)
         if (newRuns.length > 0) {
           const latestRun = newRuns[0];
           if (!selectedRun || autoSelectLatest || selectedRun !== latestRun) {
@@ -102,10 +92,10 @@ function MediaServerHistory() {
   const fetchLibraryData = async (runTimestamp = null) => {
     try {
       const url = runTimestamp
-        ? `${API_URL}/${getApiPrefix()}/library?run_timestamp=${encodeURIComponent(
+        ? `${API_URL}/${API_PREFIX}/library?run_timestamp=${encodeURIComponent(
             runTimestamp
           )}`
-        : `${API_URL}/${getApiPrefix()}/library`;
+        : `${API_URL}/${API_PREFIX}/library`;
 
       const response = await fetch(url);
       if (!response.ok) {
@@ -126,10 +116,10 @@ function MediaServerHistory() {
   const fetchEpisodeData = async (runTimestamp = null) => {
     try {
       const url = runTimestamp
-        ? `${API_URL}/${getApiPrefix()}/episodes?run_timestamp=${encodeURIComponent(
+        ? `${API_URL}/${API_PREFIX}/episodes?run_timestamp=${encodeURIComponent(
             runTimestamp
           )}`
-        : `${API_URL}/${getApiPrefix()}/episodes`;
+        : `${API_URL}/${API_PREFIX}/episodes`;
 
       const response = await fetch(url);
       if (!response.ok) {
@@ -146,13 +136,13 @@ function MediaServerHistory() {
     }
   };
 
-  // Import latest CSVs (for both Plex and Jellyfin/Emby)
+  // Import latest CSVs
   const importCSVs = async () => {
     if (importing) return;
 
     setImporting(true);
     try {
-      const response = await fetch(`${API_URL}/${getApiPrefix()}/import`, {
+      const response = await fetch(`${API_URL}/${API_PREFIX}/import`, {
         method: "POST",
       });
 
@@ -163,7 +153,6 @@ function MediaServerHistory() {
 
       const data = await response.json();
       if (data.success) {
-        // Check if data was already imported
         if (data.already_imported) {
           showInfo(
             t("plexExport.alreadyImported", "Data already imported"),
@@ -173,14 +162,8 @@ function MediaServerHistory() {
           showSuccess(t("plexExport.importSuccess", "Import successful"), 3000);
         }
 
-        // Refresh statistics first
         await fetchStatistics(true);
-
-        // Fetch runs to get the new latest run
         await fetchRuns();
-
-        // fetchRuns will update selectedRun state, which will trigger
-        // the useEffect that fetches library and episode data
       }
     } catch (error) {
       console.error("Error importing CSVs:", error);
@@ -200,31 +183,9 @@ function MediaServerHistory() {
     loadInitialData();
   }, []);
 
-  // Reload data when media server changes
-  useEffect(() => {
-    const reloadForServer = async () => {
-      setLoading(true);
-      setLibraryData([]);
-      setEpisodeData([]);
-      setStatistics(null);
-      setRuns([]);
-      setSelectedRun(null);
-      setCurrentPage(0);
-      setSearchTerm("");
-      setLibraryTypeFilter("all");
-      setLibraryNameFilter("all");
-
-      await Promise.all([fetchStatistics(true), fetchRuns()]);
-      setLoading(false);
-    };
-
-    reloadForServer();
-  }, [mediaServer]);
-
   // Load data when selected run changes
   useEffect(() => {
     if (selectedRun) {
-      // Load both library and episode data
       fetchLibraryData(selectedRun);
       fetchEpisodeData(selectedRun);
     }
@@ -233,24 +194,21 @@ function MediaServerHistory() {
   // Auto-refresh data every 30 seconds
   useEffect(() => {
     const interval = setInterval(async () => {
-      // Silently refresh statistics and runs
       await fetchStatistics(true);
-      await fetchRuns(true); // Pass true to auto-select latest run
-    }, 30000); // 30 seconds
+      await fetchRuns(true);
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [mediaServer]);
+  }, []);
 
   // Filter data based on search term
   const getFilteredData = () => {
     let data = activeTab === "library" ? libraryData : episodeData;
 
-    // Apply library type filter (only for library tab)
     if (activeTab === "library" && libraryTypeFilter !== "all") {
       data = data.filter((item) => item.library_type === libraryTypeFilter);
     }
 
-    // Apply library name filter
     if (libraryNameFilter !== "all") {
       data = data.filter((item) => item.library_name === libraryNameFilter);
     }
@@ -301,7 +259,6 @@ function MediaServerHistory() {
     const data = activeTab === "library" ? libraryData : episodeData;
     let filteredForLibraryNames = data;
 
-    // Apply library type filter if active
     if (activeTab === "library" && libraryTypeFilter !== "all") {
       filteredForLibraryNames = data.filter(
         (item) => item.library_type === libraryTypeFilter
@@ -322,14 +279,8 @@ function MediaServerHistory() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-
-    // Refresh statistics and runs
     await fetchStatistics(true);
     await fetchRuns();
-
-    // fetchRuns will update selectedRun state, which will trigger
-    // the useEffect that fetches library and episode data
-
     setTimeout(() => setRefreshing(false), 500);
   };
 
@@ -358,36 +309,6 @@ function MediaServerHistory() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-
-      {/* Media Server Tabs */}
-      <div className="bg-theme-card rounded-xl border border-theme shadow-sm">
-        <div className="flex gap-2 p-2">
-          <button
-            onClick={() => setMediaServer("plex")}
-            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-medium transition-all ${
-              mediaServer === "plex"
-                ? "bg-theme-primary/20 text-theme-primary border border-theme-primary/30"
-                : "bg-theme-hover text-theme-muted hover:text-theme-text border border-transparent"
-            }`}
-          >
-            <Database className="w-4 h-4" />
-            {t("mediaServerExport.plex", "Plex")}
-          </button>
-          <button
-            onClick={() => setMediaServer("other")}
-            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-medium transition-all ${
-              mediaServer === "other"
-                ? "bg-theme-primary/20 text-theme-primary border border-theme-primary/30"
-                : "bg-theme-hover text-theme-muted hover:text-theme-text border border-transparent"
-            }`}
-          >
-            <Server className="w-4 h-4" />
-            {t("mediaServerExport.jellyfinEmby", "Jellyfin / Emby")}
-          </button>
-        </div>
-      </div>
-
       <div className="flex justify-end items-start">
         <div></div>
 
@@ -607,7 +528,6 @@ function MediaServerHistory() {
                 activeTab === "library" ? libraryData : episodeData
               ).filter((item) => {
                 let match = item.library_name === libraryName;
-                // Also apply library type filter if active
                 if (activeTab === "library" && libraryTypeFilter !== "all") {
                   match = match && item.library_type === libraryTypeFilter;
                 }
@@ -1087,4 +1007,4 @@ function DetailRow({
   );
 }
 
-export default MediaServerHistory;
+export default JellyfinEmbyExport;

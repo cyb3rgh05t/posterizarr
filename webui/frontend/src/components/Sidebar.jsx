@@ -44,6 +44,7 @@ const Sidebar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAssetsExpanded, setIsAssetsExpanded] = useState(false);
   const [isConfigExpanded, setIsConfigExpanded] = useState(false);
+  const [isMediaServerExpanded, setIsMediaServerExpanded] = useState(false);
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
   const [missingAssetsCount, setMissingAssetsCount] = useState(0);
   const [manualAssetsCount, setManualAssetsCount] = useState(0);
@@ -161,6 +162,19 @@ const Sidebar = () => {
       path: "/media-server-export",
       label: t("nav.mediaServerExport", "Media Server Export"),
       icon: Server,
+      hasSubItems: true,
+      subItems: [
+        {
+          path: "/media-server-export/plex",
+          label: t("mediaServerExport.plex", "Plex"),
+          icon: Database,
+        },
+        {
+          path: "/media-server-export/jellyfin-emby",
+          label: t("mediaServerExport.jellyfinEmby", "Jellyfin / Emby"),
+          icon: Server,
+        },
+      ],
     },
     {
       id: "gallery",
@@ -329,6 +343,9 @@ const Sidebar = () => {
 
   const isInAssetsSection = location.pathname.startsWith("/gallery");
   const isInConfigSection = location.pathname.startsWith("/config");
+  const isInMediaServerSection = location.pathname.startsWith(
+    "/media-server-export"
+  );
 
   return (
     <>
@@ -368,15 +385,22 @@ const Sidebar = () => {
               if (item.hasSubItems) {
                 const isAssetsItem = item.path === "/gallery";
                 const isConfigItem = item.path === "/config";
+                const isMediaServerItem = item.path === "/media-server-export";
                 const isExpanded = isAssetsItem
                   ? isAssetsExpanded
-                  : isConfigExpanded;
+                  : isConfigItem
+                  ? isConfigExpanded
+                  : isMediaServerExpanded;
                 const isInSection = isAssetsItem
                   ? isInAssetsSection
-                  : isInConfigSection;
+                  : isConfigItem
+                  ? isInConfigSection
+                  : isInMediaServerSection;
                 const toggleExpanded = isAssetsItem
                   ? () => setIsAssetsExpanded(!isAssetsExpanded)
-                  : () => setIsConfigExpanded(!isConfigExpanded);
+                  : isConfigItem
+                  ? () => setIsConfigExpanded(!isConfigExpanded)
+                  : () => setIsMediaServerExpanded(!isMediaServerExpanded);
 
                 return (
                   <div
@@ -617,15 +641,23 @@ const Sidebar = () => {
                   if (item.hasSubItems) {
                     const isAssetsItem = item.path === "/gallery";
                     const isConfigItem = item.path === "/config";
+                    const isMediaServerItem =
+                      item.path === "/media-server-export";
                     const isExpanded = isAssetsItem
                       ? isAssetsExpanded
-                      : isConfigExpanded;
+                      : isConfigItem
+                      ? isConfigExpanded
+                      : isMediaServerExpanded;
                     const isInSection = isAssetsItem
                       ? isInAssetsSection
-                      : isInConfigSection;
+                      : isConfigItem
+                      ? isInConfigSection
+                      : isInMediaServerSection;
                     const toggleExpanded = isAssetsItem
                       ? () => setIsAssetsExpanded(!isAssetsExpanded)
-                      : () => setIsConfigExpanded(!isConfigExpanded);
+                      : isConfigItem
+                      ? () => setIsConfigExpanded(!isConfigExpanded)
+                      : () => setIsMediaServerExpanded(!isMediaServerExpanded);
 
                     return (
                       <div
