@@ -272,6 +272,15 @@ The Web UI will display warnings if uploaded images are smaller than these recom
    - `Background1080p` : 1080p Background overlay file name. (overlay has to match the Background dimensions 3840x2160)
    - `TC4k`: 4K TitleCard overlay file name. (overlay has to match the Poster dimensions 3840x2160)
    - `TC1080p` : 1080p TitleCard overlay file name. (overlay has to match the Poster dimensions 3840x2160)
+   - `4KDoVi`: Specific overlay for 4K Dolby Vision posters. (2000x3000)
+   - `4KHDR10`: Specific overlay for 4K HDR10 posters. (2000x3000)
+   - `4KDoViHDR10`: Specific overlay for 4K DoVi & HDR10 posters. (2000x3000)
+   - `4KDoViBackground`: Specific overlay for 4K Dolby Vision backgrounds. (3840x2160)
+   - `4KHDR10Background`: Specific overlay for 4K HDR10 backgrounds. (3840x2160)
+   - `4KDoViHDR10Background`: Specific overlay for 4K DoVi & HDR10 backgrounds. (3840x2160)
+   - `4KDoViTC`: Specific overlay for 4K Dolby Vision TitleCards. (3840x2160)
+   - `4KHDR10TC`: Specific overlay for 4K HDR10 TitleCards. (3840x2160)
+   - `4KDoViHDR10TC`: Specific overlay for 4K DoVi & HDR10 TitleCards. (3840x2160)
    - `UsePosterResolutionOverlays`: Set to `true` to apply specific overlay with resolution for 4k/1080p posters [4K Example](https://github.com/fscorrupt/Posterizarr/blob/main/images/poster-4k.png)/[1080p Example](https://github.com/fscorrupt/Posterizarr/blob/main/images/poster-1080p.png).
      - if you only want 4k just add your default overlay file also for `Poster1080p`.
    - `UseBackgroundResolutionOverlays`: Set to `true` to apply specific overlay with resolution for 4k/1080p posters [4K Example](https://github.com/fscorrupt/Posterizarr/blob/main/images/background-4k.png)/[1080p Example](https://github.com/fscorrupt/Posterizarr/blob/main/images/background-1080p.png).
@@ -282,6 +291,7 @@ The Web UI will display warnings if uploaded images are smaller than these recom
    - `Posters`: Set to `true` to create movie/show posters.
    - `NewLineOnSpecificSymbols`: Set to `true` to enable automatic insertion of a newline character at each occurrence of specific symbols in `NewLineSymbols` within the title text.
    - `NewLineSymbols`: A list of symbols that will trigger a newline insertion when `NewLineOnSpecificSymbols` is set to `true`. Separate each symbol with a comma (e.g., " - ", ":").
+   - `SymbolsToKeepOnNewLine`: A list of symbols that trigger a newline insertion but are not replaced by the newline character. This only applies if the symbol is also included in `NewLineSymbols`. Separate each symbol with a comma (e.g., "-", ":").
    - `SeasonPosters`: Set to `true` to also create season posters.
    - `BackgroundPosters`: Set to `true` to also create background posters.
    - `TitleCards` : Set to `true` to also create title cards.
@@ -564,16 +574,16 @@ On [docker](#docker) this way:
 >
 > Source picture gets edited by script and is then moved to desired asset location.
 
-Run the script with the `-Manual` switch:
+Run the script with the `-Manual` switch and add the desired extra switch for which poster you want to create `-MoviePosterCard` or `-ShowPosterCard` or`-SeasonPoster` or `-CollectionCard` or `-BackgroundCard` or `-TitleCard`
 
 ```powershell
-.\Posterizarr.ps1 -Manual
+  .\Posterizarr.ps1 -Manual -MoviePosterCard
 ```
 
 On [docker](#docker) this way:
 
 ```sh
-  docker exec -it posterizarr pwsh /app/Posterizarr.ps1 -Manual
+  docker exec -it posterizarr pwsh /app/Posterizarr.ps1 -Manual -MoviePosterCard
 ```
 
 Follow the prompts to enter the source picture path (Container needs Access to it), media folder name, and movie/show title to manually create a custom poster.
@@ -607,6 +617,15 @@ Follow the prompts to enter the source picture path (Container needs Access to i
 `Enter Plex Library Name:`
 
 - Enter the name of the Plex (or Jellyfin) library, e.g., "Movies" or "TV Shows".
+
+`Enter Title Text:`
+
+- Enter the Title of the asset e.g., "Avatar".
+
+`Enter Season Name:`
+
+- Enter the Title of the asset e.g., "Season 1".
+  - If you want to add Custom Text to Season poster please enter it via prefix `Title | Season 1`
 
 ### Manual Mode (Semi Automated)
 

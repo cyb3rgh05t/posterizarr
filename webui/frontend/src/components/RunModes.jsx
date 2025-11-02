@@ -683,7 +683,12 @@ function RunModes() {
 
   const runScript = async (mode) => {
     if (status.running) {
-      showError(t("runModes.scriptRunning"));
+      showError(
+        `${t("runModes.scriptRunning")} - ${t("runModes.status.mode")}: ${
+          status.current_mode.charAt(0).toUpperCase() +
+          status.current_mode.slice(1)
+        }`
+      );
       return;
     }
 
@@ -696,7 +701,11 @@ function RunModes() {
       const data = await response.json();
 
       if (data.success) {
-        showSuccess(t("runModes.startedMode", { mode }));
+        showSuccess(
+          t("runModes.startedMode", {
+            mode: mode.charAt(0).toUpperCase() + mode.slice(1),
+          })
+        );
         fetchStatus();
 
         const logFile = getLogFileForMode(mode);
@@ -725,7 +734,12 @@ function RunModes() {
 
   const runManualMode = async () => {
     if (status.running) {
-      showError(t("runModes.scriptRunning"));
+      showError(
+        `${t("runModes.scriptRunning")} - ${t("runModes.status.mode")}: ${
+          status.current_mode.charAt(0).toUpperCase() +
+          status.current_mode.slice(1)
+        }`
+      );
       return;
     }
 
@@ -1557,7 +1571,9 @@ function RunModes() {
               </div>
               {status.current_mode && (
                 <div className="text-xs text-theme-muted">
-                  {t("runModes.status.mode")} {status.current_mode}
+                  {t("runModes.status.mode")}{" "}
+                  {status.current_mode.charAt(0).toUpperCase() +
+                    status.current_mode.slice(1)}
                 </div>
               )}
             </div>

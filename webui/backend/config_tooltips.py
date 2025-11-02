@@ -95,6 +95,7 @@ CONFIG_TOOLTIPS = {
     "AutoUpdateIM": "Set to true to Auto-Update ImageMagick Portable Version (Does not work with Docker/Unraid). Warning: Untested versions may break things",
     "NewLineOnSpecificSymbols": "Set to true to enable automatic insertion of a newline character at each occurrence of specific symbols in NewLineSymbols within the title text",
     "NewLineSymbols": "A list of symbols that will trigger a newline insertion when NewLineOnSpecificSymbols is true. Separate each symbol with comma (e.g., ' - ', ':')",
+    "SymbolsToKeepOnNewLine": "A list of symbols that trigger a newline insertion but are not replaced by the NewLineOnSpecificSymbols setting. This only applies if the symbol is also included in NewLineSymbols. Separate each symbol with a comma (e.g., '-', ':')",
     "DisableHashValidation": "Set to true to skip hash validation (Default: false). Note: This may produce bloat, as every item will be re-uploaded to media servers",
     "DisableOnlineAssetFetch": "Set to true to skip all online lookups and use only locally available assets (Default: false)",
     # OverlayPart

@@ -19,12 +19,45 @@ const LibraryExclusionSelector = ({
   const [error, setError] = useState(null);
   const [librariesFetched, setLibrariesFetched] = useState(false);
 
+  // Separate state for DB-cached data (shown in boxes)
+  const [cachedLibraries, setCachedLibraries] = useState([]);
+  const [cachedExclusions, setCachedExclusions] = useState([]);
+
   // Initialize from value prop
   useEffect(() => {
     if (Array.isArray(value) && value.length > 0) {
       setExcludedLibraries(value);
     }
   }, [value]);
+
+  // Load ONLY exclusion/inclusion info from DB (not for fetching)
+  useEffect(() => {
+    if (!disabled) {
+      loadCachedExclusionsForDisplay();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array = run only once on mount
+
+  const loadCachedExclusionsForDisplay = async () => {
+    try {
+      const response = await fetch(`/api/libraries/${mediaServerType}/cached`);
+      const data = await response.json();
+
+      if (data.success) {
+        // Store cached data for display in boxes only
+        if (data.libraries && data.libraries.length > 0) {
+          setCachedLibraries(data.libraries);
+        }
+        if (data.excluded && Array.isArray(data.excluded)) {
+          setCachedExclusions(data.excluded);
+          setExcludedLibraries(data.excluded);
+          onChange(data.excluded);
+        }
+      }
+    } catch (err) {
+      console.log("No cached data in database");
+    }
+  };
 
   const getMediaServerConfig = () => {
     if (!config) return null;
@@ -60,6 +93,15 @@ const LibraryExclusionSelector = ({
     }
 
     try {
+      // First, get cached exclusion status
+      const cachedResponse = await fetch(
+        `/api/libraries/${mediaServerType}/cached`
+      );
+      const cachedData = await cachedResponse.json();
+      const cachedExclusions =
+        cachedData.success && cachedData.excluded ? cachedData.excluded : [];
+
+      // Then fetch fresh libraries from server
       const endpoint = `/api/libraries/${mediaServerType}`;
       const response = await fetch(endpoint, {
         method: "POST",
@@ -75,6 +117,16 @@ const LibraryExclusionSelector = ({
         setAvailableLibraries(data.libraries);
         setLibrariesFetched(true);
         setError(null);
+
+        // Restore cached exclusions
+        if (cachedExclusions.length > 0) {
+          setExcludedLibraries(cachedExclusions);
+          onChange(cachedExclusions);
+        }
+
+        // Update cached libraries for display boxes
+        setCachedLibraries(data.libraries);
+        setCachedExclusions(cachedExclusions);
       } else {
         setError(data.error || t("libraryExclusion.fetchFailed"));
         setAvailableLibraries([]);
@@ -87,7 +139,7 @@ const LibraryExclusionSelector = ({
     }
   };
 
-  const toggleLibrary = (libraryName) => {
+  const toggleLibrary = async (libraryName) => {
     let newExcluded;
     if (excludedLibraries.includes(libraryName)) {
       // Remove from excluded (include it)
@@ -97,18 +149,41 @@ const LibraryExclusionSelector = ({
       newExcluded = [...excludedLibraries, libraryName];
     }
     setExcludedLibraries(newExcluded);
+    setCachedExclusions(newExcluded); // Update cached state too
     onChange(newExcluded);
+
+    // Update database
+    await updateExclusionsInDB(newExcluded);
   };
 
-  const clearAll = () => {
+  const updateExclusionsInDB = async (excluded) => {
+    try {
+      await fetch(`/api/libraries/${mediaServerType}/exclusions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ excluded_libraries: excluded }),
+      });
+
+      // Reload cached data for display boxes
+      await loadCachedExclusionsForDisplay();
+    } catch (err) {
+      console.error("Failed to update exclusions in database:", err);
+    }
+  };
+
+  const clearAll = async () => {
     setExcludedLibraries([]);
     onChange([]);
+    await updateExclusionsInDB([]);
   };
 
-  const excludeAll = () => {
+  const excludeAll = async () => {
     const allLibraryNames = availableLibraries.map((lib) => lib.name);
     setExcludedLibraries(allLibraryNames);
     onChange(allLibraryNames);
+    await updateExclusionsInDB(allLibraryNames);
   };
 
   const getLibraryTypeIcon = (type) => {
@@ -306,51 +381,69 @@ const LibraryExclusionSelector = ({
           </div>
         )}
 
-      {/* Included Libraries Section */}
-      {showIncluded && librariesFetched && availableLibraries.length > 0 && (
-        <div className="px-4 py-3 bg-theme-bg/50 border border-theme rounded-lg">
-          <p className="text-xs text-theme-muted mb-2">
-            {t("libraryExclusion.includedCount", {
-              count: availableLibraries.length - excludedLibraries.length,
-            })}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {availableLibraries
-              .filter((lib) => !excludedLibraries.includes(lib.name))
-              .map((lib) => (
-                <span
-                  key={lib.name}
-                  className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm border border-green-500/30 flex items-center gap-1.5"
-                >
-                  <Check className="w-3 h-3" />
-                  {lib.name}
-                </span>
-              ))}
-          </div>
-        </div>
-      )}
+      {/* Separator between Fetch section and Status Boxes */}
+      <div className="border-t border-theme-border/30 my-4"></div>
 
-      {/* Current Exclusions Summary */}
-      {excludedLibraries.length > 0 && (
-        <div className="px-4 py-3 bg-theme-bg/50 border border-theme rounded-lg">
-          <p className="text-xs text-theme-muted mb-2">
-            {t("libraryExclusion.excludedCount", {
-              count: excludedLibraries.length,
-            })}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {excludedLibraries.map((libName) => (
-              <span
-                key={libName}
-                className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm border border-red-500/30 flex items-center gap-1.5"
-              >
-                <X className="w-3 h-3" />
-                {libName}
-              </span>
-            ))}
+      {/* Excluded and Included Libraries - Always Visible in Full Width Row */}
+      <div>
+        <div className="grid grid-cols-2 gap-6">
+          {/* Excluded Libraries */}
+          <div className="px-4 py-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+            <p className="text-xs text-red-400/80 font-medium mb-2">
+              {t("libraryExclusion.excludedCount", {
+                count: cachedExclusions.length,
+              })}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {cachedExclusions.length > 0 ? (
+                cachedExclusions.map((libName) => (
+                  <span
+                    key={libName}
+                    className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm border border-red-500/30 flex items-center gap-1.5"
+                  >
+                    <X className="w-3 h-3" />
+                    {libName}
+                  </span>
+                ))
+              ) : (
+                <span className="text-xs text-theme-muted italic">
+                  {t("libraryExclusion.noneExcluded")}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Included Libraries */}
+          <div className="px-4 py-3 bg-green-500/5 border border-green-500/20 rounded-lg">
+            <p className="text-xs text-green-400/80 font-medium mb-2">
+              {t("libraryExclusion.includedCount", {
+                count: cachedLibraries.length - cachedExclusions.length,
+              })}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {cachedLibraries.length - cachedExclusions.length > 0 ? (
+                cachedLibraries
+                  .filter((lib) => !cachedExclusions.includes(lib.name))
+                  .map((lib) => (
+                    <span
+                      key={lib.name}
+                      className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm border border-green-500/30 flex items-center gap-1.5"
+                    >
+                      <Check className="w-3 h-3" />
+                      {lib.name}
+                    </span>
+                  ))
+              ) : (
+                <span className="text-xs text-theme-muted italic">
+                  {cachedLibraries.length === 0
+                    ? t("libraryExclusion.noneExcluded")
+                    : t("libraryExclusion.allExcluded")}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Help Text */}
       {helpText && <p className="text-xs text-theme-muted">{helpText}</p>}

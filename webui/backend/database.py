@@ -64,12 +64,14 @@ class ImageChoicesDB:
                     tvdbid TEXT,
                     imdbid TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(Title, Rootfolder, Type, LibraryName)
                 )
             """
             )
+
             self.connection.commit()
-            logger.info("Table 'imagechoices' created or already exists")
+            logger.info("Tables created or already exist")
             logger.debug("Table creation/verification complete")
         except sqlite3.Error as e:
             logger.error(f"Error creating table: {e}")
@@ -309,7 +311,7 @@ class ImageChoicesDB:
         imdbid: str = None,
     ):
         """
-        Insert a new image choice record
+        Insert a new image choice record, ignoring duplicates.
 
         Args:
             title: Title of the media
@@ -333,7 +335,7 @@ class ImageChoicesDB:
             cursor = self.connection.cursor()
             cursor.execute(
                 """
-                INSERT INTO imagechoices 
+                INSERT OR IGNORE INTO imagechoices
                 (Title, Type, Rootfolder, LibraryName, Language, Fallback, 
                  TextTruncated, DownloadSource, FavProviderLink, Manual,
                  tmdbid, tvdbid, imdbid)
@@ -356,8 +358,16 @@ class ImageChoicesDB:
                 ),
             )
             self.connection.commit()
-            logger.info(f"Inserted new record for title: {title}")
-            return cursor.lastrowid
+            # Check if a row was actually inserted (lastrowid is 0 if ignored)
+            inserted_id = cursor.lastrowid
+            if inserted_id > 0:
+                logger.info(
+                    f"Inserted new record for title: {title} (ID: {inserted_id})"
+                )
+            else:
+                logger.debug(f"Ignored duplicate record for title: {title}")
+
+            return inserted_id
         except sqlite3.Error as e:
             logger.error(f"Error inserting record: {e}")
             raise
@@ -411,6 +421,48 @@ class ImageChoicesDB:
             return cursor.fetchone()
         except sqlite3.Error as e:
             logger.error(f"Error fetching record by ID: {e}")
+            raise
+
+    def get_choice_by_rootfolder(self, rootfolder: str):
+        """
+        Get image choice by rootfolder name
+
+        Args:
+            rootfolder: Rootfolder name to search for (e.g., "Movie Name (2024) {tmdb-12345}")
+
+        Returns:
+            sqlite3.Row or None: Record if found, None otherwise
+        """
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "SELECT * FROM imagechoices WHERE Rootfolder = ?", (rootfolder,)
+            )
+            return cursor.fetchone()
+        except sqlite3.Error as e:
+            logger.error(f"Error fetching record by rootfolder: {e}")
+            raise
+
+    def get_choice_by_rootfolder_and_title(self, rootfolder: str, title: str):
+        """
+        Get image choice by rootfolder and title (more specific lookup)
+
+        Args:
+            rootfolder: Rootfolder name to search for (e.g., "Movie Name (2024) {tmdb-12345}")
+            title: Title/filename to search for (e.g., "Season 4", "S04E01", "background")
+
+        Returns:
+            sqlite3.Row or None: Record if found, None otherwise
+        """
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "SELECT * FROM imagechoices WHERE Rootfolder = ? AND Title = ?",
+                (rootfolder, title),
+            )
+            return cursor.fetchone()
+        except sqlite3.Error as e:
+            logger.error(f"Error fetching record by rootfolder and title: {e}")
             raise
 
     def update_choice(self, record_id: int, **kwargs):
@@ -505,31 +557,15 @@ class ImageChoicesDB:
                     reader, start=2
                 ):  # start=2 because of header
                     try:
-                        # Remove quotes and whitespace from values
+                        # PARSE ALL VALUES
                         title = row.get("Title", "").strip('"').strip()
                         rootfolder = row.get("Rootfolder", "").strip('"').strip()
 
-                        # Skip empty rows (all fields are empty or just semicolons)
+                        # Skip empty rows
                         if not title and not rootfolder:
                             continue
 
-                        # Get type early for duplicate check
                         type_ = row.get("Type", "").strip('"').strip()
-
-                        # Check if record already exists (based on Title, Rootfolder AND Type)
-                        cursor = self.connection.cursor()
-                        cursor.execute(
-                            "SELECT id FROM imagechoices WHERE Title = ? AND Rootfolder = ? AND Type = ?",
-                            (title, rootfolder, type_),
-                        )
-                        existing = cursor.fetchone()
-
-                        if existing:
-                            stats["skipped"] += 1
-                            logger.debug(f"Skipping existing record: {title} ({type_})")
-                            continue
-
-                        # Insert new record
                         library_name = row.get("LibraryName", "").strip('"').strip()
                         language = row.get("Language", "").strip('"').strip()
                         fallback = row.get("Fallback", "").strip('"').strip()
@@ -540,15 +576,14 @@ class ImageChoicesDB:
                         fav_provider_link = (
                             row.get("Fav Provider Link", "").strip('"').strip()
                         )
-
-                        # Get Manual value from CSV if present, otherwise determine from download_source
                         manual = row.get("Manual", "").strip('"').strip()
+                        tmdbid = row.get("tmdbid", "").strip('"').strip() or "false"
+                        tvdbid = row.get("tvdbid", "").strip('"').strip() or "false"
+                        imdbid = row.get("imdbid", "").strip('"').strip() or "false"
 
-                        # If Manual field is empty in CSV, determine from download_source
+                        # LOGIC FOR MANUAL/IDS
                         if not manual:
-                            # Manual is "false" by default (automatic run)
                             manual = "false"
-                            # Check if it's a local file path (indicates manual upload)
                             if download_source == "false" or (
                                 download_source
                                 and (
@@ -559,13 +594,6 @@ class ImageChoicesDB:
                             ):
                                 manual = "true"
 
-                        # Get IDs from CSV if present (after script update), otherwise extract from Rootfolder
-                        tmdbid = row.get("tmdbid", "").strip('"').strip() or "false"
-                        tvdbid = row.get("tvdbid", "").strip('"').strip() or "false"
-                        imdbid = row.get("imdbid", "").strip('"').strip() or "false"
-
-                        # If IDs not in CSV, extract from rootfolder name (backward compatibility)
-                        # Format: "Movie Name (2024) {tmdb-12345}" or "{tvdb-67890}" or "{imdb-tt1234567}"
                         if (
                             tmdbid == "false"
                             and tvdbid == "false"
@@ -573,22 +601,20 @@ class ImageChoicesDB:
                         ) and rootfolder:
                             import re
 
-                            # Extract tmdb ID
                             tmdb_match = re.search(r"\{tmdb-(\d+)\}", rootfolder)
                             if tmdb_match:
                                 tmdbid = tmdb_match.group(1)
-
-                            # Extract tvdb ID
                             tvdb_match = re.search(r"\{tvdb-(\d+)\}", rootfolder)
                             if tvdb_match:
                                 tvdbid = tvdb_match.group(1)
-
-                            # Extract imdb ID
                             imdb_match = re.search(r"\{imdb-(tt\d+)\}", rootfolder)
                             if imdb_match:
                                 imdbid = imdb_match.group(1)
 
-                        self.insert_choice(
+                        # JUST CALL INSERT_CHOICE
+                        # It will return 0 if the record was a duplicate (ignored)
+                        # or the new ID if it was successfully added.
+                        inserted_id = self.insert_choice(
                             title=title,
                             type_=type_,
                             rootfolder=rootfolder,
@@ -603,7 +629,12 @@ class ImageChoicesDB:
                             tvdbid=tvdbid,
                             imdbid=imdbid,
                         )
-                        stats["added"] += 1
+
+                        # UPDATE STATS BASED ON THE RESULT
+                        if inserted_id > 0:
+                            stats["added"] += 1
+                        else:
+                            stats["skipped"] += 1
 
                     except Exception as e:
                         stats["errors"] += 1
