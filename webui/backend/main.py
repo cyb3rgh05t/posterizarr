@@ -2086,6 +2086,55 @@ async def update_config(data: ConfigUpdate):
         else:
             current_flat = current_config
 
+        # Preserve library exclusions if database hasn't been populated yet
+        # This prevents losing exclusions on autosave before libraries are fetched
+        logger.debug("Checking if library exclusions need to be preserved...")
+        for server_config in [
+            ("plex", "PlexLibstoExclude"),
+            ("jellyfin", "JellyfinLibstoExclude"),
+            ("emby", "EmbyLibstoExclude"),
+        ]:
+            server_type, exclusion_key = server_config
+
+            # Check if the database has libraries for this server type
+            try:
+                db_result = server_libraries_db.get_media_server_libraries(server_type)
+                has_db_libraries = len(db_result.get("libraries", [])) > 0
+
+                # If database is empty but config.json has exclusions, preserve them
+                if not has_db_libraries and current_flat.get(exclusion_key):
+                    current_exclusions = current_flat.get(exclusion_key)
+                    new_exclusions = data.config.get(exclusion_key, [])
+
+                    # Only preserve if the new value is empty/different
+                    # (user might be intentionally clearing it)
+                    if not new_exclusions and current_exclusions:
+                        logger.info(
+                            f"Preserving {exclusion_key} from config.json "
+                            f"(database not yet populated): {current_exclusions}"
+                        )
+                        data.config[exclusion_key] = current_exclusions
+                    elif new_exclusions != current_exclusions:
+                        logger.debug(
+                            f"{exclusion_key} changed by user, using new value: {new_exclusions}"
+                        )
+                else:
+                    if has_db_libraries:
+                        logger.debug(
+                            f"Database has libraries for {server_type}, "
+                            f"using value from config update"
+                        )
+            except Exception as db_error:
+                logger.warning(
+                    f"Could not check database for {server_type} libraries: {db_error}"
+                )
+                # On error, preserve existing exclusions to be safe
+                if current_flat.get(exclusion_key):
+                    logger.info(
+                        f"Preserving {exclusion_key} due to database check error"
+                    )
+                    data.config[exclusion_key] = current_flat.get(exclusion_key)
+
         # Detect and log changes
         changes_detected = []
         for key, new_value in data.config.items():
