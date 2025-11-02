@@ -592,7 +592,9 @@
     "clickToFetch": "Klicken Sie auf \"Bibliotheken abrufen\", um Bibliotheken von Ihrem {{server}}-Server zu laden.",
     "noLibraries": "Keine Film- oder Serienbibliotheken auf diesem Server gefunden.",
     "excludedCount": "Ausgeschlossene Bibliotheken ({{count}}):",
-    "includedCount": "Eingeschlossene Bibliotheken ({{count}}):"
+    "includedCount": "Eingeschlossene Bibliotheken ({{count}}):",
+    "noneExcluded": "Keine Bibliotheken ausgeschlossen - alle Bibliotheken werden verarbeitet",
+    "allExcluded": "Alle Bibliotheken ausgeschlossen - keine Verarbeitung erfolgt"
   },
   "languageOrderSelector": {
     "noLanguages": "Keine Sprachen ausgewählt. Fügen Sie Sprachen über das Dropdown-Menü unten hinzu.",

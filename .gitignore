@@ -30,3 +30,5 @@ scheduler.json
 /Overlayfiles
 /webui tests-infos
 /devUtils
+/Cache
+webui/backend/config_tooltips.py.backup

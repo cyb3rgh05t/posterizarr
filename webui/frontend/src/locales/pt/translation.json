@@ -591,7 +591,9 @@
     "clickToFetch": "Clique em \"Buscar bibliotecas\" para carregar bibliotecas do seu servidor {{server}}.",
     "noLibraries": "Nenhuma biblioteca de filmes ou séries encontrada neste servidor.",
     "excludedCount": "Bibliotecas excluídas ({{count}}):",
-    "includedCount": "Bibliotecas incluídas ({{count}}):"
+    "includedCount": "Bibliotecas incluídas ({{count}}):",
+    "noneExcluded": "Nenhuma biblioteca excluída - todas as bibliotecas serão processadas",
+    "allExcluded": "Todas as bibliotecas excluídas - nenhum processamento ocorrerá"
   },
   "languageOrderSelector": {
     "noLanguages": "Nenhum idioma selecionado. Adicione idiomas usando o menu suspenso abaixo.",

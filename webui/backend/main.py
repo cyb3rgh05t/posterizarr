@@ -382,19 +382,15 @@ try:
         get_tooltip,
     )
 
-    # Import tooltips
-    logger.debug("Importing config_tooltips")
-    from config_tooltips import CONFIG_TOOLTIPS
+    # Tooltips are now handled in the frontend (ConfigEditor.jsx) with multi-language support
+    CONFIG_TOOLTIPS = {}
 
     CONFIG_MAPPER_AVAILABLE = True
     logger.info("Config mapper loaded successfully")
     logger.debug(f"UI_GROUPS available: {len(UI_GROUPS) if UI_GROUPS else 0}")
-    logger.debug(
-        f"CONFIG_TOOLTIPS available: {len(CONFIG_TOOLTIPS) if CONFIG_TOOLTIPS else 0}"
-    )
 except ImportError as e:
     CONFIG_MAPPER_AVAILABLE = False
-    CONFIG_TOOLTIPS = {}  # Fallback if config_tooltips not available
+    CONFIG_TOOLTIPS = {}
     logger.warning(f"Config mapper not available: {e}. Using grouped config structure.")
     logger.debug(f"ImportError details: {type(e).__name__}: {str(e)}", exc_info=True)
 
@@ -435,6 +431,20 @@ except ImportError as e:
     DATABASE_AVAILABLE = False
     logger.warning(
         f"Database module not available: {e}. Database features will be disabled."
+    )
+    logger.debug(f"ImportError details: {type(e).__name__}: {str(e)}", exc_info=True)
+
+# Import server libraries database module
+try:
+    logger.debug("Attempting to import server_libraries_database module")
+    from server_libraries_database import init_server_libraries_db, ServerLibrariesDB
+
+    SERVER_LIBRARIES_DB_AVAILABLE = True
+    logger.info("Server libraries database module loaded successfully")
+except ImportError as e:
+    SERVER_LIBRARIES_DB_AVAILABLE = False
+    logger.warning(
+        f"Server libraries database module not available: {e}. Library management will be disabled."
     )
     logger.debug(f"ImportError details: {type(e).__name__}: {str(e)}", exc_info=True)
 
@@ -513,6 +523,7 @@ scheduler: Optional["PosterizarrScheduler"] = None
 db: Optional["ImageChoicesDB"] = None
 config_db: Optional["ConfigDB"] = None
 media_export_db: Optional["MediaExportDatabase"] = None
+server_libraries_db: Optional["ServerLibrariesDB"] = None
 
 # Initialize cache variables early to prevent race conditions
 cache_refresh_task = None
@@ -1622,7 +1633,7 @@ class SPAMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown"""
-    global scheduler, db, config_db, media_export_db, logs_watcher
+    global scheduler, db, config_db, media_export_db, logs_watcher, server_libraries_db
 
     # Startup: Initialize cache asynchronously
     logger.info("Starting Posterizarr Web UI Backend")
@@ -1708,6 +1719,22 @@ async def lifespan(app: FastAPI):
             db = None
     else:
         logger.info("Database module not available, skipping database initialization")
+
+    # Initialize server libraries database
+    server_libraries_db = None
+    if SERVER_LIBRARIES_DB_AVAILABLE:
+        try:
+            logger.info("Initializing server libraries database...")
+            SERVER_LIBRARIES_DB_PATH = DATABASE_DIR / "server_libraries.db"
+            server_libraries_db = init_server_libraries_db(SERVER_LIBRARIES_DB_PATH)
+            logger.info(f"Server libraries database ready: {SERVER_LIBRARIES_DB_PATH}")
+        except Exception as e:
+            logger.error(f"Failed to initialize server libraries database: {e}")
+            server_libraries_db = None
+    else:
+        logger.info(
+            "Server libraries database module not available, skipping initialization"
+        )
 
     # Initialize and start logs watcher if available
     logs_watcher = None
@@ -3566,6 +3593,52 @@ async def validate_uptimekuma(request: UptimeKumaValidationRequest):
 # ============================================================================
 
 
+@app.get("/api/libraries/{server_type}/cached")
+async def get_cached_libraries(server_type: str):
+    """Get cached libraries from database for a specific server type"""
+    logger.info(f"Fetching cached libraries for {server_type}")
+
+    if server_type not in ["plex", "jellyfin", "emby"]:
+        return {"success": False, "error": "Invalid server type"}
+
+    try:
+        result = server_libraries_db.get_media_server_libraries(server_type)
+        logger.info(
+            f"Found {len(result['libraries'])} cached libraries for {server_type} ({len(result['excluded'])} excluded)"
+        )
+        return {
+            "success": True,
+            "libraries": result["libraries"],
+            "excluded": result["excluded"],
+        }
+    except Exception as e:
+        logger.error(f"Error fetching cached libraries: {e}")
+        return {"success": False, "error": str(e), "libraries": [], "excluded": []}
+
+
+class LibraryExclusionUpdate(BaseModel):
+    excluded_libraries: list[str]
+
+
+@app.post("/api/libraries/{server_type}/exclusions")
+async def update_library_exclusions(server_type: str, request: LibraryExclusionUpdate):
+    """Update which libraries are excluded for a specific server type"""
+    logger.info(f"Updating exclusions for {server_type}: {request.excluded_libraries}")
+
+    if server_type not in ["plex", "jellyfin", "emby"]:
+        return {"success": False, "error": "Invalid server type"}
+
+    try:
+        server_libraries_db.update_library_exclusions(
+            server_type, request.excluded_libraries
+        )
+        logger.info(f"Successfully updated exclusions for {server_type}")
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error updating library exclusions: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @app.post("/api/libraries/plex")
 async def get_plex_libraries(request: PlexValidationRequest):
     """Fetch Plex libraries"""
@@ -3591,6 +3664,16 @@ async def get_plex_libraries(request: PlexValidationRequest):
                     )
 
                 logger.info(f"Found {len(libraries)} Plex libraries")
+
+                # Save libraries to database
+                try:
+                    server_libraries_db.save_media_server_libraries("plex", libraries)
+                    logger.info("Saved Plex libraries to database")
+                except Exception as db_error:
+                    logger.error(
+                        f"Failed to save Plex libraries to database: {str(db_error)}"
+                    )
+
                 return {"success": True, "libraries": libraries}
             else:
                 logger.error(f"Failed to fetch Plex libraries: {response.status_code}")
@@ -3633,6 +3716,18 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
                         )
 
                 logger.info(f"Found {len(libraries)} Jellyfin libraries")
+
+                # Save libraries to database
+                try:
+                    server_libraries_db.save_media_server_libraries(
+                        "jellyfin", libraries
+                    )
+                    logger.info("Saved Jellyfin libraries to database")
+                except Exception as db_error:
+                    logger.error(
+                        f"Failed to save Jellyfin libraries to database: {str(db_error)}"
+                    )
+
                 return {"success": True, "libraries": libraries}
             else:
                 logger.error(
@@ -3676,6 +3771,16 @@ async def get_emby_libraries(request: EmbyValidationRequest):
                         )
 
                 logger.info(f"Found {len(libraries)} Emby libraries")
+
+                # Save libraries to database
+                try:
+                    server_libraries_db.save_media_server_libraries("emby", libraries)
+                    logger.info("Saved Emby libraries to database")
+                except Exception as db_error:
+                    logger.error(
+                        f"Failed to save Emby libraries to database: {str(db_error)}"
+                    )
+
                 return {"success": True, "libraries": libraries}
             else:
                 logger.error(f"Failed to fetch Emby libraries: {response.status_code}")

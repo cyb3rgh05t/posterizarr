@@ -21,12 +21,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Import tooltips from separate file
-try:
-    from config_tooltips import CONFIG_TOOLTIPS
-except ImportError:
-    # Fallback if config_tooltips.py is not available
-    CONFIG_TOOLTIPS = {}
+# Tooltips are now handled in the frontend (ConfigEditor.jsx) with multi-language support
+CONFIG_TOOLTIPS = {}
 
 
 # =============================================================================
@@ -327,6 +323,7 @@ CONFIG_GROUPS = {
     "RTLFont": "PrerequisitePart",
     "NewLineOnSpecificSymbols": "PrerequisitePart",
     "NewLineSymbols": "PrerequisitePart",
+    "SymbolsToKeepOnNewLine": "PrerequisitePart",
     "PlexUpload": "PrerequisitePart",
     "BackupPath": "PrerequisitePart",
     "ForceRunningDeletion": "PrerequisitePart",
@@ -344,6 +341,15 @@ CONFIG_GROUPS = {
     "TC1080p": "PrerequisitePart",
     "UseBackgroundResolutionOverlays": "PrerequisitePart",
     "UseTCResolutionOverlays": "PrerequisitePart",
+    "4KDoVi": "PrerequisitePart",
+    "4KHDR10": "PrerequisitePart",
+    "4KDoViHDR10": "PrerequisitePart",
+    "4KDoViBackground": "PrerequisitePart",
+    "4KHDR10Background": "PrerequisitePart",
+    "4KDoViHDR10Background": "PrerequisitePart",
+    "4KDoViTC": "PrerequisitePart",
+    "4KHDR10TC": "PrerequisitePart",
+    "4KDoViHDR10TC": "PrerequisitePart",
     "DisableOnlineAssetFetch": "PrerequisitePart",
     "collectionfont": "PrerequisitePart",
     "collectionoverlayfile": "PrerequisitePart",
@@ -587,15 +593,28 @@ UI_GROUPS = {
         "UsePosterResolutionOverlays",
         "poster4k",
         "Poster1080p",
+        "4KDoVi",
+        "4KHDR10",
+        "4KDoViHDR10",
         "UseBackgroundResolutionOverlays",
         "Background4k",
         "Background1080p",
+        "4KDoViBackground",
+        "4KHDR10Background",
+        "4KDoViHDR10Background",
         "UseTCResolutionOverlays",
         "TC4k",
         "TC1080p",
+        "4KDoViTC",
+        "4KHDR10TC",
+        "4KDoViHDR10TC",
     ],
     "Image Processing": ["ImageProcessing", "outputQuality"],
-    "Text Formatting": ["NewLineOnSpecificSymbols", "NewLineSymbols"],
+    "Text Formatting": [
+        "NewLineOnSpecificSymbols",
+        "NewLineSymbols",
+        "SymbolsToKeepOnNewLine",
+    ],
     "Poster Settings": [
         "PosterFontAllCaps",
         "PosterAddBorder",
@@ -979,6 +998,7 @@ DISPLAY_NAMES = {
     "AutoUpdateIM": "Auto-Update ImageMagick",
     "NewLineOnSpecificSymbols": "New Line on Specific Symbols",
     "NewLineSymbols": "New Line Symbols",
+    "SymbolsToKeepOnNewLine": "Symbols to Keep on New Line",
     "BackupPath": "Backup Path",
     "ForceRunningDeletion": "Force Running Deletion",
     "AutoUpdatePosterizarr": "Auto-Update Posterizarr",
@@ -995,6 +1015,15 @@ DISPLAY_NAMES = {
     "TC1080p": "1080p Title Card Overlay",
     "UseBackgroundResolutionOverlays": "Use Background Resolution Overlays",
     "UseTCResolutionOverlays": "Use Title Card Resolution Overlays",
+    "4KDoVi": "4K Dolby Vision Poster Overlay",
+    "4KHDR10": "4K HDR10 Poster Overlay",
+    "4KDoViHDR10": "4K DoVi & HDR10 Poster Overlay",
+    "4KDoViBackground": "4K Dolby Vision Background Overlay",
+    "4KHDR10Background": "4K HDR10 Background Overlay",
+    "4KDoViHDR10Background": "4K DoVi & HDR10 Background Overlay",
+    "4KDoViTC": "4K Dolby Vision Title Card Overlay",
+    "4KHDR10TC": "4K HDR10 Title Card Overlay",
+    "4KDoViHDR10TC": "4K DoVi & HDR10 Title Card Overlay",
     "DisableOnlineAssetFetch": "Disable Online Asset Fetch",
     # Image Processing
     "ImageProcessing": "Image Processing",
