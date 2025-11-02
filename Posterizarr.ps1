@@ -232,8 +232,8 @@ function Output-ConfigJson {
     function RedactKey($value) {
         if ($null -eq $value) { return $null }
         # If the string is 1 character or less, return it as-is.
-        if ($value.Length -le 1) { 
-            return $value 
+        if ($value.Length -le 1) {
+            return $value
         }
         # For any string longer than 1 char, show the first char and then redact.
         return $value.Substring(0, 1) + '****'
@@ -1234,6 +1234,7 @@ function Get-OptimalPointSize {
     if ($__tsc_Hit) {
         if ($__tsc_Hit.PSObject.Properties.Name -contains 'isTruncated') { $global:IsTruncated = [bool]$__tsc_Hit.isTruncated } else { $global:IsTruncated = $null }
         $script:CurrentTextSizeSource = 'cache'
+        $script:tsHits++   # [stats] count cache hits
         return [int]$__tsc_Hit.pointSize
     }
     # ----- /cache hit -----
@@ -1245,6 +1246,9 @@ function Get-OptimalPointSize {
 
     # Log the command for debugging purposes
     $cmd | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+
+    # [stats] start timing the “miss” compute path
+    $tsc_sw = [Diagnostics.Stopwatch]::StartNew()
 
     # Execute the command and get the current point size
     $current_pointsize = [int](Invoke-Expression $cmd | Out-String).Trim()
@@ -1259,6 +1263,12 @@ function Get-OptimalPointSize {
         $current_pointsize = $min_pointsize
     }
 
+    # [stats] stop timer and record miss metrics
+    $tsc_sw.Stop()
+    $script:tsMiss++
+    $script:tsRuns++
+    $script:tsMs += $tsc_sw.ElapsedMilliseconds
+
     # ----- cache store -----
     $__tsc_Save = [PSCustomObject]@{ pointSize = [int]$current_pointsize; isTruncated = [bool]$global:IsTruncated }
     Set-TextSizeCacheEntry -Key $__tsc_Key -Result $__tsc_Save -Path $__tsc_Path
@@ -1267,6 +1277,7 @@ function Get-OptimalPointSize {
     $script:CurrentTextSizeSource = 'calculated'
     return $current_pointsize
 }
+
 function GetTMDBMoviePoster {
     Write-Entry -Subtext "Searching on TMDB for a movie poster - TMDBID: $global:tmdbid" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
     if (!$global:tmdbid) {
@@ -3503,7 +3514,7 @@ function GetTVDBSeasonPoster {
         }
         if ($response) {
             if ($response.data.seasons) {
-                # Select season id from current Seasonnumber
+                # Select season id from current Season number
                 $SeasonID = $response.data.seasons | Where-Object { $_.number -eq $global:SeasonNumber -and $_.type.type -eq 'official' }
                 if (!$SeasonID) {
                     $SeasonID = $response.data.seasons | Where-Object { $_.number -eq $global:SeasonNumber -and $_.type.type -eq 'alternate' }
@@ -4088,14 +4099,14 @@ function CheckJsonPaths {
     )
 
     $paths = @(
-        $font, $RTLfont, $backgroundfont, $titlecardfont, $Posteroverlay, 
-        $Collectionoverlay, $Backgroundoverlay, $titlecardoverlay, $Seasonoverlay, 
-        $Posteroverlay4k, $Posteroverlay1080p, $Backgroundoverlay4k, 
+        $font, $RTLfont, $backgroundfont, $titlecardfont, $Posteroverlay,
+        $Collectionoverlay, $Backgroundoverlay, $titlecardoverlay, $Seasonoverlay,
+        $Posteroverlay4k, $Posteroverlay1080p, $Backgroundoverlay4k,
         $Backgroundoverlay1080p, $TCoverlay4k, $TCoverlay1080p,$Posteroverlay4KDoVi, $Posteroverlay4KHDR10, $Posteroverlay4KDoViHDR10,
         $Backgroundoverlay4KDoVi, $Backgroundoverlay4KHDR10, $Backgroundoverlay4KDoViHDR10,
         $TCoverlay4KDoVi, $TCoverlay4KHDR10, $TCoverlay4KDoViHDR10
     )
-    
+
     foreach ($path in $paths) {
         # Only check the path if it's not null or empty.
         # This allows optional overlays (set to null in config) to pass.
@@ -4435,14 +4446,14 @@ function CheckOverlayDimensions {
             [string]$OverlayName
         )
 
-        # If the path is $null or empty (i.e., optional overlay not configured), 
+        # If the path is $null or empty (i.e., optional overlay not configured),
         if ([string]::IsNullOrEmpty($OverlayPath)) {
             return
         }
 
         try {
             $actualDimensions = & $magick $OverlayPath -format "%wx%h" info:
-            
+
             if ($actualDimensions -eq $ExpectedSize) {
                 Write-Entry -Subtext "$OverlayName is correctly sized at: $ExpectedSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
             }
@@ -4462,7 +4473,7 @@ function CheckOverlayDimensions {
     Test-Dimension -OverlayPath $Collectionoverlay -ExpectedSize $PosterSize -OverlayName "Collection overlay"
     Test-Dimension -OverlayPath $Posteroverlay4k -ExpectedSize $PosterSize -OverlayName "4K Poster overlay"
     Test-Dimension -OverlayPath $Posteroverlay1080p -ExpectedSize $PosterSize -OverlayName "1080p Poster overlay"
-    
+
     # Standard Background/TC Types (expect BackgroundSize)
     Test-Dimension -OverlayPath $Backgroundoverlay -ExpectedSize $BackgroundSize -OverlayName "Background overlay"
     Test-Dimension -OverlayPath $Titlecardoverlay -ExpectedSize $BackgroundSize -OverlayName "TitleCard overlay"
@@ -6360,6 +6371,7 @@ function MassDownloadPlexArtwork {
     if ($errorCount -ge '1') {
         Write-Entry -Message "During execution '$errorCount' Errors occurred, please check the log for a detailed description where you see [ERROR-HERE]." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
@@ -6731,10 +6743,28 @@ function Send-UptimeKumaWebhook {
         Write-Entry -Message "Failed to send Uptime Kuma webhook: $_" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
     }
 }
+
+function Write-TextSizeCacheSummary {
+  param([string]$Label = "Text-size cache")
+  $total=$script:tsHits+$script:tsMiss
+  $rate = if($total){[math]::Round(100*$script:tsHits/$total,2)}else{0}
+  $avg  = if($script:tsRuns){[math]::Round($script:tsMs/$script:tsRuns,2)}else{0}
+  $saved=[TimeSpan]::FromMilliseconds([double]($script:tsHits*$avg))
+  Write-Entry -Subtext ("{0}: hits='{1}', misses='{2}' ({3}%); magick_calls='{4}' in '{5} ms'; est_saved='{6}h {7}m {8}s'" -f `
+    $Label,$script:tsHits,$script:tsMiss,$rate,$script:tsRuns,$script:tsMs,$saved.Hours,$saved.Minutes,$saved.Seconds) `
+    -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+}
+
 #### FUNCTION END ####
 
 ##### PRE-START #####
 $global:errorCount = 0
+# ---- text-size cache stats (minimal) ----
+if (-not (Get-Variable -Name tsHits -Scope Script -ErrorAction SilentlyContinue)) { [int]  $script:tsHits = 0 }
+if (-not (Get-Variable -Name tsMiss -Scope Script -ErrorAction SilentlyContinue)) { [int]  $script:tsMiss = 0 }
+if (-not (Get-Variable -Name tsRuns -Scope Script -ErrorAction SilentlyContinue)) { [int]  $script:tsRuns = 0 }
+if (-not (Get-Variable -Name tsMs   -Scope Script -ErrorAction SilentlyContinue)) { [int64]$script:tsMs   = 0 }
+# -----------------------------------------
 #region Variables
 # Set Branch
 if ($dev) {
@@ -7823,7 +7853,7 @@ if ($Manual) {
 
         # 1. Define all poster-related parameters
         $posterParams = @(
-            'SeasonPoster', 'MoviePosterCard', 'ShowPosterCard', 
+            'SeasonPoster', 'MoviePosterCard', 'ShowPosterCard',
             'TitleCard', 'CollectionCard', 'BackgroundCard'
         )
 
@@ -7833,7 +7863,7 @@ if ($Manual) {
         # 3. Only ask questions if *none* were provided
         if (-not $anyPosterParamBound) {
             Write-Host "No poster types specified. Please select which to create."
-            
+
             # Define the variable names and their prompts
             $posterPrompts = [Ordered]@{
                 'SeasonPoster'     = "Create Season Poster?"
@@ -7857,7 +7887,7 @@ if ($Manual) {
         # Error handling for missing selection (CORRECTED to check all types)
         if (-not ($SeasonPoster -or $MoviePosterCard -or $ShowPosterCard -or $TitleCard -or $CollectionCard -or $BackgroundCard)) {
             Write-Entry -Message "No poster type selected. Please select at least one type." -Path $global:ScriptRoot\Logs\Manuallog.log -Color Red -log Error
-            
+
             if (Test-Path $CurrentlyRunning) {
                 try {
                     Remove-Item -LiteralPath $CurrentlyRunning -ErrorAction Stop | Out-Null
@@ -7868,7 +7898,7 @@ if ($Manual) {
                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                 }
             }
-            
+
             if ($global:UptimeKumaUrl) {
                 Send-UptimeKumaWebhook -status "down" -msg "No poster type selected"
             }
@@ -9678,6 +9708,7 @@ Elseif ($Testing) {
     Write-Entry -Subtext "Deleting backgroundtestimage: $backgroundtestimage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     Remove-Item -LiteralPath $backgroundtestimage | out-null
     Write-Entry -Subtext "Poster/Background/TitleCard Tests finished, you can find them here: $(Join-Path $global:ScriptRoot 'test')" -Path (Join-Path $global:ScriptRoot 'Logs\Testinglog.log') -Color Green -log Info
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     $gettestimages = Get-ChildItem $global:ScriptRoot\test
     $titlecardscount = ($gettestimages | Where-Object { $_.name -like 'Title*' }).count
@@ -14235,6 +14266,7 @@ Elseif ($Tautulli) {
         $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
         Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Export json
@@ -18527,6 +18559,7 @@ Elseif ($ArrTrigger) {
             $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
             Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
+        Write-TextSizeCacheSummary
         Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
         # Send Notification
@@ -23072,6 +23105,7 @@ Elseif ($ArrTrigger) {
             $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
             Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
+        Write-TextSizeCacheSummary
         Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
         # Send Notification
@@ -24499,7 +24533,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
     if ($errorCount -ge '1') {
         Write-Entry -Message "During execution '$errorCount' Errors occurred, please check the log for a detailed description where you see [ERROR-HERE]." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
-
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
@@ -28785,6 +28819,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
         $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
         Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
@@ -34196,6 +34231,7 @@ else {
         $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
         Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
