@@ -23610,7 +23610,27 @@ Elseif ($ArrTrigger) {
 }
 #region Backup Mode
 Elseif ($Backup) {
-    MassDownloadPlexArtwork
+    if ($UsePlex -eq 'true') {
+        MassDownloadPlexArtwork
+    }
+    Else {
+        Write-Entry -Message "Backup mode currently works only for Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Warning
+        # Clear Running File
+        if (Test-Path $CurrentlyRunning) {
+            try {
+                Remove-Item -LiteralPath $CurrentlyRunning -ErrorAction Stop | Out-Null
+            }
+            catch {
+                Write-Entry -Message "Failed to delete '$CurrentlyRunning'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                Write-Entry -Subtext "Reason: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Error
+                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            }
+        }
+        if ($global:UptimeKumaUrl) {
+            Send-UptimeKumaWebhook -status "down" -msg "No libs found"
+        }
+        Exit
+    }
 }
 #region Sync Mode
 Elseif ($SyncJelly -or $SyncEmby) {
