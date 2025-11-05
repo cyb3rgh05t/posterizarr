@@ -4278,6 +4278,11 @@ function CheckPlexAccess {
                 Write-Entry -Subtext "Plex access is working..." -Path $configLogging -Color Green -log Info
                 # Check if libs are available
                 [XML]$Libs = $response.Content
+                # Plex Debug info
+                Write-Entry -Subtext "Plex Server Version: $($Libs.MediaContainer.version)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "My Plex Server: $($Libs.MediaContainer.myPlex)"-Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server Signin State: $($Libs.MediaContainer.myPlexSigninState)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server allow Deletion: $($Libs.MediaContainer.allowMediaDeletion)" -Path $configLogging -Color Cyan -log Debug
                 if ($Libs.MediaContainer.size -ge 1) {
                     return $Libs
                 }
@@ -4884,6 +4889,7 @@ function MassDownloadPlexArtwork {
         }
     }
     $Mode = "backup"
+    Write-Entry -Message "Backup Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libsoverview = @()
     foreach ($lib in $Libs.MediaContainer.Directory) {
@@ -9931,7 +9937,7 @@ Elseif ($Tautulli) {
     # {parent_rating_key}	The unique identifier for the season or album.
     # {grandparent_rating_key}	The unique identifier for the TV show or artist.
     $Mode = "tautulli"
-
+    Write-Entry -Message "Tautulli Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libraries = @()
     if (($RatingKey -or $parentratingkey -or $grandparentratingkey) -and $mediatype) {
         if ($mediatype -eq 'movie') {
@@ -10687,7 +10693,7 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -10699,31 +10705,27 @@ Elseif ($Tautulli) {
                                                 Else {
                                                     "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                                 }
-                                                Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 # Try uploading, capturing the response in detail
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -Body $fileContent `
-                                                                            -ContentType 'application/octet-stream' `
+                                                                            -InFile $PosterImage `
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
-                                                Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                }
                                             }
                                             catch {
-                                                $errorMessage = $_.Exception.Message
-                                                $response = $_.Exception.Response
-                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                # Try to dump response content if available
-                                                if ($response -and $response.GetResponseStream()) {
-                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                    $responseText = $reader.ReadToEnd()
-                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                }
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 $global:errorCount++
                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -11180,7 +11182,7 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -11192,31 +11194,27 @@ Elseif ($Tautulli) {
                                                 Else {
                                                     "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                                 }
-                                                Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 # Try uploading, capturing the response in detail
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -Body $fileContent `
-                                                                            -ContentType 'application/octet-stream' `
+                                                                            -InFile $backgroundImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
-                                                Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                }
                                             }
                                             catch {
-                                                $errorMessage = $_.Exception.Message
-                                                $response = $_.Exception.Response
-                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                # Try to dump response content if available
-                                                if ($response -and $response.GetResponseStream()) {
-                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                    $responseText = $reader.ReadToEnd()
-                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                }
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 $global:errorCount++
                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -11761,7 +11759,7 @@ Elseif ($Tautulli) {
                                     if (!$global:IsTruncated) {
                                         try {
                                             Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                            $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                            #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                             # Verify variables before uploading
                                             Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -11773,31 +11771,27 @@ Elseif ($Tautulli) {
                                             Else {
                                                 "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                             }
-                                            Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             # Try uploading, capturing the response in detail
                                             $Upload = Invoke-WebRequest -Uri $uri `
                                                                         -Method Post `
                                                                         -Headers $extraPlexHeaders `
-                                                                        -Body $fileContent `
-                                                                        -ContentType 'application/octet-stream' `
+                                                                        -InFile $PosterImage`
+                                                                        -ContentType 'image/jpeg' `
+                                                                        -SkipHttpErrorCheck `
                                                                         -ErrorAction Stop
 
-                                            Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                            }
+                                            else {
+                                                Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                            }
                                         }
                                         catch {
-                                            $errorMessage = $_.Exception.Message
-                                            $response = $_.Exception.Response
-                                            $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                            Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                            # Try to dump response content if available
-                                            if ($response -and $response.GetResponseStream()) {
-                                                $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                $responseText = $reader.ReadToEnd()
-                                                Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            }
+                                            Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             $global:errorCount++
                                             Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -12270,7 +12264,7 @@ Elseif ($Tautulli) {
                                     if (!$global:IsTruncated) {
                                         try {
                                             Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                            $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                            #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                             # Verify variables before uploading
                                             Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -12282,31 +12276,27 @@ Elseif ($Tautulli) {
                                             Else {
                                                 "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                             }
-                                            Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             # Try uploading, capturing the response in detail
                                             $Upload = Invoke-WebRequest -Uri $uri `
                                                                         -Method Post `
                                                                         -Headers $extraPlexHeaders `
-                                                                        -Body $fileContent `
-                                                                        -ContentType 'application/octet-stream' `
+                                                                        -InFile $backgroundImage`
+                                                                        -ContentType 'image/jpeg' `
+                                                                        -SkipHttpErrorCheck `
                                                                         -ErrorAction Stop
 
-                                            Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                            }
+                                            else {
+                                                Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                            }
                                         }
                                         catch {
-                                            $errorMessage = $_.Exception.Message
-                                            $response = $_.Exception.Response
-                                            $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                            Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                            # Try to dump response content if available
-                                            if ($response -and $response.GetResponseStream()) {
-                                                $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                $responseText = $reader.ReadToEnd()
-                                                Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            }
+                                            Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             $global:errorCount++
                                             Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -12968,7 +12958,7 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -12980,31 +12970,27 @@ Elseif ($Tautulli) {
                                                 Else {
                                                     "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
                                                 }
-                                                Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 # Try uploading, capturing the response in detail
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -Body $fileContent `
-                                                                            -ContentType 'application/octet-stream' `
+                                                                            -InFile $SeasonImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
-                                                Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                }
                                             }
                                             catch {
-                                                $errorMessage = $_.Exception.Message
-                                                $response = $_.Exception.Response
-                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                # Try to dump response content if available
-                                                if ($response -and $response.GetResponseStream()) {
-                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                    $responseText = $reader.ReadToEnd()
-                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                }
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 $global:errorCount++
                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -13603,7 +13589,7 @@ Elseif ($Tautulli) {
                                                         if (!$global:IsTruncated) {
                                                             try {
                                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                 # Verify variables before uploading
                                                                 Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                 Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -13615,31 +13601,27 @@ Elseif ($Tautulli) {
                                                                 Else {
                                                                     "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                                 }
-                                                                Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                 # Try uploading, capturing the response in detail
                                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                                             -Method Post `
                                                                                             -Headers $extraPlexHeaders `
-                                                                                            -Body $fileContent `
-                                                                                            -ContentType 'application/octet-stream' `
+                                                                                            -InFile $EpisodeImage`
+                                                                                            -ContentType 'image/jpeg' `
+                                                                                            -SkipHttpErrorCheck `
                                                                                             -ErrorAction Stop
 
-                                                                Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                }
+                                                                else {
+                                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                                }
                                                             }
                                                             catch {
-                                                                $errorMessage = $_.Exception.Message
-                                                                $response = $_.Exception.Response
-                                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                                # Try to dump response content if available
-                                                                if ($response -and $response.GetResponseStream()) {
-                                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                                    $responseText = $reader.ReadToEnd()
-                                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                }
+                                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                                 $global:errorCount++
                                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -14214,7 +14196,7 @@ Elseif ($Tautulli) {
                                                         if (!$global:IsTruncated) {
                                                             try {
                                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                 # Verify variables before uploading
                                                                 Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                 Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -14226,31 +14208,27 @@ Elseif ($Tautulli) {
                                                                 Else {
                                                                     "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                                 }
-                                                                Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                 # Try uploading, capturing the response in detail
                                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                                             -Method Post `
                                                                                             -Headers $extraPlexHeaders `
-                                                                                            -Body $fileContent `
-                                                                                            -ContentType 'application/octet-stream' `
+                                                                                            -InFile $EpisodeImage`
+                                                                                            -ContentType 'image/jpeg' `
+                                                                                            -SkipHttpErrorCheck `
                                                                                             -ErrorAction Stop
 
-                                                                Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                }
+                                                                else {
+                                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                                }
                                                             }
                                                             catch {
-                                                                $errorMessage = $_.Exception.Message
-                                                                $response = $_.Exception.Response
-                                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                                # Try to dump response content if available
-                                                                if ($response -and $response.GetResponseStream()) {
-                                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                                    $responseText = $reader.ReadToEnd()
-                                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                }
+                                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                                 $global:errorCount++
                                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -14477,7 +14455,7 @@ Elseif ($ArrTrigger) {
     $posterCount = 0
     $arrplatform = $arrTriggers['arr_platform']
     $Mode = "arr"
-
+    Write-Entry -Message "ArrTrigger Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     switch ($arrplatform) {
         'Sonarr' {
             Write-Entry -Message "Processing Sonarr trigger" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
@@ -19673,7 +19651,7 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -19685,31 +19663,27 @@ Elseif ($ArrTrigger) {
                                                     Else {
                                                         "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                                     }
-                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     # Try uploading, capturing the response in detail
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -Body $fileContent `
-                                                                                -ContentType 'application/octet-stream' `
+                                                                                -InFile $PosterImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
-                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    }
                                                 }
                                                 catch {
-                                                    $errorMessage = $_.Exception.Message
-                                                    $response = $_.Exception.Response
-                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    # Try to dump response content if available
-                                                    if ($response -and $response.GetResponseStream()) {
-                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                        $responseText = $reader.ReadToEnd()
-                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    }
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     $global:errorCount++
                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -20166,7 +20140,7 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -20178,31 +20152,27 @@ Elseif ($ArrTrigger) {
                                                     Else {
                                                         "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                                     }
-                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     # Try uploading, capturing the response in detail
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -Body $fileContent `
-                                                                                -ContentType 'application/octet-stream' `
+                                                                                -InFile $backgroundImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
-                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    }
                                                 }
                                                 catch {
-                                                    $errorMessage = $_.Exception.Message
-                                                    $response = $_.Exception.Response
-                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    # Try to dump response content if available
-                                                    if ($response -and $response.GetResponseStream()) {
-                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                        $responseText = $reader.ReadToEnd()
-                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    }
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     $global:errorCount++
                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -20747,7 +20717,7 @@ Elseif ($ArrTrigger) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -20759,31 +20729,27 @@ Elseif ($ArrTrigger) {
                                                 Else {
                                                     "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                                 }
-                                                Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 # Try uploading, capturing the response in detail
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -Body $fileContent `
-                                                                            -ContentType 'application/octet-stream' `
+                                                                            -InFile $PosterImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
-                                                Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                }
                                             }
                                             catch {
-                                                $errorMessage = $_.Exception.Message
-                                                $response = $_.Exception.Response
-                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                # Try to dump response content if available
-                                                if ($response -and $response.GetResponseStream()) {
-                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                    $responseText = $reader.ReadToEnd()
-                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                }
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 $global:errorCount++
                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -21256,7 +21222,7 @@ Elseif ($ArrTrigger) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -21268,31 +21234,27 @@ Elseif ($ArrTrigger) {
                                                 Else {
                                                     "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                                 }
-                                                Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 # Try uploading, capturing the response in detail
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -Body $fileContent `
-                                                                            -ContentType 'application/octet-stream' `
+                                                                            -InFile $backgroundImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
-                                                Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                }
                                             }
                                             catch {
-                                                $errorMessage = $_.Exception.Message
-                                                $response = $_.Exception.Response
-                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                # Try to dump response content if available
-                                                if ($response -and $response.GetResponseStream()) {
-                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                    $responseText = $reader.ReadToEnd()
-                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                }
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 $global:errorCount++
                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -21953,7 +21915,7 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -21965,31 +21927,27 @@ Elseif ($ArrTrigger) {
                                                     Else {
                                                         "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
                                                     }
-                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     # Try uploading, capturing the response in detail
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -Body $fileContent `
-                                                                                -ContentType 'application/octet-stream' `
+                                                                                -InFile $SeasonImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
-                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    }
                                                 }
                                                 catch {
-                                                    $errorMessage = $_.Exception.Message
-                                                    $response = $_.Exception.Response
-                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    # Try to dump response content if available
-                                                    if ($response -and $response.GetResponseStream()) {
-                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                        $responseText = $reader.ReadToEnd()
-                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    }
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     $global:errorCount++
                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -22588,7 +22546,7 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:IsTruncated) {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                     # Verify variables before uploading
                                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -22600,31 +22558,27 @@ Elseif ($ArrTrigger) {
                                                                     Else {
                                                                         "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                                     }
-                                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     # Try uploading, capturing the response in detail
                                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                                 -Method Post `
                                                                                                 -Headers $extraPlexHeaders `
-                                                                                                -Body $fileContent `
-                                                                                                -ContentType 'application/octet-stream' `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
                                                                                                 -ErrorAction Stop
 
-                                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                                    }
                                                                 }
                                                                 catch {
-                                                                    $errorMessage = $_.Exception.Message
-                                                                    $response = $_.Exception.Response
-                                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                                    # Try to dump response content if available
-                                                                    if ($response -and $response.GetResponseStream()) {
-                                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                                        $responseText = $reader.ReadToEnd()
-                                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                    }
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                                     $global:errorCount++
                                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -23199,7 +23153,7 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:IsTruncated) {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                     # Verify variables before uploading
                                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -23211,31 +23165,27 @@ Elseif ($ArrTrigger) {
                                                                     Else {
                                                                         "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                                     }
-                                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     # Try uploading, capturing the response in detail
                                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                                 -Method Post `
                                                                                                 -Headers $extraPlexHeaders `
-                                                                                                -Body $fileContent `
-                                                                                                -ContentType 'application/octet-stream' `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
                                                                                                 -ErrorAction Stop
 
-                                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                                    }
                                                                 }
                                                                 catch {
-                                                                    $errorMessage = $_.Exception.Message
-                                                                    $response = $_.Exception.Response
-                                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                                    # Try to dump response content if available
-                                                                    if ($response -and $response.GetResponseStream()) {
-                                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                                        $responseText = $reader.ReadToEnd()
-                                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                    }
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                                     $global:errorCount++
                                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -23680,6 +23630,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
         $OtherMediaServerUrl = $JellyfinUrl
         $OtherMediaServerApiKey = $JellyfinAPIKey
         $Mode = "syncjelly"
+        Write-Entry -Message "Sync Jelly Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     if ($SyncEmby) {
         # Check Emby now:
@@ -23687,8 +23638,9 @@ Elseif ($SyncJelly -or $SyncEmby) {
         $OtherMediaServerUrl = $EmbyUrl
         $OtherMediaServerApiKey = $EmbyAPIKey
         $Mode = "syncemby"
+        Write-Entry -Message "Sync Emby Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
-
+    
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libsoverview = @()
     foreach ($lib in $Libs.MediaContainer.Directory) {
@@ -24975,9 +24927,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
 
     if ($UISchedule -or $ContainerSchedule) {
         $Mode = "scheduled"
+        Write-Entry -Message "Scheduled Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     Else {
         $Mode = "normal"
+        Write-Entry -Message "Normal Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
 
     Write-Entry -Message "Query Jellyfin/Emby..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
@@ -29615,9 +29569,11 @@ ElseIf ($PosterReset) {
 else {
     if ($UISchedule -or $ContainerSchedule) {
         $Mode = "scheduled"
+        Write-Entry -Message "Scheduled Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     Else {
         $Mode = "normal"
+        Write-Entry -Message "Normal Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libsoverview = @()
@@ -30576,7 +30532,7 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -30588,31 +30544,27 @@ else {
                                                     Else {
                                                         "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                                     }
-                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     # Try uploading, capturing the response in detail
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -Body $fileContent `
-                                                                                -ContentType 'application/octet-stream' `
+                                                                                -InFile $PosterImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
-                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    }
                                                 }
                                                 catch {
-                                                    $errorMessage = $_.Exception.Message
-                                                    $response = $_.Exception.Response
-                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    # Try to dump response content if available
-                                                    if ($response -and $response.GetResponseStream()) {
-                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                        $responseText = $reader.ReadToEnd()
-                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    }
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     $global:errorCount++
                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -30714,7 +30666,7 @@ else {
                                     GetPlexArtwork -Type "$Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        $fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
+                                        #$fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
                                         # Verify variables before uploading
                                         Write-Entry -Subtext "PosterImage: $PosterImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -30726,34 +30678,29 @@ else {
                                         Else {
                                             "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                         }
-                                        Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         # Try uploading, capturing the response in detail
                                         $Upload = Invoke-WebRequest -Uri $uri `
                                                                     -Method Post `
                                                                     -Headers $extraPlexHeaders `
-                                                                    -Body $fileContent `
-                                                                    -ContentType 'application/octet-stream' `
+                                                                    -InFile $PosterImageoriginal`
+                                                                    -ContentType 'image/jpeg' `
+                                                                    -SkipHttpErrorCheck `
                                                                     -ErrorAction Stop
 
-                                        Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                        Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                        }
+                                        else {
+                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        }
                                         $UploadCount++
                                     }
                                 }
                                 catch {
-                                    $errorMessage = $_.Exception.Message
-                                    $response = $_.Exception.Response
-                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                    # Try to dump response content if available
-                                    if ($response -and $response.GetResponseStream()) {
-                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                        $responseText = $reader.ReadToEnd()
-                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                    }
+                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                     $global:errorCount++
                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -31141,7 +31088,7 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -31153,31 +31100,27 @@ else {
                                                     Else {
                                                         "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                                     }
-                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     # Try uploading, capturing the response in detail
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -Body $fileContent `
-                                                                                -ContentType 'application/octet-stream' `
+                                                                                -InFile $backgroundImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
-                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    }
                                                 }
                                                 catch {
-                                                    $errorMessage = $_.Exception.Message
-                                                    $response = $_.Exception.Response
-                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    # Try to dump response content if available
-                                                    if ($response -and $response.GetResponseStream()) {
-                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                        $responseText = $reader.ReadToEnd()
-                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    }
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     $global:errorCount++
                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -31279,7 +31222,7 @@ else {
                                     GetPlexArtwork -Type " $Titletext | Backgound Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        $fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
+                                        #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
                                         # Verify variables before uploading
                                         Write-Entry -Subtext "BackgroundImage: $backgroundImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -31291,34 +31234,29 @@ else {
                                         Else {
                                             "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                         }
-                                        Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         # Try uploading, capturing the response in detail
                                         $Upload = Invoke-WebRequest -Uri $uri `
                                                                     -Method Post `
                                                                     -Headers $extraPlexHeaders `
-                                                                    -Body $fileContent `
-                                                                    -ContentType 'application/octet-stream' `
+                                                                    -InFile $backgroundImageoriginal`
+                                                                    -ContentType 'image/jpeg' `
+                                                                    -SkipHttpErrorCheck `
                                                                     -ErrorAction Stop
 
-                                        Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                        Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                        }
+                                        else {
+                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        }
                                         $UploadCount++
                                     }
                                 }
                                 catch {
-                                    $errorMessage = $_.Exception.Message
-                                    $response = $_.Exception.Response
-                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                    # Try to dump response content if available
-                                    if ($response -and $response.GetResponseStream()) {
-                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                        $responseText = $reader.ReadToEnd()
-                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                    }
+                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                     $global:errorCount++
                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -31796,7 +31734,7 @@ else {
                                         if ($Upload2Plex -eq 'true') {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -31808,31 +31746,27 @@ else {
                                                 Else {
                                                     "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                                 }
-                                                Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 # Try uploading, capturing the response in detail
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -Body $fileContent `
-                                                                            -ContentType 'application/octet-stream' `
+                                                                            -InFile $PosterImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
-                                                Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                }
                                             }
                                             catch {
-                                                $errorMessage = $_.Exception.Message
-                                                $response = $_.Exception.Response
-                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                # Try to dump response content if available
-                                                if ($response -and $response.GetResponseStream()) {
-                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                    $responseText = $reader.ReadToEnd()
-                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                }
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 $global:errorCount++
                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -31933,7 +31867,7 @@ else {
                                 GetPlexArtwork -Type "$Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
+                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
                                     # Verify variables before uploading
                                     Write-Entry -Subtext "PosterImage: $PosterImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -31945,34 +31879,29 @@ else {
                                     Else {
                                         "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                     }
-                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     # Try uploading, capturing the response in detail
                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                 -Method Post `
                                                                 -Headers $extraPlexHeaders `
-                                                                -Body $fileContent `
-                                                                -ContentType 'application/octet-stream' `
+                                                                -InFile $PosterImageoriginal`
+                                                                -ContentType 'image/jpeg' `
+                                                                -SkipHttpErrorCheck `
                                                                 -ErrorAction Stop
 
-                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                    }
+                                    else {
+                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    }
                                     $UploadCount++
                                 }
                             }
                             catch {
-                                $errorMessage = $_.Exception.Message
-                                $response = $_.Exception.Response
-                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                # Try to dump response content if available
-                                if ($response -and $response.GetResponseStream()) {
-                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                    $responseText = $reader.ReadToEnd()
-                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                }
+                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                 $global:errorCount++
                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -32375,7 +32304,7 @@ else {
                                         if ($Upload2Plex -eq 'true') {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -32387,31 +32316,27 @@ else {
                                                 Else {
                                                     "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                                 }
-                                                Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 # Try uploading, capturing the response in detail
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -Body $fileContent `
-                                                                            -ContentType 'application/octet-stream' `
+                                                                            -InFile $backgroundImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
-                                                Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                }
                                             }
                                             catch {
-                                                $errorMessage = $_.Exception.Message
-                                                $response = $_.Exception.Response
-                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                # Try to dump response content if available
-                                                if ($response -and $response.GetResponseStream()) {
-                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                    $responseText = $reader.ReadToEnd()
-                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                }
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 $global:errorCount++
                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -32511,7 +32436,7 @@ else {
                                 GetPlexArtwork -Type " $Titletext | Backgound Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
+                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
                                     # Verify variables before uploading
                                     Write-Entry -Subtext "BackgroundImage: $backgroundImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -32523,34 +32448,29 @@ else {
                                     Else {
                                         "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                     }
-                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     # Try uploading, capturing the response in detail
                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                 -Method Post `
                                                                 -Headers $extraPlexHeaders `
-                                                                -Body $fileContent `
-                                                                -ContentType 'application/octet-stream' `
+                                                                -InFile $backgroundImageoriginal`
+                                                                -ContentType 'image/jpeg' `
+                                                                -SkipHttpErrorCheck `
                                                                 -ErrorAction Stop
 
-                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                    }
+                                    else {
+                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    }
                                     $UploadCount++
                                 }
                             }
                             catch {
-                                $errorMessage = $_.Exception.Message
-                                $response = $_.Exception.Response
-                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                # Try to dump response content if available
-                                if ($response -and $response.GetResponseStream()) {
-                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                    $responseText = $reader.ReadToEnd()
-                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                }
+                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                 $global:errorCount++
                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -33156,7 +33076,7 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -33168,31 +33088,27 @@ else {
                                                     Else {
                                                         "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
                                                     }
-                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     # Try uploading, capturing the response in detail
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -Body $fileContent `
-                                                                                -ContentType 'application/octet-stream' `
+                                                                                -InFile $SeasonImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
-                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    }
                                                 }
                                                 catch {
-                                                    $errorMessage = $_.Exception.Message
-                                                    $response = $_.Exception.Response
-                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    # Try to dump response content if available
-                                                    if ($response -and $response.GetResponseStream()) {
-                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                        $responseText = $reader.ReadToEnd()
-                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    }
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     $global:errorCount++
                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -33292,7 +33208,7 @@ else {
                                     GetPlexArtwork -Type " $Titletext | $global:seasontmp Artwork."  -ArtUrl $Arturl -TempImage $SeasonImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        $fileContent = [System.IO.File]::ReadAllBytes($SeasonImageoriginal)
+                                        #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImageoriginal)
                                         # Verify variables before uploading
                                         Write-Entry -Subtext "SeasonImage: $SeasonImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -33304,34 +33220,29 @@ else {
                                         Else {
                                             "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
                                         }
-                                        Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         # Try uploading, capturing the response in detail
                                         $Upload = Invoke-WebRequest -Uri $uri `
                                                                     -Method Post `
                                                                     -Headers $extraPlexHeaders `
-                                                                    -Body $fileContent `
-                                                                    -ContentType 'application/octet-stream' `
+                                                                    -InFile $SeasonImageoriginal`
+                                                                    -ContentType 'image/jpeg' `
+                                                                    -SkipHttpErrorCheck `
                                                                     -ErrorAction Stop
 
-                                        Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                        Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                        }
+                                        else {
+                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        }
                                         $UploadCount++
                                     }
                                 }
                                 catch {
-                                    $errorMessage = $_.Exception.Message
-                                    $response = $_.Exception.Response
-                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                    # Try to dump response content if available
-                                    if ($response -and $response.GetResponseStream()) {
-                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                        $responseText = $reader.ReadToEnd()
-                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                    }
+                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                     $global:errorCount++
                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -33858,7 +33769,7 @@ else {
                                                             if ($Upload2Plex -eq 'true') {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                     # Verify variables before uploading
                                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -33870,31 +33781,27 @@ else {
                                                                     Else {
                                                                         "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                                     }
-                                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     # Try uploading, capturing the response in detail
                                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                                 -Method Post `
                                                                                                 -Headers $extraPlexHeaders `
-                                                                                                -Body $fileContent `
-                                                                                                -ContentType 'application/octet-stream' `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
                                                                                                 -ErrorAction Stop
 
-                                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                                    }
                                                                 }
                                                                 catch {
-                                                                    $errorMessage = $_.Exception.Message
-                                                                    $response = $_.Exception.Response
-                                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                                    # Try to dump response content if available
-                                                                    if ($response -and $response.GetResponseStream()) {
-                                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                                        $responseText = $reader.ReadToEnd()
-                                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                    }
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                                     $global:errorCount++
                                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -33996,7 +33903,7 @@ else {
                                                 GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
                                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -34008,34 +33915,29 @@ else {
                                                     Else {
                                                         "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                     }
-                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     # Try uploading, capturing the response in detail
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -Body $fileContent `
-                                                                                -ContentType 'application/octet-stream' `
+                                                                                -InFile $EpisodeImageoriginal`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
-                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    }
                                                     $UploadCount++
                                                 }
                                             }
                                             catch {
-                                                $errorMessage = $_.Exception.Message
-                                                $response = $_.Exception.Response
-                                                $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                # Try to dump response content if available
-                                                if ($response -and $response.GetResponseStream()) {
-                                                    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                    $responseText = $reader.ReadToEnd()
-                                                    Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                }
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 $global:errorCount++
                                                 Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -34536,7 +34438,7 @@ else {
                                                             if ($Upload2Plex -eq 'true') {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                     # Verify variables before uploading
                                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -34548,31 +34450,27 @@ else {
                                                                     Else {
                                                                         "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                                     }
-                                                                    Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     # Try uploading, capturing the response in detail
                                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                                 -Method Post `
                                                                                                 -Headers $extraPlexHeaders `
-                                                                                                -Body $fileContent `
-                                                                                                -ContentType 'application/octet-stream' `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
                                                                                                 -ErrorAction Stop
 
-                                                                    Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                    Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                                    }
                                                                 }
                                                                 catch {
-                                                                    $errorMessage = $_.Exception.Message
-                                                                    $response = $_.Exception.Response
-                                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                                    # Try to dump response content if available
-                                                                    if ($response -and $response.GetResponseStream()) {
-                                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                                        $responseText = $reader.ReadToEnd()
-                                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                                    }
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                                     $global:errorCount++
                                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -34674,7 +34572,7 @@ else {
                                                     GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
                                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                        $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
+                                                        #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
                                                         # Verify variables before uploading
                                                         Write-Entry -Subtext "EpisodeImage: $EpisodeImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                         Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -34686,34 +34584,29 @@ else {
                                                         Else {
                                                             "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                         }
-                                                        Write-Entry -Subtext "Upload URI: $uri" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                         # Try uploading, capturing the response in detail
                                                         $Upload = Invoke-WebRequest -Uri $uri `
                                                                                     -Method Post `
                                                                                     -Headers $extraPlexHeaders `
-                                                                                    -Body $fileContent `
-                                                                                    -ContentType 'application/octet-stream' `
+                                                                                    -InFile $EpisodeImageoriginal`
+                                                                                    -ContentType 'image/jpeg' `
+                                                                                    -SkipHttpErrorCheck `
                                                                                     -ErrorAction Stop
 
-                                                        Write-Entry -Subtext "Upload Response StatusCode: $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                        Write-Entry -Subtext "Upload Response: $($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                        }
+                                                        else {
+                                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                        }
                                                         $UploadCount++
                                                     }
                                                 }
                                                 catch {
-                                                    $errorMessage = $_.Exception.Message
-                                                    $response = $_.Exception.Response
-                                                    $statusCode = if ($response) { $response.StatusCode.value__ } else { "N/A" }
-
-                                                    Write-Entry -Subtext "Could not upload Artwork to Plex. Error Message: $errorMessage (StatusCode: $statusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    # Try to dump response content if available
-                                                    if ($response -and $response.GetResponseStream()) {
-                                                        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-                                                        $responseText = $reader.ReadToEnd()
-                                                        Write-Entry -Subtext "Plex Response Body: $responseText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    }
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     $global:errorCount++
                                                     Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error

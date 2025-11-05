@@ -197,6 +197,18 @@
       "cancel": "Annuler",
       "start": "Démarrer la synchronisation Emby"
     },
+    "backup": {
+      "title": "Mode Sauvegarde",
+      "info": "Dans ce mode, le script téléchargera toutes les illustrations que vous avez dans Plex.",
+      "description": "Il utilise les valeurs spécifiées dans votre config.json pour trouver et enregistrer les illustrations.",
+      "benefitsTitle": "Avantages du Mode Sauvegarde",
+      "step1Title": "Créer une sauvegarde complète",
+      "step1Text": "Sauvegardez facilement toutes vos illustrations Plex existantes dans un dossier local spécifié dans votre configuration.",
+      "step2Title": "Préparer pour Jellyfin/Emby",
+      "step2Text": "C'est pratique pour créer un deuxième dossier d'assets avec des données EXIF Kometa/TCM, qui peut ensuite être utilisé par Jellyfin ou Emby.",
+      "cancel": "Annuler",
+      "start": "Démarrer la sauvegarde"
+    },
     "status": {
       "running": "Script en cours",
       "stopFirst": "Arrêtez le script avant de lancer un autre mode",

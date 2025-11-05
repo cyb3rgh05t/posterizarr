@@ -87,7 +87,7 @@
       },
       "backup": {
         "title": "Backup Mode",
-        "description": "Backup existing posters"
+        "description": "Backup existing Plex posters"
       },
       "syncJellyfin": {
         "title": "Sync Jellyfin",
@@ -196,6 +196,18 @@
       "important": "Important: Make sure both UseEmby and UsePlex are set to true in your config.json, and that library names match exactly.",
       "cancel": "Cancel",
       "start": "Start Emby Sync"
+    },
+    "backup": {
+      "title": "Backup Mode",
+      "info": "In this mode, the script will download every artwork you have in Plex.",
+      "description": "It uses the values specified in your config.json file to find and save the artwork.",
+      "benefitsTitle": "Benefits of Backup Mode",
+      "step1Title": "Create a Full Backup",
+      "step1Text": "Easily back up all your existing Plex artwork to a local folder specified in your config.",
+      "step2Title": "Prepare for Jellyfin/Emby",
+      "step2Text": "This is handy for creating a second asset folder with Kometa/TCM EXIF data, which can then be used by Jellyfin or Emby.",
+      "cancel": "Cancel",
+      "start": "Start Backup"
     },
     "status": {
       "running": "Script Running",
