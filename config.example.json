@@ -81,6 +81,7 @@
   "PrerequisitePart": {
     "AssetPath": "P:\\assets",
     "SkipAddText": "false",
+    "SkipAddTextAndOverlay": "false",
     "FollowSymlink": "false",
     "ForceRunningDeletion": "false",
     "AutoUpdatePosterizarr": "false",
@@ -128,8 +129,7 @@
     "NewLineSymbols": [
       " - "
     ],
-    "SymbolsToKeepOnNewLine": [
-    ],
+    "SymbolsToKeepOnNewLine": [],
     "SkipTBA": "false",
     "SkipJapTitle": "false",
     "AssetCleanup": "false",

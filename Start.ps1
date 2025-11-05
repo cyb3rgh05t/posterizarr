@@ -19,10 +19,10 @@ function ScriptSchedule {
         Write-Host "UI is disabled, skipping UI availability check."
     }
     Else {
-        Write-Host "UI is being initialized this can take a minute..."
+        Write-Host "UI is being initialized. This can take a minute or two..."
         $websiteUrl = "http://localhost:$($env:APP_PORT)/"
         $retryIntervalSeconds = 5
-        $maxWaitSeconds = 60
+        $maxWaitSeconds = 360
         $UIstartTime = Get-Date
         $isOnline = $false
 
@@ -36,17 +36,26 @@ function ScriptSchedule {
                 }
             }
             catch {
+                # Ignore errors and continue retrying
             }
             Start-Sleep -Seconds $retryIntervalSeconds
         }
 
         # Final status message after the loop exits.
+        $UIendTime = Get-Date
+        $totalTime = $UIendTime - $UIstartTime
+        $totalSeconds = [math]::Round($totalTime.TotalSeconds)
+        $minutes = [math]::Floor($totalSeconds / 60)
+        $seconds = $totalSeconds % 60
+        $formattedTime = "{0}m {1}s" -f $minutes, $seconds
+
         if ($isOnline) {
-            Write-Host "UI & Cache is now builded and online."
+            Write-Host "UI & Cache are now built and online after $formattedTime." -ForegroundColor Green
             Write-Host "    You can access it by going to: http://localhost:$($env:APP_PORT)/"
         }
-        Else {
+        else {
             Write-Host "UI did not become available within $maxWaitSeconds seconds." -ForegroundColor Red
+            Write-Host "    Total time waited: $formattedTime."
         }
     }
 
@@ -193,7 +202,9 @@ function ScriptSchedule {
                 write-host "$totalTime" -ForegroundColor Cyan
                 CompareScriptVersion
                 write-host ""
-                Write-Host "Next Script Run is at: $NextScriptRunTime"
+                if ($env:RUN_TIME -ne "disabled") {
+                    Write-Host "Next Script Run is at: $NextScriptRunTime"
+                }
                 Remove-Item "$inputDir/$($item.Name)" -Force -Confirm:$false
             }
 

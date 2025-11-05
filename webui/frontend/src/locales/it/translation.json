@@ -571,7 +571,10 @@
     "autoScrollStatus": "Scorrimento automatico: {{status}}",
     "on": "Attivo",
     "off": "Disattivo",
-    "receivingUpdates": "Ricezione aggiornamenti in tempo reale"
+    "receivingUpdates": "Ricezione aggiornamenti in tempo reale",
+    "loadFull": "Carica il file di log completo",
+    "loadingFullLog": "Caricamento del file di log completo...",
+    "loadedFullLog": "File di log completo caricato"
   },
   "libraryExclusion": {
     "configNotFound": "Configurazione del media server non trovata",
@@ -805,7 +808,9 @@
     "deleteError": "Errore durante l'eliminazione: {{message}}",
     "bulkDeletePartial": "Eliminate {{deleted}} locandine, ma {{failed}} non riuscite.",
     "bulkDeleteSuccess": "Eliminate con successo {{count}} locandine",
-    "assetReplaced": "Asset sostituito con successo!"
+    "assetReplaced": "Asset sostituito con successo!",
+    "selectPage": "Seleziona Pagina",
+    "deselectPage": "Deseleziona Pagina"
   },
   "toast": {
     "success": "Successo",
@@ -821,6 +826,7 @@
     "runMigration": "Esegui migrazione",
     "importing": "Importazione...",
     "importJson": "Importa JSON",
+	"loading": "Caricamento in corso...",
     "summary": "Riepilogo (ultimi {{days}} giorni)",
     "days": "{{count}} giorni",
     "totalRuns": "Esecuzioni totali",
@@ -864,6 +870,11 @@
       "previous": "Precedente",
       "next": "Successivo"
     }
+  },
+  "pagination": {
+    "page": "Pagina {{page}} • Mostra {{count}} voci",
+    "previous": "Precedente",
+    "next": "Successivo"
   },
   "schedulerSettings": {
     "loading": "Caricamento impostazioni pianificatore...",
@@ -1349,7 +1360,14 @@
     "bulkMarkSuccess": "{{count}} asset contrassegnato/i come risolto/i con successo",
     "bulkMarkPartial": "{{success}} contrassegnato/i come risolto/i, {{failed}} non riuscito/i",
     "bulkMarkFailed": "Impossibile contrassegnare gli asset come risolti",
-    "bulkMarkError": "Errore: {{error}}"
+    "bulkMarkError": "Errore: {{error}}",
+    "addedOn": "Aggiunto il",
+    "noAssetsToMark": "Nessun asset filtrato da contrassegnare come risolto.",
+    "bulkMarkAllFilteredConfirm": "Sei sicuro di voler contrassegnare tutti gli {{count}} asset filtrati come risolti?\n\nQuesto li rimuoverà dalla vista 'Non risolti'. Questa azione non può essere annullata facilmente.",
+    "markAllFilteredTooltip": "Contrassegna tutti gli asset filtrati come risolti",
+    "markAllFiltered": "Segna tutti ({{count}}) come risolti",
+    "bulkMarkAllFilteredTitle": "Segnare tutto come risolto?",
+    "confirmMarkAll": "Conferma e segna tutto ({{count}})"
   },
   "common": {
     "save": "Salva",
@@ -1515,7 +1533,14 @@
     "startTime": "Ora di inizio",
     "endTime": "Ora di fine",
     "notificationSent": "Notifica inviata",
-    "notes": "Note"
+    "notes": "Note",
+    "lastRun": "Ultima esecuzione",
+    "searchLogs": "Cerca nei log",
+    "searchPlaceholder": "Digita per filtrare i log...",
+    "filterLevel": "Filtra per livello",
+    "allLevels": "Tutti i livelli",
+    "noMatchingLogs": "Nessuna voce di log corrisponde ai tuoi filtri.",
+    "adjustFilters": "Prova a modificare i filtri di ricerca o di livello."
   },
   "dangerZone": {
     "title": "Zona pericolosa",
@@ -1585,7 +1610,11 @@
     "deleteMultipleMessage": "Sei sicuro di voler eliminare {{count}} asset selezionato/i?",
     "deleteAssetMessage": "Sei sicuro di voler eliminare questo asset?",
     "deleteButton": "Elimina",
-    "assetReplaced": "Asset sostituito con successo!"
+    "assetReplaced": "Asset sostituito con successo!",
+    "itemsPerPage": "Elementi per pagina",
+    "paginationPage": "Pagina {{current}} di {{total}}",
+    "paginationPrevious": "Precedente",
+    "paginationNext": "Successivo"
   },
   "autoTriggers": {
     "header": {

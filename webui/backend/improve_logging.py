@@ -74,12 +74,6 @@ def remove_emojis_from_file(file_path: Path):
         content = emoji_pattern.sub("", content)
 
     if content != original_content:
-        # Backup original file
-        backup_path = file_path.with_suffix(file_path.suffix + ".backup")
-        with open(backup_path, "w", encoding="utf-8") as f:
-            f.write(original_content)
-        print(f"  Backup created: {backup_path}")
-
         # Write cleaned content
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)

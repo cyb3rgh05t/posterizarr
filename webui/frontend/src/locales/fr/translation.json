@@ -571,7 +571,10 @@
     "autoScrollStatus": "Défilement auto : {{status}}",
     "on": "Activé",
     "off": "Désactivé",
-    "receivingUpdates": "Réception des mises à jour en direct"
+    "receivingUpdates": "Réception des mises à jour en direct",
+    "loadFull": "Charger le fichier journal complet",
+    "loadingFullLog": "Chargement du fichier journal complet...",
+    "loadedFullLog": "Fichier journal complet chargé"
   },
   "libraryExclusion": {
     "configNotFound": "Configuration du serveur multimédia non trouvée",
@@ -805,7 +808,9 @@
     "deleteError": "Erreur lors de la suppression : {{message}}",
     "bulkDeletePartial": "Supprimé {{deleted}} affiche(s), mais {{failed}} ont échoué.",
     "bulkDeleteSuccess": "Supprimé avec succès {{count}} affiche(s)",
-    "assetReplaced": "Ressource remplacée avec succès !"
+    "assetReplaced": "Ressource remplacée avec succès !",
+    "selectPage": "Sélectionner la page",
+    "deselectPage": "Désélectionner la page"
   },
   "toast": {
     "success": "Succès",
@@ -821,6 +826,7 @@
     "runMigration": "Lancer la migration",
     "importing": "Importation...",
     "importJson": "Importer JSON",
+	"loading": "Chargement en cours...",
     "summary": "Résumé ({{days}} derniers jours)",
     "days": "{{count}} jours",
     "totalRuns": "Exécutions totales",
@@ -864,6 +870,11 @@
       "previous": "Précédent",
       "next": "Suivant"
     }
+  },
+  "pagination": {
+    "page": "Page {{page}} • Affichage de {{count}} entrées",
+    "previous": "Précédent",
+    "next": "Suivant"
   },
   "schedulerSettings": {
     "loading": "Chargement des paramètres du planificateur...",
@@ -1349,7 +1360,14 @@
     "bulkMarkSuccess": "{{count}} ressource(s) marquée(s) comme résolue(s) avec succès",
     "bulkMarkPartial": "{{success}} marqué(s) comme résolu(s), {{failed}} échoué(s)",
     "bulkMarkFailed": "Échec de marquer les ressources comme résolues",
-    "bulkMarkError": "Erreur : {{error}}"
+    "bulkMarkError": "Erreur : {{error}}",
+    "addedOn": "Ajouté le",
+    "noAssetsToMark": "Aucun asset filtré à marquer comme résolu.",
+    "bulkMarkAllFilteredConfirm": "Êtes-vous sûr de vouloir marquer les {{count}} assets filtrés comme résolus ?\n\nCela les supprimera de la vue 'Non résolus'. Cette action ne peut pas être annulée facilement.",
+    "markAllFilteredTooltip": "Marquer tous les assets filtrés comme résolus",
+    "markAllFiltered": "Tout marquer ({{count}}) comme résolu",
+    "bulkMarkAllFilteredTitle": "Tout marquer comme résolu ?",
+    "confirmMarkAll": "Confirmer et tout marquer ({{count}})"
   },
   "common": {
     "save": "Enregistrer",
@@ -1515,7 +1533,14 @@
     "startTime": "Heure de début",
     "endTime": "Heure de fin",
     "notificationSent": "Notification envoyée",
-    "notes": "Notes"
+    "notes": "Notes",
+    "lastRun": "Dernière exécution",
+    "searchLogs": "Rechercher dans les logs",
+    "searchPlaceholder": "Filtrer les journaux...",
+    "filterLevel": "Filtrer par niveau",
+    "allLevels": "Tous les niveaux",
+    "noMatchingLogs": "Aucune entrée de log ne correspond à vos filtres.",
+    "adjustFilters": "Essayez d'ajuster vos filtres de recherche ou de niveau."
   },
   "dangerZone": {
     "title": "Zone de danger",
@@ -1585,7 +1610,11 @@
     "deleteMultipleMessage": "Êtes-vous sûr de vouloir supprimer {{count}} ressource(s) sélectionnée(s) ?",
     "deleteAssetMessage": "Êtes-vous sûr de vouloir supprimer cette ressource ?",
     "deleteButton": "Supprimer",
-    "assetReplaced": "Ressource remplacée avec succès !"
+    "assetReplaced": "Ressource remplacée avec succès !",
+    "itemsPerPage": "Éléments par page",
+    "paginationPage": "Page {{current}} sur {{total}}",
+    "paginationPrevious": "Précédent",
+    "paginationNext": "Suivant"
   },
   "autoTriggers": {
     "header": {

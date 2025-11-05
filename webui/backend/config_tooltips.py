@@ -57,6 +57,7 @@ CONFIG_TOOLTIPS = {
     "BackupPath": "Path to store/download Plex posters when using the backup mode",
     "ManualAssetPath": "If assets are placed in this directory with the exact naming convention, they will be preferred (must follow same naming convention as /assets)",
     "SkipAddText": "If set to true, Posterizarr will skip adding text to the poster if it is flagged as a 'Poster with text' by the provider",
+    "SkipAddTextAndOverlay": "If set to true, Posterizarr will skip adding text/overlay to the poster if it is flagged as a 'Poster with text' by the provider",
     "FollowSymlink": "If set to true, Posterizarr will follow symbolic links in the specified directories during hashtable creation",
     "PlexUpload": "If set to true, Posterizarr will directly upload the artwork to Plex (handy if you do not use Kometa)",
     "ForceRunningDeletion": "If set to true, Posterizarr will automatically delete the Running File. WARNING: May result in multiple concurrent runs sharing the same temp directory",
