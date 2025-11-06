@@ -51,27 +51,28 @@ export default defineConfig({
     proxy: {
       // API Requests
       "/api": {
-        target: "",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
-      // WebSocket
+      // WebSocket (IMPORTANT for real-time updates!)
       "/ws": {
-        target: "",
+        target: "ws://localhost:8000",
         ws: true,
+        changeOrigin: true,
       },
       // Assets
       "/assets": {
-        target: "",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
       // Assets
       "/poster_assets": {
-        target: "",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
       // Test-Bilder
       "/test": {
-        target: "",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
     },

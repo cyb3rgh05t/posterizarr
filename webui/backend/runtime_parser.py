@@ -155,7 +155,6 @@ def parse_runtime_from_log(log_path: Path, mode: str = "normal") -> Optional[Dic
 def save_runtime_to_db(log_path: Path, mode: str = "normal"):
     """
     Parse runtime from JSON file (preferred) or log file and save to database
-    This function is now ATOMIC thanks to changes in runtime_database.py
 
     Args:
         log_path: Path to the log file (used to determine JSON file location)
@@ -197,10 +196,25 @@ def save_runtime_to_db(log_path: Path, mode: str = "normal"):
             runtime_data = parse_runtime_from_log(log_path, mode)
 
         if runtime_data:
-            # The database now handles the atomic duplicate check internally.
-            logger.debug(f"Attempting to import: mode={mode}, start={runtime_data.get('start_time')}, end={runtime_data.get('end_time')}")
-            runtime_db.add_runtime_entry(**runtime_data)
+            # Check for duplicates based on start/end time
+            # Watcher prevents restart duplicates, this prevents same-data duplicates
+            start_time = runtime_data.get("start_time")
+            end_time = runtime_data.get("end_time")
 
+            logger.debug(
+                f"Checking for duplicate: mode={mode}, start={start_time}, end={end_time}"
+            )
+
+            if runtime_db.entry_exists(mode, start_time, end_time):
+                logger.info(
+                    f"Runtime entry already exists for {mode} mode (start: {start_time}, end: {end_time}), skipping duplicate import"
+                )
+            else:
+                logger.debug(
+                    f"No duplicate found, importing: mode={mode}, start={start_time}, end={end_time}"
+                )
+                runtime_db.add_runtime_entry(**runtime_data)
+                logger.info(f"Runtime data saved to database for {mode} mode")
         else:
             logger.warning(f"No runtime data to save for {mode} mode")
 
@@ -391,7 +405,6 @@ def _parse_runtime_to_seconds(runtime_str: str) -> int:
 def import_json_to_db(logs_dir: Path = None):
     """
     Import runtime data from all JSON files in Logs directory to database
-    This function is now ATOMIC thanks to changes in runtime_database.py
 
     This function looks for:
     - normal.json
@@ -446,11 +459,10 @@ def import_json_to_db(logs_dir: Path = None):
                 runtime_data = parse_runtime_from_json(json_path, mode)
 
                 if runtime_data:
-                    # The database now handles the atomic duplicate check.
+                    # Import directly - duplicate prevention handled by watcher
                     runtime_db.add_runtime_entry(**runtime_data)
                     imported_count += 1
                     logger.info(f"Imported {json_file} to database")
-
 
         logger.info(f"JSON import complete: {imported_count} files imported")
 

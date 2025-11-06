@@ -32,8 +32,7 @@ i18n
   .use(initReactI18next) // Pass i18n to react-i18next
   .init({
     resources,
-    lng: "en", // Set default language to English
-    fallbackLng: "en",
+    fallbackLng: "en", // Fallback to English if detection fails
     debug: false,
 
     interpolation: {

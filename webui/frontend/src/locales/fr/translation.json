@@ -197,18 +197,6 @@
       "cancel": "Annuler",
       "start": "Démarrer la synchronisation Emby"
     },
-    "backup": {
-      "title": "Mode Sauvegarde",
-      "info": "Dans ce mode, le script téléchargera toutes les illustrations que vous avez dans Plex.",
-      "description": "Il utilise les valeurs spécifiées dans votre config.json pour trouver et enregistrer les illustrations.",
-      "benefitsTitle": "Avantages du Mode Sauvegarde",
-      "step1Title": "Créer une sauvegarde complète",
-      "step1Text": "Sauvegardez facilement toutes vos illustrations Plex existantes dans un dossier local spécifié dans votre configuration.",
-      "step2Title": "Préparer pour Jellyfin/Emby",
-      "step2Text": "C'est pratique pour créer un deuxième dossier d'assets avec des données EXIF Kometa/TCM, qui peut ensuite être utilisé par Jellyfin ou Emby.",
-      "cancel": "Annuler",
-      "start": "Démarrer la sauvegarde"
-    },
     "status": {
       "running": "Script en cours",
       "stopFirst": "Arrêtez le script avant de lancer un autre mode",
@@ -583,10 +571,7 @@
     "autoScrollStatus": "Défilement auto : {{status}}",
     "on": "Activé",
     "off": "Désactivé",
-    "receivingUpdates": "Réception des mises à jour en direct",
-    "loadFull": "Charger le fichier journal complet",
-    "loadingFullLog": "Chargement du fichier journal complet...",
-    "loadedFullLog": "Fichier journal complet chargé"
+    "receivingUpdates": "Réception des mises à jour en direct"
   },
   "libraryExclusion": {
     "configNotFound": "Configuration du serveur multimédia non trouvée",
@@ -820,9 +805,7 @@
     "deleteError": "Erreur lors de la suppression : {{message}}",
     "bulkDeletePartial": "Supprimé {{deleted}} affiche(s), mais {{failed}} ont échoué.",
     "bulkDeleteSuccess": "Supprimé avec succès {{count}} affiche(s)",
-    "assetReplaced": "Ressource remplacée avec succès !",
-    "selectPage": "Sélectionner la page",
-    "deselectPage": "Désélectionner la page"
+    "assetReplaced": "Ressource remplacée avec succès !"
   },
   "toast": {
     "success": "Succès",
@@ -831,6 +814,7 @@
   },
   "runtimeHistory": {
     "title": "Historique d'exécution",
+    "loading": "Chargement de l'historique d'exécution...",
     "migrationAvailable": "Migration des données historiques disponible",
     "migrationDescription": "Les données d'exécution de vos fichiers journaux existants peuvent être importées dans la base de données. Cela préservera les statistiques historiques et les rendra interrogeables.",
     "migrationInfo": "La migration s'exécute automatiquement lors de la première création de la base de données, ou vous pouvez la déclencher manuellement ci-dessous.",
@@ -838,7 +822,6 @@
     "runMigration": "Lancer la migration",
     "importing": "Importation...",
     "importJson": "Importer JSON",
-	"loading": "Chargement en cours...",
     "summary": "Résumé ({{days}} derniers jours)",
     "days": "{{count}} jours",
     "totalRuns": "Exécutions totales",
@@ -882,11 +865,6 @@
       "previous": "Précédent",
       "next": "Suivant"
     }
-  },
-  "pagination": {
-    "page": "Page {{page}} • Affichage de {{count}} entrées",
-    "previous": "Précédent",
-    "next": "Suivant"
   },
   "schedulerSettings": {
     "loading": "Chargement des paramètres du planificateur...",
@@ -1349,6 +1327,7 @@
     "type": "Type",
     "language": "Langue",
     "source": "Source",
+    "addedOn": "Ajouté le",
     "viewSource": "Voir la source",
     "replace": "Remplacer",
     "replaceTooltip": "Remplacer cette ressource",
@@ -1372,14 +1351,7 @@
     "bulkMarkSuccess": "{{count}} ressource(s) marquée(s) comme résolue(s) avec succès",
     "bulkMarkPartial": "{{success}} marqué(s) comme résolu(s), {{failed}} échoué(s)",
     "bulkMarkFailed": "Échec de marquer les ressources comme résolues",
-    "bulkMarkError": "Erreur : {{error}}",
-    "addedOn": "Ajouté le",
-    "noAssetsToMark": "Aucun asset filtré à marquer comme résolu.",
-    "bulkMarkAllFilteredConfirm": "Êtes-vous sûr de vouloir marquer les {{count}} assets filtrés comme résolus ?\n\nCela les supprimera de la vue 'Non résolus'. Cette action ne peut pas être annulée facilement.",
-    "markAllFilteredTooltip": "Marquer tous les assets filtrés comme résolus",
-    "markAllFiltered": "Tout marquer ({{count}}) comme résolu",
-    "bulkMarkAllFilteredTitle": "Tout marquer comme résolu ?",
-    "confirmMarkAll": "Confirmer et tout marquer ({{count}})"
+    "bulkMarkError": "Erreur : {{error}}"
   },
   "common": {
     "save": "Enregistrer",
@@ -1546,13 +1518,7 @@
     "endTime": "Heure de fin",
     "notificationSent": "Notification envoyée",
     "notes": "Notes",
-    "lastRun": "Dernière exécution",
-    "searchLogs": "Rechercher dans les logs",
-    "searchPlaceholder": "Filtrer les journaux...",
-    "filterLevel": "Filtrer par niveau",
-    "allLevels": "Tous les niveaux",
-    "noMatchingLogs": "Aucune entrée de log ne correspond à vos filtres.",
-    "adjustFilters": "Essayez d'ajuster vos filtres de recherche ou de niveau."
+    "lastRun": "Dernière exécution"
   },
   "dangerZone": {
     "title": "Zone de danger",
@@ -1622,11 +1588,7 @@
     "deleteMultipleMessage": "Êtes-vous sûr de vouloir supprimer {{count}} ressource(s) sélectionnée(s) ?",
     "deleteAssetMessage": "Êtes-vous sûr de vouloir supprimer cette ressource ?",
     "deleteButton": "Supprimer",
-    "assetReplaced": "Ressource remplacée avec succès !",
-    "itemsPerPage": "Éléments par page",
-    "paginationPage": "Page {{current}} sur {{total}}",
-    "paginationPrevious": "Précédent",
-    "paginationNext": "Suivant"
+    "assetReplaced": "Ressource remplacée avec succès !"
   },
   "autoTriggers": {
     "header": {

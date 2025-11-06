@@ -207,8 +207,6 @@ const getConfigTooltips = (language) => {
         "If assets are placed in this directory with the exact naming convention, they will be preferred (must follow same naming convention as /assets)",
       SkipAddText:
         "If set to true, Posterizarr will skip adding text to the poster if it is flagged as a 'Poster with text' by the provider",
-      SkipAddTextAndOverlay:
-        "If set to true, Posterizarr will skip adding text/overlay to the poster if it is flagged as a 'Poster with text' by the provider",
       FollowSymlink:
         "If set to true, Posterizarr will follow symbolic links in the specified directories during hashtable creation",
       ForceRunningDeletion:
@@ -635,8 +633,6 @@ const getConfigTooltips = (language) => {
         "Wenn Assets in diesem Verzeichnis mit der exakten Namenskonvention platziert werden, werden sie bevorzugt (muss dieselbe Namenskonvention wie /assets befolgen)",
       SkipAddText:
         "Wenn auf true gesetzt, überspringt Posterizarr das Hinzufügen von Text zum Poster, wenn es vom Anbieter als 'Poster mit Text' gekennzeichnet ist",
-      SkipAddTextAndOverlay:
-        "Wenn auf true gesetzt, überspringt Posterizarr das Hinzufügen von Text/overlay zum Poster, wenn es vom Anbieter als 'Poster mit Text' gekennzeichnet ist",
       FollowSymlink:
         "Wenn auf true gesetzt, folgt Posterizarr symbolischen Links in den angegebenen Verzeichnissen während der Hashtabellen-Erstellung",
       ForceRunningDeletion:
@@ -1071,8 +1067,6 @@ const getConfigTooltips = (language) => {
         "Si des ressources sont placées dans ce répertoire avec la convention de nommage exacte, elles seront préférées (doit suivre la même convention de nommage que /assets)",
       SkipAddText:
         "Si défini sur true, Posterizarr sautera l'ajout de texte à l'affiche si elle est signalée comme 'Affiche avec texte' par le fournisseur",
-      SkipAddTextAndOverlay:
-        "S’il est défini sur vrai, Posterizarr ignorera l’ajout de texte/superposition à l’affiche si elle est marquée comme 'Affiche avec texte' par le fournisseur.",
       FollowSymlink:
         "Si défini sur true, Posterizarr suivra les liens symboliques dans les répertoires spécifiés lors de la création de la table de hachage",
       ForceRunningDeletion:
@@ -1538,8 +1532,6 @@ const getConfigTooltips = (language) => {
         "Se le risorse sono posizionate in questa directory con la convenzione di denominazione esatta, verranno preferite (deve seguire la stessa convenzione di denominazione di /assets)",
       SkipAddText:
         "Se impostato su true, Posterizarr salterà l'aggiunta di testo al poster se è contrassegnato come 'Poster con testo' dal provider",
-      SkipAddTextAndOverlay:
-        "Se impostato su true, Posterizarr salterà l’aggiunta di testo/sovrapposizione al poster se è contrassegnato come 'Poster con testo' dal provider.",
       FollowSymlink:
         "Se impostato su true, Posterizarr seguirà i collegamenti simbolici nelle directory specificate durante la creazione della tabella hash",
       ForceRunningDeletion:
@@ -1997,8 +1989,6 @@ const getConfigTooltips = (language) => {
         "Se os recursos forem colocados neste diretório com a convenção de nomenclatura exata, eles serão preferidos (deve seguir a mesma convenção de nomenclatura de /assets)",
       SkipAddText:
         "Se definido como true, Posterizarr pulará a adição de texto ao pôster se estiver marcado como 'Pôster com texto' pelo provedor",
-      SkipAddTextAndOverlay:
-        "Se definido como verdadeiro, o Posterizarr irá ignorar a adição de texto/sobreposição ao poster se este estiver marcado como 'Poster com texto' pelo fornecedor.",
       FollowSymlink:
         "Se definido como true, Posterizarr seguirá links simbólicos nos diretórios especificados durante a criação da tabela hash",
       ForceRunningDeletion:
@@ -2398,7 +2388,7 @@ function ConfigEditor() {
   const initialAuthStatus = useRef(null); // Track initial auth status when config is loaded
 
   // Auto-save state
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const autoSaveTimerRef = useRef(null);
   const lastSavedConfigRef = useRef(null);
@@ -4105,7 +4095,6 @@ function ConfigEditor() {
         "SkipTBA",
         "SkipJapTitle",
         "SkipAddText",
-		"SkipAddTextAndOverlay",
         "DisableOnlineAssetFetch",
         "AutoUpdateIM",
         "AutoUpdatePosterizarr",

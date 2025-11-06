@@ -32,6 +32,7 @@ import DangerZone from "./DangerZone";
 import RecentAssets from "./RecentAssets";
 import Notification from "./Notification";
 import { useToast } from "../context/ToastContext";
+import { useStatus } from "../context/StatusContext";
 import ConfirmDialog from "./ConfirmDialog";
 import { formatDateTimeInTimezone } from "../utils/timeUtils";
 
@@ -66,6 +67,10 @@ function Dashboard() {
   const { t } = useTranslation();
   const { showSuccess, showError, showInfo } = useToast();
   const { startLoading, finishLoading } = useDashboardLoading();
+
+  // Use WebSocket-based status context (replaces polling!)
+  const { status: wsStatus, isLoading: wsLoading, transportMode } = useStatus();
+
   const [status, setStatus] = useState(
     cachedStatus || {
       running: false,
@@ -80,8 +85,17 @@ function Dashboard() {
       start_time: null,
     }
   );
+
+  // Update local status from WebSocket context
+  useEffect(() => {
+    if (wsStatus) {
+      setStatus(wsStatus);
+      cachedStatus = wsStatus;
+    }
+  }, [wsStatus]);
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [version, setVersion] = useState(
     cachedVersion || { local: null, remote: null }
   );
@@ -208,6 +222,7 @@ function Dashboard() {
       // Mark dashboard as loaded after first successful fetch
       if (!hasInitiallyLoaded.current) {
         hasInitiallyLoaded.current = true;
+        setIsInitialLoading(false);
         finishLoading("dashboard");
       }
     } catch (error) {
@@ -215,6 +230,7 @@ function Dashboard() {
       // Even on error, mark as loaded to show the page
       if (!hasInitiallyLoaded.current) {
         hasInitiallyLoaded.current = true;
+        setIsInitialLoading(false);
         finishLoading("dashboard");
       }
     } finally {
@@ -485,12 +501,12 @@ function Dashboard() {
     startLoading("dashboard");
     fetchDashboardData(false);
 
-    // Poll individual endpoints every 3 seconds for updates (lighter requests)
-    const statusInterval = setInterval(() => {
-      fetchStatus(true);
+    // NOTE: Status polling removed! Now using WebSocket context for real-time updates 🚀
+    // Poll only scheduler status and system info (less frequent, lightweight)
+    const lighterInterval = setInterval(() => {
       fetchSchedulerStatus(true);
       fetchSystemInfo(true);
-    }, 3000);
+    }, 5000); // Every 5 seconds (less frequent than before)
 
     // Interval for force refresh every 24 hours (if page stays open)
     const versionInterval = setInterval(
@@ -511,8 +527,7 @@ function Dashboard() {
         );
         setRuntimeStatsRefreshTrigger((prev) => prev + 1);
 
-        // Fetch latest status
-        fetchStatus(true);
+        // Refresh scheduler and system info (status comes from WebSocket!)
         fetchSchedulerStatus(true);
         fetchSystemInfo(true);
 
@@ -523,7 +538,7 @@ function Dashboard() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      clearInterval(statusInterval);
+      clearInterval(lighterInterval); // Changed from statusInterval
       clearInterval(versionInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       disconnectDashboardWebSocket();
@@ -788,11 +803,11 @@ function Dashboard() {
           <div className="bg-theme-card rounded-xl p-6 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-theme-muted text-sm mb-1 font-medium">
+                <p className="text-theme-muted text-sm mb-2 font-medium">
                   {t("dashboard.scriptStatus")}
                 </p>
                 <p
-                  className={`text-2xl font-bold mb-2 ${
+                  className={`text-3xl font-bold mb-3 ${
                     status.running ? "text-green-400" : "text-theme-text"
                   }`}
                 >
@@ -801,16 +816,17 @@ function Dashboard() {
                     : t("dashboard.stopped")}
                 </p>
                 {status.running && (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     {status.current_mode && (
-                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30 mb-1">
-                        {t("dashboard.mode")}: {status.current_mode}
+                      <div className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30 mb-1">
+                        {t("dashboard.mode")}:{" "}
+                        {status.current_mode.charAt(0).toUpperCase() +
+                          status.current_mode.slice(1)}
                       </div>
                     )}
                     {status.pid && (
-                      <p className="text-sm text-theme-muted">
-                        {t("dashboard.pid")}:{" "}
-                        <span className="font-mono">{status.pid}</span>
+                      <p className="text-xs text-theme-muted">
+                        PID: <span className="font-mono">{status.pid}</span>
                       </p>
                     )}
                     {status.start_time && (
@@ -830,9 +846,9 @@ function Dashboard() {
               </div>
               <div className="p-3 rounded-lg bg-theme-primary/10">
                 {status.running ? (
-                  <Activity className="w-12 h-12 text-green-400" />
+                  <Activity className="w-10 h-10 text-green-400" />
                 ) : (
-                  <Activity className="w-12 h-12 text-gray-500" />
+                  <Activity className="w-10 h-10 text-theme-muted" />
                 )}
               </div>
             </div>
@@ -842,16 +858,16 @@ function Dashboard() {
           <div className="bg-theme-card rounded-xl p-6 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="text-theme-muted text-sm mb-1 font-medium">
+                <p className="text-theme-muted text-sm mb-2 font-medium">
                   {t("dashboard.schedulerJobs")}
                 </p>
                 <p
-                  className={`text-2xl font-bold mb-2 ${
+                  className={`text-3xl font-bold mb-3 ${
                     schedulerStatus.enabled && schedulerStatus.running
                       ? "text-green-400"
                       : schedulerStatus.enabled
                       ? "text-yellow-400"
-                      : "text-gray-400"
+                      : "text-theme-muted"
                   }`}
                 >
                   {schedulerStatus.enabled
@@ -861,12 +877,11 @@ function Dashboard() {
                     : t("dashboard.disabled")}
                 </p>
                 {schedulerStatus.enabled && (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     {schedulerStatus.schedules &&
                     schedulerStatus.schedules.length > 0 ? (
                       <>
                         <p className="text-xs text-theme-muted">
-                          ⏰{" "}
                           {schedulerStatus.schedules
                             .map((s) => s.time)
                             .join(", ")}
@@ -894,7 +909,7 @@ function Dashboard() {
                       </p>
                     )}
                     {schedulerStatus.is_executing && (
-                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      <div className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
                         {t("dashboard.executing")}
                       </div>
                     )}
@@ -903,11 +918,11 @@ function Dashboard() {
               </div>
               <div className="p-3 rounded-lg bg-theme-primary/10">
                 {schedulerStatus.enabled && schedulerStatus.running ? (
-                  <Clock className="w-12 h-12 text-green-400" />
+                  <Clock className="w-10 h-10 text-green-400" />
                 ) : schedulerStatus.enabled ? (
-                  <Clock className="w-12 h-12 text-yellow-400" />
+                  <Clock className="w-10 h-10 text-yellow-400" />
                 ) : (
-                  <Clock className="w-12 h-12 text-gray-500" />
+                  <Clock className="w-10 h-10 text-theme-muted" />
                 )}
               </div>
             </div>
@@ -915,89 +930,100 @@ function Dashboard() {
 
           {/* Script & Config Files Card */}
           <div className="bg-theme-card rounded-xl p-6 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-theme-muted text-sm mb-1 font-medium">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-theme-muted text-sm mb-3 font-medium">
                   {t("dashboard.scriptFile")} & {t("dashboard.configFile")}
                 </p>
-                <div className="space-y-3">
-                  {/* Script Status */}
-                  <div className="flex items-center gap-2">
-                    {status.script_exists ? (
-                      <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                    )}
-                    <span
-                      className={`text-lg font-bold ${
-                        status.script_exists ? "text-green-400" : "text-red-400"
-                      }`}
-                    >
-                      {t("dashboard.scriptFile")}:{" "}
-                      {status.script_exists
-                        ? t("dashboard.found")
-                        : t("dashboard.missing")}
-                    </span>
-                  </div>
-                  {status.script_exists &&
-                    (version.local || version.remote) && (
-                      <div className="flex items-center gap-2 flex-wrap ml-7">
-                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-card border border-theme-primary text-theme-primary shadow-sm">
-                          v{version.local || version.remote}
-                        </span>
-                        {version.is_update_available && (
-                          <a
-                            href="https://github.com/fscorrupt/Posterizarr/releases/latest"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center"
-                          >
-                            <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/20 border border-green-500/50 text-green-400 shadow-sm animate-pulse hover:scale-105 transition-transform">
-                              v{version.remote} available
-                            </span>
-                          </a>
-                        )}
-                      </div>
-                    )}
-
-                  {/* Config Status */}
-                  <div className="flex items-center gap-2">
-                    {status.config_exists ? (
-                      <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                    )}
-                    <span
-                      className={`text-lg font-bold ${
-                        status.config_exists ? "text-green-400" : "text-red-400"
-                      }`}
-                    >
-                      {t("dashboard.configFile")}:{" "}
-                      {status.config_exists
-                        ? t("dashboard.found")
-                        : t("dashboard.missing")}
-                    </span>
-                  </div>
-                  {status.config_exists && (
-                    <div className="ml-7">
-                      <Link
-                        to="/config"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
-                      >
-                        <Settings className="w-4 h-4 text-theme-primary" />
-                        <span className="text-theme-text">
-                          {t("dashboard.configureNow")}
-                        </span>
-                      </Link>
+                {isInitialLoading ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-theme-primary animate-spin flex-shrink-0" />
+                      <span className="text-sm font-medium text-theme-text">
+                        {t("dashboard.loading", "Loading...")}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </div>
-              <div className="p-3 rounded-lg bg-theme-primary/10">
-                {status.script_exists && status.config_exists ? (
-                  <CheckCircle className="w-12 h-12 text-green-400" />
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-theme-primary animate-spin flex-shrink-0" />
+                      <span className="text-sm font-medium text-theme-text">
+                        {t("dashboard.loading", "Loading...")}
+                      </span>
+                    </div>
+                  </div>
                 ) : (
-                  <AlertCircle className="w-12 h-12 text-red-400" />
+                  <div className="space-y-3">
+                    {/* Script Status */}
+                    <div className="space-y-1.5">
+                      <span
+                        className={`text-base font-semibold ${
+                          status.script_exists
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {t("dashboard.scriptFile")}
+                      </span>
+
+                      {/* Version Info */}
+                      {status.script_exists &&
+                        (version.local || version.remote) && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-theme-hover border border-theme text-theme-text">
+                              v{version.local || version.remote}
+                            </span>
+                            {version.is_update_available && (
+                              <a
+                                href="https://github.com/fscorrupt/Posterizarr/releases/latest"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center"
+                              >
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-500/20 border border-green-500/50 text-green-400 animate-pulse hover:scale-105 transition-transform">
+                                  v{version.remote} available
+                                </span>
+                              </a>
+                            )}
+                          </div>
+                        )}
+                    </div>
+
+                    {/* Config Status */}
+                    <div className="space-y-1.5">
+                      <span
+                        className={`text-base font-semibold ${
+                          status.config_exists
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {t("dashboard.configFile")}
+                      </span>
+
+                      {/* Config Action Button */}
+                      {status.config_exists && (
+                        <div>
+                          <Link
+                            to="/config"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-theme-hover hover:bg-theme-primary/20 border border-theme hover:border-theme-primary/50 rounded-lg text-xs font-medium transition-all"
+                          >
+                            <Settings className="w-3.5 h-3.5 text-theme-primary" />
+                            <span className="text-theme-text">
+                              {t("dashboard.configureNow")}
+                            </span>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="p-3 rounded-lg bg-theme-primary/10 flex-shrink-0">
+                {isInitialLoading ? (
+                  <RefreshCw className="w-10 h-10 text-theme-primary animate-spin" />
+                ) : status.script_exists && status.config_exists ? (
+                  <CheckCircle className="w-10 h-10 text-green-400" />
+                ) : (
+                  <AlertCircle className="w-10 h-10 text-red-400" />
                 )}
               </div>
             </div>
@@ -1090,6 +1116,22 @@ function Dashboard() {
                       </div>
                     </div>
                   )}
+
+                  {/* WebSocket Status Badge */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-theme-hover/50">
+                    <Wifi className="w-3.5 h-3.5 text-theme-muted" />
+                    <span className="text-xs text-theme-muted">
+                      {transportMode === "websocket" ? (
+                        <span className="text-green-500 font-medium">
+                          🚀 WebSocket (Real-time)
+                        </span>
+                      ) : (
+                        <span className="text-yellow-500">
+                          📡 HTTP Polling (Fallback)
+                        </span>
+                      )}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="p-3 rounded-lg bg-theme-primary/10 flex-shrink-0">
@@ -1112,162 +1154,197 @@ function Dashboard() {
         />
       ),
       logViewer: visibleCards.logViewer && (
-        <div
-          key="logViewer"
-          className="bg-theme-card rounded-xl p-6 border border-theme hover:border-theme-primary/50 transition-all shadow-sm"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex-1">
+        <div key="logViewer" className="space-y-4">
+          {/* Log Viewer Header Card */}
+          <div className="bg-theme-card rounded-lg shadow-md p-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <h2 className="text-xl font-semibold text-theme-text flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-theme-primary/10">
-                    <FileText className="w-5 h-5 text-theme-primary" />
-                  </div>
-                  {t("dashboard.liveLogFeed")}
-                </h2>
-
-                {wsConnected && (
-                  <span className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    <Wifi className="w-3 h-3" />
-                    Live
-                  </span>
-                )}
+                <div className="p-2 rounded-lg bg-theme-primary/10">
+                  <FileText className="w-5 h-5 text-theme-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-theme-text">
+                    {t("dashboard.liveLogFeed")}
+                  </h2>
+                  {status.running &&
+                    status.active_log &&
+                    allLogs.length > 0 && (
+                      <p className="text-xs text-theme-muted mt-1">
+                        {t("dashboard.readingFrom")}:{" "}
+                        <span className="font-mono text-theme-primary">
+                          {status.current_mode
+                            ? getLogFileForMode(status.current_mode)
+                            : status.active_log}
+                        </span>
+                        <span className="ml-3 text-xs text-theme-muted/70">
+                          ({allLogs.length} {t("dashboard.linesLoaded")})
+                        </span>
+                      </p>
+                    )}
+                </div>
               </div>
 
-              {status.running && status.active_log && allLogs.length > 0 && (
-                <p
-                  className="text-xs text-theme-muted mt-2"
-                  style={{ marginLeft: "calc(2.25rem + 0.75rem)" }}
-                >
-                  {t("dashboard.readingFrom")}:{" "}
-                  <span className="font-mono text-theme-primary">
-                    {status.current_mode
-                      ? getLogFileForMode(status.current_mode)
-                      : status.active_log}
-                  </span>
-                  <span className="ml-3 text-xs text-theme-muted/70">
-                    ({allLogs.length} {t("dashboard.linesLoaded")})
-                  </span>
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-sm font-medium text-theme-text">
-                  {t("dashboard.autoScroll")}
-                </span>
-                <button
-                  onClick={() => {
-                    const newAutoScrollState = !autoScroll;
-                    setAutoScroll(newAutoScrollState);
-                    userHasScrolled.current = false;
+              <div className="flex items-center gap-3">
+                {/* Connection Status Badge */}
+                {wsConnected && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-green-500/50 bg-green-500/10 text-xs font-medium text-green-400">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <Wifi className="w-3.5 h-3.5" />
+                    <span>Live</span>
+                  </div>
+                )}
 
-                    if (newAutoScrollState && logContainerRef.current) {
-                      setTimeout(() => {
-                        if (logContainerRef.current) {
-                          logContainerRef.current.scrollTop =
-                            logContainerRef.current.scrollHeight;
-                        }
-                      }, 100);
-                    }
-                  }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    autoScroll ? "bg-theme-primary" : "bg-theme-hover"
-                  }`}
-                  title={
-                    autoScroll
-                      ? t("dashboard.autoScrollEnabled")
-                      : t("dashboard.autoScrollDisabled")
-                  }
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      autoScroll ? "translate-x-6" : "translate-x-1"
+                {/* Auto-scroll Toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-sm font-medium text-theme-text">
+                    {t("dashboard.autoScroll")}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const newAutoScrollState = !autoScroll;
+                      setAutoScroll(newAutoScrollState);
+                      userHasScrolled.current = false;
+
+                      if (newAutoScrollState && logContainerRef.current) {
+                        setTimeout(() => {
+                          if (logContainerRef.current) {
+                            logContainerRef.current.scrollTop =
+                              logContainerRef.current.scrollHeight;
+                          }
+                        }, 100);
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      autoScroll ? "bg-theme-primary" : "bg-theme-hover"
                     }`}
-                  />
-                </button>
-              </label>
+                    title={
+                      autoScroll
+                        ? t("dashboard.autoScrollEnabled")
+                        : t("dashboard.autoScrollDisabled")
+                    }
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        autoScroll ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
             </div>
           </div>
 
-          <div className="bg-black rounded-lg overflow-hidden border-2 border-theme shadow-sm">
+          {/* Log Viewer Table Card */}
+          <div className="bg-theme-card rounded-lg shadow-md overflow-hidden">
             {status.running && allLogs && allLogs.length > 0 ? (
-              <div
-                ref={logContainerRef}
-                className="font-mono text-[11px] leading-relaxed max-h-96 overflow-y-auto"
-              >
-                {allLogs.map((line, index) => {
-                  const parsed = parseLogLine(line);
+              <>
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-theme">
+                        <th className="text-left py-3 px-4 text-theme-muted text-sm font-medium w-48">
+                          Timestamp
+                        </th>
+                        <th className="text-left py-3 px-4 text-theme-muted text-sm font-medium w-32">
+                          Level
+                        </th>
+                        <th className="text-left py-3 px-4 text-theme-muted text-sm font-medium">
+                          Message
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-theme">
+                      <tr>
+                        <td colSpan="3" className="p-0">
+                          <div
+                            ref={logContainerRef}
+                            className="overflow-y-auto"
+                            style={{ maxHeight: "400px" }}
+                          >
+                            <table className="w-full">
+                              <tbody className="divide-y divide-theme">
+                                {allLogs.map((line, index) => {
+                                  const parsed = parseLogLine(line);
 
-                  if (parsed.raw === null) {
-                    return null;
-                  }
+                                  if (parsed.raw === null) {
+                                    return null;
+                                  }
 
-                  if (parsed.raw) {
-                    return (
-                      <div
-                        key={`log-${index}`}
-                        className="px-3 py-1.5 hover:bg-gray-900/50 transition-colors border-l-2 border-transparent hover:border-theme-primary/50"
-                        style={{ color: "#9ca3af" }}
-                      >
-                        {parsed.raw}
-                      </div>
-                    );
-                  }
+                                  if (parsed.raw) {
+                                    return (
+                                      <tr
+                                        key={`log-${index}`}
+                                        className="hover:bg-theme-hover transition-colors"
+                                      >
+                                        <td
+                                          colSpan="3"
+                                          className="px-4 py-2 text-xs text-theme-muted font-mono"
+                                        >
+                                          {parsed.raw}
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
 
-                  const logColor = getLogColor(parsed.level);
+                                  return (
+                                    <tr
+                                      key={`log-${index}`}
+                                      className="hover:bg-theme-hover transition-colors"
+                                    >
+                                      <td className="px-4 py-2 text-xs text-theme-muted font-mono whitespace-nowrap w-48">
+                                        {parsed.timestamp}
+                                      </td>
+                                      <td className="px-4 py-2 text-xs whitespace-nowrap w-32">
+                                        <LogLevel level={parsed.level} />
+                                      </td>
+                                      <td className="px-4 py-2 text-xs text-theme-text font-mono break-all">
+                                        <span className="text-theme-muted mr-2">
+                                          L.{parsed.lineNum}
+                                        </span>
+                                        {parsed.message}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
 
-                  return (
-                    <div
-                      key={`log-${index}`}
-                      className="px-3 py-1.5 hover:bg-gray-900/50 transition-colors flex items-center gap-2 border-l-2 border-transparent hover:border-theme-primary/50"
-                    >
-                      <span
-                        style={{ color: "#6b7280" }}
-                        className="text-[10px]"
-                      >
-                        [{parsed.timestamp}]
-                      </span>
-                      <LogLevel level={parsed.level} />
-                      <span
-                        style={{ color: "#4b5563" }}
-                        className="text-[10px]"
-                      >
-                        |L.{parsed.lineNum}|
-                      </span>
-                      <span style={{ color: logColor }}>{parsed.message}</span>
+                {/* Footer */}
+                <div className="bg-theme-hover border-t border-theme px-4 py-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-theme-muted">
+                      {allLogs.length}{" "}
+                      {t("dashboard.logEntries", "log entries")}
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="flex items-center gap-2 text-xs text-theme-muted">
+                      <Clock className="w-3 h-3" />
+                      {wsConnected
+                        ? t("dashboard.live")
+                        : t("dashboard.autoRefresh") + ": 3s"}
+                    </div>
+                  </div>
+                </div>
+              </>
             ) : (
-              <div className="px-4 py-12 text-center">
-                <FileText className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm font-medium">
+              <div className="px-4 py-16 text-center">
+                <FileText className="w-12 h-12 text-theme-muted/50 mx-auto mb-3" />
+                <p className="text-theme-muted font-medium">
                   {t("dashboard.noLogs")}
                 </p>
-                <p className="text-gray-600 text-xs mt-1">
+                <p className="text-theme-muted text-xs mt-1">
                   {status.running
                     ? t("dashboard.waitingForLogs")
                     : t("dashboard.startRunToSeeLogs")}
                 </p>
               </div>
             )}
-          </div>
-
-          <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
-            <span className="flex items-center gap-2">
-              <Clock className="w-3 h-3" />
-              {t("dashboard.autoRefresh")}:{" "}
-              {wsConnected ? t("dashboard.live") : "1.5s"}
-            </span>
-            <span className="text-gray-500">
-              {t("dashboard.lastEntries", { count: 25 })} •{" "}
-              {status.current_mode
-                ? getLogFileForMode(status.current_mode)
-                : status.active_log || t("dashboard.noActiveLog")}
-            </span>
           </div>
         </div>
       ),

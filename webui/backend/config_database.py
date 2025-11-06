@@ -7,16 +7,16 @@ Automatically syncs with config.json on startup
 import sqlite3
 import json
 import logging
-from pathlib import Path
-from typing import Any, Dict, Optional, List, Tuple
-from datetime import datetime
 import threading
+from pathlib import Path
+from typing import Any, Dict, Optional
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigDB:
-    """Database class for managing configuration in SQLite"""
+    """Database class for managing configuration in SQLite (thread-safe)"""
 
     def __init__(self, db_path: Path, config_json_path: Path):
         """
@@ -28,32 +28,38 @@ class ConfigDB:
         """
         self.db_path = db_path
         self.config_json_path = config_json_path
-        # REMOVED: self.connection
-        self.lock = threading.RLock()  # Thread-safety lock
-
-    def _get_connection(self):
-        """Helper to create a new, thread-safe connection"""
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        return conn
+        self.connection = None
+        self._lock = threading.RLock()  # Thread-safe access
 
     def connect(self):
-        """Establish database connection (now just ensures tables exist)"""
-        logger.debug("Initializing config database (checking tables)...")
-        self.create_tables()
+        """Establish database connection"""
+        with self._lock:
+            try:
+                self.connection = sqlite3.connect(self.db_path, check_same_thread=False)
+                self.connection.row_factory = sqlite3.Row
+                logger.info(f"Connected to config database: {self.db_path}")
+            except sqlite3.Error as e:
+                logger.error(f"Error connecting to config database: {e}")
+                raise
 
     def close(self):
-        """Close connection - No longer needed."""
-        pass
+        """Close database connection"""
+        with self._lock:
+            if self.connection:
+                self.connection.close()
+                logger.info("Config database connection closed")
 
     def create_tables(self):
         """Create the config tables if they don't exist"""
-        with self.lock:
+        with self._lock:
             try:
-                conn = self._get_connection()
-                cursor = conn.cursor()
+                cursor = self.connection.cursor()
 
-                # Main config table
+                # Use DELETE mode (default) - WAL caused issues with 35GB files
+                cursor.execute("PRAGMA journal_mode=DELETE")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+
+                # Main config table - stores all config values in a key-value structure
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS config (
@@ -63,28 +69,29 @@ class ConfigDB:
                         value TEXT,
                         value_type TEXT NOT NULL,
                         description TEXT,
-                        created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
-                        updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         UNIQUE(section, key)
                     )
                 """
                 )
 
-                # Indexes
+                # Index for faster lookups
                 cursor.execute(
                     """
-                    CREATE INDEX IF NOT EXISTS idx_config_section
+                    CREATE INDEX IF NOT EXISTS idx_config_section 
                     ON config(section)
                 """
                 )
+
                 cursor.execute(
                     """
-                    CREATE INDEX IF NOT EXISTS idx_config_key
+                    CREATE INDEX IF NOT EXISTS idx_config_key 
                     ON config(section, key)
                 """
                 )
 
-                # Metadata table
+                # Metadata table - stores information about the config sync
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS config_metadata (
@@ -97,14 +104,10 @@ class ConfigDB:
                 """
                 )
 
-                conn.commit()
-                conn.close()
+                self.connection.commit()
                 logger.info("Config database tables created successfully")
             except sqlite3.Error as e:
                 logger.error(f"Error creating config tables: {e}")
-                if 'conn' in locals():
-                    conn.rollback()
-                    conn.close()
                 raise
 
     def _get_value_type(self, value: Any) -> str:
@@ -133,220 +136,272 @@ class ConfigDB:
 
     def _deserialize_value(self, value_str: str, value_type: str) -> Any:
         """Deserialize a value from the database"""
-        if value_str is None:
-            return None
-        try:
-            if value_type == "boolean":
-                return value_str.lower() == "true"
-            elif value_type == "integer":
-                return int(value_str)
-            elif value_type == "float":
-                return float(value_str)
-            elif value_type == "list" or value_type == "dict":
-                return json.loads(value_str)
-            else:
-                return value_str
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.warning(f"Error deserializing value '{value_str}' as type '{value_type}': {e}")
-            return value_str # Fallback to string
+        if value_type == "boolean":
+            return value_str.lower() == "true"
+        elif value_type == "integer":
+            return int(value_str)
+        elif value_type == "float":
+            return float(value_str)
+        elif value_type == "list" or value_type == "dict":
+            return json.loads(value_str)
+        else:
+            return value_str
 
     def import_from_json(self, config_data: Dict = None):
         """
         Import configuration from JSON data or from config.json file
-        Uses a single transaction for performance.
+
+        Args:
+            config_data: Optional dictionary with config data. If None, reads from config.json
         """
-        with self.lock:
-            try:
-                if config_data is None:
-                    if not self.config_json_path.exists():
-                        logger.error(f"Config file not found: {self.config_json_path}")
-                        return False
-                    with open(self.config_json_path, "r", encoding="utf-8") as f:
-                        config_data = json.load(f)
-                    logger.info(f"Loaded config from: {self.config_json_path}")
+        try:
+            # Load config from file if not provided
+            if config_data is None:
+                if not self.config_json_path.exists():
+                    logger.error(f"Config file not found: {self.config_json_path}")
+                    return False
 
-                conn = self._get_connection()
-                cursor = conn.cursor()
-                entries_to_upsert: List[Tuple] = []
-                now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S') # Use local time string
+                with open(self.config_json_path, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+                logger.info(f"Loaded config from: {self.config_json_path}")
 
-                for section, section_data in config_data.items():
-                    if not isinstance(section_data, dict):
-                        value_type = self._get_value_type(section_data)
-                        value_str = self._serialize_value(section_data)
-                        entries_to_upsert.append(
-                            ("_root", section, value_str, value_type, now_str)
-                        )
-                        continue
-                    for key, value in section_data.items():
-                        value_type = self._get_value_type(value)
-                        value_str = self._serialize_value(value)
-                        entries_to_upsert.append(
-                            (section, key, value_str, value_type, now_str)
-                        )
+            cursor = self.connection.cursor()
+            imported_count = 0
+            updated_count = 0
 
-                if entries_to_upsert:
-                    cursor.executemany(
+            # Iterate through all sections and keys
+            for section, section_data in config_data.items():
+                if not isinstance(section_data, dict):
+                    # Handle non-dict values at root level (shouldn't happen but just in case)
+                    value_type = self._get_value_type(section_data)
+                    value_str = self._serialize_value(section_data)
+
+                    cursor.execute(
                         """
                         INSERT INTO config (section, key, value, value_type, updated_at)
                         VALUES (?, ?, ?, ?, ?)
-                        ON CONFLICT(section, key)
-                        DO UPDATE SET
+                        ON CONFLICT(section, key) 
+                        DO UPDATE SET 
                             value = excluded.value,
                             value_type = excluded.value_type,
                             updated_at = excluded.updated_at
-                        """,
-                        entries_to_upsert,
+                    """,
+                        ("_root", section, value_str, value_type, datetime.now()),
                     )
-                    imported_count = cursor.rowcount
-                    logger.info(f"Config sync complete: {imported_count} rows affected (inserted or updated)")
-                else:
-                    imported_count = 0
-                    logger.info("Config sync: No entries found in config.json")
+                    imported_count += 1
+                    continue
 
-                cursor.execute(
-                    """
-                    INSERT INTO config_metadata (last_sync_time, config_file_path, sync_status, sync_message)
-                    VALUES (?, ?, ?, ?)
-                """,
-                    (
-                        now_str, str(self.config_json_path), "success", f"Synced {imported_count} entries",
-                    ),
-                )
-                conn.commit()
-                conn.close()
-                return True
+                # Handle section with key-value pairs
+                for key, value in section_data.items():
+                    value_type = self._get_value_type(value)
+                    value_str = self._serialize_value(value)
 
-            except json.JSONDecodeError as e:
-                logger.error(f"Error parsing JSON: {e}")
-                return False
-            except sqlite3.Error as e:
-                logger.error(f"Database error during import: {e}")
-                if 'conn' in locals():
-                    conn.rollback()
-                    conn.close()
-                return False
-            except Exception as e:
-                logger.error(f"Unexpected error during import: {e}")
-                if 'conn' in locals():
-                    conn.rollback()
-                    conn.close()
-                return False
+                    # Check if entry exists
+                    cursor.execute(
+                        """
+                        SELECT id, value FROM config 
+                        WHERE section = ? AND key = ?
+                    """,
+                        (section, key),
+                    )
+
+                    existing = cursor.fetchone()
+
+                    if existing:
+                        # Update if value changed
+                        if existing[1] != value_str:
+                            cursor.execute(
+                                """
+                                UPDATE config 
+                                SET value = ?, value_type = ?, updated_at = ?
+                                WHERE section = ? AND key = ?
+                            """,
+                                (value_str, value_type, datetime.now(), section, key),
+                            )
+                            updated_count += 1
+                    else:
+                        # Insert new entry
+                        cursor.execute(
+                            """
+                            INSERT INTO config (section, key, value, value_type, updated_at)
+                            VALUES (?, ?, ?, ?, ?)
+                        """,
+                            (section, key, value_str, value_type, datetime.now()),
+                        )
+                        imported_count += 1
+
+            # Update metadata
+            cursor.execute(
+                """
+                INSERT INTO config_metadata (last_sync_time, config_file_path, sync_status, sync_message)
+                VALUES (?, ?, ?, ?)
+            """,
+                (
+                    datetime.now(),
+                    str(self.config_json_path),
+                    "success",
+                    f"Imported {imported_count} new entries, updated {updated_count} entries",
+                ),
+            )
+
+            self.connection.commit()
+            logger.info(
+                f"Config imported successfully: {imported_count} new, {updated_count} updated"
+            )
+            return True
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing JSON: {e}")
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"Database error during import: {e}")
+            self.connection.rollback()
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error during import: {e}")
+            self.connection.rollback()
+            return False
 
     def export_to_json(self, output_path: Path = None) -> Dict:
-        """Export configuration from database to JSON format"""
-        with self.lock:
-            try:
-                conn = self._get_connection()
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    SELECT section, key, value, value_type
-                    FROM config
-                    ORDER BY section, key
+        """
+        Export configuration from database to JSON format
+
+        Args:
+            output_path: Optional path to write the JSON file. If None, returns dict only.
+
+        Returns:
+            Dictionary with the configuration data
+        """
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
                 """
-                )
+                SELECT section, key, value, value_type 
+                FROM config 
+                ORDER BY section, key
+            """
+            )
 
-                config_data = {}
-                for row in cursor.fetchall():
-                    section = row["section"]
-                    key = row["key"]
-                    value_str = row["value"]
-                    value_type = row["value_type"]
-                    value = self._deserialize_value(value_str, value_type)
+            config_data = {}
 
-                    if section == "_root":
-                        config_data[key] = value
-                    else:
-                        if section not in config_data:
-                            config_data[section] = {}
-                        config_data[section][key] = value
+            for row in cursor.fetchall():
+                section = row[0]
+                key = row[1]
+                value_str = row[2]
+                value_type = row[3]
 
-                conn.close()
+                # Deserialize value
+                value = self._deserialize_value(value_str, value_type)
 
-                if output_path:
-                    with open(output_path, "w", encoding="utf-8") as f:
-                        json.dump(config_data, f, indent=2, ensure_ascii=False)
-                    logger.info(f"Config exported to: {output_path}")
+                # Build nested structure
+                if section == "_root":
+                    config_data[key] = value
+                else:
+                    if section not in config_data:
+                        config_data[section] = {}
+                    config_data[section][key] = value
 
-                return config_data
+            # Write to file if path provided
+            if output_path:
+                with open(output_path, "w", encoding="utf-8") as f:
+                    json.dump(config_data, f, indent=2, ensure_ascii=False)
+                logger.info(f"Config exported to: {output_path}")
 
-            except sqlite3.Error as e:
-                logger.error(f"Database error during export: {e}")
-                if 'conn' in locals():
-                    conn.close()
-                return {}
-            except Exception as e:
-                logger.error(f"Unexpected error during export: {e}")
-                if 'conn' in locals():
-                    conn.close()
-                return {}
+            return config_data
+
+        except sqlite3.Error as e:
+            logger.error(f"Database error during export: {e}")
+            return {}
+        except Exception as e:
+            logger.error(f"Unexpected error during export: {e}")
+            return {}
 
     def get_value(self, section: str, key: str, default: Any = None) -> Any:
-        """Get a configuration value"""
-        with self.lock:
+        """
+        Get a configuration value
+
+        Args:
+            section: Config section name
+            key: Config key name
+            default: Default value if not found
+
+        Returns:
+            The configuration value or default
+        """
+        with self._lock:
             try:
-                conn = self._get_connection()
-                cursor = conn.cursor()
+                cursor = self.connection.cursor()
                 cursor.execute(
                     """
-                    SELECT value, value_type FROM config
+                    SELECT value, value_type FROM config 
                     WHERE section = ? AND key = ?
                 """,
                     (section, key),
                 )
-                row = cursor.fetchone()
-                conn.close()
 
+                row = cursor.fetchone()
                 if row:
-                    return self._deserialize_value(row["value"], row["value_type"])
+                    return self._deserialize_value(row[0], row[1])
                 return default
+
             except sqlite3.Error as e:
                 logger.error(f"Error getting value: {e}")
-                if 'conn' in locals():
-                    conn.close()
                 return default
 
     def set_value(self, section: str, key: str, value: Any) -> bool:
-        """Set a configuration value"""
-        with self.lock:
+        """
+        Set a configuration value
+
+        Args:
+            section: Config section name
+            key: Config key name
+            value: Value to set
+
+        Returns:
+            True if successful, False otherwise
+        """
+        with self._lock:
             try:
-                conn = self._get_connection()
-                cursor = conn.cursor()
+                cursor = self.connection.cursor()
                 value_type = self._get_value_type(value)
                 value_str = self._serialize_value(value)
 
                 cursor.execute(
                     """
                     INSERT INTO config (section, key, value, value_type, updated_at)
-                    VALUES (?, ?, ?, ?, (datetime('now', 'localtime')))
-                    ON CONFLICT(section, key)
-                    DO UPDATE SET
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(section, key) 
+                    DO UPDATE SET 
                         value = excluded.value,
                         value_type = excluded.value_type,
-                        updated_at = (datetime('now', 'localtime'))
+                        updated_at = excluded.updated_at
                 """,
-                    (section, key, value_str, value_type),
+                    (section, key, value_str, value_type, datetime.now()),
                 )
-                conn.commit()
-                conn.close()
+
+                self.connection.commit()
                 return True
+
             except sqlite3.Error as e:
                 logger.error(f"Error setting value: {e}")
-                if 'conn' in locals():
-                    conn.rollback()
-                    conn.close()
                 return False
 
     def get_section(self, section: str) -> Dict:
-        """Get all values from a configuration section"""
-        with self.lock:
+        """
+        Get all values from a configuration section
+
+        Args:
+            section: Config section name
+
+        Returns:
+            Dictionary with all key-value pairs in the section
+        """
+        with self._lock:
             try:
-                conn = self._get_connection()
-                cursor = conn.cursor()
+                cursor = self.connection.cursor()
                 cursor.execute(
                     """
-                    SELECT key, value, value_type FROM config
+                    SELECT key, value, value_type FROM config 
                     WHERE section = ?
                     ORDER BY key
                 """,
@@ -355,38 +410,33 @@ class ConfigDB:
 
                 result = {}
                 for row in cursor.fetchall():
-                    key = row["key"]
-                    value = self._deserialize_value(row["value"], row["value_type"])
+                    key = row[0]
+                    value = self._deserialize_value(row[1], row[2])
                     result[key] = value
 
-                conn.close()
                 return result
+
             except sqlite3.Error as e:
                 logger.error(f"Error getting section: {e}")
-                if 'conn' in locals():
-                    conn.close()
                 return {}
 
     def get_all_sections(self) -> list:
         """Get list of all configuration sections"""
-        with self.lock:
+        with self._lock:
             try:
-                conn = self._get_connection()
-                cursor = conn.cursor()
+                cursor = self.connection.cursor()
                 cursor.execute(
                     """
-                    SELECT DISTINCT section FROM config
+                    SELECT DISTINCT section FROM config 
                     WHERE section != '_root'
                     ORDER BY section
                 """
                 )
-                sections = [row["section"] for row in cursor.fetchall()]
-                conn.close()
-                return sections
+
+                return [row[0] for row in cursor.fetchall()]
+
             except sqlite3.Error as e:
                 logger.error(f"Error getting sections: {e}")
-                if 'conn' in locals():
-                    conn.close()
                 return []
 
     def initialize(self):
@@ -398,8 +448,10 @@ class ConfigDB:
         else:
             logger.info(f"Creating new config database: {self.db_path}")
 
-        self.connect()  # This now just creates tables
+        self.connect()
+        self.create_tables()
 
+        # Always sync with config.json on startup
         logger.info(f"Syncing config database with config.json...")
         success = self.import_from_json()
 
@@ -410,34 +462,3 @@ class ConfigDB:
                 logger.info(f"Config database synced with config.json")
         else:
             logger.warning(f"Config database sync had issues")
-
-    def get_status(self) -> dict:
-        """Get status and metadata, thread-safe"""
-        with self.lock:
-            try:
-                conn = self._get_connection()
-                cursor = conn.cursor()
-
-                cursor.execute("SELECT * FROM config_metadata ORDER BY last_sync_time DESC LIMIT 1")
-                metadata_row = cursor.fetchone()
-                metadata = dict(metadata_row) if metadata_row else None
-
-                cursor.execute("SELECT COUNT(*) FROM config")
-                total_entries = cursor.fetchone()[0]
-
-                cursor.execute("SELECT DISTINCT section FROM config WHERE section != '_root' ORDER BY section")
-                sections = [row["section"] for row in cursor.fetchall()]
-
-                conn.close()
-                return {
-                    "database_path": str(self.db_path),
-                    "sections": sections,
-                    "section_count": len(sections),
-                    "total_entries": total_entries,
-                    "metadata": metadata,
-                }
-            except Exception as e:
-                logger.error(f"Error getting config DB status: {e}")
-                if 'conn' in locals():
-                    conn.close()
-                return {"error": str(e)}

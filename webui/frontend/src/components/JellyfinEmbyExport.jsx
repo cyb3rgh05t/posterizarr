@@ -15,11 +15,7 @@ import {
   X,
   Search,
 } from "lucide-react";
-import {
-  formatDateToLocale,
-  getBrowserTimezone,
-  isTimezoneDifferent,
-} from "../utils/timeUtils";
+import { formatDateToLocale } from "../utils/timeUtils";
 
 const API_URL = "/api";
 const API_PREFIX = "other-media-export";
@@ -964,7 +960,7 @@ function JellyfinEmbyExport() {
               <div className="pt-4 border-t border-theme">
                 <DetailRow
                   label={t("plexExport.importedAt", "Imported At")}
-				  value={new Date(selectedItem.created_at).toLocaleString("sv-SE").replace("T", " ")}
+                  value={formatDateToLocale(selectedItem.created_at)}
                 />
               </div>
             </div>

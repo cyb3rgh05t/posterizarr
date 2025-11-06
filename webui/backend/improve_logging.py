@@ -105,7 +105,6 @@ def main():
 
     if changed:
         print("\n✅ Emoji removal completed!")
-        print("   Backup files created with .backup extension")
     else:
         print("\n✅ No emojis found in any files")
 

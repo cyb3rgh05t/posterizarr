@@ -17,6 +17,7 @@ from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 import subprocess
 import platform
+import aiofiles
 
 # Try to import psutil for process checking
 try:
@@ -55,8 +56,7 @@ class PosterizarrScheduler:
         self.current_process = None
         self.is_running = False
         self._scheduler_initialized = False
-        # Use a threading.RLock for all methods (sync and async)
-        self._lock = threading.RLock()
+        self._lock = asyncio.Lock()  # Lock for thread-safe operations
 
         logger.debug(f"Config file path: {self.config_path}")
         logger.debug(f"psutil available: {PSUTIL_AVAILABLE}")
@@ -94,113 +94,152 @@ class PosterizarrScheduler:
         2. Config file timezone setting
         3. Default: Europe/Berlin
 
-        This method acquires its own lock.
+        Note: Uses synchronous file I/O for initialization only.
+        For runtime access, use async methods.
         """
-        with self._lock:
-            logger.debug("Determining timezone...")
+        logger.debug("Determining timezone...")
 
-            # 1. If Docker, try to read TZ from ENV
-            if IS_DOCKER:
-                env_tz = os.environ.get("TZ")
-                if env_tz:
-                    logger.info(f"Using timezone from ENV (Docker): {env_tz}")
-                    logger.debug(f"IS_DOCKER={IS_DOCKER}, TZ environment variable found")
-                    return env_tz
-                else:
-                    logger.debug(
-                        f"IS_DOCKER={IS_DOCKER}, but no TZ environment variable found"
-                    )
-
-            # 2. Fallback: Config file
-            config = self.load_config() # This is RLock-safe
-            config_tz = config.get("timezone")
-            if config_tz:
-                logger.info(f"Using timezone from config: {config_tz}")
-                logger.debug(f"Loaded from config file: {self.config_path}")
-                return config_tz
+        # 1. If Docker, try to read TZ from ENV
+        if IS_DOCKER:
+            env_tz = os.environ.get("TZ")
+            if env_tz:
+                logger.info(f"Using timezone from ENV (Docker): {env_tz}")
+                logger.debug(f"IS_DOCKER={IS_DOCKER}, TZ environment variable found")
+                return env_tz
             else:
-                logger.debug("No timezone found in config file")
+                logger.debug(
+                    f"IS_DOCKER={IS_DOCKER}, but no TZ environment variable found"
+                )
 
-            # 3. Fallback: Default
-            default_tz = "Europe/Berlin"
-            logger.info(f"Using default timezone: {default_tz}")
-            logger.debug("No timezone found in ENV or config, using default")
-            return default_tz
-
-    def load_config(self) -> Dict:
-        """Load scheduler configuration from JSON file (Thread-safe)"""
-        with self._lock:
-            logger.debug(f"Loading scheduler config from: {self.config_path}")
-
-            default_config = {
-                "enabled": False,
-                "schedules": [],
-                "timezone": "Europe/Berlin",
-                "skip_if_running": True,
-                "last_run": None,
-                "next_run": None,
-            }
-
-            if not self.config_path.exists():
-                logger.info("Config file does not exist, creating default config")
-                logger.debug(f"Default config: {default_config}")
-                self.save_config(default_config) # RLock-safe
-                return default_config
-
+        # 2. Fallback: Config file (synchronous read for init only)
+        if self.config_path.exists():
             try:
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     config = json.load(f)
-                logger.debug(f"Config loaded successfully: {len(config)} keys")
-                logger.debug(
-                    f"Enabled: {config.get('enabled')}, Schedules: {len(config.get('schedules', []))}"
-                )
-                return {**default_config, **config}  # Merge with defaults
+                config_tz = config.get("timezone")
+                if config_tz:
+                    logger.info(f"Using timezone from config: {config_tz}")
+                    logger.debug(f"Loaded from config file: {self.config_path}")
+                    return config_tz
             except Exception as e:
-                logger.error(f"Error loading scheduler config: {e}")
-                logger.exception("Full traceback:")
-                return default_config
+                logger.warning(f"Could not read timezone from config during init: {e}")
 
-    def save_config(self, config: Dict) -> bool:
-        """Save scheduler configuration to JSON file (Thread-safe)"""
-        with self._lock:
-            logger.debug(f"Saving scheduler config to: {self.config_path}")
-            logger.debug(f"Config to save: {len(config)} keys")
+        # 3. Fallback: Default
+        default_tz = "Europe/Berlin"
+        logger.info(f"Using default timezone: {default_tz}")
+        logger.debug("No timezone found in ENV or config, using default")
+        return default_tz
 
-            try:
-                with open(self.config_path, "w", encoding="utf-8") as f:
-                    json.dump(config, f, indent=2, ensure_ascii=False)
-                logger.info("Scheduler config saved successfully")
-                logger.debug(f"File size: {self.config_path.stat().st_size} bytes")
-                return True
-            except Exception as e:
-                logger.error(f"Error saving scheduler config: {e}")
-                logger.exception("Full traceback:")
-                return False
+    def _load_config_sync(self) -> Dict:
+        """
+        Synchronous config loader for internal scheduler use only.
+        Use load_config() for API-facing calls.
+        """
+        default_config = {
+            "enabled": False,
+            "schedules": [],
+            "timezone": "Europe/Berlin",
+            "skip_if_running": True,
+            "last_run": None,
+            "next_run": None,
+        }
 
-    def update_config(self, updates: Dict) -> Dict:
-        """Update specific config values (Thread-safe)"""
-        with self._lock:
-            logger.info("=" * 60)
-            logger.info("UPDATING SCHEDULER CONFIG")
-            logger.info(f"Updates: {list(updates.keys())}")
-            logger.debug(f"Full updates: {updates}")
+        if not self.config_path.exists():
+            return default_config
 
-            config = self.load_config()
-            config.update(updates)
-            self.save_config(config)
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+            return {**default_config, **config}
+        except Exception as e:
+            logger.error(f"Error loading scheduler config (sync): {e}")
+            return default_config
 
-            # Update scheduler timezone if changed
-            if "timezone" in updates and self.scheduler:
-                logger.info(f"Timezone change detected: {updates['timezone']}")
-                self.scheduler.configure(timezone=updates["timezone"])
-                logger.info(f"Scheduler timezone updated to {updates['timezone']}")
-                # Recalculate next_run with new timezone
-                if config.get("schedules"):
-                    logger.debug("Recalculating next_run with new timezone...")
-                    self.update_next_run_from_schedules()
+    def _save_config_sync(self, config: Dict) -> bool:
+        """
+        Synchronous config saver for internal scheduler use only.
+        Use save_config() for API-facing calls.
+        """
+        try:
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            logger.error(f"Error saving scheduler config (sync): {e}")
+            return False
 
-            logger.info("=" * 60)
-            return config
+    async def load_config(self) -> Dict:
+        """Load scheduler configuration from JSON file"""
+        logger.debug(f"Loading scheduler config from: {self.config_path}")
+
+        default_config = {
+            "enabled": False,
+            "schedules": [],
+            "timezone": "Europe/Berlin",
+            "skip_if_running": True,
+            "last_run": None,
+            "next_run": None,
+        }
+
+        if not self.config_path.exists():
+            logger.info("Config file does not exist, creating default config")
+            logger.debug(f"Default config: {default_config}")
+            await self.save_config(default_config)
+            return default_config
+
+        try:
+            async with aiofiles.open(self.config_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+                config = json.loads(content)
+            logger.debug(f"Config loaded successfully: {len(config)} keys")
+            logger.debug(
+                f"Enabled: {config.get('enabled')}, Schedules: {len(config.get('schedules', []))}"
+            )
+            return {**default_config, **config}  # Merge with defaults
+        except Exception as e:
+            logger.error(f"Error loading scheduler config: {e}")
+            logger.exception("Full traceback:")
+            return default_config
+
+    async def save_config(self, config: Dict) -> bool:
+        """Save scheduler configuration to JSON file"""
+        logger.debug(f"Saving scheduler config to: {self.config_path}")
+        logger.debug(f"Config to save: {len(config)} keys")
+
+        try:
+            async with aiofiles.open(self.config_path, "w", encoding="utf-8") as f:
+                await f.write(json.dumps(config, indent=2, ensure_ascii=False))
+            logger.info("Scheduler config saved successfully")
+            logger.debug(f"File size: {self.config_path.stat().st_size} bytes")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving scheduler config: {e}")
+            logger.exception("Full traceback:")
+            return False
+
+    async def update_config(self, updates: Dict) -> Dict:
+        """Update specific config values"""
+        logger.info("=" * 60)
+        logger.info("UPDATING SCHEDULER CONFIG")
+        logger.info(f"Updates: {list(updates.keys())}")
+        logger.debug(f"Full updates: {updates}")
+
+        config = await self.load_config()
+        config.update(updates)
+        await self.save_config(config)
+
+        # Update scheduler timezone if changed
+        if "timezone" in updates and self.scheduler:
+            logger.info(f"Timezone change detected: {updates['timezone']}")
+            self.scheduler.configure(timezone=updates["timezone"])
+            logger.info(f"Scheduler timezone updated to {updates['timezone']}")
+            # Recalculate next_run with new timezone
+            if config.get("schedules"):
+                logger.debug("Recalculating next_run with new timezone...")
+                self.update_next_run_from_schedules()
+
+        logger.info("=" * 60)
+        return config
 
     def _is_posterizarr_actually_running(self) -> bool:
         """Check if Posterizarr is actually running by checking for PowerShell processes"""
@@ -237,54 +276,52 @@ class PosterizarrScheduler:
     async def run_script(self, force_run: bool = False):
         """
         Execute Posterizarr script in normal mode (non-blocking)
-        This async method uses the thread-safe lock for critical state changes.
+
+        Args:
+            force_run: If True, bypass "already running" checks for manual runs
         """
+        config = await self.load_config()
 
-        # --- Acquire lock for pre-flight checks ---
-        with self._lock:
-            config = self.load_config()
+        # Check if script should be skipped when already running (skip check for manual runs)
+        if not force_run and config.get("skip_if_running", True) and self.is_running:
+            error_msg = "Script is already running, skipping scheduled execution"
+            logger.warning(error_msg)
+            raise RuntimeError(error_msg)
 
-            # Check if script should be skipped when already running (skip check for manual runs)
-            if not force_run and config.get("skip_if_running", True) and self.is_running:
-                error_msg = "Script is already running, skipping scheduled execution"
+        # Check if another process is running (skip check for manual runs)
+        running_file = self.base_dir / "temp" / "Posterizarr.Running"
+        if not force_run and running_file.exists():
+            logger.warning(
+                "Posterizarr.Running file exists, checking if process is actually running..."
+            )
+
+            # Check if Posterizarr is actually running
+            if self._is_posterizarr_actually_running():
+                error_msg = (
+                    "Posterizarr process is running, cannot start another instance"
+                )
                 logger.warning(error_msg)
                 raise RuntimeError(error_msg)
-
-            # Check if another process is running (skip check for manual runs)
-            running_file = self.base_dir / "temp" / "Posterizarr.Running"
-            if not force_run and running_file.exists():
+            else:
+                # File exists but no process is running - force delete
                 logger.warning(
-                    "Posterizarr.Running file exists, checking if process is actually running..."
+                    "Posterizarr.Running file exists but no process found - force deleting stale file"
                 )
-
-                # Check if Posterizarr is actually running
-                if self._is_posterizarr_actually_running():
-                    error_msg = (
-                        "Posterizarr process is running, cannot start another instance"
-                    )
-                    logger.warning(error_msg)
+                try:
+                    running_file.unlink()
+                    logger.info("Successfully deleted stale Posterizarr.Running file")
+                except Exception as e:
+                    error_msg = f"Failed to delete stale running file: {e}"
+                    logger.error(error_msg)
                     raise RuntimeError(error_msg)
-                else:
-                    # File exists but no process is running - force delete
-                    logger.warning(
-                        "Posterizarr.Running file exists but no process found - force deleting stale file"
-                    )
-                    try:
-                        running_file.unlink()
-                        logger.info("Successfully deleted stale Posterizarr.Running file")
-                    except Exception as e:
-                        error_msg = f"Failed to delete stale running file: {e}"
-                        logger.error(error_msg)
-                        raise RuntimeError(error_msg)
-
-            # --- All checks passed, set state to running ---
-            self.is_running = True
-            config["last_run"] = datetime.now().isoformat()
-            self.save_config(config)
-
-        # --- Lock is RELEASED before await ---
 
         try:
+            self.is_running = True
+
+            # Update last run time
+            config["last_run"] = datetime.now().isoformat()
+            await self.save_config(config)
+
             # Determine PowerShell command
             if platform.system() == "Windows":
                 ps_command = "pwsh"
@@ -310,11 +347,7 @@ class PosterizarrScheduler:
                         stderr=None,
                         text=True,
                     )
-
-                    # --- CRITICAL: Safely set the current_process ---
-                    with self._lock:
-                        self.current_process = process
-                    # --- Lock released ---
+                    self.current_process = process
 
                     # Wait for completion (without reading output)
                     returncode = process.wait()
@@ -337,6 +370,26 @@ class PosterizarrScheduler:
 
             logger.info(f"Scheduled run finished with return code: {returncode}")
 
+            # Runtime import is now handled by logs_watcher automatically
+            # Commenting out to prevent duplicate entries
+            # if returncode == 0:
+            #     try:
+            #         from runtime_parser import save_runtime_to_db
+            #
+            #         # schedule.json is created in Logs directory
+            #         logs_dir = self.base_dir / "Logs"
+            #         schedule_json = logs_dir / "scheduled.json"
+            #
+            #         if schedule_json.exists():
+            #             # Use the Scriptlog.log path as base, mode will determine JSON file
+            #             log_path = logs_dir / "Scriptlog.log"
+            #             save_runtime_to_db(log_path, "scheduled")
+            #             logger.info("scheduled.json runtime data saved to database")
+            #         else:
+            #             logger.warning("scheduled.json not found after scheduled run")
+            #     except Exception as e:
+            #         logger.error(f"Error saving schedule runtime to database: {e}")
+
             if returncode == 0:
                 logger.info(
                     "Scheduled run completed successfully - runtime will be imported by logs_watcher"
@@ -346,20 +399,15 @@ class PosterizarrScheduler:
             # Better error logging with full stack trace
             logger.error(f"Error during scheduled script execution: {e}", exc_info=True)
         finally:
-            # --- MODIFICATION ---
-            # DO NOT clean up self.is_running or self.current_process here.
-            # That state is now "reaped" by the get_status() function in main.py
-            # to prevent race conditions.
-
-            # Safely update the next run time
-            with self._lock:
-                self.update_next_run()
+            self.is_running = False
+            self.current_process = None
+            # Update next_run after execution completes
+            self.update_next_run()
 
     def parse_schedule_time(self, time_str: str) -> tuple:
         """
         Parse and validate time string (HH:MM) into hour and minute
         Only accepts times between 00:00 and 23:59
-        (No lock needed - pure function)
         """
         try:
             # Check format
@@ -400,318 +448,307 @@ class PosterizarrScheduler:
             return None, None
 
     def apply_schedules(self):
-        """Apply all configured schedules to the scheduler (Thread-safe)"""
-        with self._lock:
-            config = self.load_config()
+        """Apply all configured schedules to the scheduler"""
+        config = self._load_config_sync()
 
-            # Remove all existing jobs first
-            if self.scheduler.running:
-                self.scheduler.remove_all_jobs()
-                logger.debug("Removed all existing scheduler jobs")
+        # Remove all existing jobs first
+        if self.scheduler.running:
+            self.scheduler.remove_all_jobs()
+            logger.debug("Removed all existing scheduler jobs")
 
-            if not config.get("enabled", False):
-                logger.info("Scheduler is disabled, not applying schedules")
-                return
+        if not config.get("enabled", False):
+            logger.info("Scheduler is disabled, not applying schedules")
+            return
 
-            schedules = config.get("schedules", [])
-            if not schedules:
-                logger.warning("No schedules configured")
-                # Reset next_run when no schedules exist
-                config["next_run"] = None
-                self.save_config(config)
-                return
+        schedules = config.get("schedules", [])
+        if not schedules:
+            logger.warning("No schedules configured")
+            # Reset next_run when no schedules exist
+            config["next_run"] = None
+            self._save_config_sync(config)
+            return
 
-            # Get timezone (ENV has priority in Docker)
-            timezone = self._get_timezone()
+        # Get timezone (ENV has priority in Docker)
+        timezone = self._get_timezone()
 
-            # Add jobs for each schedule
-            for idx, schedule in enumerate(schedules):
-                time_str = schedule.get("time", "")
-                hour, minute = self.parse_schedule_time(time_str)
+        # Add jobs for each schedule
+        for idx, schedule in enumerate(schedules):
+            time_str = schedule.get("time", "")
+            hour, minute = self.parse_schedule_time(time_str)
 
-                if hour is None or minute is None:
-                    logger.error(f"Invalid schedule time: {time_str}")
-                    continue
+            if hour is None or minute is None:
+                logger.error(f"Invalid schedule time: {time_str}")
+                continue
 
-                job_id = f"posterizarr_normal_{idx}"
+            job_id = f"posterizarr_normal_{idx}"
 
-                # Create cron trigger for daily execution
-                trigger = CronTrigger(
-                    hour=hour,
-                    minute=minute,
-                    timezone=timezone,
-                )
+            # Create cron trigger for daily execution
+            trigger = CronTrigger(
+                hour=hour,
+                minute=minute,
+                timezone=timezone,
+            )
 
-                self.scheduler.add_job(
-                    self.run_script,
-                    trigger=trigger,
-                    id=job_id,
-                    name=f"Posterizarr Normal Mode @ {time_str}",
-                    replace_existing=True,
-                )
+            self.scheduler.add_job(
+                self.run_script,
+                trigger=trigger,
+                id=job_id,
+                name=f"Posterizarr Normal Mode @ {time_str}",
+                replace_existing=True,
+            )
 
-                logger.info(f"Added schedule: {time_str} (Job ID: {job_id})")
+            logger.info(f"Added schedule: {time_str} (Job ID: {job_id})")
 
-            self.update_next_run()
+        self.update_next_run()
 
     def update_next_run(self):
-        """Update next_run timestamp in config immediately (Thread-safe)"""
-        with self._lock:
-            try:
-                jobs = self.scheduler.get_jobs()
-                if jobs:
-                    next_runs = [
-                        job.next_run_time
-                        for job in jobs
-                        if hasattr(job, "next_run_time") and job.next_run_time
-                    ]
-                    if next_runs:
-                        next_run = min(next_runs)
-                        config = self.load_config()
-                        config["next_run"] = next_run.isoformat()
-                        self.save_config(config)
-                        logger.info(f"Next scheduled run: {next_run}")
-                    else:
-                        logger.warning("No next_run_time found for jobs")
+        """Update next_run timestamp in config immediately"""
+        try:
+            jobs = self.scheduler.get_jobs()
+            if jobs:
+                next_runs = [
+                    job.next_run_time
+                    for job in jobs
+                    if hasattr(job, "next_run_time") and job.next_run_time
+                ]
+                if next_runs:
+                    next_run = min(next_runs)
+                    config = self._load_config_sync()
+                    config["next_run"] = next_run.isoformat()
+                    self._save_config_sync(config)
+                    logger.info(f"Next scheduled run: {next_run}")
                 else:
-                    logger.debug("No active jobs to update next_run")
-            except Exception as e:
-                logger.error(f"Error updating next_run: {e}")
+                    logger.warning("No next_run_time found for jobs")
+            else:
+                logger.debug("No active jobs to update next_run")
+        except Exception as e:
+            logger.error(f"Error updating next_run: {e}")
 
     def start(self):
-        """Start the scheduler (Thread-safe)"""
-        with self._lock:
-            try:
-                config = self.load_config()
+        """Start the scheduler"""
+        try:
+            config = self._load_config_sync()
 
-                if not config.get("enabled", False):
-                    logger.info("Scheduler is disabled in config, not starting")
-                    return
-
-                if not self.scheduler.running:
-                    # Update timezone before starting (ENV has priority in Docker)
-                    timezone = self._get_timezone()
-                    self.scheduler.configure(timezone=timezone)
-
-                    # Calculate next_run if schedules exist but next_run is not set
-                    if config.get("schedules") and not config.get("next_run"):
-                        logger.info("Schedules exist but next_run not set, calculating...")
-                        self.update_next_run_from_schedules()
-
-                    # Apply schedules
-                    self.apply_schedules()
-
-                    # Start scheduler
-                    self.scheduler.start()
-                    logger.info(f"Scheduler started with timezone {timezone}")
-
-                    # Update next_run immediately
-                    self.update_next_run()
-                    self._scheduler_initialized = True
-                else:
-                    logger.info("Scheduler is already running")
-            except Exception as e:
-                logger.error(f"Error starting scheduler: {e}", exc_info=True)
-
-    def stop(self):
-        """Stop the scheduler (Thread-safe)"""
-        with self._lock:
-            try:
-                if self.scheduler.running:
-                    self.scheduler.shutdown(wait=False)
-                    logger.info("Scheduler stopped")
-                    self._scheduler_initialized = False
-
-                    # Reset next_run when scheduler is stopped
-                    config = self.load_config()
-                    config["next_run"] = None
-                    self.save_config(config)
-            except Exception as e:
-                logger.error(f"Error stopping scheduler: {e}", exc_info=True)
-
-    def restart(self):
-        """Restart the scheduler with new configuration (Thread-safe)"""
-        with self._lock:
-            logger.info("Restarting scheduler...")
-            try:
-                self.stop()
-                self.start()
-            except Exception as e:
-                logger.error(f"Error restarting scheduler: {e}", exc_info=True)
-
-    def get_status(self) -> Dict:
-        """Get current scheduler status (Thread-safe)"""
-        with self._lock:
-            config = self.load_config()
-            jobs = self.scheduler.get_jobs() if self.scheduler.running else []
-
-            job_info = []
-            for job in jobs:
-                next_run = None
-                if hasattr(job, "next_run_time") and job.next_run_time:
-                    next_run = job.next_run_time.isoformat()
-
-                job_info.append(
-                    {
-                        "id": job.id,
-                        "name": job.name,
-                        "next_run": next_run,
-                    }
-                )
-
-            # Show current timezone (ENV or config)
-            current_timezone = self._get_timezone()
-
-            return {
-                "enabled": config.get("enabled", False),
-                "running": self.scheduler.running,
-                "is_executing": self.is_running,
-                "schedules": config.get("schedules", []),
-                "timezone": current_timezone,  # Use detected timezone
-                "last_run": config.get("last_run"),
-                "next_run": config.get("next_run"),
-                "active_jobs": job_info,
-            }
-
-    def calculate_next_run_time(self, time_str: str) -> Optional[str]:
-        """Calculate the next run time for a given schedule time (HH:MM) (Thread-safe)"""
-        with self._lock:
-            from datetime import datetime, timedelta
-            import pytz
-
-            hour, minute = self.parse_schedule_time(time_str)
-            if hour is None or minute is None:
-                return None
-
-            # Use _get_timezone() instead of config only
-            timezone_str = self._get_timezone()
-
-            try:
-                tz = pytz.timezone(timezone_str)
-                now = datetime.now(tz)
-
-                # Create today's scheduled time
-                scheduled_time = now.replace(
-                    hour=hour, minute=minute, second=0, microsecond=0
-                )
-
-                # If scheduled time has passed today, use tomorrow
-                if scheduled_time <= now:
-                    scheduled_time += timedelta(days=1)
-
-                return scheduled_time.isoformat()
-            except Exception as e:
-                logger.error(f"Error calculating next run time: {e}")
-                return None
-
-    def update_next_run_from_schedules(self):
-        """Update next_run in config based on all schedules (without requiring scheduler to be running) (Thread-safe)"""
-        with self._lock:
-            config = self.load_config()
-            schedules = config.get("schedules", [])
-
-            if not schedules:
-                config["next_run"] = None
-                self.save_config(config)
-                logger.debug("No schedules, next_run set to None")
+            if not config.get("enabled", False):
+                logger.info("Scheduler is disabled in config, not starting")
                 return
 
-            # Calculate next run for all schedules
-            next_runs = []
-            for schedule in schedules:
-                time_str = schedule.get("time", "")
-                next_run = self.calculate_next_run_time(time_str)
-                if next_run:
-                    next_runs.append(next_run)
+            if not self.scheduler.running:
+                # Update timezone before starting (ENV has priority in Docker)
+                timezone = self._get_timezone()
+                self.scheduler.configure(timezone=timezone)
 
-            if next_runs:
-                # Get the earliest next run
-                next_run = min(next_runs)
-                config["next_run"] = next_run
-                self.save_config(config)
-                logger.info(f"Next run updated to: {next_run}")
+                # Calculate next_run if schedules exist but next_run is not set
+                if config.get("schedules") and not config.get("next_run"):
+                    logger.info("Schedules exist but next_run not set, calculating...")
+                    self.update_next_run_from_schedules()
+
+                # Apply schedules
+                self.apply_schedules()
+
+                # Start scheduler
+                self.scheduler.start()
+                logger.info(f"Scheduler started with timezone {timezone}")
+
+                # Update next_run immediately
+                self.update_next_run()
+                self._scheduler_initialized = True
             else:
+                logger.info("Scheduler is already running")
+        except Exception as e:
+            logger.error(f"Error starting scheduler: {e}", exc_info=True)
+
+    def stop(self):
+        """Stop the scheduler"""
+        try:
+            if self.scheduler.running:
+                self.scheduler.shutdown(wait=False)
+                logger.info("Scheduler stopped")
+                self._scheduler_initialized = False
+
+                # Reset next_run when scheduler is stopped
+                config = self._load_config_sync()
                 config["next_run"] = None
-                self.save_config(config)
-                logger.warning("No valid next runs calculated")
+                self._save_config_sync(config)
+        except Exception as e:
+            logger.error(f"Error stopping scheduler: {e}", exc_info=True)
+
+    def restart(self):
+        """Restart the scheduler with new configuration"""
+        logger.info("Restarting scheduler...")
+        try:
+            self.stop()
+            self.start()
+        except Exception as e:
+            logger.error(f"Error restarting scheduler: {e}", exc_info=True)
+
+    def get_status(self) -> Dict:
+        """Get current scheduler status"""
+        config = self._load_config_sync()
+        jobs = self.scheduler.get_jobs() if self.scheduler.running else []
+
+        job_info = []
+        for job in jobs:
+            next_run = None
+            if hasattr(job, "next_run_time") and job.next_run_time:
+                next_run = job.next_run_time.isoformat()
+
+            job_info.append(
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run": next_run,
+                }
+            )
+
+        # Show current timezone (ENV or config)
+        current_timezone = self._get_timezone()
+
+        return {
+            "enabled": config.get("enabled", False),
+            "running": self.scheduler.running,
+            "is_executing": self.is_running,
+            "schedules": config.get("schedules", []),
+            "timezone": current_timezone,  # Use detected timezone
+            "last_run": config.get("last_run"),
+            "next_run": config.get("next_run"),
+            "active_jobs": job_info,
+        }
+
+    def calculate_next_run_time(self, time_str: str) -> Optional[str]:
+        """Calculate the next run time for a given schedule time (HH:MM)"""
+        from datetime import datetime, timedelta
+        import pytz
+
+        hour, minute = self.parse_schedule_time(time_str)
+        if hour is None or minute is None:
+            return None
+
+        # Use _get_timezone() instead of config only
+        timezone_str = self._get_timezone()
+
+        try:
+            tz = pytz.timezone(timezone_str)
+            now = datetime.now(tz)
+
+            # Create today's scheduled time
+            scheduled_time = now.replace(
+                hour=hour, minute=minute, second=0, microsecond=0
+            )
+
+            # If scheduled time has passed today, use tomorrow
+            if scheduled_time <= now:
+                scheduled_time += timedelta(days=1)
+
+            return scheduled_time.isoformat()
+        except Exception as e:
+            logger.error(f"Error calculating next run time: {e}")
+            return None
+
+    def update_next_run_from_schedules(self):
+        """Update next_run in config based on all schedules (without requiring scheduler to be running)"""
+        config = self._load_config_sync()
+        schedules = config.get("schedules", [])
+
+        if not schedules:
+            config["next_run"] = None
+            self._save_config_sync(config)
+            logger.debug("No schedules, next_run set to None")
+            return
+
+        # Calculate next run for all schedules
+        next_runs = []
+        for schedule in schedules:
+            time_str = schedule.get("time", "")
+            next_run = self.calculate_next_run_time(time_str)
+            if next_run:
+                next_runs.append(next_run)
+
+        if next_runs:
+            # Get the earliest next run
+            next_run = min(next_runs)
+            config["next_run"] = next_run
+            self._save_config_sync(config)
+            logger.info(f"Next run updated to: {next_run}")
+        else:
+            config["next_run"] = None
+            self._save_config_sync(config)
+            logger.warning("No valid next runs calculated")
 
     def add_schedule(self, time_str: str, description: str = "") -> bool:
-        """Add a new schedule (Thread-safe)"""
-        with self._lock:
-            hour, minute = self.parse_schedule_time(time_str)
-            if hour is None or minute is None:
-                return False
+        """Add a new schedule"""
+        hour, minute = self.parse_schedule_time(time_str)
+        if hour is None or minute is None:
+            return False
 
-            config = self.load_config()
-            schedules = config.get("schedules", [])
+        config = self._load_config_sync()
+        schedules = config.get("schedules", [])
 
-            # Check for duplicates
-            if any(s.get("time") == time_str for s in schedules):
-                logger.warning(f"Schedule {time_str} already exists")
-                return False
+        # Check for duplicates
+        if any(s.get("time") == time_str for s in schedules):
+            logger.warning(f"Schedule {time_str} already exists")
+            return False
 
-            schedules.append({"time": time_str, "description": description})
-            config["schedules"] = schedules
-            self.save_config(config)
+        schedules.append({"time": time_str, "description": description})
+        config["schedules"] = schedules
+        self._save_config_sync(config)
 
-            logger.info(f"Added new schedule: {time_str}")
+        logger.info(f"Added new schedule: {time_str}")
 
-            if config.get("enabled", False) and self.scheduler.running:
-                logger.info("Scheduler is running, reapplying schedules...")
-                self.apply_schedules()
-            else:
-                # Even if not running, update next_run for UI display
-                self.update_next_run_from_schedules()
+        if config.get("enabled", False) and self.scheduler.running:
+            logger.info("Scheduler is running, reapplying schedules...")
+            self.apply_schedules()
+        else:
+            # Even if not running, update next_run for UI display
+            self.update_next_run_from_schedules()
 
-            return True
+        return True
 
     def remove_schedule(self, time_str: str) -> bool:
-        """Remove a schedule (Thread-safe)"""
-        with self._lock:
-            config = self.load_config()
-            schedules = config.get("schedules", [])
+        """Remove a schedule"""
+        config = self._load_config_sync()
+        schedules = config.get("schedules", [])
 
-            new_schedules = [s for s in schedules if s.get("time") != time_str]
+        new_schedules = [s for s in schedules if s.get("time") != time_str]
 
-            if len(new_schedules) == len(schedules):
-                return False  # Schedule not found
+        if len(new_schedules) == len(schedules):
+            return False  # Schedule not found
 
-            config["schedules"] = new_schedules
+        config["schedules"] = new_schedules
 
-            logger.info(f"Removed schedule: {time_str}")
+        logger.info(f"Removed schedule: {time_str}")
 
-            # Save config first before applying changes
-            # If no schedules left, reset next_run
-            if len(new_schedules) == 0:
-                config["next_run"] = None
-                logger.info("Last schedule removed, resetting next_run to None")
+        # Save config first before applying changes
+        # If no schedules left, reset next_run
+        if len(new_schedules) == 0:
+            config["next_run"] = None
+            logger.info("Last schedule removed, resetting next_run to None")
 
-            self.save_config(config)
+        self._save_config_sync(config)
 
-            # Always reapply schedules if scheduler is enabled and running
-            if config.get("enabled", False) and self.scheduler.running:
-                logger.info(
-                    "Scheduler is running, reapplying schedules to remove deleted job..."
-                )
-                self.apply_schedules()
-            else:
-                # Even if not running, recalculate next_run for UI display
-                self.update_next_run_from_schedules()
+        # Always reapply schedules if scheduler is enabled and running
+        if config.get("enabled", False) and self.scheduler.running:
+            logger.info(
+                "Scheduler is running, reapplying schedules to remove deleted job..."
+            )
+            self.apply_schedules()
+        else:
+            # Even if not running, recalculate next_run for UI display
+            self.update_next_run_from_schedules()
 
-            return True
+        return True
 
     def clear_schedules(self) -> bool:
-        """Remove all schedules (Thread-safe)"""
-        with self._lock:
-            config = self.load_config()
-            config["schedules"] = []
-            config["next_run"] = None  # Reset next_run when no schedules exist
-            self.save_config(config)
+        """Remove all schedules"""
+        config = self._load_config_sync()
+        config["schedules"] = []
+        config["next_run"] = None  # Reset next_run when no schedules exist
+        self._save_config_sync(config)
 
-            logger.info("All schedules cleared")
+        logger.info("All schedules cleared")
 
-            if config.get("enabled", False) and self.scheduler.running:
-                logger.info("Scheduler is running, reapplying schedules (now empty)...")
-                self.apply_schedules()
+        if config.get("enabled", False) and self.scheduler.running:
+            logger.info("Scheduler is running, reapplying schedules (now empty)...")
+            self.apply_schedules()
 
-            return True
+        return True

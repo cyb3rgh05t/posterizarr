@@ -7,8 +7,6 @@ import {
   Loader2,
   Search,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ImageIcon,
   CheckSquare,
   Square,
@@ -24,117 +22,6 @@ import ImagePreviewModal from "./ImagePreviewModal";
 
 const API_URL = "/api";
 
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// ++ NEW PAGINATION COMPONENT
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
-  const { t } = useTranslation();
-
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      onPageChange(page);
-    }
-  };
-
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxPagesToShow = 5; // Max 5 page buttons (e.g., 1 ... 4 5 6 ... 10)
-    const half = Math.floor(maxPagesToShow / 2);
-
-    if (totalPages <= maxPagesToShow + 2) {
-      // Show all pages if 7 or less
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Show first page
-      pages.push(1);
-
-      // Ellipsis after first page?
-      if (currentPage > half + 2) {
-        pages.push("...");
-      }
-
-      // Middle pages
-      let start = Math.max(2, currentPage - half);
-      let end = Math.min(totalPages - 1, currentPage + half);
-
-      if (currentPage <= half + 2) {
-        end = maxPagesToShow - 1;
-      }
-      if (currentPage >= totalPages - half - 1) {
-        start = totalPages - maxPagesToShow + 2;
-      }
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      // Ellipsis before last page?
-      if (currentPage < totalPages - half - 1) {
-        pages.push("...");
-      }
-
-      // Show last page
-      pages.push(totalPages);
-    }
-
-    return pages;
-  };
-
-  if (totalPages <= 1) {
-    return null; // Don't show pagination if only one page
-  }
-
-  return (
-    <div className="flex items-center justify-center gap-2 mt-8">
-      <button
-        onClick={() => handlePageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className="px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        {t("pagination.previous")}
-      </button>
-
-      {getPageNumbers().map((page, index) =>
-        typeof page === "number" ? (
-          <button
-            key={index}
-            onClick={() => handlePageChange(page)}
-            className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-all shadow-sm ${
-              currentPage === page
-                ? "bg-theme-primary text-white"
-                : "bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text"
-            }`}
-          >
-            {page}
-          </button>
-        ) : (
-          <span
-            key={`ellipsis-${index}`}
-            className="w-10 h-10 flex items-center justify-center text-theme-muted"
-          >
-            ...
-          </span>
-        )
-      )}
-
-      <button
-        onClick={() => handlePageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className="px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-      >
-        {t("pagination.next")}
-        <ChevronRight className="w-4 h-4" />
-      </button>
-    </div>
-  );
-};
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// ++ END OF PAGINATION COMPONENT
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 function TitleCardGallery() {
   const { t } = useTranslation();
   const { showSuccess, showError, showInfo } = useToast();
@@ -149,14 +36,11 @@ function TitleCardGallery() {
   const [deletingImage, setDeletingImage] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-
-  // --- PAGINATION STATE ---
-  const [currentPage, setCurrentPage] = useState(1);
+  const [displayCount, setDisplayCount] = useState(50);
   const [itemsPerPage, setItemsPerPage] = useState(() => {
     const saved = localStorage.getItem("titlecard-items-per-page");
-    return saved ? parseInt(saved) : 25;
+    return saved ? parseInt(saved) : 50;
   });
-  // --- END PAGINATION STATE ---
 
   // Multi-select state
   const [selectMode, setSelectMode] = useState(false);
@@ -486,10 +370,18 @@ function TitleCardGallery() {
     setSelectedImages([]);
   };
 
+  const loadMore = () => {
+    setDisplayCount((prev) => prev + itemsPerPage);
+  };
+
+  const loadAll = () => {
+    setDisplayCount(filteredImages.length);
+  };
+
   const handleItemsPerPageChange = (value) => {
     setItemsPerPage(value);
     localStorage.setItem("titlecard-items-per-page", value.toString());
-    setCurrentPage(1); // Reset to first page
+    setDisplayCount(value);
   };
 
   useEffect(() => {
@@ -501,6 +393,18 @@ function TitleCardGallery() {
       fetchFolderImages(activeFolder, false);
     }
   }, [activeFolder]);
+
+  // Function to calculate dropdown position
+  const calculateDropdownPosition = (ref) => {
+    if (!ref.current) return false;
+
+    const rect = ref.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    // If more space above than below, open upward
+    return spaceAbove > spaceBelow;
+  };
 
   // Click outside detection for dropdown
   useEffect(() => {
@@ -520,7 +424,7 @@ function TitleCardGallery() {
   }, []);
 
   useEffect(() => {
-    setCurrentPage(1); // Reset to page 1 on search or folder change
+    setDisplayCount(itemsPerPage);
   }, [searchTerm, activeFolder, itemsPerPage]);
 
   const filteredImages = images.filter(
@@ -529,13 +433,8 @@ function TitleCardGallery() {
       img.path.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // --- NEW PAGINATION LOGIC ---
-  const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
-  const displayedImages = filteredImages.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  // --- END NEW PAGINATION LOGIC ---
+  const displayedImages = filteredImages.slice(0, displayCount);
+  const hasMore = filteredImages.length > displayCount;
 
   return (
     <div className="space-y-6">
@@ -944,8 +843,7 @@ function TitleCardGallery() {
             ))}
           </div>
 
-          {/* Pagination and Items Per Page Controls */}
-          {filteredImages.length > 0 && (
+          {hasMore && (
             <div className="mt-8 space-y-6">
               {/* Items per page selector */}
               <div className="flex justify-center">
@@ -973,13 +871,7 @@ function TitleCardGallery() {
                     </button>
 
                     {itemsPerPageDropdownOpen && (
-                      <div
-                        className={`absolute z-50 right-0 ${
-                          itemsPerPageDropdownUp
-                            ? "bottom-full mb-2"
-                            : "top-full mt-2"
-                        } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
-                      >
+                      <div className="absolute z-50 right-0 ${itemsPerPageDropdownUp ? 'bottom-full mb-2' : 'top-full mt-2'} bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto">
                         {[25, 50, 100, 200, 500].map((value) => (
                           <button
                             key={value}
@@ -1002,15 +894,37 @@ function TitleCardGallery() {
                 </div>
               </div>
 
-              {/* Pagination controls */}
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={(page) => {
-                  setCurrentPage(page);
-                  // You can add scroll-to-top logic here if desired
-                }}
-              />
+              {/* Load buttons */}
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={loadMore}
+                  className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+                >
+                  <ChevronDown className="w-4 h-4 text-theme-primary" />
+                  <span className="text-theme-text">
+                    {t("titleCardGallery.loadMore")}
+                  </span>
+                  <span className="ml-1 px-2 py-0.5 bg-theme-primary/20 rounded-full text-xs font-bold text-theme-primary">
+                    {t("titleCardGallery.remaining", {
+                      count: filteredImages.length - displayCount,
+                    })}
+                  </span>
+                </button>
+                <button
+                  onClick={loadAll}
+                  className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+                >
+                  <ChevronDown className="w-4 h-4 text-theme-primary" />
+                  <span className="text-theme-text">
+                    {t("titleCardGallery.loadAll")}
+                  </span>
+                  <span className="ml-1 px-2 py-0.5 bg-theme-primary/20 rounded-full text-xs font-bold text-theme-primary">
+                    {t("titleCardGallery.total", {
+                      count: filteredImages.length,
+                    })}
+                  </span>
+                </button>
+              </div>
             </div>
           )}
         </>
@@ -1086,7 +1000,7 @@ function TitleCardGallery() {
             // Force cache-bust and refetch images
             setCacheBuster(Date.now());
             setTimeout(() => {
-              fetchFolderImages(activeFolder); // Refetch images for the active folder
+              fetchFolderImages();
             }, 500);
           }}
         />

@@ -166,11 +166,19 @@ function ImagePreviewModal({
                       {t("common.created")}
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
-                      {/* --- THIS IS THE FIX --- */}
                       {selectedImage.created
-                        ? new Date(selectedImage.created * 1000)
-                            .toLocaleString("sv-SE")
-                            .replace("T", " ")
+                        ? new Date(selectedImage.created * 1000).toLocaleString(
+                            "en-GB",
+                            {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                              hour12: false,
+                            }
+                          )
                         : formatTimestamp(selectedImage.path)}
                     </p>
                   </div>
@@ -182,9 +190,17 @@ function ImagePreviewModal({
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
                       {selectedImage.modified
-                        ? new Date(selectedImage.modified * 1000)
-                            .toLocaleString("sv-SE")
-                            .replace("T", " ")
+                        ? new Date(
+                            selectedImage.modified * 1000
+                          ).toLocaleString("en-GB", {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                            hour12: false,
+                          })
                         : formatTimestamp(selectedImage.path)}
                     </p>
                   </div>
@@ -195,7 +211,15 @@ function ImagePreviewModal({
                       {t("common.lastViewed")}
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
-                      {new Date().toLocaleString("sv-SE").replace("T", " ")}
+                      {new Date().toLocaleString("en-GB", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: false,
+                      })}
                     </p>
                   </div>
                 </>

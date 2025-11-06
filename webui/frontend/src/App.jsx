@@ -11,6 +11,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { SidebarProvider, useSidebar } from "./context/SidebarContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
+import { StatusProvider } from "./context/StatusContext";
 import {
   DashboardLoadingProvider,
   useDashboardLoading,
@@ -304,13 +305,15 @@ function App() {
     <Router>
       <ThemeProvider>
         <AuthProvider>
-          <SidebarProvider>
-            <ToastProvider>
-              <DashboardLoadingProvider>
-                <AppContent />
-              </DashboardLoadingProvider>
-            </ToastProvider>
-          </SidebarProvider>
+          <StatusProvider>
+            <SidebarProvider>
+              <ToastProvider>
+                <DashboardLoadingProvider>
+                  <AppContent />
+                </DashboardLoadingProvider>
+              </ToastProvider>
+            </SidebarProvider>
+          </StatusProvider>
         </AuthProvider>
       </ThemeProvider>
     </Router>

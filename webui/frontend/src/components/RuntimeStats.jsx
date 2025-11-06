@@ -146,14 +146,13 @@ function RuntimeStats({ refreshTrigger = 0 }) {
 
     fetchMigrationStatus();
 
-    // Refresh every 30 seconds (silent)
-    const interval = setInterval(() => {
-      console.log("Auto-refreshing runtime stats...");
-      fetchRuntimeStats(true);
-    }, 30 * 1000);
+    // NOTE: Auto-refresh removed! Stats are now only updated:
+    // 1. When script finishes (via refreshTrigger from Dashboard)
+    // 2. When user manually clicks refresh button
+    // 3. When tab becomes visible (handled by Dashboard)
+    // This dramatically reduces unnecessary API calls! 🚀
 
     return () => {
-      clearInterval(interval);
       // Don't finish loading on unmount - that happens when data is fetched
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

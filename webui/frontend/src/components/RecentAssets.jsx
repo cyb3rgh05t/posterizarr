@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDashboardLoading } from "../context/DashboardLoadingContext";
+import Notification from "./Notification";
 import { useToast } from "../context/ToastContext";
 import CompactImageSizeSlider from "./CompactImageSizeSlider";
 
@@ -268,6 +269,30 @@ function RecentAssets({ refreshTrigger = 0 }) {
         return "Background";
       default:
         return "Asset";
+    }
+  };
+
+  // Format timestamp for display
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return "Unknown";
+
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return "Unknown";
+
+      // Format: "Oct 29, 2025 at 3:45 PM"
+      const options = {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      };
+
+      return date.toLocaleString("en-US", options);
+    } catch (e) {
+      return "Unknown";
     }
   };
 
@@ -700,8 +725,19 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
                       {selectedAsset.created
-						  ? new Date(selectedAsset.created * 1000).toLocaleString("sv-SE").replace("T", " ")
-						  : "Unknown"}
+                        ? new Date(selectedAsset.created * 1000).toLocaleString(
+                            "en-GB",
+                            {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                              hour12: false,
+                            }
+                          )
+                        : "Unknown"}
                     </p>
                   </div>
 
@@ -712,9 +748,18 @@ function RecentAssets({ refreshTrigger = 0 }) {
                         {t("common.modified")}
                       </label>
                       <p className="text-theme-text mt-1 text-sm">
-                        {selectedAsset.modified
-                      ? new Date(selectedAsset.modified * 1000).toLocaleString("sv-SE").replace("T", " ")
-                      : "Unknown"}
+                        {new Date(selectedAsset.modified * 1000).toLocaleString(
+                          "en-GB",
+                          {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                            hour12: false,
+                          }
+                        )}
                       </p>
                     </div>
                   )}
@@ -725,8 +770,15 @@ function RecentAssets({ refreshTrigger = 0 }) {
                       {t("common.lastViewed")}
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
-                      {/* This now shows the current time in the correct format */}
-                      {new Date().toLocaleString("sv-SE").replace("T", " ")}
+                      {new Date().toLocaleString("en-GB", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: false,
+                      })}
                     </p>
                   </div>
 

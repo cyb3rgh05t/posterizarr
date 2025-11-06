@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  ImageIcon,
-  Folder,
-  Trash2,
   RefreshCw,
-  Loader2,
+  Image as ImageIcon,
   Search,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
-  ChevronRight,
+  Loader2,
+  X,
+  Trash2,
+  Eye,
   AlertCircle,
   FolderOpen,
   Film,
@@ -18,136 +18,20 @@ import {
   Download,
   LayoutGrid,
   FolderTree,
+  Folder,
+  ChevronRight,
   Home,
   CheckSquare,
   Square,
   Check,
   Calendar,
   HardDrive,
-  Eye,
-  X,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import CompactImageSizeSlider from "./CompactImageSizeSlider";
-import Notification from "./Notification";
 import { useToast } from "../context/ToastContext";
-import ConfirmDialog from "./ConfirmDialog";
-import AssetReplacer from "./AssetReplacer";
 import ScrollToButtons from "./ScrollToButtons";
-import ImagePreviewModal from "./ImagePreviewModal";
+import CompactImageSizeSlider from "./CompactImageSizeSlider";
 
 const API_URL = "/api";
-
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// ++ NEW PAGINATION COMPONENT
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
-  const { t } = useTranslation();
-
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      onPageChange(page);
-    }
-  };
-
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxPagesToShow = 5; // Max 5 page buttons (e.g., 1 ... 4 5 6 ... 10)
-    const half = Math.floor(maxPagesToShow / 2);
-
-    if (totalPages <= maxPagesToShow + 2) {
-      // Show all pages if 7 or less
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Show first page
-      pages.push(1);
-
-      // Ellipsis after first page?
-      if (currentPage > half + 2) {
-        pages.push("...");
-      }
-
-      // Middle pages
-      let start = Math.max(2, currentPage - half);
-      let end = Math.min(totalPages - 1, currentPage + half);
-
-      if (currentPage <= half + 2) {
-        end = maxPagesToShow - 1;
-      }
-      if (currentPage >= totalPages - half - 1) {
-        start = totalPages - maxPagesToShow + 2;
-      }
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      // Ellipsis before last page?
-      if (currentPage < totalPages - half - 1) {
-        pages.push("...");
-      }
-
-      // Show last page
-      pages.push(totalPages);
-    }
-
-    return pages;
-  };
-
-  if (totalPages <= 1) {
-    return null; // Don't show pagination if only one page
-  }
-
-  return (
-    <div className="flex items-center justify-center gap-2 mt-8">
-      <button
-        onClick={() => handlePageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className="px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        {t("pagination.previous")}
-      </button>
-
-      {getPageNumbers().map((page, index) =>
-        typeof page === "number" ? (
-          <button
-            key={index}
-            onClick={() => handlePageChange(page)}
-            className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-all shadow-sm ${
-              currentPage === page
-                ? "bg-theme-primary text-white"
-                : "bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text"
-            }`}
-          >
-            {page}
-          </button>
-        ) : (
-          <span
-            key={`ellipsis-${index}`}
-            className="w-10 h-10 flex items-center justify-center text-theme-muted"
-          >
-            ...
-          </span>
-        )
-      )}
-
-      <button
-        onClick={() => handlePageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className="px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-      >
-        {t("pagination.next")}
-        <ChevronRight className="w-4 h-4" />
-      </button>
-    </div>
-  );
-};
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// ++ END OF PAGINATION COMPONENT
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 function ManualAssets() {
   const { t } = useTranslation();
@@ -162,14 +46,6 @@ function ManualAssets() {
   const [expandedFolders, setExpandedFolders] = useState({});
   const [selectedAssets, setSelectedAssets] = useState(new Set());
   const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
-
-  // --- PAGINATION STATE ---
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(() => {
-    const saved = localStorage.getItem("manual-assets-items-per-page"); // Use unique key
-    return saved ? parseInt(saved) : 50;
-  });
-  // --- END PAGINATION STATE ---
 
   // View mode: 'folder' (default) or 'grid'
   const [viewMode, setViewMode] = useState(() => {
@@ -190,12 +66,6 @@ function ManualAssets() {
     const saved = localStorage.getItem("manual-assets-grid-size");
     return saved ? parseInt(saved) : 5;
   });
-
-  // Dropdown state
-  const [itemsPerPageDropdownOpen, setItemsPerPageDropdownOpen] =
-    useState(false);
-  const [itemsPerPageDropdownUp, setItemsPerPageDropdownUp] = useState(false);
-  const itemsPerPageDropdownRef = useRef(null);
 
   // Save view mode to localStorage
   useEffect(() => {
@@ -284,6 +154,21 @@ function ManualAssets() {
       }
       return newSet;
     });
+  };
+
+  // Select all assets in view
+  const selectAllAssets = () => {
+    const allAssets = new Set();
+    libraries.forEach((library) => {
+      library.folders.forEach((folder) => {
+        folder.assets.forEach((asset) => {
+          if (matchesSearch(asset, folder, library)) {
+            allAssets.add(asset.path);
+          }
+        });
+      });
+    });
+    setSelectedAssets(allAssets);
   };
 
   // Clear selection
@@ -458,22 +343,17 @@ function ManualAssets() {
   // Format timestamp for display
   const formatTimestamp = () => {
     try {
-      return new Date().toLocaleString("sv-SE").replace("T", " ");
+      return new Date().toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
     } catch (e) {
       return "Unknown";
     }
-  };
-
-  // --- NEW: Reset page when filters change ---
-  useEffect(() => {
-    setCurrentPage(1); // Reset to page 1 on search, view mode, or active library change
-  }, [searchQuery, viewMode, activeLibrary, currentPath, itemsPerPage]);
-
-  // --- NEW: Items per page handler ---
-  const handleItemsPerPageChange = (value) => {
-    setItemsPerPage(value);
-    localStorage.setItem("manual-assets-items-per-page", value.toString());
-    setCurrentPage(1); // Reset to first page
   };
 
   // Flatten all assets for grid view
@@ -563,23 +443,6 @@ function ManualAssets() {
     }
     return { type: "libraries", items: [] };
   };
-
-  // --- NEW: Grid View Pagination Logic ---
-  const allGridAssets = viewMode === "grid" ? getAllAssets() : [];
-  const totalGridPages = Math.ceil(allGridAssets.length / itemsPerPage);
-  const displayedGridAssets = allGridAssets.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const toggleSelectAllGrid = () => {
-    if (selectedAssets.size === displayedGridAssets.length) {
-      clearSelection();
-    } else {
-      setSelectedAssets(new Set(displayedGridAssets.map((asset) => asset.path)));
-    }
-  };
-  // --- END Grid View Pagination ---
 
   if (loading) {
     return (
@@ -771,19 +634,11 @@ function ManualAssets() {
           {bulkDeleteMode && (
             <div className="flex items-center gap-2 pt-2 border-t border-theme-border">
               <button
-                onClick={toggleSelectAllGrid}
+                onClick={selectAllAssets}
                 className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium text-sm"
               >
-                {selectedAssets.size === displayedGridAssets.length && displayedGridAssets.length > 0 ? (
-                  <Square className="w-4 h-4" />
-                ) : (
-                  <CheckSquare className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">
-                  {selectedAssets.size === displayedGridAssets.length && displayedGridAssets.length > 0
-                    ? "Deselect Page"
-                    : "Select Page"}
-                </span>
+                <CheckSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">Select All</span>
               </button>
               <button
                 onClick={clearSelection}
@@ -827,183 +682,99 @@ function ManualAssets() {
         </div>
       ) : viewMode === "grid" ? (
         /* Grid View - Assets Grid */
-        <>
-          <div className="bg-theme-card rounded-xl p-4 border border-theme">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-theme-text font-medium">
-                {t("gallery.showing", {
-                  displayed: displayedGridAssets.length,
-                  total: allGridAssets.length,
-                  folder:
-                    activeLibrary === "all"
-                      ? "all libraries"
-                      : activeLibrary,
-                })}
-              </span>
-              {allGridAssets.length !== totalAssets && (
-                <span className="text-theme-primary font-semibold">
-                  {t("gallery.filteredFrom", { total: totalAssets })}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="bg-theme-card border border-theme rounded-lg p-4">
-            <div className={`grid ${getGridClass(imageSize)} gap-4`}>
-              {displayedGridAssets.map((asset) => (
+        <div className="bg-theme-card border border-theme rounded-lg p-4">
+          <div className={`grid ${getGridClass(imageSize)} gap-4`}>
+            {getAllAssets().map((asset) => (
+              <div
+                key={asset.path}
+                className={`relative group bg-theme-card border rounded-lg overflow-hidden transition-all hover:border-theme-primary/50 ${
+                  bulkDeleteMode && selectedAssets.has(asset.path)
+                    ? "ring-2 ring-theme-primary"
+                    : "border-theme"
+                }`}
+              >
+                {/* Selection Checkbox (Bulk Delete Mode) */}
+                {bulkDeleteMode && (
+                  <div className="absolute top-2 left-2 z-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedAssets.has(asset.path)}
+                      onChange={() => toggleAssetSelection(asset.path)}
+                      className="w-5 h-5 rounded border-2 border-theme-primary bg-theme-card cursor-pointer"
+                    />
+                  </div>
+                )}
+
+                {/* Image */}
                 <div
-                  key={asset.path}
-                  className={`relative group bg-theme-card border rounded-lg overflow-hidden transition-all hover:border-theme-primary/50 ${
-                    bulkDeleteMode && selectedAssets.has(asset.path)
-                      ? "ring-2 ring-theme-primary"
-                      : "border-theme"
-                  }`}
+                  className={`${getAssetAspectRatio(
+                    asset.type
+                  )} bg-theme-darker relative cursor-pointer`}
+                  onClick={() => {
+                    if (bulkDeleteMode) {
+                      toggleAssetSelection(asset.path);
+                    } else {
+                      setSelectedImage(asset);
+                    }
+                  }}
                 >
-                  {/* Selection Checkbox (Bulk Delete Mode) */}
-                  {bulkDeleteMode && (
-                    <div className="absolute top-2 left-2 z-10">
-                      <input
-                        type="checkbox"
-                        checked={selectedAssets.has(asset.path)}
-                        onChange={() => toggleAssetSelection(asset.path)}
-                        className="w-5 h-5 rounded border-2 border-theme-primary bg-theme-card cursor-pointer"
-                      />
+                  <img
+                    src={asset.url}
+                    alt={asset.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Eye className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+
+                {/* Asset Info */}
+                <div className="p-2">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium ${getAssetTypeBadgeColor(
+                        asset.type
+                      )}`}
+                    >
+                      {getAssetTypeIcon(asset.type)}
+                      <span className="capitalize">{asset.type}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-theme-text font-medium truncate mb-1">
+                    {asset.name}
+                  </p>
+                  <p className="text-xs text-theme-muted truncate mb-1">
+                    {asset.libraryName} / {asset.folderName}
+                  </p>
+                  <p className="text-xs text-theme-muted">
+                    {(asset.size / 1024).toFixed(0)} KB
+                  </p>
+
+                  {/* Actions */}
+                  {!bulkDeleteMode && (
+                    <div className="flex gap-1 mt-2">
+                      <button
+                        onClick={() => setSelectedImage(asset)}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-theme-bg hover:bg-theme-hover border border-theme rounded text-xs transition-all"
+                      >
+                        <Eye className="w-3 h-3" />
+                        View
+                      </button>
+                      <button
+                        onClick={() => deleteAsset(asset.path, asset.name)}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-400 rounded text-xs transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Delete
+                      </button>
                     </div>
                   )}
-
-                  {/* Image */}
-                  <div
-                    className={`${getAssetAspectRatio(
-                      asset.type
-                    )} bg-theme-darker relative cursor-pointer`}
-                    onClick={() => {
-                      if (bulkDeleteMode) {
-                        toggleAssetSelection(asset.path);
-                      } else {
-                        setSelectedImage(asset);
-                      }
-                    }}
-                  >
-                    <img
-                      src={asset.url}
-                      alt={asset.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Eye className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-
-                  {/* Asset Info */}
-                  <div className="p-2">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium ${getAssetTypeBadgeColor(
-                          asset.type
-                        )}`}
-                      >
-                        {getAssetTypeIcon(asset.type)}
-                        <span className="capitalize">{asset.type}</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-theme-text font-medium truncate mb-1">
-                      {asset.name}
-                    </p>
-                    <p className="text-xs text-theme-muted truncate mb-1">
-                      {asset.libraryName} / {asset.folderName}
-                    </p>
-                    <p className="text-xs text-theme-muted">
-                      {(asset.size / 1024).toFixed(0)} KB
-                    </p>
-
-                    {/* Actions */}
-                    {!bulkDeleteMode && (
-                      <div className="flex gap-1 mt-2">
-                        <button
-                          onClick={() => setSelectedImage(asset)}
-                          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-theme-bg hover:bg-theme-hover border border-theme rounded text-xs transition-all"
-                        >
-                          <Eye className="w-3 h-3" />
-                          View
-                        </button>
-                        <button
-                          onClick={() => deleteAsset(asset.path, asset.name)}
-                          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-400 rounded text-xs transition-all"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Pagination for Grid View */}
-            {(totalGridPages > 1 || allGridAssets.length > itemsPerPage) && (
-              <div className="mt-8 space-y-6">
-                <div className="flex justify-center">
-                  <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
-                    <label className="text-sm font-medium text-theme-text">
-                      {t("gallery.itemsPerPage")}:
-                    </label>
-                    <div className="relative" ref={itemsPerPageDropdownRef}>
-                      <button
-                        onClick={() => {
-                          const shouldOpenUp = calculateDropdownPosition(
-                            itemsPerPageDropdownRef
-                          );
-                          setItemsPerPageDropdownUp(shouldOpenUp);
-                          setItemsPerPageDropdownOpen(!itemsPerPageDropdownOpen);
-                        }}
-                        className="px-4 py-2 bg-theme-bg text-theme-text border border-theme-border rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all cursor-pointer shadow-sm flex items-center gap-2"
-                      >
-                        <span>{itemsPerPage}</span>
-                        <ChevronDown
-                          className={`w-4 h-4 transition-transform ${
-                            itemsPerPageDropdownOpen ? "rotate-180" : ""
-                          }`}
-                        />
-                      </button>
-                      {itemsPerPageDropdownOpen && (
-                        <div
-                          className={`absolute z-50 right-0 ${
-                            itemsPerPageDropdownUp
-                              ? "bottom-full mb-2"
-                              : "top-full mt-2"
-                          } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
-                        >
-                          {[25, 50, 100, 200, 500].map((value) => (
-                            <button
-                              key={value}
-                              onClick={() => {
-                                handleItemsPerPageChange(value);
-                                setItemsPerPageDropdownOpen(false);
-                              }}
-                              className={`w-full px-4 py-2 text-sm transition-all text-center ${
-                                itemsPerPage === value
-                                  ? "bg-theme-primary text-white"
-                                  : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                              }`}
-                            >
-                              {value}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <PaginationControls
-                  currentPage={currentPage}
-                  totalPages={totalGridPages}
-                  onPageChange={setCurrentPage}
-                />
               </div>
-            )}
+            ))}
           </div>
-        </>
+        </div>
       ) : (
         /* Folder View */
         <>
@@ -1076,60 +847,11 @@ function ManualAssets() {
                   {bulkDeleteMode && (
                     <>
                       <button
-                        onClick={() => {
-                          const viewData = getCurrentViewData();
-                          const displayedFolderAssets =
-                            viewData.type === "assets"
-                              ? viewData.items.slice(
-                                  (currentPage - 1) * itemsPerPage,
-                                  currentPage * itemsPerPage
-                                )
-                              : [];
-
-                          if (
-                            selectedAssets.size === displayedFolderAssets.length
-                          ) {
-                            clearSelection();
-                          } else {
-                            setSelectedAssets(
-                              new Set(
-                                displayedFolderAssets.map((asset) => asset.path)
-                              )
-                            );
-                          }
-                        }}
+                        onClick={selectAllAssets}
                         className="flex items-center gap-2 px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium text-sm"
                       >
-                        {(() => {
-                          const viewData = getCurrentViewData();
-                          const displayedFolderAssets =
-                            viewData.type === "assets"
-                              ? viewData.items.slice(
-                                  (currentPage - 1) * itemsPerPage,
-                                  currentPage * itemsPerPage
-                                )
-                              : [];
-                          return selectedAssets.size ===
-                            displayedFolderAssets.length && displayedFolderAssets.length > 0 ? (
-                            <Square className="w-5 h-5" />
-                          ) : (
-                            <CheckSquare className="w-5 h-5" />
-                          );
-                        })()}
-                        {(() => {
-                          const viewData = getCurrentViewData();
-                          const displayedFolderAssets =
-                            viewData.type === "assets"
-                              ? viewData.items.slice(
-                                  (currentPage - 1) * itemsPerPage,
-                                  currentPage * itemsPerPage
-                                )
-                              : [];
-                          return selectedAssets.size ===
-                            displayedFolderAssets.length && displayedFolderAssets.length > 0
-                            ? "Deselect Page"
-                            : "Select Page";
-                        })()}
+                        <CheckSquare className="w-5 h-5" />
+                        Select All
                       </button>
                       <button
                         onClick={clearSelection}
@@ -1137,7 +859,7 @@ function ManualAssets() {
                         disabled={selectedAssets.size === 0}
                       >
                         <Square className="w-5 h-5" />
-                        <span>Clear ({selectedAssets.size})</span>
+                        Deselect All
                       </button>
                       {selectedAssets.size > 0 && (
                         <button
@@ -1190,18 +912,6 @@ function ManualAssets() {
           {/* Content Area */}
           {(() => {
             const viewData = getCurrentViewData();
-
-            // --- Pagination logic for folder view assets ---
-            const allFolderAssets =
-              viewData.type === "assets" ? viewData.items : [];
-            const totalFolderPages = Math.ceil(
-              allFolderAssets.length / itemsPerPage
-            );
-            const displayedFolderAssets = allFolderAssets.slice(
-              (currentPage - 1) * itemsPerPage,
-              currentPage * itemsPerPage
-            );
-            // --- End pagination logic ---
 
             if (viewData.type === "libraries") {
               // Show library folders
@@ -1266,9 +976,8 @@ function ManualAssets() {
                               {library.folders.reduce(
                                 (sum, f) =>
                                   sum +
-                                  f.assets.filter(
-                                    (a) => a.type === "titlecard"
-                                  ).length,
+                                  f.assets.filter((a) => a.type === "titlecard")
+                                    .length,
                                 0
                               )}
                             </div>
@@ -1311,171 +1020,104 @@ function ManualAssets() {
             } else {
               // Show assets grid
               return (
-                <>
-                  <div className={`grid ${getGridClass(imageSize)} gap-4`}>
-                    {displayedFolderAssets.map((asset) => (
-                      <div
-                        key={asset.path}
-                        className={`relative group bg-theme-card border rounded-lg overflow-hidden transition-all shadow-sm hover:shadow-md ${
-                          bulkDeleteMode && selectedAssets.has(asset.path)
-                            ? "ring-2 ring-theme-primary border-theme-primary"
-                            : "border-theme-border hover:border-theme-primary/50"
-                        }`}
-                      >
-                        {/* Selection Checkbox (Bulk Delete Mode) */}
-                        {bulkDeleteMode && (
-                          <div className="absolute top-2 left-2 z-10">
-                            <div
-                              className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-all ${
-                                selectedAssets.has(asset.path)
-                                  ? "bg-theme-primary border-theme-primary"
-                                  : "bg-white/90 border-gray-300"
-                              }`}
-                              onClick={() => toggleAssetSelection(asset.path)}
-                            >
-                              {selectedAssets.has(asset.path) && (
-                                <Check className="w-4 h-4 text-white" />
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Image */}
-                        <div
-                          className={`${getAssetAspectRatio(
-                            asset.type
-                          )} bg-gradient-to-br from-theme-bg to-theme-darker relative cursor-pointer overflow-hidden`}
-                          onClick={() => {
-                            if (bulkDeleteMode) {
-                              toggleAssetSelection(asset.path);
-                            } else {
-                              setSelectedImage(asset);
-                            }
-                          }}
-                        >
-                          <img
-                            src={asset.url}
-                            alt={asset.name}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                            loading="lazy"
-                          />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Eye className="w-6 h-6 text-white drop-shadow-lg" />
-                          </div>
-                        </div>
-
-                        {/* Asset Info */}
-                        <div className="p-2.5">
-                          <p className="text-xs text-theme-text font-semibold truncate mb-1">
-                            {asset.name}
-                          </p>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-theme-muted">
-                              {(asset.size / 1024).toFixed(0)} KB
-                            </span>
-                            <div
-                              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${getAssetTypeBadgeColor(
-                                asset.type
-                              )}`}
-                            >
-                              {getAssetTypeIcon(asset.type)}
-                              <span className="capitalize text-xs">
-                                {asset.type}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          {!bulkDeleteMode && (
-                            <div className="flex gap-1.5">
-                              <button
-                                onClick={() => setSelectedImage(asset)}
-                                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-theme-primary/10 hover:bg-theme-primary/20 border border-theme-primary/30 text-theme-primary rounded text-xs font-medium transition-all"
-                              >
-                                <Eye className="w-3 h-3" />
-                                View
-                              </button>
-                              <button
-                                onClick={() =>
-                                  deleteAsset(asset.path, asset.name)
-                                }
-                                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded text-xs font-medium transition-all"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Pagination for Folder View Assets */}
-                  {(totalFolderPages > 1 || allFolderAssets.length > itemsPerPage) && (
-                    <div className="mt-8 space-y-6">
-                      <div className="flex justify-center">
-                        <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
-                          <label className="text-sm font-medium text-theme-text">
-                            {t("gallery.itemsPerPage")}:
-                          </label>
-                          <div className="relative" ref={itemsPerPageDropdownRef}>
-                            <button
-                              onClick={() => {
-                                const shouldOpenUp = calculateDropdownPosition(
-                                  itemsPerPageDropdownRef
-                                );
-                                setItemsPerPageDropdownUp(shouldOpenUp);
-                                setItemsPerPageDropdownOpen(
-                                  !itemsPerPageDropdownOpen
-                                );
-                              }}
-                              className="px-4 py-2 bg-theme-bg text-theme-text border border-theme-border rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all cursor-pointer shadow-sm flex items-center gap-2"
-                            >
-                              <span>{itemsPerPage}</span>
-                              <ChevronDown
-                                className={`w-4 h-4 transition-transform ${
-                                  itemsPerPageDropdownOpen ? "rotate-180" : ""
-                                }`}
-                              />
-                            </button>
-                            {itemsPerPageDropdownOpen && (
-                              <div
-                                className={`absolute z-50 right-0 ${
-                                  itemsPerPageDropdownUp
-                                    ? "bottom-full mb-2"
-                                    : "top-full mt-2"
-                                } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
-                              >
-                                {[25, 50, 100, 200, 500].map((value) => (
-                                  <button
-                                    key={value}
-                                    onClick={() => {
-                                      handleItemsPerPageChange(value);
-                                      setItemsPerPageDropdownOpen(false);
-                                    }}
-                                    className={`w-full px-4 py-2 text-sm transition-all text-center ${
-                                      itemsPerPage === value
-                                        ? "bg-theme-primary text-white"
-                                        : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                                    }`}
-                                  >
-                                    {value}
-                                  </button>
-                                ))}
-                              </div>
+                <div className={`grid ${getGridClass(imageSize)} gap-4`}>
+                  {viewData.items.map((asset) => (
+                    <div
+                      key={asset.path}
+                      className={`relative group bg-theme-card border rounded-lg overflow-hidden transition-all shadow-sm hover:shadow-md ${
+                        bulkDeleteMode && selectedAssets.has(asset.path)
+                          ? "ring-2 ring-theme-primary border-theme-primary"
+                          : "border-theme-border hover:border-theme-primary/50"
+                      }`}
+                    >
+                      {/* Selection Checkbox (Bulk Delete Mode) */}
+                      {bulkDeleteMode && (
+                        <div className="absolute top-2 left-2 z-10">
+                          <div
+                            className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-all ${
+                              selectedAssets.has(asset.path)
+                                ? "bg-theme-primary border-theme-primary"
+                                : "bg-white/90 border-gray-300"
+                            }`}
+                            onClick={() => toggleAssetSelection(asset.path)}
+                          >
+                            {selectedAssets.has(asset.path) && (
+                              <Check className="w-4 h-4 text-white" />
                             )}
                           </div>
                         </div>
+                      )}
+
+                      {/* Image */}
+                      <div
+                        className={`${getAssetAspectRatio(
+                          asset.type
+                        )} bg-gradient-to-br from-theme-bg to-theme-darker relative cursor-pointer overflow-hidden`}
+                        onClick={() => {
+                          if (bulkDeleteMode) {
+                            toggleAssetSelection(asset.path);
+                          } else {
+                            setSelectedImage(asset);
+                          }
+                        }}
+                      >
+                        <img
+                          src={asset.url}
+                          alt={asset.name}
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Eye className="w-6 h-6 text-white drop-shadow-lg" />
+                        </div>
                       </div>
-                      <PaginationControls
-                        currentPage={currentPage}
-                        totalPages={totalFolderPages}
-                        onPageChange={setCurrentPage}
-                      />
+
+                      {/* Asset Info */}
+                      <div className="p-2.5">
+                        <p className="text-xs text-theme-text font-semibold truncate mb-1">
+                          {asset.name}
+                        </p>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-theme-muted">
+                            {(asset.size / 1024).toFixed(0)} KB
+                          </span>
+                          <div
+                            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${getAssetTypeBadgeColor(
+                              asset.type
+                            )}`}
+                          >
+                            {getAssetTypeIcon(asset.type)}
+                            <span className="capitalize text-xs">
+                              {asset.type}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        {!bulkDeleteMode && (
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => setSelectedImage(asset)}
+                              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-theme-primary/10 hover:bg-theme-primary/20 border border-theme-primary/30 text-theme-primary rounded text-xs font-medium transition-all"
+                            >
+                              <Eye className="w-3 h-3" />
+                              View
+                            </button>
+                            <button
+                              onClick={() =>
+                                deleteAsset(asset.path, asset.name)
+                              }
+                              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded text-xs font-medium transition-all"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </>
+                  ))}
+                </div>
               );
             }
           })()}

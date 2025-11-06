@@ -12,10 +12,40 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import Notification from "./Notification";
 import { useToast } from "../context/ToastContext";
 import ConfirmDialog from "./ConfirmDialog";
 
 const API_URL = "/api";
+
+// ============================================================================
+// WAIT FOR LOG FILE - Polls backend until log file exists
+// ============================================================================
+const waitForLogFile = async (logFileName, maxAttempts = 30, delayMs = 200) => {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const response = await fetch(`${API_URL}/logs/${logFileName}/exists`);
+      const data = await response.json();
+
+      if (data.exists) {
+        console.log(`Log file ${logFileName} exists after ${i + 1} attempts`);
+        return true;
+      }
+
+      // Wait before next attempt
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    } catch (error) {
+      console.error(`Error checking log file existence: ${error}`);
+      // Continue trying even if there's an error
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  console.warn(
+    `Log file ${logFileName} not found after ${maxAttempts} attempts`
+  );
+  return false;
+};
 
 function AssetReplacer({ asset, onClose, onSuccess }) {
   const { t } = useTranslation();
@@ -247,43 +277,20 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       }
     }
 
-    // Only override title if it's NOT a season or titlecard, as their DB Title
-    // contains extra info (e.g., "Show | Season 01" or "S01E01 | Episode")
-    if (dbData?.Title && assetType !== "season" && assetType !== "titlecard") {
-      title = dbData.Title;
-      console.log(`Using Title from database: ${title}`);
-  	}
-    if (dbData?.year) {
-      year = parseInt(dbData.year);
-      console.log(`Using Year from database: ${year}`);
-  	}
-
-    // Determine mediaType
-    const backendAssetType = (asset.type || "").toLowerCase();
-    const dbType = (dbData?.Type || "").toLowerCase();
-    const libName = (libraryName || "").toLowerCase();
-    let mediaType = "movie"; // Default
-
-    if (
-      dbType.includes("show") ||
-      backendAssetType.includes("show") ||
-      backendAssetType.includes("season") ||
-      backendAssetType.includes("episode") ||
-      assetType === "season" ||
-      assetType === "titlecard" ||
-      libName.includes("tv") ||
-      libName.includes("show") ||
-      libName.includes("series") ||
-      libName.includes("serier") ||
-      libName.includes("anime")
-    ) {
-      mediaType = "tv";
-    }
-
-    console.log(`Backend asset.type: '${backendAssetType}'`);
-    console.log(`DB data Type: '${dbType}'`);
-  	console.log(`Library Name: '${libName}'`);
-  	console.log(`Derived mediaType: '${mediaType}'`);
+    // Determine media type - check for TV indicators (Season folders, episode patterns, or TV in path)
+    // Support Season 0/00 (Special Seasons) as well as regular seasons
+    const hasSeason = asset.path?.match(/Season\d+/i);
+    const hasEpisode = asset.path?.match(/S\d+E\d+/i);
+    const hasTVFolder = asset.path?.match(/[\/\\](TV|Series)[\/\\]/i);
+    // Also check for TVDB/TMDB IDs in brackets which indicate TV shows
+    const hasTVDBId = asset.path?.match(/\[tvdb-\d+\]/i);
+    const isTV =
+      hasSeason ||
+      hasEpisode ||
+      hasTVFolder ||
+      hasTVDBId ||
+      asset.type === "tv";
+    const mediaType = isTV ? "tv" : "movie";
 
     // Extract season/episode numbers
     // Priority 1: From DB Title field (if asset comes from AssetOverview)
@@ -547,170 +554,106 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     fetchLanguageOrder();
   }, []);
 
-// Fetch database data if not provided (e.g., when opened from FolderView)
-  useEffect(() => {
-    // Helper function to find a match in a list of records
-    // Handles both ImageChoices (Rootfolder) and MediaExport (root_foldername)
-    // Helper function to find a match in a list of records
-    // Handles both ImageChoices (Rootfolder) and MediaExport (root_foldername)
-    const findMatch = (records, libraryName, rootfolder) => {
-      // 1. Filter by LibraryName
-      const libraryMatchingRecords = records.filter(
-        (r) =>
-          (r.LibraryName && r.LibraryName === libraryName) ||
-          (r.library_name && r.library_name === libraryName)
-      );
+  // Fetch database data if not provided (e.g., when opened from FolderView)
+  useEffect(() => {
+    const fetchDatabaseData = async () => {
+      if (dbData !== null) {
+        // Already have database data
+        console.log("Already have database data, skipping fetch");
+        return;
+      }
 
-      // Debug: Show a few sample records from the library
-      const sampleRecords = libraryMatchingRecords
-        .slice(0, 3)
-        .map((r) => ({
-          LibraryName: r.LibraryName || r.library_name,
-          Rootfolder: r.Rootfolder || r.root_foldername,
-          Type: r.Type || r.library_type,
-        }));
+      try {
+        console.log("Fetching database data for asset:", asset.path);
 
-      if (sampleRecords.length > 0) {
-        console.log(
-          `Sample records from "${libraryName}" library:`,
-          sampleRecords
-        );
-      }
+        // Query all database records
+        const response = await fetch(`${API_URL}/imagechoices`);
 
-      // 2. Filter THAT list by Rootfolder
-      const rootfolderMatchingRecords = libraryMatchingRecords.filter(
-        (r) =>
-          (r.Rootfolder && r.Rootfolder === rootfolder) ||
-          (r.root_foldername && r.root_foldername === rootfolder)
-      );
+        if (response.ok) {
+          const allRecords = await response.json();
+          console.log(`Fetched ${allRecords.length} database records`);
 
-      // If no records match the root folder, we can't proceed.
-      if (rootfolderMatchingRecords.length === 0) {
-        console.log(
-          `...No records found matching rootfolder: "${rootfolder}"`
-        );
-        return null;
-      }
+          // Find matching asset by comparing paths
+          // asset.path format: "TestMovies\A View to a Kill (1985)\poster.jpg"
+          // Need to match against LibraryName + Rootfolder
 
-      // 3. Prioritize based on the SPECIFIC root folder matches
-      // Prioritize: Show/Movie records > Season records > Episode records
-      return (
-        rootfolderMatchingRecords.find(
-          (r) =>
-            (r.Type?.includes("Show") || r.Type?.includes("Movie")) ||
-            (r.library_type?.includes("show") || r.library_type?.includes("movie"))
-        ) ||
-        rootfolderMatchingRecords.find(
-          (r) =>
-            (r.Type?.includes("Season") && !r.Type?.includes("Episode")) ||
-            (r.library_type === "show" && r.season_number) // Approximate
-        ) ||
-        rootfolderMatchingRecords.find((r) => r.Type?.includes("Background")) ||
-        rootfolderMatchingRecords[0] // Fallback to first match in the rootfolder list
-      );
-    };
+          const pathParts = asset.path?.split(/[\/\\]/).filter(Boolean);
+          if (pathParts && pathParts.length >= 2) {
+            const libraryName = pathParts[0];
+            const rootfolder = pathParts[1];
+            const filename = pathParts[pathParts.length - 1]; // e.g., "Season01.jpg", "S03E09.jpg", "poster.jpg"
 
-    // Helper to normalize data from media_export.db to match ImageChoices.db format
-    // This is CRITICAL so the rest of the component (like extractMetadata) works
-    const normalizeMediaExportData = (record) => {
-      if (!record) return null;
-      return {
-        LibraryName: record.library_name,
-        Rootfolder: record.root_foldername,
-        Title: record.title,
-        Type: record.library_type, // 'show' or 'movie'
-        tmdbid: record.tmdbid,
-        tvdbid: record.tvdbid,
-        imdbid: record.imdbid,
-        // Add any other fields from media_export.db that extractMetadata might need
-        // e.g., year, season_numbers, etc.
-        year: record.year,
-      };
-    };
+            console.log(
+              `Looking for match: LibraryName="${libraryName}", Rootfolder="${rootfolder}", File="${filename}"`
+            );
 
-    const fetchDatabaseData = async () => {
-      if (dbData !== null) {
-        // Already have database data
-        console.log("Already have database data, skipping fetch");
-        return;
-      }
+            // Debug: Show a few sample records from the same library
+            const sampleRecords = allRecords
+              .filter((r) => r.LibraryName === libraryName)
+              .slice(0, 3)
+              .map((r) => ({
+                LibraryName: r.LibraryName,
+                Rootfolder: r.Rootfolder,
+                Type: r.Type,
+              }));
+            if (sampleRecords.length > 0) {
+              console.log(
+                `Sample records from "${libraryName}" library:`,
+                sampleRecords
+              );
+            }
 
-      // --- Parse Path ---
-      const pathParts = asset.path?.split(/[\/\\]/).filter(Boolean);
-      if (!pathParts || pathParts.length < 2) {
-        console.log("✗ Cannot parse path:", pathParts);
-        return;
-      }
-      const libraryName = pathParts[0];
-      const rootfolder = pathParts[1];
-      console.log(
-        `Fetching DB data for: LibraryName="${libraryName}", Rootfolder="${rootfolder}"`
-      );
-      // --- End Parse Path ---
+            // Find matching record - prefer show-level records (not episodes)
+            const matchingRecords = allRecords.filter((record) => {
+              return (
+                record.LibraryName === libraryName &&
+                record.Rootfolder === rootfolder
+              );
+            });
 
-      try {
-        let response; // Declare response once
+            // Prioritize: Show/Movie records > Season records > Episode records
+            const matchingRecord =
+              matchingRecords.find(
+                (r) => r.Type?.includes("Show") || r.Type?.includes("Movie")
+              ) ||
+              matchingRecords.find(
+                (r) =>
+                  r.Type?.includes("Season") && !r.Type?.includes("Episode")
+              ) ||
+              matchingRecords.find((r) => r.Type?.includes("Background")) ||
+              matchingRecords[0]; // Fallback to first match
 
-        // --- 1. Try Plex Export (media_export.db) ---
-        console.log("Checking Plex Export DB (/api/plex-export/library)...");
-        response = await fetch(`${API_URL}/plex-export/library`);
-        if (response.ok) {
-          const plexData = await response.json();
-          if (plexData.success && plexData.data) {
-            const matchingRecord = findMatch(plexData.data, libraryName, rootfolder);
-            if (matchingRecord) {
-              console.log("✓ Found matching record in Plex Export DB:", matchingRecord);
-              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
-              return; // Found it!
-            }
-          }
-        }
-        console.log("...Not found in Plex Export DB.");
+            if (matchingRecord) {
+              console.log("✓ Found matching database record:", {
+                Type: matchingRecord.Type,
+                Title: matchingRecord.Title,
+                tmdbid: matchingRecord.tmdbid,
+                tvdbid: matchingRecord.tvdbid,
+                imdbid: matchingRecord.imdbid,
+              });
+              setDbData(matchingRecord);
+            } else {
+              console.log("✗ No matching database record found for:", {
+                libraryName,
+                rootfolder,
+              });
+            }
+          } else {
+            console.log(
+              "✗ Cannot parse path - insufficient segments:",
+              pathParts
+            );
+          }
+        } else {
+          console.error("Failed to fetch database records:", response.status);
+        }
+      } catch (error) {
+        console.error("Error fetching database data:", error);
+      }
+    };
 
-        // --- 2. Try Other Media Export (media_export.db) ---
-        console.log("Checking Other Media Export DB (/api/other-media-export/library)...");
-        response = await fetch(`${API_URL}/other-media-export/library`);
-        if (response.ok) {
-          const otherData = await response.json();
-          if (otherData.success && otherData.data) {
-            const matchingRecord = findMatch(otherData.data, libraryName, rootfolder);
-            if (matchingRecord) {
-              console.log("✓ Found matching record in Other Media Export DB:", matchingRecord);
-              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
-              return; // Found it!
-            }
-          }
-        }
-        console.log("...Not found in Other Media Export DB.");
-        
-        // --- 3. Try ImageChoices (Posterizarr DB) ---
-        console.log("Checking ImageChoices DB (/api/imagechoices)...");
-        response = await fetch(`${API_URL}/imagechoices`);
-        if (response.ok) {
-          const allRecords = await response.json();
-          const matchingRecord = findMatch(allRecords, libraryName, rootfolder);
-
-          if (matchingRecord) {
-            console.log("✓ Found matching record in ImageChoices DB:", matchingRecord);
-            setDbData(matchingRecord); // Already in correct format
-            return; // Found it!
-          }
-        }
-        console.log("...Not found in ImageChoices DB.");
-        
-        // --- 4. Final Failure ---
-        console.log("✗ No matching database record found in ANY source for:", {
-          libraryName,
-          rootfolder,
-        });
-
-      } catch (error) {
-        console.error("Error fetching database data:", error);
-      }
-    };
-
-    fetchDatabaseData();
-  }, [asset.path, dbData]); // Dependencies remain the same
+    fetchDatabaseData();
+  }, [asset.path, dbData]);
 
   // Initialize season number from metadata
   useEffect(() => {

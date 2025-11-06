@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react"; // Added useMemo
+import React, { useState, useEffect } from "react";
 import { X, RefreshCw, Loader2, AlertCircle, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -13,8 +13,6 @@ const LibraryExclusionSelector = ({
   showIncluded = false, // New prop to show included libraries section
 }) => {
   const { t } = useTranslation();
-
-  // --- All useState hooks must come first ---
   const [excludedLibraries, setExcludedLibraries] = useState([]);
   const [availableLibraries, setAvailableLibraries] = useState([]);
   const [loadingLibraries, setLoadingLibraries] = useState(false);
@@ -24,31 +22,6 @@ const LibraryExclusionSelector = ({
   // Separate state for DB-cached data (shown in boxes)
   const [cachedLibraries, setCachedLibraries] = useState([]);
   const [cachedExclusions, setCachedExclusions] = useState([]);
-
-  // --- THEN, the useMemo hooks that depend on state ---
-  // Create a Set of all valid library names from the server list
-  const validLibraryNames = React.useMemo(() => {
-    return new Set(cachedLibraries.map((lib) => lib.name));
-  }, [cachedLibraries]);
-
-  // Create a *filtered* list of exclusions
-  // This list only contains libraries that are BOTH in the exclusion list AND on the server
-  const validExclusions = React.useMemo(() => {
-    // We use cachedExclusions as it's the source for the summary boxes
-    return cachedExclusions.filter((name) => validLibraryNames.has(name));
-  }, [cachedExclusions, validLibraryNames]);
-
-  // Create the *filtered* list of included libraries
-  const validIncluded = React.useMemo(() => {
-    const exclusionSet = new Set(validExclusions);
-    return cachedLibraries.filter((lib) => !exclusionSet.has(lib.name));
-  }, [cachedLibraries, validExclusions]);
-
-  // --- FINALLY, the variables that depend on the useMemo hooks ---
-  const excludedCount = validExclusions.length;
-  const includedCount = validIncluded.length;
-
-  // --- The rest of your code (useEffect, functions, return) ---
 
   // Initialize from value prop
   useEffect(() => {
@@ -65,38 +38,40 @@ const LibraryExclusionSelector = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array = run only once on mount
 
-  // THIS IS THE CORRECTED loadCachedExclusionsForDisplay
   const loadCachedExclusionsForDisplay = async () => {
     try {
       const response = await fetch(`/api/libraries/${mediaServerType}/cached`);
       const data = await response.json();
 
       if (data.success) {
-        // Store cached libraries for display
+        // Store cached data for display in boxes only
         if (data.libraries && data.libraries.length > 0) {
           setCachedLibraries(data.libraries);
         }
-
-        // --- NEW LOGIC ---
-        // Trust the 'value' prop (from the main config) as the source of truth
-        const exclusions =
-          Array.isArray(value) && value.length > 0
-            ? value
-            : data.excluded || []; // Fallback to DB cache if 'value' is empty
-
-        setCachedExclusions(exclusions);
-        setExcludedLibraries(exclusions);
-
-        // Only call onChange if the DB/value is different from current state
-        if (JSON.stringify(exclusions) !== JSON.stringify(value)) {
-          onChange(exclusions);
+        if (data.excluded && Array.isArray(data.excluded)) {
+          setCachedExclusions(data.excluded);
+          setExcludedLibraries(data.excluded);
+          onChange(data.excluded);
+        } else if (!data.libraries || data.libraries.length === 0) {
+          // Database is empty, but config might have exclusions
+          // Show them in the excluded box until user fetches libraries
+          if (Array.isArray(value) && value.length > 0) {
+            console.log(
+              `Database empty for ${mediaServerType}, using config exclusions:`,
+              value
+            );
+            setCachedExclusions(value);
+          }
         }
-        // --- END NEW LOGIC ---
       }
     } catch (err) {
-      console.log("No cached data in database, using config 'value'");
-      // If DB query fails, just use the 'value' prop from the config
-      if (Array.isArray(value)) {
+      console.log("No cached data in database");
+      // If DB query fails and config has exclusions, show them
+      if (Array.isArray(value) && value.length > 0) {
+        console.log(
+          `Database error for ${mediaServerType}, using config exclusions:`,
+          value
+        );
         setCachedExclusions(value);
       }
     }
@@ -124,7 +99,6 @@ const LibraryExclusionSelector = ({
     return null;
   };
 
-  // THIS IS THE CORRECTED fetchLibraries
   const fetchLibraries = async () => {
     setLoadingLibraries(true);
     setError(null);
@@ -137,9 +111,13 @@ const LibraryExclusionSelector = ({
     }
 
     try {
-      // Get the current stale list *from state*. (e.g., your 14 libraries)
-      // This state was populated on load by loadCachedExclusionsForDisplay
-      const staleExclusions = cachedExclusions;
+      // First, get cached exclusion status
+      const cachedResponse = await fetch(
+        `/api/libraries/${mediaServerType}/cached`
+      );
+      const cachedData = await cachedResponse.json();
+      const cachedExclusions =
+        cachedData.success && cachedData.excluded ? cachedData.excluded : [];
 
       // Then fetch fresh libraries from server
       const endpoint = `/api/libraries/${mediaServerType}`;
@@ -154,29 +132,19 @@ const LibraryExclusionSelector = ({
       const data = await response.json();
 
       if (data.success && data.libraries) {
-        const allFetchedLibraries = data.libraries; // Full list (e.g., 12 libs)
-
-        // --- PRUNING LOGIC ---
-        // Prune the stale list (14 items) against the fresh list (12 items)
-        const freshLibraryNames = new Set(allFetchedLibraries.map(lib => lib.name));
-        // This creates the list of 10 valid exclusions
-        const validExclusions = staleExclusions.filter(name => freshLibraryNames.has(name));
-        // --- END PRUNING LOGIC ---
-
-        // Set the UI list to show ALL fetched libraries
-        setAvailableLibraries(allFetchedLibraries);
+        setAvailableLibraries(data.libraries);
         setLibrariesFetched(true);
         setError(null);
 
-        // Set the exclusion state to the *pruned, valid* list (10 items)
-        setExcludedLibraries(validExclusions);
-        // Send the pruned list back to the config
-        onChange(validExclusions);
+        // Restore cached exclusions
+        if (cachedExclusions.length > 0) {
+          setExcludedLibraries(cachedExclusions);
+          onChange(cachedExclusions);
+        }
 
-        // Update the summary boxes
-        setCachedLibraries(allFetchedLibraries); // Full list (12)
-        setCachedExclusions(validExclusions); // Pruned list (10)
-
+        // Update cached libraries for display boxes
+        setCachedLibraries(data.libraries);
+        setCachedExclusions(cachedExclusions);
       } else {
         setError(data.error || t("libraryExclusion.fetchFailed"));
         setAvailableLibraries([]);
@@ -189,9 +157,7 @@ const LibraryExclusionSelector = ({
     }
   };
 
-  // THIS IS THE CORRECTED toggleLibrary
-  const toggleLibrary = (libraryName) => {
-    // Removed 'async'
+  const toggleLibrary = async (libraryName) => {
     let newExcluded;
     if (excludedLibraries.includes(libraryName)) {
       // Remove from excluded (include it)
@@ -201,11 +167,13 @@ const LibraryExclusionSelector = ({
       newExcluded = [...excludedLibraries, libraryName];
     }
     setExcludedLibraries(newExcluded);
-    setCachedExclusions(newExcluded); // Update cached state for summary boxes
-    onChange(newExcluded); // Update the main config
+    setCachedExclusions(newExcluded); // Update cached state too
+    onChange(newExcluded);
+
+    // Update database
+    await updateExclusionsInDB(newExcluded);
   };
 
-  // THIS FUNCTION CAN BE DELETED, but is left for safety. It is not called.
   const updateExclusionsInDB = async (excluded) => {
     try {
       await fetch(`/api/libraries/${mediaServerType}/exclusions`, {
@@ -223,44 +191,26 @@ const LibraryExclusionSelector = ({
     }
   };
 
-  // THIS IS THE CORRECTED clearAll
-  const clearAll = () => {
-    // Removed 'async'
+  const clearAll = async () => {
     setExcludedLibraries([]);
-    setCachedExclusions([]);
     onChange([]);
+    await updateExclusionsInDB([]);
   };
 
-  // THIS IS THE CORRECTED excludeAll
-  const excludeAll = () => {
-    // Removed 'async'
+  const excludeAll = async () => {
     const allLibraryNames = availableLibraries.map((lib) => lib.name);
     setExcludedLibraries(allLibraryNames);
-    setCachedExclusions(allLibraryNames);
     onChange(allLibraryNames);
+    await updateExclusionsInDB(allLibraryNames);
   };
 
-  // THIS IS THE CORRECTED getLibraryTypeIcon
   const getLibraryTypeIcon = (type) => {
     if (type === "movie" || type === "movies") {
-      return "🎬"; // Movie
+      return "🎬";
     } else if (type === "show" || type === "tvshows") {
-      return "📺"; // TV Show
-    } else if (type === "music") {
-      return "🎵"; // Music
-    } else if (type === "photo" || type === "photos") {
-      return "📸"; // Photo
-    } else if (type === "audiobook" || type === "audiobooks") {
-      return "🎧"; // Audiobook
-    } else if (type === "book" || type === "books") {
-      return "📖"; // Book
+      return "📺";
     }
-    // Plex uses 'artist' for music/audiobooks, but the backend is filtering them.
-    // If the backend ever sends them, this will try to show an icon.
-    else if (type === "artist") {
-      return "🎤"; // Artist (fallback for music/audiobooks)
-    }
-    return "📁"; // Fallback for any other type
+    return "📁";
   };
 
   return (
@@ -427,7 +377,7 @@ const LibraryExclusionSelector = ({
       {/* Empty State - No Libraries Fetched */}
       {!loadingLibraries && !librariesFetched && (
         <div className="px-4 py-8 bg-theme-bg/50 border-2 border-dashed border-theme rounded-lg text-center">
-          <p className="text-sm text-theme-muted">
+          <p className="text-theme-muted text-sm">
             {t("libraryExclusion.clickToFetch", {
               server:
                 mediaServerType.charAt(0).toUpperCase() +
@@ -443,7 +393,7 @@ const LibraryExclusionSelector = ({
         availableLibraries.length === 0 &&
         !error && (
           <div className="px-4 py-8 bg-theme-bg/50 border border-theme rounded-lg text-center">
-            <p className="text-sm text-theme-muted">
+            <p className="text-theme-muted text-sm">
               {t("libraryExclusion.noLibraries")}
             </p>
           </div>
@@ -452,19 +402,19 @@ const LibraryExclusionSelector = ({
       {/* Separator between Fetch section and Status Boxes */}
       <div className="border-t border-theme-border/30 my-4"></div>
 
-      {/* Excluded and Included Libraries - THIS IS THE CORRECTED MATH */}
+      {/* Excluded and Included Libraries - Always Visible in Full Width Row */}
       <div>
         <div className="grid grid-cols-2 gap-6">
           {/* Excluded Libraries */}
           <div className="px-4 py-3 bg-red-500/5 border border-red-500/20 rounded-lg">
             <p className="text-xs text-red-400/80 font-medium mb-2">
               {t("libraryExclusion.excludedCount", {
-                count: excludedCount, // <<< USES NEW COUNT
+                count: cachedExclusions.length,
               })}
             </p>
             <div className="flex flex-wrap gap-2">
-              {validExclusions.length > 0 ? ( // <<< USES NEW LIST
-                validExclusions.map((libName) => ( // <<< USES NEW LIST
+              {cachedExclusions.length > 0 ? (
+                cachedExclusions.map((libName) => (
                   <span
                     key={libName}
                     className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm border border-red-500/30 flex items-center gap-1.5"
@@ -485,20 +435,22 @@ const LibraryExclusionSelector = ({
           <div className="px-4 py-3 bg-green-500/5 border border-green-500/20 rounded-lg">
             <p className="text-xs text-green-400/80 font-medium mb-2">
               {t("libraryExclusion.includedCount", {
-                count: includedCount, // <<< USES NEW COUNT
+                count: cachedLibraries.length - cachedExclusions.length,
               })}
             </p>
             <div className="flex flex-wrap gap-2">
-              {includedCount > 0 ? ( // <<< USES NEW COUNT
-                validIncluded.map((lib) => ( // <<< USES NEW LIST
-                  <span
-                    key={lib.name}
-                    className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm border border-green-500/30 flex items-center gap-1.5"
-                  >
-                    <Check className="w-3 h-3" />
-                    {lib.name}
-                  </span>
-                ))
+              {cachedLibraries.length - cachedExclusions.length > 0 ? (
+                cachedLibraries
+                  .filter((lib) => !cachedExclusions.includes(lib.name))
+                  .map((lib) => (
+                    <span
+                      key={lib.name}
+                      className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm border border-green-500/30 flex items-center gap-1.5"
+                    >
+                      <Check className="w-3 h-3" />
+                      {lib.name}
+                    </span>
+                  ))
               ) : (
                 <span className="text-xs text-theme-muted italic">
                   {cachedLibraries.length === 0

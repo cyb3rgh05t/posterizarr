@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"; // Import useRef
+import React, { useState, useEffect, useRef } from "react";
 import {
   Folder,
   ChevronRight,
@@ -14,7 +14,7 @@ import {
   CheckSquare,
   Square,
   Check,
-  ChevronDown, // Import ChevronDown
+  ChevronDown,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CompactImageSizeSlider from "./CompactImageSizeSlider";
@@ -40,33 +40,51 @@ function FolderView() {
   const [deletingImage, setDeletingImage] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // --- Pagination State (MODIFIED) ---
-  const [currentPage, setCurrentPage] = useState(1);
-  // Load pageSize from localStorage, default to 50
-  const [pageSize, setPageSize] = useState(() => {
-    const saved = localStorage.getItem("folder-view-page-size");
-    return saved ? parseInt(saved) : 25;
+  // Pagination state
+  const [itemsPerPageAssets, setItemsPerPageAssets] = useState(() => {
+    const saved = localStorage.getItem("folder-view-assets-per-page");
+    return saved ? parseInt(saved) : 50;
+  });
+  const [itemsPerPageFolders, setItemsPerPageFolders] = useState(() => {
+    const saved = localStorage.getItem("folder-view-folders-per-page");
+    return saved ? parseInt(saved) : 50;
+  });
+  const [displayCountAssets, setDisplayCountAssets] = useState(() => {
+    const saved = localStorage.getItem("folder-view-assets-per-page");
+    return saved ? parseInt(saved) : 50;
+  });
+  const [displayCountFolders, setDisplayCountFolders] = useState(() => {
+    const saved = localStorage.getItem("folder-view-folders-per-page");
+    return saved ? parseInt(saved) : 50;
   });
 
-  // --- Page Size Dropdown State (NEW) ---
-  const [pageSizeDropdownOpen, setPageSizeDropdownOpen] = useState(false);
-  const [pageSizeDropdownUp, setPageSizeDropdownUp] = useState(false);
-  const pageSizeDropdownRef = useRef(null);
-  // ------------------------------------
+  // Dropdown state for assets
+  const [itemsPerPageAssetsDropdownOpen, setItemsPerPageAssetsDropdownOpen] =
+    useState(false);
+  const [itemsPerPageAssetsDropdownUp, setItemsPerPageAssetsDropdownUp] =
+    useState(false);
+  const itemsPerPageAssetsDropdownRef = useRef(null);
+
+  // Dropdown state for folders
+  const [itemsPerPageFoldersDropdownOpen, setItemsPerPageFoldersDropdownOpen] =
+    useState(false);
+  const [itemsPerPageFoldersDropdownUp, setItemsPerPageFoldersDropdownUp] =
+    useState(false);
+  const itemsPerPageFoldersDropdownRef = useRef(null);
 
   // Multi-select state
   const [selectMode, setSelectMode] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState([]);
-  const [selectedFolders, setSelectedFolders] = useState([]);
+  const [selectedFolders, setSelectedFolders] = useState([]); // For selecting folders/items
 
   // Asset replacer state
   const [replacerOpen, setReplacerOpen] = useState(false);
   const [assetToReplace, setAssetToReplace] = useState(null);
 
-  // Cache busting timestamp
+  // Cache busting timestamp for force-reloading images after replacement
   const [cacheBuster, setCacheBuster] = useState(Date.now());
 
-  // Image size state
+  // Image size state with localStorage (2-10 range, default 5)
   const [imageSize, setImageSize] = useState(() => {
     const saved = localStorage.getItem("folder-view-image-size");
     return saved ? parseInt(saved) : 5;
@@ -100,44 +118,36 @@ function FolderView() {
     setSelectMode(false);
     setSelectedAssets([]);
     setSelectedFolders([]);
-    setCurrentPage(1); // Reset page on navigation
   }, [currentPath]);
 
-  // --- Dropdown Click Outside Detection (NEW) ---
+  // Reset display counts when navigating or searching
+  useEffect(() => {
+    setDisplayCountAssets(itemsPerPageAssets);
+    setDisplayCountFolders(itemsPerPageFolders);
+  }, [currentPath, searchTerm, itemsPerPageAssets, itemsPerPageFolders]);
+
+  // Click outside detection for dropdowns
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
-        pageSizeDropdownRef.current &&
-        !pageSizeDropdownRef.current.contains(event.target)
+        itemsPerPageAssetsDropdownRef.current &&
+        !itemsPerPageAssetsDropdownRef.current.contains(event.target)
       ) {
-        setPageSizeDropdownOpen(false);
+        setItemsPerPageAssetsDropdownOpen(false);
+      }
+      if (
+        itemsPerPageFoldersDropdownRef.current &&
+        !itemsPerPageFoldersDropdownRef.current.contains(event.target)
+      ) {
+        setItemsPerPageFoldersDropdownOpen(false);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-  // -------------------------------------------
-
-  // --- Dropdown Position Calculator (NEW) ---
-  const calculateDropdownPosition = (ref) => {
-    if (!ref.current) return false;
-    const rect = ref.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    return spaceAbove > spaceBelow;
-  };
-  // ----------------------------------------
-
-  // --- Page Size Change Handler (NEW) ---
-  const handlePageSizeChange = (value) => {
-    setPageSize(value);
-    localStorage.setItem("folder-view-page-size", value.toString());
-    setCurrentPage(1); // Reset to page 1 when size changes
-    setPageSizeDropdownOpen(false);
-  };
-  // ------------------------------------
 
   const loadCurrentLevel = async () => {
     setLoading(true);
@@ -145,10 +155,13 @@ function FolderView() {
 
     try {
       if (currentPath.length === 0) {
+        // Root level - show libraries (top-level folders)
         await loadLibraries();
       } else if (currentPath.length === 1) {
+        // Library level - show movie/show folders
         await loadItemFolders(currentPath[0]);
       } else if (currentPath.length === 2) {
+        // Item level - show assets
         await loadItemAssets(currentPath[0], currentPath[1]);
       }
     } catch (err) {
@@ -203,7 +216,6 @@ function FolderView() {
     setCurrentPath([]);
     setSearchTerm("");
   };
-
 
   const handleRefresh = async () => {
     showSuccess(null);
@@ -293,6 +305,48 @@ function FolderView() {
     setSelectMode(false);
     setSelectedAssets([]);
     setSelectedFolders([]);
+  };
+
+  // Pagination handlers for assets
+  const loadMoreAssets = () => {
+    setDisplayCountAssets((prev) => prev + itemsPerPageAssets);
+  };
+
+  const loadAllAssets = () => {
+    setDisplayCountAssets(filteredAssets.length);
+  };
+
+  const handleItemsPerPageAssetsChange = (value) => {
+    setItemsPerPageAssets(value);
+    localStorage.setItem("folder-view-assets-per-page", value.toString());
+    setDisplayCountAssets(value);
+  };
+
+  // Pagination handlers for folders
+  const loadMoreFolders = () => {
+    setDisplayCountFolders((prev) => prev + itemsPerPageFolders);
+  };
+
+  const loadAllFolders = () => {
+    setDisplayCountFolders(filteredFolders.length);
+  };
+
+  const handleItemsPerPageFoldersChange = (value) => {
+    setItemsPerPageFolders(value);
+    localStorage.setItem("folder-view-folders-per-page", value.toString());
+    setDisplayCountFolders(value);
+  };
+
+  // Function to calculate dropdown position
+  const calculateDropdownPosition = (ref) => {
+    if (!ref.current) return false;
+
+    const rect = ref.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    // If more space above than below, open upward
+    return spaceAbove > spaceBelow;
   };
 
   const bulkDeleteAssets = async () => {
@@ -415,29 +469,21 @@ function FolderView() {
     await loadCurrentLevel();
   };
 
-
   // Filter folders and assets based on search
   const filteredFolders = folders.filter((folder) =>
     folder.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Calculate folder pagination
-  const totalFolderPages = Math.ceil(filteredFolders.length / pageSize);
-  const paginatedFolders = filteredFolders.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
   );
 
   const filteredAssets = assets.filter((asset) =>
     asset.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Calculate asset pagination
-  const totalAssetPages = Math.ceil(filteredAssets.length / pageSize);
-  const paginatedAssets = filteredAssets.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  // Pagination for displayed items
+  const displayedFolders = filteredFolders.slice(0, displayCountFolders);
+  const hasMoreFolders = filteredFolders.length > displayCountFolders;
+
+  const displayedAssets = filteredAssets.slice(0, displayCountAssets);
+  const hasMoreAssets = filteredAssets.length > displayCountAssets;
 
   const getAssetTypeIcon = (assetName) => {
     const name = assetName.toLowerCase();
@@ -565,102 +611,6 @@ function FolderView() {
     }
   };
 
-
-  // --- Reusable Pagination Component (MODIFIED) ---
-  const PaginationControls = ({
-    currentPage,
-    totalPages,
-    onPageChange,
-    pageSize,
-    onPageSizeChange,
-    pageSizeDropdownOpen,
-    onPageSizeDropdownToggle,
-    pageSizeDropdownRef,
-    pageSizeDropdownUp,
-  }) => {
-    if (totalPages <= 1) return null;
-
-    const handlePrev = () => {
-      onPageChange(Math.max(1, currentPage - 1));
-    };
-
-    const handleNext = () => {
-      onPageChange(Math.min(totalPages, currentPage + 1));
-    };
-
-    return (
-      <div className="flex flex-col sm:flex-row items-center justify-between mt-6 gap-4">
-        {/* Left Side: Page Size Dropdown */}
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-theme-text">
-            {t("folderView.itemsPerPage", "Items per page")}
-          </label>
-          <div className="relative" ref={pageSizeDropdownRef}>
-            <button
-              onClick={onPageSizeDropdownToggle}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-bg text-theme-text border border-theme-border rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all shadow-sm"
-            >
-              <span>{pageSize}</span>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform ${
-                  pageSizeDropdownOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-            {pageSizeDropdownOpen && (
-              <div
-                className={`absolute z-50 right-0 ${
-                  pageSizeDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
-              >
-                {[25, 50, 100, 200, 500].map((value) => (
-                  <button
-                    key={value}
-                    onClick={() => onPageSizeChange(value)}
-                    className={`w-full px-4 py-2 text-sm transition-all text-center ${
-                      pageSize === value
-                        ? "bg-theme-primary text-white"
-                        : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                    }`}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Side: Page Nav */}
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-theme-muted">
-            {t("folderView.paginationPage", {
-              current: currentPage,
-              total: totalPages,
-            })}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={handlePrev}
-              disabled={currentPage === 1}
-              className="px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t("folderView.paginationPrevious", "Previous")}
-            </button>
-            <button
-              onClick={handleNext}
-              disabled={currentPage === totalPages}
-              className="px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t("folderView.paginationNext", "Next")}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  // -----------------------------------------
-
   return (
     <div className="space-y-6">
       <ScrollToButtons />
@@ -752,10 +702,7 @@ function FolderView() {
                     : t("folderView.searchAssets")
                 }
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1); // Reset page on search
-                }}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-theme-bg border border-theme-primary/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-theme-primary text-sm"
               />
             </div>
@@ -771,7 +718,7 @@ function FolderView() {
             />
           )}
 
-          {/* Select Mode Controls */}
+          {/* Select Mode Controls - Show for folders (level 0 or 1) or assets (level 2) */}
           {((currentPath.length < 2 && folders.length > 0) ||
             (currentPath.length === 2 && assets.length > 0)) && (
             <>
@@ -935,8 +882,7 @@ function FolderView() {
           {filteredFolders.length > 0 && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {/* Use paginatedFolders */}
-                {paginatedFolders.map((folder) => {
+                {displayedFolders.map((folder) => {
                   const folderIdentifier = folder.path || folder.name;
                   const isSelected = selectedFolders.includes(folderIdentifier);
                   return (
@@ -955,7 +901,6 @@ function FolderView() {
                           : "border-theme-border hover:border-theme-primary"
                       }`}
                     >
-                      {/* ... (rest of folder content) ... */}
                       {/* Selection Checkbox (visible in select mode) */}
                       {selectMode && (
                         <div className="absolute top-2 right-2 z-10">
@@ -1033,23 +978,103 @@ function FolderView() {
                   );
                 })}
               </div>
-              {/* --- MODIFIED Pagination Controls Call --- */}
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalFolderPages}
-                onPageChange={setCurrentPage}
-                pageSize={pageSize}
-                onPageSizeChange={handlePageSizeChange}
-                pageSizeDropdownOpen={pageSizeDropdownOpen}
-                onPageSizeDropdownToggle={() => {
-                  const shouldOpenUp =
-                    calculateDropdownPosition(pageSizeDropdownRef);
-                  setPageSizeDropdownUp(shouldOpenUp);
-                  setPageSizeDropdownOpen(!pageSizeDropdownOpen);
-                }}
-                pageSizeDropdownRef={pageSizeDropdownRef}
-                pageSizeDropdownUp={pageSizeDropdownUp}
-              />
+
+              {/* Folders Pagination */}
+              {hasMoreFolders && (
+                <div className="mt-8 space-y-6">
+                  {/* Items per page selector */}
+                  <div className="flex justify-center">
+                    <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
+                      <label className="text-sm font-medium text-theme-text">
+                        {t("gallery.itemsPerPage")}:
+                      </label>
+                      <div
+                        className="relative"
+                        ref={itemsPerPageFoldersDropdownRef}
+                      >
+                        <button
+                          onClick={() => {
+                            const shouldOpenUp = calculateDropdownPosition(
+                              itemsPerPageFoldersDropdownRef
+                            );
+                            setItemsPerPageFoldersDropdownUp(shouldOpenUp);
+                            setItemsPerPageFoldersDropdownOpen(
+                              !itemsPerPageFoldersDropdownOpen
+                            );
+                          }}
+                          className="px-4 py-2 bg-theme-bg text-theme-text border border-theme-border rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all cursor-pointer shadow-sm flex items-center gap-2"
+                        >
+                          <span>{itemsPerPageFolders}</span>
+                          <ChevronDown
+                            className={`w-4 h-4 transition-transform ${
+                              itemsPerPageFoldersDropdownOpen
+                                ? "rotate-180"
+                                : ""
+                            }`}
+                          />
+                        </button>
+
+                        {itemsPerPageFoldersDropdownOpen && (
+                          <div
+                            className={`absolute z-50 right-0 ${
+                              itemsPerPageFoldersDropdownUp
+                                ? "bottom-full mb-2"
+                                : "top-full mt-2"
+                            } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
+                          >
+                            {[25, 50, 100, 200, 500].map((value) => (
+                              <button
+                                key={value}
+                                onClick={() => {
+                                  handleItemsPerPageFoldersChange(value);
+                                  setItemsPerPageFoldersDropdownOpen(false);
+                                }}
+                                className={`w-full px-4 py-2 text-sm transition-all text-center ${
+                                  itemsPerPageFolders === value
+                                    ? "bg-theme-primary text-white"
+                                    : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                              >
+                                {value}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Load buttons */}
+                  <div className="flex justify-center gap-4">
+                    <button
+                      onClick={loadMoreFolders}
+                      className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+                    >
+                      <ChevronDown className="w-4 h-4 text-theme-primary" />
+                      <span className="text-theme-text">
+                        {t("gallery.loadMore")}
+                      </span>
+                      <span className="ml-1 px-2 py-0.5 bg-theme-primary/20 rounded-full text-xs font-bold text-theme-primary">
+                        {t("gallery.remaining", {
+                          count: filteredFolders.length - displayCountFolders,
+                        })}
+                      </span>
+                    </button>
+                    <button
+                      onClick={loadAllFolders}
+                      className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+                    >
+                      <ChevronDown className="w-4 h-4 text-theme-primary" />
+                      <span className="text-theme-text">
+                        {t("gallery.loadAll")}
+                      </span>
+                      <span className="ml-1 px-2 py-0.5 bg-theme-primary/20 rounded-full text-xs font-bold text-theme-primary">
+                        {t("gallery.total", { count: filteredFolders.length })}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -1057,8 +1082,7 @@ function FolderView() {
           {filteredAssets.length > 0 && (
             <>
               <div className="asset-grid" style={{ "--grid-size": imageSize }}>
-                {/* Use paginatedAssets */}
-                {paginatedAssets.map((asset) => {
+                {displayedAssets.map((asset) => {
                   const isHorizontal = isHorizontalAsset(asset.name);
                   const isSelected = selectedAssets.includes(asset.path);
                   return (
@@ -1077,7 +1101,6 @@ function FolderView() {
                         }
                       }}
                     >
-                      {/* ... (rest of asset content) ... */}
                       {/* Selection Checkbox (visible in select mode) */}
                       {selectMode && (
                         <div className="absolute top-2 left-2 z-20">
@@ -1173,23 +1196,101 @@ function FolderView() {
                   );
                 })}
               </div>
-              {/* --- MODIFIED Pagination Controls Call --- */}
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalAssetPages}
-                onPageChange={setCurrentPage}
-                pageSize={pageSize}
-                onPageSizeChange={handlePageSizeChange}
-                pageSizeDropdownOpen={pageSizeDropdownOpen}
-                onPageSizeDropdownToggle={() => {
-                  const shouldOpenUp =
-                    calculateDropdownPosition(pageSizeDropdownRef);
-                  setPageSizeDropdownUp(shouldOpenUp);
-                  setPageSizeDropdownOpen(!pageSizeDropdownOpen);
-                }}
-                pageSizeDropdownRef={pageSizeDropdownRef}
-                pageSizeDropdownUp={pageSizeDropdownUp}
-              />
+
+              {/* Assets Pagination */}
+              {hasMoreAssets && (
+                <div className="mt-8 space-y-6">
+                  {/* Items per page selector */}
+                  <div className="flex justify-center">
+                    <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
+                      <label className="text-sm font-medium text-theme-text">
+                        {t("gallery.itemsPerPage")}:
+                      </label>
+                      <div
+                        className="relative"
+                        ref={itemsPerPageAssetsDropdownRef}
+                      >
+                        <button
+                          onClick={() => {
+                            const shouldOpenUp = calculateDropdownPosition(
+                              itemsPerPageAssetsDropdownRef
+                            );
+                            setItemsPerPageAssetsDropdownUp(shouldOpenUp);
+                            setItemsPerPageAssetsDropdownOpen(
+                              !itemsPerPageAssetsDropdownOpen
+                            );
+                          }}
+                          className="px-4 py-2 bg-theme-bg text-theme-text border border-theme-border rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all cursor-pointer shadow-sm flex items-center gap-2"
+                        >
+                          <span>{itemsPerPageAssets}</span>
+                          <ChevronDown
+                            className={`w-4 h-4 transition-transform ${
+                              itemsPerPageAssetsDropdownOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+
+                        {itemsPerPageAssetsDropdownOpen && (
+                          <div
+                            className={`absolute z-50 right-0 ${
+                              itemsPerPageAssetsDropdownUp
+                                ? "bottom-full mb-2"
+                                : "top-full mt-2"
+                            } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
+                          >
+                            {[25, 50, 100, 200, 500].map((value) => (
+                              <button
+                                key={value}
+                                onClick={() => {
+                                  handleItemsPerPageAssetsChange(value);
+                                  setItemsPerPageAssetsDropdownOpen(false);
+                                }}
+                                className={`w-full px-4 py-2 text-sm transition-all text-center ${
+                                  itemsPerPageAssets === value
+                                    ? "bg-theme-primary text-white"
+                                    : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                              >
+                                {value}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Load buttons */}
+                  <div className="flex justify-center gap-4">
+                    <button
+                      onClick={loadMoreAssets}
+                      className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+                    >
+                      <ChevronDown className="w-4 h-4 text-theme-primary" />
+                      <span className="text-theme-text">
+                        {t("gallery.loadMore")}
+                      </span>
+                      <span className="ml-1 px-2 py-0.5 bg-theme-primary/20 rounded-full text-xs font-bold text-theme-primary">
+                        {t("gallery.remaining", {
+                          count: filteredAssets.length - displayCountAssets,
+                        })}
+                      </span>
+                    </button>
+                    <button
+                      onClick={loadAllAssets}
+                      className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+                    >
+                      <ChevronDown className="w-4 h-4 text-theme-primary" />
+                      <span className="text-theme-text">
+                        {t("gallery.loadAll")}
+                      </span>
+                      <span className="ml-1 px-2 py-0.5 bg-theme-primary/20 rounded-full text-xs font-bold text-theme-primary">
+                        {t("gallery.total", { count: filteredAssets.length })}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
 

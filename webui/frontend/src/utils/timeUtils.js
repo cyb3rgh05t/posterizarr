@@ -15,7 +15,7 @@ export const getBrowserTimezone = () => {
 
 /**
  * Parse a date string in multiple formats
- * Supports: ISO format, German format (DD.MM.YYYY HH:MM:SS)
+ * Supports: ISO format, German format (DD.MM.YYYY HH:MM:SS), SQLite UTC format
  *
  * @param {string} dateStr - The date string to parse
  * @returns {Date|null} Parsed Date object or null if invalid
@@ -23,10 +23,17 @@ export const getBrowserTimezone = () => {
 export const parseDateTime = (dateStr) => {
   if (!dateStr) return null;
 
-  // Try ISO format first
-  let date = new Date(dateStr);
-  if (!isNaN(date.getTime())) {
-    return date;
+  // Check if it's a SQLite UTC timestamp format: "YYYY-MM-DD HH:MM:SS"
+  // SQLite CURRENT_TIMESTAMP returns UTC time without Z suffix
+  // Check this FIRST before generic Date parsing to ensure UTC interpretation
+  const sqliteFormat = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/;
+  const sqliteMatch = dateStr.match(sqliteFormat);
+  if (sqliteMatch) {
+    // Add 'Z' to treat it as UTC
+    const date = new Date(dateStr + "Z");
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
   }
 
   // Try German format: "19.10.2025 05:14:22"
@@ -34,10 +41,16 @@ export const parseDateTime = (dateStr) => {
   const match = dateStr.match(germanFormat);
   if (match) {
     const [, day, month, year, hour, minute, second] = match;
-    date = new Date(year, month - 1, day, hour, minute, second);
+    const date = new Date(year, month - 1, day, hour, minute, second);
     if (!isNaN(date.getTime())) {
       return date;
     }
+  }
+
+  // Try ISO format last (for already properly formatted UTC strings with Z)
+  const date = new Date(dateStr);
+  if (!isNaN(date.getTime())) {
+    return date;
   }
 
   return null;

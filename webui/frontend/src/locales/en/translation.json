@@ -87,7 +87,7 @@
       },
       "backup": {
         "title": "Backup Mode",
-        "description": "Backup existing Plex posters"
+        "description": "Backup existing posters"
       },
       "syncJellyfin": {
         "title": "Sync Jellyfin",
@@ -196,18 +196,6 @@
       "important": "Important: Make sure both UseEmby and UsePlex are set to true in your config.json, and that library names match exactly.",
       "cancel": "Cancel",
       "start": "Start Emby Sync"
-    },
-    "backup": {
-      "title": "Backup Mode",
-      "info": "In this mode, the script will download every artwork you have in Plex.",
-      "description": "It uses the values specified in your config.json file to find and save the artwork.",
-      "benefitsTitle": "Benefits of Backup Mode",
-      "step1Title": "Create a Full Backup",
-      "step1Text": "Easily back up all your existing Plex artwork to a local folder specified in your config.",
-      "step2Title": "Prepare for Jellyfin/Emby",
-      "step2Text": "This is handy for creating a second asset folder with Kometa/TCM EXIF data, which can then be used by Jellyfin or Emby.",
-      "cancel": "Cancel",
-      "start": "Start Backup"
     },
     "status": {
       "running": "Script Running",
@@ -585,16 +573,7 @@
     "autoScrollStatus": "Auto-scroll: {{status}}",
     "on": "On",
     "off": "Off",
-    "receivingUpdates": "Receiving live updates",
-    "searchLogs": "Search Logs",
-    "searchPlaceholder": "Type to filter logs...",
-    "filterLevel": "Filter by Level",
-    "allLevels": "All Levels",
-    "noMatchingLogs": "No log entries match your filters.",
-    "adjustFilters": "Try adjusting your search term or level filters.",
-    "loadFull": "Load full log file",
-    "loadingFullLog": "Loading full log file...",
-    "loadedFullLog": "Full log file loaded"
+    "receivingUpdates": "Receiving live updates"
   },
   "libraryExclusion": {
     "configNotFound": "Media server configuration not found",
@@ -828,9 +807,7 @@
     "deleteError": "Error while deleting: {{message}}",
     "bulkDeletePartial": "Deleted {{deleted}} poster(s), but {{failed}} failed.",
     "bulkDeleteSuccess": "Successfully deleted {{count}} poster(s)",
-    "assetReplaced": "Asset replaced successfully!",
-    "selectPage": "Select Page",
-    "deselectPage": "Deselect Page"
+    "assetReplaced": "Asset replaced successfully!"
   },
   "toast": {
     "success": "Success",
@@ -845,8 +822,8 @@
     "migrating": "Migrating...",
     "runMigration": "Run Migration",
     "importing": "Importing...",
+    "loading": "Loading Runtime History...",
     "importJson": "Import JSON",
-	"loading": "Loading...",
     "summary": "Summary (Last {{days}} Days)",
     "days": "{{count}} Days",
     "totalRuns": "Total Runs",
@@ -890,11 +867,6 @@
       "previous": "Previous",
       "next": "Next"
     }
-  },
-  "pagination": {
-    "page": "Page {{page}} • Showing {{count}} entries",
-    "previous": "Previous",
-    "next": "Next"
   },
   "schedulerSettings": {
     "loading": "Loading scheduler settings...",
@@ -1357,6 +1329,7 @@
     "type": "Type",
     "language": "Language",
     "source": "Source",
+    "addedOn": "Added On",
     "viewSource": "View Source",
     "replace": "Replace",
     "replaceTooltip": "Replace this asset",
@@ -1380,14 +1353,7 @@
     "bulkMarkSuccess": "Successfully marked {{count}} asset(s) as resolved",
     "bulkMarkPartial": "Marked {{success}} as resolved, {{failed}} failed",
     "bulkMarkFailed": "Failed to mark assets as resolved",
-    "bulkMarkError": "Error: {{error}}",
-    "addedOn": "Added on",
-    "noAssetsToMark": "No filtered assets to mark as resolved.",
-    "bulkMarkAllFilteredConfirm": "Are you sure you want to mark all {{count}} filtered assets as resolved?\n\nThis will remove them from the 'Unresolved' view. This action cannot be undone easily.",
-    "markAllFilteredTooltip": "Mark all filtered assets as resolved",
-    "markAllFiltered": "Mark All ({{count}}) Resolved",
-    "bulkMarkAllFilteredTitle": "Mark All As Resolved?",
-    "confirmMarkAll": "Confirm & Mark All ({{count}})"
+    "bulkMarkError": "Error: {{error}}"
   },
   "common": {
     "save": "Save",
@@ -1553,8 +1519,8 @@
     "startTime": "Start Time",
     "endTime": "End Time",
     "notificationSent": "Notification Sent",
-    "notes": "Notes",
-    "lastRun": "Last Run"
+    "lastRun": "Last Run",
+    "notes": "Notes"
   },
   "dangerZone": {
     "title": "Danger Zone",
@@ -1624,11 +1590,7 @@
     "deleteMultipleMessage": "Are you sure you want to delete {{count}} selected asset(s)?",
     "deleteAssetMessage": "Are you sure you want to delete this asset?",
     "deleteButton": "Delete",
-    "assetReplaced": "Asset replaced successfully!",
-    "itemsPerPage": "Items per page",
-    "paginationPage": "Page {{current}} of {{total}}",
-    "paginationPrevious": "Previous",
-    "paginationNext": "Next"
+    "assetReplaced": "Asset replaced successfully!"
   },
   "autoTriggers": {
     "header": {

@@ -15,11 +15,7 @@ import {
   X,
   Search,
 } from "lucide-react";
-import {
-  formatDateToLocale,
-  getBrowserTimezone,
-  isTimezoneDifferent,
-} from "../utils/timeUtils";
+import { formatDateToLocale } from "../utils/timeUtils";
 
 const API_URL = "/api";
 const API_PREFIX = "plex-export";
@@ -963,8 +959,8 @@ function PlexExport() {
 
               <div className="pt-4 border-t border-theme">
                 <DetailRow
-				  label={t("plexExport.importedAt", "Imported At")}
-				  value={new Date(selectedItem.created_at).toLocaleString("sv-SE").replace("T", " ")}
+                  label={t("plexExport.importedAt", "Imported At")}
+                  value={formatDateToLocale(selectedItem.created_at)}
                 />
               </div>
             </div>
