@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +156,7 @@ def parse_runtime_from_log(log_path: Path, mode: str = "normal") -> Optional[Dic
 def save_runtime_to_db(log_path: Path, mode: str = "normal"):
     """
     Parse runtime from JSON file (preferred) or log file and save to database
+    This function is now ATOMIC thanks to changes in runtime_database.py
 
     Args:
         log_path: Path to the log file (used to determine JSON file location)
@@ -196,25 +198,10 @@ def save_runtime_to_db(log_path: Path, mode: str = "normal"):
             runtime_data = parse_runtime_from_log(log_path, mode)
 
         if runtime_data:
-            # Check for duplicates based on start/end time
-            # Watcher prevents restart duplicates, this prevents same-data duplicates
-            start_time = runtime_data.get("start_time")
-            end_time = runtime_data.get("end_time")
+            # The database now handles the atomic duplicate check internally.
+            logger.debug(f"Attempting to import: mode={mode}, start={runtime_data.get('start_time')}, end={runtime_data.get('end_time')}")
+            runtime_db.add_runtime_entry(**runtime_data)
 
-            logger.debug(
-                f"Checking for duplicate: mode={mode}, start={start_time}, end={end_time}"
-            )
-
-            if runtime_db.entry_exists(mode, start_time, end_time):
-                logger.info(
-                    f"Runtime entry already exists for {mode} mode (start: {start_time}, end: {end_time}), skipping duplicate import"
-                )
-            else:
-                logger.debug(
-                    f"No duplicate found, importing: mode={mode}, start={start_time}, end={end_time}"
-                )
-                runtime_db.add_runtime_entry(**runtime_data)
-                logger.info(f"Runtime data saved to database for {mode} mode")
         else:
             logger.warning(f"No runtime data to save for {mode} mode")
 
@@ -225,24 +212,7 @@ def save_runtime_to_db(log_path: Path, mode: str = "normal"):
 def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]:
     """
     Parse runtime statistics from a JSON file
-
-    Supported JSON files:
-    - normal.json
-    - manual.json
-    - testing.json
-    - tautulli.json
-    - arr.json
-    - syncjelly.json
-    - syncemby.json
-    - backup.json
-    - scheduled.json
-
-    Args:
-        json_path: Path to the JSON file
-        mode: The run mode (will be inferred from filename if not provided)
-
-    Returns:
-        Dictionary with parsed runtime data or None if parsing failed
+    ... (omitted docstring for brevity) ...
     """
     try:
         if not json_path.exists():
@@ -276,15 +246,11 @@ def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]
         )
 
         # Parse fallback count - support both old and new formats
-        # New format: "Fallbacks": 5 (direct number)
-        # Old format: "Fallbacks": [{...}] (array, count items with Fallback: "true")
         fallback_count = 0
         fallbacks_data = data.get("Fallbacks", 0)
         if isinstance(fallbacks_data, int):
-            # New format: direct number
             fallback_count = fallbacks_data
         elif isinstance(fallbacks_data, list):
-            # Old format: count items with Fallback: "true"
             for item in fallbacks_data:
                 if isinstance(item, dict):
                     fallback_value = str(item.get("Fallback", "false")).lower()
@@ -306,6 +272,29 @@ def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]
         # Parse truncated and text counts (direct numbers in new format)
         truncated_count = data.get("Truncated", 0)
         text_count = data.get("Text", 0)
+
+        # --- START DATE FORMAT FIX ---
+        start_time_raw = data.get("Start time", "")
+        end_time_raw = data.get("End Time", "")
+
+        def reformat_date(date_str):
+            if not date_str:
+                return ""
+            try:
+                # Parse the "DD.MM.YYYY HH:MM:SS" format
+                dt = datetime.strptime(date_str, '%d.%m.%Y %H:%M:%S')
+                # Convert to "YYYY-MM-DDTHH:MM:SS" (ISO format)
+                return dt.isoformat()
+            except (ValueError, TypeError):
+                # If it's already in a good format (like ISO) or is "N/A", return as-is
+                if re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", date_str):
+                    return date_str
+                logger.warning(f"Could not parse date '{date_str}', returning as-is.")
+                return date_str
+
+        start_time_formatted = reformat_date(start_time_raw)
+        end_time_formatted = reformat_date(end_time_raw)
+        # --- END DATE FORMAT FIX ---
 
         # Build the result dictionary
         result = {
@@ -333,8 +322,8 @@ def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]
             "space_saved": data.get("Space saved", ""),
             "script_version": data.get("Script Version", ""),
             "im_version": data.get("IM Version", ""),
-            "start_time": data.get("Start time", ""),
-            "end_time": data.get("End Time", ""),
+            "start_time": start_time_formatted, # Use formatted version
+            "end_time": end_time_formatted,   # Use formatted version
             "log_file": json_path.name,
         }
 
@@ -349,7 +338,6 @@ def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]
     except Exception as e:
         logger.error(f"Error parsing runtime from JSON: {e}")
         return None
-
 
 def _parse_runtime_to_seconds(runtime_str: str) -> int:
     """
@@ -405,6 +393,7 @@ def _parse_runtime_to_seconds(runtime_str: str) -> int:
 def import_json_to_db(logs_dir: Path = None):
     """
     Import runtime data from all JSON files in Logs directory to database
+    This function is now ATOMIC thanks to changes in runtime_database.py
 
     This function looks for:
     - normal.json
@@ -459,10 +448,11 @@ def import_json_to_db(logs_dir: Path = None):
                 runtime_data = parse_runtime_from_json(json_path, mode)
 
                 if runtime_data:
-                    # Import directly - duplicate prevention handled by watcher
+                    # The database now handles the atomic duplicate check.
                     runtime_db.add_runtime_entry(**runtime_data)
                     imported_count += 1
                     logger.info(f"Imported {json_file} to database")
+
 
         logger.info(f"JSON import complete: {imported_count} files imported")
 

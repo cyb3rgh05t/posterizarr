@@ -39,7 +39,37 @@ function ImagePreviewModal({
 }) {
   const { t } = useTranslation();
 
+  // Get the display media type - use type from backend if available, otherwise fallback
+  const getDisplayMediaType = () => {
+    // First priority: use the type field from backend (already determined by database lookup)
+    if (selectedImage?.type) {
+      console.log(
+        `[ImagePreviewModal] Using backend type for ${selectedImage.name}: ${selectedImage.type}`
+      );
+      return selectedImage.type;
+    }
+
+    // Fallback to filename-based detection if type not provided
+    if (getMediaType) {
+      const fallbackType = getMediaType(selectedImage.path, selectedImage.name);
+      console.log(
+        `[ImagePreviewModal] No backend type for ${selectedImage.name}, using fallback: ${fallbackType}`
+      );
+      return fallbackType;
+    }
+
+    console.warn(
+      `[ImagePreviewModal] No type available for ${selectedImage.name}, using default: Asset`
+    );
+    return "Asset";
+  };
+
   if (!selectedImage) return null;
+
+  const displayType = getDisplayMediaType();
+  console.log(
+    `[ImagePreviewModal] Displaying ${selectedImage.name} with type: ${displayType}`
+  );
 
   return (
     <div
@@ -93,7 +123,7 @@ function ImagePreviewModal({
 
             <div className="space-y-4">
               {/* Media Type */}
-              {getMediaType && getTypeColor && (
+              {getTypeColor && (
                 <div>
                   <label className="text-sm text-theme-muted">
                     {t("common.mediaType")}
@@ -101,15 +131,10 @@ function ImagePreviewModal({
                   <div className="mt-1">
                     <span
                       className={`inline-flex items-center gap-1 px-3 py-1.5 rounded border text-sm font-medium ${getTypeColor(
-                        getMediaType(selectedImage.path, selectedImage.name)
+                        displayType
                       )}`}
                     >
-                      {t(
-                        `common.${getMediaType(
-                          selectedImage.path,
-                          selectedImage.name
-                        ).toLowerCase()}`
-                      )}
+                      {displayType}
                     </span>
                   </div>
                 </div>
@@ -141,19 +166,11 @@ function ImagePreviewModal({
                       {t("common.created")}
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
+                      {/* --- THIS IS THE FIX --- */}
                       {selectedImage.created
-                        ? new Date(selectedImage.created * 1000).toLocaleString(
-                            "en-GB",
-                            {
-                              year: "numeric",
-                              month: "2-digit",
-                              day: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                              hour12: false,
-                            }
-                          )
+                        ? new Date(selectedImage.created * 1000)
+                            .toLocaleString("sv-SE")
+                            .replace("T", " ")
                         : formatTimestamp(selectedImage.path)}
                     </p>
                   </div>
@@ -165,17 +182,9 @@ function ImagePreviewModal({
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
                       {selectedImage.modified
-                        ? new Date(
-                            selectedImage.modified * 1000
-                          ).toLocaleString("en-GB", {
-                            year: "numeric",
-                            month: "2-digit",
-                            day: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                            hour12: false,
-                          })
+                        ? new Date(selectedImage.modified * 1000)
+                            .toLocaleString("sv-SE")
+                            .replace("T", " ")
                         : formatTimestamp(selectedImage.path)}
                     </p>
                   </div>
@@ -186,15 +195,7 @@ function ImagePreviewModal({
                       {t("common.lastViewed")}
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
-                      {new Date().toLocaleString("en-GB", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                        hour12: false,
-                      })}
+                      {new Date().toLocaleString("sv-SE").replace("T", " ")}
                     </p>
                   </div>
                 </>

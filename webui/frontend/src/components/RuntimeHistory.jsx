@@ -333,9 +333,10 @@ function RuntimeHistory() {
 
   if (loading) {
     return (
-      <div className="bg-theme-card rounded-xl p-6 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-8 h-8 animate-spin text-theme-primary" />
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-theme-primary mx-auto mb-4" />
+          <p className="text-theme-muted">{t("runtimeHistory.loading")}</p>
         </div>
       </div>
     );
@@ -571,7 +572,7 @@ function RuntimeHistory() {
                     {t("runtimeStats.lastRun")}:
                   </span>
                   <span className="text-sm text-theme-text font-mono">
-                    {formatDateToLocale(summary.latest_run.start_time)}
+                    {new Date(summary.latest_run.start_time).toLocaleString("sv-SE").replace("T", " ")}
                   </span>
                 </div>
               )}
@@ -1097,7 +1098,7 @@ function RuntimeHistory() {
                     title={t("runtimeHistory.clickForDetails")}
                   >
                     <td className="py-3 px-4 text-theme-text text-sm">
-                      {formatDateToLocale(entry.start_time)}
+                      {new Date(entry.start_time).toLocaleString("sv-SE").replace("T", " ")}
                     </td>
                     <td className="py-3 px-4">
                       <span
@@ -1191,7 +1192,7 @@ function RuntimeHistory() {
                     {t("runtimeHistory.detailTitle")}
                   </h2>
                   <p className="text-sm text-theme-muted">
-                    {formatDateToLocale(selectedEntry.start_time)}
+                    {new Date(selectedEntry.start_time).toLocaleString("sv-SE").replace("T", " ")}
                   </p>
                 </div>
               </div>
@@ -1237,7 +1238,7 @@ function RuntimeHistory() {
                         {t("runtimeStats.startTime")}
                       </p>
                       <p className="text-sm font-medium text-theme-text">
-                        {formatDateToLocale(selectedEntry.start_time)}
+                        {new Date(selectedEntry.start_time).toLocaleString("sv-SE").replace("T", " ")}
                       </p>
                     </div>
                   )}
@@ -1247,7 +1248,7 @@ function RuntimeHistory() {
                         {t("runtimeStats.endTime")}
                       </p>
                       <p className="text-sm font-medium text-theme-text">
-                        {formatDateToLocale(selectedEntry.end_time)}
+                        {new Date(selectedEntry.end_time).toLocaleString("sv-SE").replace("T", " ")}
                       </p>
                     </div>
                   )}

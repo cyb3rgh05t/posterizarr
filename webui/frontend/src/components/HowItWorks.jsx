@@ -361,7 +361,7 @@ function HowItWorks() {
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <a
-            href="https://github.com/fscorrupt/Posterizarr/blob/main/walkthrough.md"
+            href="https://fscorrupt.github.io/Posterizarr/walkthrough"
             target="_blank"
             rel="noopener noreferrer"
             className="px-5 py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"

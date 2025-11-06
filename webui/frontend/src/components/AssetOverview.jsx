@@ -14,6 +14,12 @@ import {
   CheckIcon,
   Star,
   ExternalLink,
+  CheckSquare, // Added for pagination/selection
+  Square, // Added for pagination/selection
+  ChevronLeft, // Added for pagination
+  ChevronRight, // Added for pagination
+  CheckCheck, // Added for Mark All button
+  X, // <-- ADDED for new confirm modal
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../context/ToastContext";
@@ -77,9 +83,130 @@ const getProviderBadge = (url) => {
   }
 };
 
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// ++ NEW PAGINATION COMPONENT (Copied from ManualAssets.jsx)
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
+  const { t } = useTranslation();
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      onPageChange(page);
+    }
+  };
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5; // Max 5 page buttons (e.g., 1 ... 4 5 6 ... 10)
+    const half = Math.floor(maxPagesToShow / 2);
+
+    if (totalPages <= maxPagesToShow + 2) {
+      // Show all pages if 7 or less
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Show first page
+      pages.push(1);
+
+      // Ellipsis after first page?
+      if (currentPage > half + 2) {
+        pages.push("...");
+      }
+
+      // Middle pages
+      let start = Math.max(2, currentPage - half);
+      let end = Math.min(totalPages - 1, currentPage + half);
+
+      if (currentPage <= half + 2) {
+        end = maxPagesToShow - 1;
+      }
+      if (currentPage >= totalPages - half - 1) {
+        start = totalPages - maxPagesToShow + 2;
+      }
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      // Ellipsis before last page?
+      if (currentPage < totalPages - half - 1) {
+        pages.push("...");
+      }
+
+      // Show last page
+      pages.push(totalPages);
+    }
+
+    return pages;
+  };
+
+  if (totalPages <= 1) {
+    return null; // Don't show pagination if only one page
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-2 mt-8">
+      <button
+        onClick={() => handlePageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+      >
+        <ChevronLeft className="w-4 h-4" />
+        {t("pagination.previous")}
+      </button>
+
+      {getPageNumbers().map((page, index) =>
+        typeof page === "number" ? (
+          <button
+            key={index}
+            onClick={() => handlePageChange(page)}
+            className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-all shadow-sm ${
+              currentPage === page
+                ? "bg-theme-primary text-white"
+                : "bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text"
+            }`}
+          >
+            {page}
+          </button>
+        ) : (
+          <span
+            key={`ellipsis-${index}`}
+            className="w-10 h-10 flex items-center justify-center text-theme-muted"
+          >
+            ...
+          </span>
+        )
+      )}
+
+      <button
+        onClick={() => handlePageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+      >
+        {t("pagination.next")}
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// ++ END OF PAGINATION COMPONENT
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 // Asset Row Component - Memoized to prevent unnecessary re-renders
 const AssetRow = React.memo(
-  ({ asset, tags, showName, onNoEditsNeeded, onUnresolve, onReplace }) => {
+  ({
+    asset,
+    tags,
+    showName,
+    onNoEditsNeeded,
+    onUnresolve,
+    onReplace,
+    isSelected,
+    onToggleSelection,
+    showCheckbox,
+  }) => {
     const { t } = useTranslation();
     const [logoError, setLogoError] = useState(false);
 
@@ -98,81 +225,116 @@ const AssetRow = React.memo(
     return (
       <div className="bg-theme-bg border border-theme rounded-lg p-4 hover:border-theme-primary/50 transition-colors">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-theme-text break-words">
-              {showName ? (
-                <>
-                  <span className="text-theme-primary">{showName}</span>
-                  <span className="text-theme-muted mx-2">|</span>
-                  <span>{asset.Title}</span>
-                </>
-              ) : (
-                asset.Title
-              )}
-            </h3>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-sm text-theme-muted">
-              <span className="font-medium">{t("assetOverview.type")}:</span>
-              <span className="bg-theme-card px-2 py-0.5 rounded">
-                {asset.Type || "Unknown"}
-              </span>
-              <span className="hidden sm:inline">•</span>
-              <span className="font-medium">
-                {t("assetOverview.language")}:
-              </span>
-              <span className="bg-theme-card px-2 py-0.5 rounded">
-                {asset.Language &&
-                asset.Language !== "false" &&
-                asset.Language !== false
-                  ? asset.Language
-                  : "Unknown"}
-              </span>
-              <span className="hidden sm:inline">•</span>
-              <span className="font-medium">{t("assetOverview.source")}:</span>
-              {asset.DownloadSource &&
-              asset.DownloadSource !== "false" &&
-              asset.DownloadSource !== false ? (
-                <a
-                  href={asset.DownloadSource}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
-                  title={asset.DownloadSource}
-                >
-                  {badge.logo && !logoError ? (
-                    <img
-                      src={badge.logo}
-                      alt={badge.name}
-                      className="h-[35px] object-contain"
-                      onError={() => setLogoError(true)}
-                    />
-                  ) : (
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${badge.color}`}
-                    >
-                      {badge.name}
-                    </span>
-                  )}
-                  <ExternalLink className="w-3 h-3 opacity-60" />
-                </a>
-              ) : (
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${badge.color}`}
-                >
-                  {badge.name}
-                </span>
-              )}
-            </div>
+          {/* Checkbox Column */}
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            {showCheckbox && (
+              <div className="flex items-center pt-1">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleSelection(asset.id)}
+                  className="w-4 h-4 rounded border-theme-muted bg-theme-bg text-theme-primary focus:ring-2 focus:ring-theme-primary focus:ring-offset-0 cursor-pointer"
+                  title={t("assetOverview.selectAsset")}
+                />
+              </div>
+            )}
 
-            {/* Tags */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              {tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${tag.color}`}
-                >
-                  {tag.label}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-semibold text-theme-text break-words">
+                {showName ? (
+                  <>
+                    <span className="text-theme-primary">{showName}</span>
+                    <span className="text-theme-muted mx-2">|</span>
+                    <span>{asset.Title}</span>
+                  </>
+                ) : (
+                  asset.Title
+                )}
+              </h3>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-sm text-theme-muted">
+                <span className="font-medium">{t("assetOverview.type")}:</span>
+                <span className="bg-theme-card px-2 py-0.5 rounded">
+                  {asset.Type || "Unknown"}
                 </span>
-              ))}
+                <span className="hidden sm:inline">•</span>
+                <span className="font-medium">
+                  {t("assetOverview.language")}:
+                </span>
+                <span className="bg-theme-card px-2 py-0.5 rounded">
+                  {asset.Language &&
+                  asset.Language !== "false" &&
+                  asset.Language !== false
+                    ? asset.Language
+                    : "Unknown"}
+                </span>
+                <span className="hidden sm:inline">•</span>
+                <span className="font-medium">
+                  {t("assetOverview.source")}:
+                </span>
+                {asset.DownloadSource &&
+                asset.DownloadSource !== "false" &&
+                asset.DownloadSource !== false ? (
+                  <a
+                    href={asset.DownloadSource}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
+                    title={asset.DownloadSource}
+                  >
+                    {badge.logo && !logoError ? (
+                      <img
+                        src={badge.logo}
+                        alt={badge.name}
+                        className="h-[35px] object-contain"
+                        onError={() => setLogoError(true)}
+                      />
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${badge.color}`}
+                      >
+                        {badge.name}
+                      </span>
+                    )}
+                    <ExternalLink className="w-3 h-3 opacity-60" />
+                  </a>
+                ) : (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${badge.color}`}
+                  >
+                    {badge.name}
+                  </span>
+                )}
+
+                {/* Added timestamp */}
+                {asset.created_at && (
+                  <>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="font-medium">
+                      {t("assetOverview.addedOn")}:
+                    </span>
+                    <span
+                      className="bg-theme-card px-2 py-0.5 rounded"
+                      title={asset.created_at}
+                    >
+                      {new Date(asset.created_at)
+                        .toLocaleString("sv-SE")
+                        .replace("T", " ")}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Tags */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${tag.color}`}
+                  >
+                    {tag.label}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -232,23 +394,40 @@ const AssetOverview = () => {
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showReplacer, setShowReplacer] = useState(false);
 
+  // PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(() => {
+    const saved = localStorage.getItem("asset-overview-items-per-page"); // Use unique key
+    return saved ? parseInt(saved) : 25;
+  });
+  // END PAGINATION STATE
+
+  // Selection state for bulk actions
+  const [selectedAssetIds, setSelectedAssetIds] = useState(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false); // <-- NEW: For confirm modal
+
   // Dropdown states
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [libraryDropdownOpen, setLibraryDropdownOpen] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false); // New dropdown state
+  const [itemsPerPageDropdownOpen, setItemsPerPageDropdownOpen] =
+    useState(false); // New
 
   // Dropdown position states (true = opens upward, false = opens downward)
   const [typeDropdownUp, setTypeDropdownUp] = useState(false);
   const [libraryDropdownUp, setLibraryDropdownUp] = useState(false);
   const [categoryDropdownUp, setCategoryDropdownUp] = useState(false);
   const [statusDropdownUp, setStatusDropdownUp] = useState(false); // New dropdown position
+  const [itemsPerPageDropdownUp, setItemsPerPageDropdownUp] = useState(false); // New
 
   // Refs for click outside detection
   const typeDropdownRef = useRef(null);
   const libraryDropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null);
   const statusDropdownRef = useRef(null); // New ref
+  const itemsPerPageDropdownRef = useRef(null); // New
 
   // Fetch data from API
   const fetchData = async () => {
@@ -269,6 +448,19 @@ const AssetOverview = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Clear selection and reset page when filters change
+  useEffect(() => {
+    setSelectedAssetIds(new Set());
+    setCurrentPage(1); // Reset to page 1
+  }, [
+    searchQuery,
+    selectedType,
+    selectedLibrary,
+    selectedCategory,
+    selectedStatus,
+    itemsPerPage, // Reset page when itemsPerPage changes
+  ]);
 
   // Helper function to parse clean show name from Rootfolder
   const parseShowName = (rootfolder) => {
@@ -323,6 +515,13 @@ const AssetOverview = () => {
         !statusDropdownRef.current.contains(event.target)
       ) {
         setStatusDropdownOpen(false);
+      }
+      // New: Click outside for itemsPerPage dropdown
+      if (
+        itemsPerPageDropdownRef.current &&
+        !itemsPerPageDropdownRef.current.contains(event.target)
+      ) {
+        setItemsPerPageDropdownOpen(false);
       }
     };
 
@@ -725,6 +924,249 @@ const AssetOverview = () => {
     }
   };
 
+  // Items per page handler
+  const handleItemsPerPageChange = (value) => {
+    setItemsPerPage(value);
+    localStorage.setItem("asset-overview-items-per-page", value.toString());
+    setCurrentPage(1); // Reset to first page
+  };
+
+  // Handle toggling selection of a single asset
+  const handleToggleSelection = (assetId) => {
+    setSelectedAssetIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(assetId)) {
+        newSet.delete(assetId);
+      } else {
+        newSet.add(assetId);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle selecting/deselecting all filtered assets
+  const handleSelectAll = () => {
+    // This now refers to displayedAssets, which is calculated below
+    if (
+      selectedAssetIds.size === displayedAssets.length &&
+      displayedAssets.length > 0
+    ) {
+      // Deselect all
+      setSelectedAssetIds(new Set());
+    } else {
+      // Select all *displayed* assets
+      setSelectedAssetIds(new Set(displayedAssets.map((asset) => asset.id)));
+    }
+  };
+
+  // Handle bulk mark as resolved
+  const handleBulkMarkAsResolved = async () => {
+    if (selectedAssetIds.size === 0) return;
+
+    setIsBulkProcessing(true);
+    // Note: We use allAssets here to find the assets by ID, not just displayedAssets
+    const selectedAssets = allAssets.filter((asset) =>
+      selectedAssetIds.has(asset.id)
+    );
+
+    console.log(
+      `[AssetOverview] Bulk marking ${selectedAssets.length} assets as resolved`
+    );
+
+    try {
+      let successCount = 0;
+      let failCount = 0;
+
+      // Process each selected asset
+      for (const asset of selectedAssets) {
+        try {
+          const updateRecord = {
+            Title: asset.Title,
+            Type: asset.Type || null,
+            Rootfolder: asset.Rootfolder || null,
+            LibraryName: asset.LibraryName || null,
+            Language: asset.Language || null,
+            Fallback: asset.Fallback || null,
+            TextTruncated: asset.TextTruncated || null,
+            DownloadSource: asset.DownloadSource || null,
+            FavProviderLink: asset.FavProviderLink || null,
+            Manual: "Yes",
+          };
+
+          const response = await fetch(`/api/imagechoices/${asset.id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(updateRecord),
+          });
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            failCount++;
+            console.error(
+              `Failed to update asset ${asset.id}:`,
+              await response.text()
+            );
+          }
+        } catch (error) {
+          failCount++;
+          console.error(`Error updating asset ${asset.id}:`, error);
+        }
+      }
+
+      // Clear selection after processing
+      setSelectedAssetIds(new Set());
+
+      // Refresh data
+      await fetchData();
+
+      // Trigger event to update sidebar badge count
+      window.dispatchEvent(new Event("assetReplaced"));
+
+      // Show result message
+      if (successCount > 0 && failCount === 0) {
+        showSuccess(
+          t("assetOverview.bulkMarkSuccess", { count: successCount })
+        );
+      } else if (successCount > 0 && failCount > 0) {
+        showSuccess(
+          t("assetOverview.bulkMarkPartial", {
+            success: successCount,
+            failed: failCount,
+          })
+        );
+      } else {
+        showError(t("assetOverview.bulkMarkFailed"));
+      }
+    } catch (error) {
+      console.error("[AssetOverview] Error in bulk mark as resolved:", error);
+      showError(t("assetOverview.bulkMarkError", { error: error.message }));
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ++ REFACTORED: Bulk mark ALL FILTERED (split for modal)
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  // STEP 1: This is called by the "Mark All ({{count}}) Resolved" button
+  const handleBulkMarkAllFilteredAsResolved = () => {
+    const assetsToProcess = filteredAssets; // Get the currently filtered list
+
+    if (assetsToProcess.length === 0) {
+      showError(
+        t("assetOverview.noAssetsToMark", "No filtered assets to mark as resolved.")
+      );
+      return;
+    }
+
+    // If assets exist, open the confirmation modal
+    setIsConfirmModalOpen(true);
+  };
+
+  // STEP 2: This is called by the "Confirm" button INSIDE the modal
+  const runBulkMarkAllFilteredResolved = async () => {
+    setIsConfirmModalOpen(false); // Close the modal
+
+    const assetsToProcess = filteredAssets; // Get the list again
+
+    setIsBulkProcessing(true);
+    console.log(
+      `[AssetOverview] Bulk marking all ${assetsToProcess.length} filtered assets as resolved`
+    );
+
+    try {
+      let successCount = 0;
+      let failCount = 0;
+
+      // Process each filtered asset
+      for (const asset of assetsToProcess) {
+        // Check if it's already resolved (e.g., if filter is "All")
+        const isResolved =
+          asset.Manual === "Yes" ||
+          asset.Manual === "true" ||
+          asset.Manual === true;
+
+        if (isResolved) {
+          successCount++; // Count it as a "success"
+          continue;
+        }
+
+        try {
+          const updateRecord = {
+            Title: asset.Title,
+            Type: asset.Type || null,
+            Rootfolder: asset.Rootfolder || null,
+            LibraryName: asset.LibraryName || null,
+            Language: asset.Language || null,
+            Fallback: asset.Fallback || null,
+            TextTruncated: asset.TextTruncated || null,
+            DownloadSource: asset.DownloadSource || null,
+            FavProviderLink: asset.FavProviderLink || null,
+            Manual: "Yes", // Mark as resolved
+          };
+
+          const response = await fetch(`/api/imagechoices/${asset.id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(updateRecord),
+          });
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            failCount++;
+            console.error(
+              `Failed to update asset ${asset.id}:`,
+              await response.text()
+            );
+          }
+        } catch (error) {
+          failCount++;
+          console.error(`Error updating asset ${asset.id}:`, error);
+        }
+      }
+
+      // Clear selection just in case
+      setSelectedAssetIds(new Set());
+
+      // Refresh data
+      await fetchData();
+
+      // Trigger event to update sidebar badge count
+      window.dispatchEvent(new Event("assetReplaced"));
+
+      // Show result message
+      if (successCount > 0 && failCount === 0) {
+        showSuccess(
+          t("assetOverview.bulkMarkSuccess", { count: successCount })
+        );
+      } else if (successCount > 0 && failCount > 0) {
+        showSuccess(
+          t("assetOverview.bulkMarkPartial", {
+            success: successCount,
+            failed: failCount,
+          })
+        );
+      } else {
+        showError(t("assetOverview.bulkMarkFailed"));
+      }
+    } catch (error) {
+      console.error("[AssetOverview] Error in bulk mark all filtered:", error);
+      showError(t("assetOverview.bulkMarkError", { error: error.message }));
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ++ END OF REFACTORED FUNCTIONS
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
   // Get all assets from all categories
   const allAssets = useMemo(() => {
     if (!data) return [];
@@ -942,6 +1384,14 @@ const AssetOverview = () => {
     categoryCards,
   ]);
 
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredAssets.length / itemsPerPage);
+  const displayedAssets = filteredAssets.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  // END: Pagination Logic
+
   // Get tags for an asset
   const getAssetTags = (asset) => {
     const tags = [];
@@ -1133,19 +1583,8 @@ const AssetOverview = () => {
 
       {/* Filters */}
       <div className="bg-theme-card border border-theme rounded-lg p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Search */}
-          <div className="relative md:col-span-2 lg:col-span-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
-            <input
-              type="text"
-              placeholder={t("assetOverview.searchPlaceholder")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary"
-            />
-          </div>
-
+        {/* First Row: 4 Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {/* Status Filter */}
           <div className="relative" ref={statusDropdownRef}>
             <button
@@ -1362,10 +1801,62 @@ const AssetOverview = () => {
             )}
           </div>
         </div>
+
+        {/* Second Row: Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
+          <input
+            type="text"
+            placeholder={t("assetOverview.searchPlaceholder")}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary"
+          />
+        </div>
       </div>
 
       {/* Assets Grid */}
       <div className="bg-theme-card border border-theme rounded-lg p-6">
+        {/* Bulk Action Toolbar - Shows when items are selected */}
+        {selectedAssetIds.size > 0 && (
+          <div className="mb-4 p-4 bg-theme-primary/10 border border-theme-primary rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <CheckIcon className="w-5 h-5 text-theme-primary" />
+              <span className="text-theme-text font-medium">
+                {t("assetOverview.selectedCount", {
+                  count: selectedAssetIds.size,
+                })}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBulkMarkAsResolved}
+                disabled={isBulkProcessing}
+                className="flex items-center gap-2 px-4 py-2 bg-theme-primary hover:bg-theme-primary/80 disabled:bg-theme-primary/50 rounded-lg text-white font-medium transition-all shadow-sm disabled:cursor-not-allowed"
+              >
+                {isBulkProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t("assetOverview.processing")}
+                  </>
+                ) : (
+                  <>
+                    <CheckIcon className="w-4 h-4" />
+                    {t("assetOverview.markSelectedAsResolved")}
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setSelectedAssetIds(new Set())}
+                disabled={isBulkProcessing}
+                className="px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {t("assetOverview.clearSelection")}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-theme-text">
             {selectedCategory === "All Categories"
@@ -1375,13 +1866,67 @@ const AssetOverview = () => {
               ({filteredAssets.length})
             </span>
           </h2>
-          <button
-            onClick={fetchData}
-            className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
-          >
-            <RefreshCw className="w-4 h-4 text-theme-primary" />
-            <span className="text-theme-text">{t("common.refresh")}</span>
-          </button>
+
+          <div className="flex items-center gap-2">
+            {/* Select All Button */}
+            {displayedAssets.length > 0 && (
+              <button
+                onClick={handleSelectAll}
+                className="flex items-center gap-2 px-4 py-2 bg-theme-primary hover:bg-theme-primary/80 rounded-lg text-sm font-medium transition-all shadow-sm"
+                title={t(
+                  selectedAssetIds.size === displayedAssets.length
+                    ? "gallery.deselectPage"
+                    : "gallery.selectPage"
+                )}
+              >
+                {selectedAssetIds.size === displayedAssets.length ? (
+                  <Square className="w-4 h-4 text-white" />
+                ) : (
+                  <CheckSquare className="w-4 h-4 text-white" />
+                )}
+                <span className="text-white">
+                  {selectedAssetIds.size === displayedAssets.length
+                    ? t("gallery.deselectPage")
+                    : t("gallery.selectPage")}
+                </span>
+              </button>
+            )}
+
+            {/* Mark All Filtered as Resolved */}
+            {filteredAssets.length > 0 && (
+              <button
+                onClick={handleBulkMarkAllFilteredAsResolved}
+                disabled={isBulkProcessing}
+                className="flex items-center gap-2 px-4 py-2 bg-theme-primary/80 hover:bg-theme-primary disabled:bg-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm text-white"
+                title={t(
+                  "assetOverview.markAllFilteredTooltip",
+                  "Mark all filtered assets as resolved"
+                )}
+              >
+                {isBulkProcessing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCheck className="w-4 h-4 text-white" />
+                )}
+                <span className="text-white">
+                  {t(
+                    "assetOverview.markAllFiltered",
+                    `Mark All (${filteredAssets.length}) Resolved`,
+                    { count: filteredAssets.length }
+                  )}
+                </span>
+              </button>
+            )}
+            {/* END NEW BUTTON */}
+
+            <button
+              onClick={fetchData}
+              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+            >
+              <RefreshCw className="w-4 h-4 text-theme-primary" />
+              <span className="text-theme-text">{t("common.refresh")}</span>
+            </button>
+          </div>
         </div>
 
         {filteredAssets.length === 0 ? (
@@ -1393,7 +1938,7 @@ const AssetOverview = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredAssets.map((asset) => {
+            {displayedAssets.map((asset) => {
               const tags = getAssetTags(asset);
 
               // Parse show name for episodes and titlecards only (not seasons)
@@ -1414,12 +1959,151 @@ const AssetOverview = () => {
                   onNoEditsNeeded={handleNoEditsNeeded}
                   onReplace={handleReplace}
                   onUnresolve={handleUnresolve}
+                  isSelected={selectedAssetIds.has(asset.id)}
+                  onToggleSelection={handleToggleSelection}
+                  showCheckbox={selectedAssetIds.size > 0 || isBulkProcessing}
                 />
               );
             })}
           </div>
         )}
+
+        {/* Pagination */}
+        {(totalPages > 1 || filteredAssets.length > itemsPerPage) && (
+          <div className="mt-8 space-y-6">
+            <div className="flex justify-center">
+              <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-bg border border-theme-border rounded-xl shadow-md">
+                <label className="text-sm font-medium text-theme-text">
+                  {t("gallery.itemsPerPage")}:
+                </label>
+                <div className="relative" ref={itemsPerPageDropdownRef}>
+                  <button
+                    onClick={() => {
+                      const shouldOpenUp = calculateDropdownPosition(
+                        itemsPerPageDropdownRef
+                      );
+                      setItemsPerPageDropdownUp(shouldOpenUp);
+                      setItemsPerPageDropdownOpen(!itemsPerPageDropdownOpen);
+                    }}
+                    className="px-4 py-2 bg-theme-card text-theme-text border border-theme rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all cursor-pointer shadow-sm flex items-center gap-2"
+                  >
+                    <span>{itemsPerPage}</span>
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform ${
+                        itemsPerPageDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  {itemsPerPageDropdownOpen && (
+                    <div
+                      className={`absolute z-50 right-0 ${
+                        itemsPerPageDropdownUp
+                          ? "bottom-full mb-2"
+                          : "top-full mt-2"
+                      } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
+                    >
+                      {[25, 50, 100, 200, 500].map((value) => (
+                        <button
+                          key={value}
+                          onClick={() => {
+                            handleItemsPerPageChange(value);
+                            setItemsPerPageDropdownOpen(false);
+                          }}
+                          className={`w-full px-4 py-2 text-sm transition-all text-center ${
+                            itemsPerPage === value
+                              ? "bg-theme-primary text-white"
+                              : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
+                          }`}
+                        >
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        )}
       </div>
+
+      {/* NEW CONFIRMATION MODAL */}
+      {isConfirmModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80"
+          onClick={() => !isBulkProcessing && setIsConfirmModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-lg p-6 bg-theme-card border border-theme rounded-lg shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full bg-red-500/10 border border-red-500/20">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold text-theme-text">
+                  {t(
+                    "assetOverview.bulkMarkAllFilteredTitle",
+                    "Mark All As Resolved?"
+                  )}
+                </h3>
+                <p className="mt-2 text-theme-muted whitespace-pre-wrap">
+                  {t(
+                    "assetOverview.bulkMarkAllFilteredConfirm",
+                    `Are you sure you want to mark all ${filteredAssets.length} filtered assets as resolved?\n\nThis will remove them from the 'Unresolved' view. This action cannot be undone easily.`,
+                    { count: filteredAssets.length }
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => !isBulkProcessing && setIsConfirmModalOpen(false)}
+                className="absolute top-4 right-4 text-theme-muted hover:text-theme-text transition-colors"
+                disabled={isBulkProcessing}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setIsConfirmModalOpen(false)}
+                disabled={isBulkProcessing}
+                className="px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text text-sm font-medium hover:bg-theme-hover hover:border-theme-primary/50 transition-all shadow-sm disabled:opacity-50"
+              >
+                {t("common.cancel", "Cancel")}
+              </button>
+              <button
+                onClick={runBulkMarkAllFilteredResolved}
+                disabled={isBulkProcessing}
+                className="flex items-center gap-2 px-4 py-2 bg-theme-primary hover:bg-theme-primary/80 disabled:bg-theme-primary/50 rounded-lg text-white text-sm font-medium transition-all shadow-sm disabled:cursor-not-allowed"
+              >
+                {isBulkProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t("assetOverview.processing", "Processing...")}
+                  </>
+                ) : (
+                  <>
+                    <CheckCheck className="w-4 h-4" />
+                    {t(
+                      "assetOverview.confirmMarkAll",
+                      "Confirm & Mark All ({{count}})",
+                      { count: filteredAssets.length }
+                    )}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* END NEW CONFIRMATION MODAL */}
 
       {/* Asset Replacer Modal */}
       {showReplacer && selectedAsset && (

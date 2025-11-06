@@ -511,6 +511,7 @@ function RunModes() {
   // Sync Modal States
   const [showJellyfinSyncModal, setShowJellyfinSyncModal] = useState(false);
   const [showEmbySyncModal, setShowEmbySyncModal] = useState(false);
+  const [showBackupModeModal, setShowBackupModeModal] = useState(false);
 
   // TMDB Poster Search State (now multi-provider)
   const [tmdbSearch, setTmdbSearch] = useState({
@@ -683,7 +684,12 @@ function RunModes() {
 
   const runScript = async (mode) => {
     if (status.running) {
-      showError(t("runModes.scriptRunning"));
+      showError(
+        `${t("runModes.scriptRunning")} - ${t("runModes.status.mode")}: ${
+          status.current_mode.charAt(0).toUpperCase() +
+          status.current_mode.slice(1)
+        }`
+      );
       return;
     }
 
@@ -696,7 +702,11 @@ function RunModes() {
       const data = await response.json();
 
       if (data.success) {
-        showSuccess(t("runModes.startedMode", { mode }));
+        showSuccess(
+          t("runModes.startedMode", {
+            mode: mode.charAt(0).toUpperCase() + mode.slice(1),
+          })
+        );
         fetchStatus();
 
         const logFile = getLogFileForMode(mode);
@@ -725,7 +735,12 @@ function RunModes() {
 
   const runManualMode = async () => {
     if (status.running) {
-      showError(t("runModes.scriptRunning"));
+      showError(
+        `${t("runModes.scriptRunning")} - ${t("runModes.status.mode")}: ${
+          status.current_mode.charAt(0).toUpperCase() +
+          status.current_mode.slice(1)
+        }`
+      );
       return;
     }
 
@@ -1252,7 +1267,7 @@ function RunModes() {
             {/* Documentation Link */}
             <div className="pt-4 border-t-2 border-theme">
               <a
-                href="https://github.com/fscorrupt/Posterizarr?tab=readme-ov-file#sync-modes"
+                href="https://fscorrupt.github.io/Posterizarr/modes/#sync-modessync-modes"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center px-6 py-3 bg-theme-bg hover:bg-theme-hover border border-theme rounded-lg font-medium transition-all text-theme-text shadow-lg"
@@ -1389,7 +1404,7 @@ function RunModes() {
             {/* Documentation Link */}
             <div className="pt-4 border-t-2 border-theme">
               <a
-                href="https://github.com/fscorrupt/Posterizarr?tab=readme-ov-file#sync-modes"
+                href="https://fscorrupt.github.io/Posterizarr/modes/#sync-modessync-modes"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center px-6 py-3 bg-theme-bg hover:bg-theme-hover border border-theme rounded-lg font-medium transition-all text-theme-text shadow-lg"
@@ -1415,6 +1430,117 @@ function RunModes() {
             >
               <RefreshCw className="w-5 h-5 mr-2" />
               {t("runModes.emby.start")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Backup Mode Modal Component
+  const BackupModeModal = () => {
+    if (!showBackupModeModal) return null;
+
+    const startBackup = () => {
+      setShowBackupModeModal(false);
+      runScript("backup");
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-theme-card border border-theme-primary rounded-xl max-w-2xl w-full shadow-2xl animate-in fade-in duration-200">
+          {/* Header */}
+          <div className="bg-theme-primary px-6 py-4 rounded-t-xl flex items-center justify-between">
+            <div className="flex items-center">
+              <Save className="w-6 h-6 mr-3 text-white" />
+              <h3 className="text-xl font-bold text-white">
+                {t("runModes.backup.title")}
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowBackupModeModal(false)}
+              className="text-white/80 hover:text-white transition-all p-1 hover:bg-white/10 rounded"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 space-y-4">
+            <div className="bg-orange-900/20 border-l-4 border-orange-500 p-4 rounded">
+              <p className="text-orange-200 font-medium mb-2">
+                {t("runModes.backup.info")}
+              </p>
+              <p className="text-orange-100 text-sm">
+                {t("runModes.backup.description")}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold text-theme-primary text-lg">
+                {t("runModes.backup.benefitsTitle")}
+              </h4>
+
+              <ul className="space-y-3 text-theme-text">
+                <li className="flex">
+                  <span className="bg-theme-primary text-white rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0 text-sm font-bold">
+                    1
+                  </span>
+                  <div>
+                    <strong className="text-theme-primary">
+                      {t("runModes.backup.step1Title")}
+                    </strong>
+                    <p className="text-sm text-theme-muted mt-1">
+                      {t("runModes.backup.step1Text")}
+                    </p>
+                  </div>
+                </li>
+
+                <li className="flex">
+                  <span className="bg-theme-primary text-white rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0 text-sm font-bold">
+                    2
+                  </span>
+                  <div>
+                    <strong className="text-theme-primary">
+                      {t("runModes.backup.step2Title")}
+                    </strong>
+                    <p className="text-sm text-theme-muted mt-1">
+                      {t("runModes.backup.step2Text")}
+                    </p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            {/* Documentation Link */}
+            <div className="pt-4 border-t-2 border-theme">
+              <a
+                href="https://fscorrupt.github.io/Posterizarr/modes/#backup-mode"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center px-6 py-3 bg-theme-bg hover:bg-theme-hover border border-theme rounded-lg font-medium transition-all text-theme-text shadow-lg"
+              >
+                <ExternalLink className="w-5 h-5 mr-2" />
+                {t("runModes.viewDocumentation")}
+              </a>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="bg-theme-bg px-6 py-4 rounded-b-xl flex justify-between border-t-2 border-theme">
+            <button
+              onClick={() => setShowBackupModeModal(false)}
+              className="px-6 py-2 bg-theme-card hover:bg-theme-hover border border-theme rounded-lg font-medium transition-all"
+            >
+              {t("runModes.backup.cancel")}
+            </button>
+            <button
+              onClick={startBackup}
+              disabled={loading || status.running}
+              className="px-6 py-2 bg-theme-primary hover:bg-theme-primary/90 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-all text-white flex items-center shadow-lg"
+            >
+              <RefreshCw className="w-5 h-5 mr-2" />
+              {t("runModes.backup.start")}
             </button>
           </div>
         </div>
@@ -1535,6 +1661,7 @@ function RunModes() {
 
       <JellyfinSyncModal />
       <EmbySyncModal />
+      <BackupModeModal />
 
       {/* TMDB Modal - Now with stable props */}
       <TMDBPosterSearchModal
@@ -1557,7 +1684,9 @@ function RunModes() {
               </div>
               {status.current_mode && (
                 <div className="text-xs text-theme-muted">
-                  {t("runModes.status.mode")} {status.current_mode}
+                  {t("runModes.status.mode")}{" "}
+                  {status.current_mode.charAt(0).toUpperCase() +
+                    status.current_mode.slice(1)}
                 </div>
               )}
             </div>
@@ -1632,7 +1761,7 @@ function RunModes() {
 
           {/* Backup Mode */}
           <button
-            onClick={() => runScript("backup")}
+            onClick={() => setShowBackupModeModal(true)}
             disabled={loading || status.running}
             className="flex flex-col items-center justify-center p-6 bg-theme-hover hover:bg-theme-primary/20 disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 rounded-lg border border-theme-primary/30 hover:border-theme-primary transition-all group"
           >
@@ -2411,7 +2540,7 @@ function RunModes() {
               {/* Documentation Link */}
               <div className="mt-4 pt-4 border-t border-blue-500/30">
                 <a
-                  href="https://github.com/fscorrupt/Posterizarr#manual-mode-semi-automated"
+                  href="https://fscorrupt.github.io/Posterizarr/modes/#manual-mode-semi-automated"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 rounded-lg font-medium transition-all text-blue-100 hover:text-white"

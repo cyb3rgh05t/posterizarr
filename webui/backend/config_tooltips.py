@@ -57,6 +57,7 @@ CONFIG_TOOLTIPS = {
     "BackupPath": "Path to store/download Plex posters when using the backup mode",
     "ManualAssetPath": "If assets are placed in this directory with the exact naming convention, they will be preferred (must follow same naming convention as /assets)",
     "SkipAddText": "If set to true, Posterizarr will skip adding text to the poster if it is flagged as a 'Poster with text' by the provider",
+    "SkipAddTextAndOverlay": "If set to true, Posterizarr will skip adding text/overlay to the poster if it is flagged as a 'Poster with text' by the provider",
     "FollowSymlink": "If set to true, Posterizarr will follow symbolic links in the specified directories during hashtable creation",
     "PlexUpload": "If set to true, Posterizarr will directly upload the artwork to Plex (handy if you do not use Kometa)",
     "ForceRunningDeletion": "If set to true, Posterizarr will automatically delete the Running File. WARNING: May result in multiple concurrent runs sharing the same temp directory",
@@ -95,6 +96,7 @@ CONFIG_TOOLTIPS = {
     "AutoUpdateIM": "Set to true to Auto-Update ImageMagick Portable Version (Does not work with Docker/Unraid). Warning: Untested versions may break things",
     "NewLineOnSpecificSymbols": "Set to true to enable automatic insertion of a newline character at each occurrence of specific symbols in NewLineSymbols within the title text",
     "NewLineSymbols": "A list of symbols that will trigger a newline insertion when NewLineOnSpecificSymbols is true. Separate each symbol with comma (e.g., ' - ', ':')",
+    "SymbolsToKeepOnNewLine": "A list of symbols that trigger a newline insertion but are not replaced by the NewLineOnSpecificSymbols setting. This only applies if the symbol is also included in NewLineSymbols. Separate each symbol with a comma (e.g., '-', ':')",
     "DisableHashValidation": "Set to true to skip hash validation (Default: false). Note: This may produce bloat, as every item will be re-uploaded to media servers",
     "DisableOnlineAssetFetch": "Set to true to skip all online lookups and use only locally available assets (Default: false)",
     # OverlayPart

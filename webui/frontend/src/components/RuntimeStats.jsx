@@ -230,7 +230,7 @@ function RuntimeStats({ refreshTrigger = 0 }) {
                   {t("dashboard.lastRun")}:
                 </span>
                 <span className="font-medium text-theme-text">
-                  {formatDateToLocale(runtimeStats.start_time)}
+                  {new Date(runtimeStats.start_time).toLocaleString("sv-SE").replace("T", " ")}
                 </span>
               </div>
             )}

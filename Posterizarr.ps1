@@ -30,6 +30,7 @@ param (
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ExtraArgs # Required for Arrtrigger
 )
+# Disable command history saving
 Set-PSReadLineOption -HistorySaveStyle SaveNothing
 
 # Parse ExtraArgs into a hashtable
@@ -51,7 +52,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.0.12"
+$CurrentScriptVersion = "2.1.0"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -69,6 +70,55 @@ $env:PSMODULE_ANALYSIS_CACHE_ENABLED = $false
 
 #### FUNCTION START ####
 #region Functions
+
+function New-TextSizeCacheKey {
+    param([Parameter(Mandatory)][string]$Text, [Parameter(Mandatory)][hashtable]$Params)
+    $list = [System.Collections.Generic.List[string]]::new()
+    $list.Add("text=`"$Text`"")
+    foreach ($k in ((($Params.Keys | ForEach-Object { $_.ToString().ToLowerInvariant() }) | Sort-Object))) {
+        $v = $Params[$k]; if ($null -eq $v) { $v = '' }
+        $list.Add(("{0}={1}" -f ($k.ToString().ToLowerInvariant()), ($v.ToString())))
+    }
+    $payload = [string]::Join('|', $list)
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $hash = ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join ''
+    return $hash
+}
+
+function Get-TextSizeFromCache {
+    param([Parameter(Mandatory)][string]$Key, [string]$Path = $Global:TextSizeCachePath)
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+    if (-not $raw) { return $null }
+    try { $db = $raw | ConvertFrom-Json -ErrorAction Stop } catch { return $null }
+    if ($db.PSObject.Properties.Name -contains $Key) { return $db.$Key }
+    return $null
+}
+
+function Set-TextSizeCacheEntry {
+    param([Parameter(Mandatory)][string]$Key, [Parameter(Mandatory)]$Result, [string]$Path = $Global:TextSizeCachePath)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        try { '{}' | Set-Content -LiteralPath $Path -Encoding UTF8 } catch {}
+    }
+    $lockPath = "$Path.lock"
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    while (Test-Path -LiteralPath $lockPath) {
+        Start-Sleep -Milliseconds 50
+        if ($sw.ElapsedMilliseconds -gt 5000) { break }
+    }
+    New-Item -ItemType File -Path $lockPath -Force | Out-Null
+    try {
+        $raw = if (Test-Path -LiteralPath $Path) { Get-Content -LiteralPath $Path -Raw -Encoding UTF8 } else { '{}' }
+        if (-not $raw) { $raw = '{}' }
+        $db = $raw | ConvertFrom-Json
+        if ($null -eq $db) { $db = @{ } }
+        $db | Add-Member -NotePropertyName $Key -NotePropertyValue $Result -Force
+        ($db | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $Path -Encoding UTF8
+    } finally {
+        Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
+    }
+}
 function InvokeIMChecks {
     # Check for latest Imagemagick Version
     if ($global:OSarch -eq "Arm64") {
@@ -181,10 +231,14 @@ function Output-ConfigJson {
     }
     function RedactKey($value) {
         if ($null -eq $value) { return $null }
-        if ($value.Length -le 7) { return $value }
-        return ($value[0..6] -join '') + '****'
+        # If the string is 1 character or less, return it as-is.
+        if ($value.Length -le 1) {
+            return $value
+        }
+        # For any string longer than 1 char, show the first char and then redact.
+        return $value.Substring(0, 1) + '****'
     }
-    $redactKeys = @("tvdbapi", "tmdbtoken", "fanarttvapikey", "plextoken", "jellyfinapikey", "embyapikey", "embyurl", "jellyfinurl", "discord", "plexurl", "UptimeKumaUrl", "AppriseUrl", "basicAuthPassword")
+    $redactKeys = @("tvdbapi", "tmdbtoken", "fanarttvapikey", "plextoken", "jellyfinapikey", "embyapikey", "embyurl", "jellyfinurl", "discord", "plexurl", "UptimeKumaUrl", "AppriseUrl", "basicAuthPassword","basicAuthUsername")
     $indent = '  ' * $indentLevel
 
     if ($indentLevel -eq 0) {
@@ -802,343 +856,82 @@ function SendMessage {
         [string]$fallback,
         [string]$truncated
     )
-    if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*') {
-        if ($global:NotifyUrl -like '*discord*') {
-            if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-                $jsonPayload = @"
-    {
-        "username": "$global:DiscordUserName",
-        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-        "content": "",
-        "embeds": [
-        {
-            "author": {
-            "name": "Posterizarr @Github",
-            "url": "https://github.com/fscorrupt/Posterizarr"
-            },
-            "description": "Recently Added\n\n",
-            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true'){15120384}Else{5763719}),
-            "fields": [
-            {
-                "name": "",
-                "value": ":bar_chart:",
-                "inline": false
-            },
-            {
-                "name": "Type",
-                "value": "$type",
-                "inline": false
-            },
-            {
-                "name": "Fallback",
-                "value": "$fallback",
-                "inline": true
-            },
-            {
-                "name": "Language",
-                "value": "$lang",
-                "inline": true
-            },
-            {
-                "name": "Truncated",
-                "value": "$truncated",
-                "inline": true
-            },
-            {
-                "name": "TBA Skipped",
-                "value": "$SkipTBACount",
-                "inline": true
-            },
-            {
-                "name": "Jap/Chinese Skipped",
-                "value": "$SkipJapTitleCount",
-                "inline": true
-            },
-            {
-                "name": "",
-                "value": ":frame_photo:",
-                "inline": false
-            },
-            {
-                "name": "Title",
-                "value": "$title",
-                "inline": false
-            },
-            {
-                "name": "Library",
-                "value": "$Lib",
-                "inline": true
-            },
-            {
-                "name": "Fav Url",
-                "value": "$favurl",
-                "inline": true
-            }
-            ],
-            "thumbnail": {
-                "url": "$DLSource"
-            },
-            "footer": {
-                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-            }
+    function Build-DiscordPayload {
 
+        # Create a list for the fields
+        $fieldList = [System.Collections.Generic.List[object]]::new()
+
+        # Add all common fields
+        $fieldList.Add([PSCustomObject]@{ name = ""; value = ":bar_chart:"; inline = $false })
+        $fieldList.Add([PSCustomObject]@{ name = "Type"; value = $type; inline = $false })
+        $fieldList.Add([PSCustomObject]@{ name = "Fallback"; value = $fallback; inline = $true })
+        $fieldList.Add([PSCustomObject]@{ name = "Language"; value = $lang; inline = $true })
+        $fieldList.Add([PSCustomObject]@{ name = "Truncated"; value = $truncated; inline = $true })
+
+        # Add conditional fields
+        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
+            $fieldList.Add([PSCustomObject]@{ name = "TBA Skipped"; value = "$SkipTBACount"; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Jap/Chinese Skipped"; value = "$SkipJapTitleCount"; inline = $true })
         }
-        ]
+
+        # Add remaining fields
+        $fieldList.Add([PSCustomObject]@{ name = ""; value = ":frame_photo:"; inline = $false })
+
+        # Add the title. ConvertTo-Json will handle any special characters in $title
+        $fieldList.Add([PSCustomObject]@{ name = "Title"; value = $title; inline = $false })
+
+        $fieldList.Add([PSCustomObject]@{ name = "Library"; value = $Lib; inline = $true })
+
+        # Add the URL. ConvertTo-Json will handle any special characters in $favurl
+        $fieldList.Add([PSCustomObject]@{ name = "Fav Url"; value = $favurl; inline = $true })
+
+        # Build the final payload object
+        $payloadObject = [PSCustomObject]@{
+            username   = $global:DiscordUserName
+            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/docs/images/webhook.png"
+            content    = ""
+            embeds     = @(
+                [PSCustomObject]@{
+                    author      = @{
+                        name = "Posterizarr @Github"
+                        url  = "https://github.com/fscorrupt/Posterizarr"
+                    }
+                    description = "Recently Added`n`n"
+                    timestamp   = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                    color       = $(if ($errorCount -ge '1') { 16711680 } Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true') { 15120384 } Else { 5763719 })
+                    fields      = $fieldList
+                    thumbnail   = @{
+                        url = $DLSource
+                    }
+                    footer      = @{
+                        text = "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
+                    }
+                }
+            )
+        }
+
+        # Convert the entire object to a JSON string safely
+        # -Depth 6 is needed to make sure it nests everything (payload->embeds->fields)
+        return $payloadObject | ConvertTo-Json -Depth 6
     }
-"@
+
+    if ($global:NotifyUrl -and $global:SendNotification -eq 'true') {
+
+        # Handle Discord notifications
+        if ($global:NotifyUrl -like '*discord*') {
+            $jsonPayload = Build-DiscordPayload
+            $webhookUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
+            Push-ObjectToDiscord -strDiscordWebhook $webhookUrl -objPayload $jsonPayload
+        }
+
+        # Handle Apprise notifications
+        Elseif ($env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*') {
+            if ($errorCount -ge '1') {
+                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
             }
             Else {
-                $jsonPayload = @"
-    {
-        "username": "$global:DiscordUserName",
-        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-        "content": "",
-        "embeds": [
-        {
-            "author": {
-            "name": "Posterizarr @Github",
-            "url": "https://github.com/fscorrupt/Posterizarr"
-            },
-            "description": "Recently Added\n\n",
-            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true'){15120384}Else{5763719}),
-            "fields": [
-            {
-                "name": "",
-                "value": ":bar_chart:",
-                "inline": false
-            },
-            {
-                "name": "Type",
-                "value": "$type",
-                "inline": false
-            },
-            {
-                "name": "Fallback",
-                "value": "$fallback",
-                "inline": true
-            },
-            {
-                "name": "Language",
-                "value": "$lang",
-                "inline": true
-            },
-            {
-                "name": "Truncated",
-                "value": "$truncated",
-                "inline": true
-            },
-            {
-                "name": "",
-                "value": ":frame_photo:",
-                "inline": false
-            },
-            {
-                "name": "Title",
-                "value": "$title",
-                "inline": false
-            },
-            {
-                "name": "Library",
-                "value": "$Lib",
-                "inline": true
-            },
-            {
-                "name": "Fav Url",
-                "value": "$favurl",
-                "inline": true
+                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
             }
-            ],
-            "thumbnail": {
-                "url": "$DLSource"
-            },
-            "footer": {
-                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-            }
-
-        }
-        ]
-    }
-"@
-            }
-            $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-            if ($global:SendNotification -eq 'true') {
-                Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-            }
-        }
-        Else {
-            if ($global:SendNotification -eq 'true') {
-                if ($errorCount -ge '1') {
-                    apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-                }
-                Else {
-                    apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-                }
-            }
-        }
-    }
-    if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -notlike 'PSDocker*') {
-        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-            $jsonPayload = @"
-    {
-        "username": "$global:DiscordUserName",
-        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-        "content": "",
-        "embeds": [
-        {
-            "author": {
-            "name": "Posterizarr @Github",
-            "url": "https://github.com/fscorrupt/Posterizarr"
-            },
-            "description": "Recently Added\n\n",
-            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true'){15120384}Else{5763719}),
-            "fields": [
-            {
-                "name": "",
-                "value": ":bar_chart:",
-                "inline": false
-            },
-            {
-                "name": "Type",
-                "value": "$type",
-                "inline": false
-            },
-            {
-                "name": "Fallback",
-                "value": "$fallback",
-                "inline": true
-            },
-            {
-                "name": "Language",
-                "value": "$lang",
-                "inline": true
-            },
-            {
-                "name": "Truncated",
-                "value": "$truncated",
-                "inline": true
-            },
-            {
-                "name": "TBA Skipped",
-                "value": "$SkipTBACount",
-                "inline": true
-            },
-            {
-                "name": "Jap/Chinese Skipped",
-                "value": "$SkipJapTitleCount",
-                "inline": true
-            },
-            {
-                "name": "",
-                "value": ":frame_photo:",
-                "inline": false
-            },
-            {
-                "name": "Title",
-                "value": "$title",
-                "inline": false
-            },
-            {
-                "name": "Library",
-                "value": "$Lib",
-                "inline": true
-            },
-            {
-                "name": "Fav Url",
-                "value": "$favurl",
-                "inline": true
-            }
-            ],
-            "thumbnail": {
-                "url": "$DLSource"
-            },
-            "footer": {
-                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-            }
-
-        }
-        ]
-    }
-"@
-        }
-        Else {
-            jsonPayload = @"
-    {
-        "username": "$global:DiscordUserName",
-        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-        "content": "",
-        "embeds": [
-        {
-            "author": {
-            "name": "Posterizarr @Github",
-            "url": "https://github.com/fscorrupt/Posterizarr"
-            },
-            "description": "Recently Added\n\n",
-            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true'){15120384}Else{5763719}),
-            "fields": [
-            {
-                "name": "",
-                "value": ":bar_chart:",
-                "inline": false
-            },
-            {
-                "name": "Type",
-                "value": "$type",
-                "inline": false
-            },
-            {
-                "name": "Fallback",
-                "value": "$fallback",
-                "inline": true
-            },
-            {
-                "name": "Language",
-                "value": "$lang",
-                "inline": true
-            },
-            {
-                "name": "Truncated",
-                "value": "$truncated",
-                "inline": true
-            },
-            {
-                "name": "",
-                "value": ":frame_photo:",
-                "inline": false
-            },
-            {
-                "name": "Title",
-                "value": "$title",
-                "inline": false
-            },
-            {
-                "name": "Library",
-                "value": "$Lib",
-                "inline": true
-            },
-            {
-                "name": "Fav Url",
-                "value": "$favurl",
-                "inline": true
-            }
-            ],
-            "thumbnail": {
-                "url": "$DLSource"
-            },
-            "footer": {
-                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-            }
-
-        }
-        ]
-    }
-"@
-        }
-        if ($global:SendNotification -eq 'true') {
-            Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
         }
     }
 }
@@ -1164,6 +957,27 @@ function Get-OptimalPointSize {
         [int]$max_pointsize,
         [int]$lineSpacing  # New parameter for line height
     )
+
+    # ----- Text size cache: try hit -----
+    try {
+        if (-not $script:IMVersion) { $script:IMVersion = (& $magick -version | Select-Object -First 1) }
+    } catch {}
+    $__tsc_Params = @{
+        font=$fontImagemagick; w=$box_width; h=$box_height;
+        min=$min_pointsize; max=$max_pointsize; line=$lineSpacing;
+        imv=$script:IMVersion; algo='Get-OptimalPointSize-v1'
+    }
+    $__tsc_Key  = New-TextSizeCacheKey -Text $text -Params $__tsc_Params
+    $__tsc_Path = if ($Global:TextSizeCachePath) { $Global:TextSizeCachePath } else { Join-Path $global:ScriptRoot 'Cache\text_size_cache.json' }
+    $__tsc_Hit  = Get-TextSizeFromCache -Key $__tsc_Key -Path $__tsc_Path
+    if ($__tsc_Hit) {
+        if ($__tsc_Hit.PSObject.Properties.Name -contains 'isTruncated') { $global:IsTruncated = [bool]$__tsc_Hit.isTruncated } else { $global:IsTruncated = $null }
+        $script:CurrentTextSizeSource = 'cache'
+        $script:tsHits++   # [stats] count cache hits
+        return [int]$__tsc_Hit.pointSize
+    }
+    # ----- /cache hit -----
+
     $global:IsTruncated = $null
 
     # Construct the command with interline spacing and font option
@@ -1171,6 +985,9 @@ function Get-OptimalPointSize {
 
     # Log the command for debugging purposes
     $cmd | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+
+    # [stats] start timing the “miss” compute path
+    $tsc_sw = [Diagnostics.Stopwatch]::StartNew()
 
     # Execute the command and get the current point size
     $current_pointsize = [int](Invoke-Expression $cmd | Out-String).Trim()
@@ -1185,9 +1002,21 @@ function Get-OptimalPointSize {
         $current_pointsize = $min_pointsize
     }
 
-    # Return optimal point size
+    # [stats] stop timer and record miss metrics
+    $tsc_sw.Stop()
+    $script:tsMiss++
+    $script:tsRuns++
+    $script:tsMs += $tsc_sw.ElapsedMilliseconds
+
+    # ----- cache store -----
+    $__tsc_Save = [PSCustomObject]@{ pointSize = [int]$current_pointsize; isTruncated = [bool]$global:IsTruncated }
+    Set-TextSizeCacheEntry -Key $__tsc_Key -Result $__tsc_Save -Path $__tsc_Path
+    # ----- /cache store -----
+
+    $script:CurrentTextSizeSource = 'calculated'
     return $current_pointsize
 }
+
 function GetTMDBMoviePoster {
     Write-Entry -Subtext "Searching on TMDB for a movie poster - TMDBID: $global:tmdbid" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
     if (!$global:tmdbid) {
@@ -3424,7 +3253,7 @@ function GetTVDBSeasonPoster {
         }
         if ($response) {
             if ($response.data.seasons) {
-                # Select season id from current Seasonnumber
+                # Select season id from current Season number
                 $SeasonID = $response.data.seasons | Where-Object { $_.number -eq $global:SeasonNumber -and $_.type.type -eq 'official' }
                 if (!$SeasonID) {
                     $SeasonID = $response.data.seasons | Where-Object { $_.number -eq $global:SeasonNumber -and $_.type.type -eq 'alternate' }
@@ -3773,15 +3602,35 @@ function Push-ObjectToDiscord {
 
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [object]$objPayload
+        [string]$objPayload
     )
+
     try {
         $null = Invoke-RestMethod -Method Post -Uri $strDiscordWebhook -Body $objPayload -ContentType 'Application/Json'
+
+        # This is a good, simple way to help avoid rate limits.
         Start-Sleep -Seconds 1
     }
     catch {
-        Write-Entry -Message "Unable to send to Discord. $($_)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-        Write-Entry -Message "$objPayload" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+        $errorMessage = "Unable to send to Discord."
+        $discordErrorBody = "N/A"
+        $statusCode = "N/A"
+
+        $response = $_.Exception.Response
+        if ($response) {
+            $statusCode = $response.StatusCode
+            $stream = $response.GetResponseStream()
+            $reader = New-Object System.IO.StreamReader($stream)
+            $discordErrorBody = $reader.ReadToEnd() # This is the JSON error from Discord
+
+            $errorMessage = "Unable to send to Discord. Status: $statusCode. Reason: $discordErrorBody"
+        }
+        else {
+            # This was a general network error (e.g., DNS failure)
+            $errorMessage = "Unable to send to Discord. Error: $($_.Exception.Message)"
+        }
+        Write-Entry -Message $errorMessage -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+        Write-Entry -Message "Failing Payload: $objPayload" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
     }
 }
 function CheckJson {
@@ -3862,7 +3711,7 @@ function CheckJson {
                         Write-Entry -Message "Missing Main Attribute in your Config file: $partKey." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                         Write-Entry -Subtext "I will copy all settings from 'PosterOverlayPart'..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                         Write-Entry -Subtext "Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                        Write-Entry -Subtext "GH Readme -> https://github.com/fscorrupt/Posterizarr/blob/$($Branch)/README.md#configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                        Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/Posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                         # Convert the updated configuration object back to JSON and save it, then reload it
                         $configJson = $config | ConvertTo-Json -Depth 10
                         $configJson | Set-Content -Path $jsonFilePath -Force
@@ -3871,7 +3720,7 @@ function CheckJson {
                     Else {
                         Write-Entry -Message "Missing Main Attribute in your Config file: $partKey." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                         Write-Entry -Subtext "Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                        Write-Entry -Subtext "GH Readme -> https://github.com/fscorrupt/Posterizarr/blob/$($Branch)/README.md#configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                        Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/Posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                         $config | Add-Member -MemberType NoteProperty -Name $partKey -Value $defaultConfig.$partKey
                         $AttributeChanged = $True
                     }
@@ -3905,7 +3754,7 @@ function CheckJson {
                         if (-not $config.$partKey.PSObject.Properties.Name.tolower().Contains($propertyKey.tolower())) {
                             Write-Entry -Message "Missing Sub-Attribute in your Config file: $partKey.$propertyKey" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                             Write-Entry -Subtext "Adding it for you... In GH Readme, look for $partKey.$propertyKey - if you want to see what changed..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                            Write-Entry -Subtext "GH Readme -> https://github.com/fscorrupt/Posterizarr/blob/$($Branch)/README.md#configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                            Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/Posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                             # Add the property using the expected casing
                             $config.$partKey | Add-Member -MemberType NoteProperty -Name $propertyKey -Value $defaultConfig.$partKey.$propertyKey -Force
                             $AttributeChanged = $True
@@ -3996,16 +3845,34 @@ function CheckJsonPaths {
         [string]$Backgroundoverlay4k,
         [string]$Backgroundoverlay1080p,
         [string]$TCoverlay4k,
-        [string]$TCoverlay1080p
+        [string]$TCoverlay1080p,
+        [string]$Posteroverlay4KDoVi,
+        [string]$Posteroverlay4KHDR10,
+        [string]$Posteroverlay4KDoViHDR10,
+        [string]$Backgroundoverlay4KDoVi,
+        [string]$Backgroundoverlay4KHDR10,
+        [string]$Backgroundoverlay4KDoViHDR10,
+        [string]$TCoverlay4KDoVi,
+        [string]$TCoverlay4KHDR10,
+        [string]$TCoverlay4KDoViHDR10
     )
 
-    $paths = @($font, $RTLfont, $backgroundfont, $titlecardfont, $Posteroverlay, $Collectionoverlay, $Backgroundoverlay, $titlecardoverlay, $Seasonoverlay, $Posteroverlay4k, $Posteroverlay1080p, $Backgroundoverlay4k, $Backgroundoverlay1080p, $TCoverlay4k, $TCoverlay1080p)
+    $paths = @(
+        $font, $RTLfont, $backgroundfont, $titlecardfont, $Posteroverlay,
+        $Collectionoverlay, $Backgroundoverlay, $titlecardoverlay, $Seasonoverlay,
+        $Posteroverlay4k, $Posteroverlay1080p, $Backgroundoverlay4k,
+        $Backgroundoverlay1080p, $TCoverlay4k, $TCoverlay1080p,$Posteroverlay4KDoVi, $Posteroverlay4KHDR10, $Posteroverlay4KDoViHDR10,
+        $Backgroundoverlay4KDoVi, $Backgroundoverlay4KHDR10, $Backgroundoverlay4KDoViHDR10,
+        $TCoverlay4KDoVi, $TCoverlay4KHDR10, $TCoverlay4KDoViHDR10
+    )
+
     foreach ($path in $paths) {
-        if (-not (Test-Path -LiteralPath $path.TrimEnd())) {
+        # Only check the path if it's not null or empty.
+        # This allows optional overlays (set to null in config) to pass.
+        if ((-not [string]::IsNullOrEmpty($path)) -and (-not (Test-Path -LiteralPath $path.TrimEnd()))) {
             Write-Entry -Message "Could not find file in: $path" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
             Write-Entry -Subtext "Check config for typos and make sure that the file is present in scriptroot." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
         }
     }
 
@@ -4170,6 +4037,13 @@ function CheckPlexAccess {
                 Write-Entry -Subtext "Plex access is working..." -Path $configLogging -Color Green -log Info
                 # Check if libs are available
                 [XML]$Libs = $response.Content
+                # Plex Debug info
+                $plexdebuginfo = Invoke-WebRequest -Uri "$PlexUrl/?X-Plex-Token=$PlexToken" -ErrorAction Stop -Headers $extraPlexHeaders
+                [XML]$plexdebuginfo = $plexdebuginfo.Content
+                Write-Entry -Subtext "Plex Server Version: $($plexdebuginfo.MediaContainer.version)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "My Plex Server: $($plexdebuginfo.MediaContainer.myPlex)"-Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server Signin State: $($plexdebuginfo.MediaContainer.myPlexSigninState)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server allow Deletion: $($plexdebuginfo.MediaContainer.allowMediaDeletion)" -Path $configLogging -Color Cyan -log Debug
                 if ($Libs.MediaContainer.size -ge 1) {
                     return $Libs
                 }
@@ -4242,6 +4116,13 @@ function CheckPlexAccess {
                 Write-Entry -Subtext "Plex access is working..." -Path $configLogging -Color Green -log Info
                 # Check if libs are available
                 [XML]$Libs = $result.Content
+                # Plex Debug info
+                $plexdebuginfo = Invoke-WebRequest -Uri "$PlexUrl" -ErrorAction Stop -Headers $extraPlexHeaders
+                [XML]$plexdebuginfo = $plexdebuginfo.Content
+                Write-Entry -Subtext "Plex Server Version: $($plexdebuginfo.MediaContainer.version)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "My Plex Server: $($plexdebuginfo.MediaContainer.myPlex)"-Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server Signin State: $($plexdebuginfo.MediaContainer.myPlexSigninState)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server allow Deletion: $($plexdebuginfo.MediaContainer.allowMediaDeletion)" -Path $configLogging -Color Cyan -log Debug
                 if ($Libs.MediaContainer.size -ge 1) {
                     Write-Entry -Subtext "Found libs on Plex..." -Path $configLogging -Color White -log Info
                     return $Libs
@@ -4319,108 +4200,75 @@ function CheckOverlayDimensions {
         [string]$TCoverlay4k,
         [string]$TCoverlay1080p,
         [string]$PosterSize,
-        [string]$BackgroundSize
+        [string]$BackgroundSize,
+        [string]$Posteroverlay4KDoVi,
+        [string]$Posteroverlay4KHDR10,
+        [string]$Posteroverlay4KDoViHDR10,
+        [string]$Backgroundoverlay4KDoVi,
+        [string]$Backgroundoverlay4KHDR10,
+        [string]$Backgroundoverlay4KDoViHDR10,
+        [string]$TCoverlay4KDoVi,
+        [string]$TCoverlay4KHDR10,
+        [string]$TCoverlay4KDoViHDR10
     )
+    # This function checks a single overlay's dimensions
+    function Test-Dimension {
+        param (
+            [string]$OverlayPath,
+            [string]$ExpectedSize,
+            [string]$OverlayName
+        )
 
-    # Use magick to check dimensions
-    $Posteroverlaydimensions = & $magick $Posteroverlay -format "%wx%h" info:
-    $Seasonoverlaydimensions = & $magick $Seasonoverlay -format "%wx%h" info:
-    $Collectionverlaydimensions = & $magick $Collectionoverlay -format "%wx%h" info:
-    $Backgroundoverlaydimensions = & $magick $Backgroundoverlay -format "%wx%h" info:
-    $Titlecardoverlaydimensions = & $magick $Titlecardoverlay -format "%wx%h" info:
-    $4kPosteroverlaydimensions = & $magick $Posteroverlay4k -format "%wx%h" info:
-    $1080pPosteroverlaydimensions = & $magick $Posteroverlay1080p -format "%wx%h" info:
-    $4kBackgroundoverlaydimensions = & $magick $Backgroundoverlay4k -format "%wx%h" info:
-    $1080pBackgroundoverlaydimensions = & $magick $Backgroundoverlay1080p -format "%wx%h" info:
-    $4kTCoverlaydimensions = & $magick $TCoverlay4k -format "%wx%h" info:
-    $1080pTCoverlaydimensions = & $magick $TCoverlay1080p -format "%wx%h" info:
+        # If the path is $null or empty (i.e., optional overlay not configured),
+        if ([string]::IsNullOrEmpty($OverlayPath)) {
+            return
+        }
 
-    # Check Poster Overlay Size
-    if ($Posteroverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "Poster overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "Poster overlay is NOT correctly sized at: $Postersize. Actual dimensions: $Posteroverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+        try {
+            $actualDimensions = & $magick $OverlayPath -format "%wx%h" info:
 
-    # Check Season Poster Overlay Size
-    if ($Seasonoverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "Season overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "Season overlay is NOT correctly sized at: $Postersize. Actual dimensions: $Seasonoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-
-    # Check Collection Poster Overlay Size
-    if ($Collectionverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "Collection overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "Collection overlay is NOT correctly sized at: $Postersize. Actual dimensions: $Collectionverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+            if ($actualDimensions -eq $ExpectedSize) {
+                Write-Entry -Subtext "$OverlayName is correctly sized at: $ExpectedSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
+            }
+            else {
+                Write-Entry -Subtext "$OverlayName is NOT correctly sized at: $ExpectedSize. Actual dimensions: $actualDimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+            }
+        }
+        catch {
+            Write-Entry -Subtext "Failed to check dimensions for $OverlayName at path $OverlayPath. Error: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+        }
     }
 
-    # Check Background Overlay Size
-    if ($Backgroundoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "Background overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "Background overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $Backgroundoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+    # Standard Poster Types (expect PosterSize)
+    Test-Dimension -OverlayPath $Posteroverlay -ExpectedSize $PosterSize -OverlayName "Poster overlay"
+    Test-Dimension -OverlayPath $Seasonoverlay -ExpectedSize $PosterSize -OverlayName "Season overlay"
+    Test-Dimension -OverlayPath $Collectionoverlay -ExpectedSize $PosterSize -OverlayName "Collection overlay"
+    Test-Dimension -OverlayPath $Posteroverlay4k -ExpectedSize $PosterSize -OverlayName "4K Poster overlay"
+    Test-Dimension -OverlayPath $Posteroverlay1080p -ExpectedSize $PosterSize -OverlayName "1080p Poster overlay"
 
-    # Check TitleCard Overlay Size
-    if ($Titlecardoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "TitleCard overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "TitleCard overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $Titlecardoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+    # Standard Background/TC Types (expect BackgroundSize)
+    Test-Dimension -OverlayPath $Backgroundoverlay -ExpectedSize $BackgroundSize -OverlayName "Background overlay"
+    Test-Dimension -OverlayPath $Titlecardoverlay -ExpectedSize $BackgroundSize -OverlayName "TitleCard overlay"
+    Test-Dimension -OverlayPath $Backgroundoverlay4k -ExpectedSize $BackgroundSize -OverlayName "4K Background overlay"
+    Test-Dimension -OverlayPath $Backgroundoverlay1080p -ExpectedSize $BackgroundSize -OverlayName "1080p Background overlay"
+    Test-Dimension -OverlayPath $TCoverlay4k -ExpectedSize $BackgroundSize -OverlayName "4K TitleCard overlay"
+    Test-Dimension -OverlayPath $TCoverlay1080p -ExpectedSize $BackgroundSize -OverlayName "1080p TitleCard overlay"
 
-    # Check 4K Poster Overlay Size
-    if ($4kPosteroverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "4K Poster overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "4K Poster overlay is NOT correctly sized at: $Postersize. Actual dimensions: $4kPosteroverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+    # New 4K Poster Types (expect PosterSize)
+    Test-Dimension -OverlayPath $Posteroverlay4KDoVi -ExpectedSize $PosterSize -OverlayName "4K DoVi Poster overlay"
+    Test-Dimension -OverlayPath $Posteroverlay4KHDR10 -ExpectedSize $PosterSize -OverlayName "4K HDR10 Poster overlay"
+    Test-Dimension -OverlayPath $Posteroverlay4KDoViHDR10 -ExpectedSize $PosterSize -OverlayName "4K DoVi/HDR10 Poster overlay"
 
-    # Check 1080p Poster Overlay Size
-    if ($1080pPosteroverlaydimensions -eq $PosterSize) {
-        Write-Entry -Subtext "1080p Poster overlay is correctly sized at: $Postersize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "1080p Poster overlay is NOT correctly sized at: $Postersize. Actual dimensions: $1080pPosteroverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+    # New 4K Background Types (expect BackgroundSize)
+    Test-Dimension -OverlayPath $Backgroundoverlay4KDoVi -ExpectedSize $BackgroundSize -OverlayName "4K DoVi Background overlay"
+    Test-Dimension -OverlayPath $Backgroundoverlay4KHDR10 -ExpectedSize $BackgroundSize -OverlayName "4K HDR10 Background overlay"
+    Test-Dimension -OverlayPath $Backgroundoverlay4KDoViHDR10 -ExpectedSize $BackgroundSize -OverlayName "4K DoVi/HDR10 Background overlay"
 
-    # Check 4K Background Overlay Size
-    if ($4kBackgroundoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "4K Background overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "4K Background overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $4kBackgroundoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-
-    # Check 1080p Background Overlay Size
-    if ($1080pBackgroundoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "1080p Background overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "1080p Background overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $1080pBackgroundoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-
-    # Check 4K TitleCard Overlay Size
-    if ($4kTCoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "4K TitleCard overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "4K TitleCard overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $4kTCoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
-    # Check 1080p TitleCard Overlay Size
-    if ($1080pTCoverlaydimensions -eq $BackgroundSize) {
-        Write-Entry -Subtext "1080p TitleCard overlay is correctly sized at: $BackgroundSize" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-    }
-    else {
-        Write-Entry -Subtext "1080p TitleCard overlay is NOT correctly sized at: $BackgroundSize. Actual dimensions: $1080pTCoverlaydimensions" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-    }
+    # New 4K TC Types (expect BackgroundSize)
+    Test-Dimension -OverlayPath $TCoverlay4KDoVi -ExpectedSize $BackgroundSize -OverlayName "4K DoVi TitleCard overlay"
+    Test-Dimension -OverlayPath $TCoverlay4KHDR10 -ExpectedSize $BackgroundSize -OverlayName "4K HDR10 TitleCard overlay"
+    Test-Dimension -OverlayPath $TCoverlay4KDoViHDR10 -ExpectedSize $BackgroundSize -OverlayName "4K DoVi/HDR10 TitleCard overlay"
 }
 function InvokeMagickCommand {
     param (
@@ -4809,6 +4657,7 @@ function MassDownloadPlexArtwork {
         }
     }
     $Mode = "backup"
+    Write-Entry -Message "Backup Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libsoverview = @()
     foreach ($lib in $Libs.MediaContainer.Directory) {
@@ -6296,129 +6145,11 @@ function MassDownloadPlexArtwork {
     if ($errorCount -ge '1') {
         Write-Entry -Message "During execution '$errorCount' Errors occurred, please check the log for a detailed description where you see [ERROR-HERE]." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
-    if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-            $jsonPayload = @"
-        {
-            "username": "$global:DiscordUserName",
-            "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-            "content": "",
-            "embeds": [
-            {
-                "author": {
-                "name": "Posterizarr @Github",
-                "url": "https://github.com/fscorrupt/Posterizarr"
-                },
-                "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                "fields": [
-                {
-                    "name": "",
-                    "value": ":frame_photo:",
-                    "inline": false
-                },
-                {
-                    "name": "Posters Downloaded",
-                    "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                    "inline": false
-                },
-                {
-                    "name": "Backgrounds Downloaded",
-                    "value": "$BackgroundCount",
-                    "inline": true
-                },
-                {
-                    "name": "Seasons Downloaded",
-                    "value": "$SeasonCount",
-                    "inline": true
-                },
-                {
-                    "name": "TitleCards Downloaded",
-                    "value": "$EpisodeCount",
-                    "inline": true
-                }
-                ],
-                "thumbnail": {
-                    "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                },
-                "footer": {
-                    "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                }
-            }
-            ]
-        }
-"@
-        }
-        Else {
-            $jsonPayload = @"
-            {
-                "username": "$global:DiscordUserName",
-                "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                "content": "",
-                "embeds": [
-                {
-                    "author": {
-                    "name": "Posterizarr @Github",
-                    "url": "https://github.com/fscorrupt/Posterizarr"
-                    },
-                    "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                    "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                    "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                    "fields": [
-                    {
-                        "name": "",
-                        "value": ":frame_photo:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Posters Downloaded",
-                        "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                        "inline": false
-                    },
-                    {
-                        "name": "Backgrounds Downloaded",
-                        "value": "$BackgroundCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Seasons Downloaded",
-                        "value": "$SeasonCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TitleCards Downloaded",
-                        "value": "$EpisodeCount",
-                        "inline": true
-                    }
-                    ],
-                    "thumbnail": {
-                        "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                    },
-                    "footer": {
-                        "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                    }
-                }
-                ]
-            }
-"@
-        }
-        $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-        Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-    }
-    Else {
-        if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-            if ($errorCount -ge '1') {
-                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Downloaded '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-            }
-            Else {
-                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Downloaded '$posterCount' Images" "$global:NotifyUrl"
-            }
-        }
-    }
+    Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount
 
     # Export json
     $jsonObject = [PSCustomObject]@{
@@ -6667,10 +6398,174 @@ function Send-UptimeKumaWebhook {
         Write-Entry -Message "Failed to send Uptime Kuma webhook: $_" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
     }
 }
+
+function Write-TextSizeCacheSummary {
+    param([string]$Label = "Text-size cache")
+    $total=$script:tsHits+$script:tsMiss
+    $rate = if($total){[math]::Round(100*$script:tsHits/$total,2)}else{0}
+    $avg  = if($script:tsRuns){[math]::Round($script:tsMs/$script:tsRuns,2)}else{0}
+    $saved=[TimeSpan]::FromMilliseconds([double]($script:tsHits*$avg))
+    Write-Entry -Subtext ("{0}: hits='{1}', misses='{2}' ({3}%); magick_calls='{4}' in '{5} ms'; est_saved='{6}h {7}m {8}s'" -f `
+    $Label,$script:tsHits,$script:tsMiss,$rate,$script:tsRuns,$script:tsMs,$saved.Hours,$saved.Minutes,$saved.Seconds) `
+    -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+}
+
+function Send-SummaryNotification {
+    param (
+        [string]$ScriptMode,
+        [string]$FormattedTimespawn,
+        [int]$ErrorCount,
+        [int]$FallbackCount,
+        [int]$TextlessCount,
+        [int]$TruncatedCount,
+        [int]$PosterUnknownCount,
+        [int]$SkipTBACount,
+        [int]$SkipJapTitleCount,
+        [int]$PosterCount,
+        [int]$BackgroundCount,
+        [int]$SeasonCount,
+        [int]$EpisodeCount,
+        [int]$ImagesCleared,
+        [int]$PathsCleared,
+        [string]$SavedSizeString,
+        [int]$UploadCount
+    )
+
+    if (-not ($global:NotifyUrl -and $global:SendNotification -eq 'true')) {
+        return # Do nothing if notifications are off
+    }
+
+    # 1. Handle Apprise (Docker)
+    if ($global:NotifyUrl -notlike '*discord*' -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*') {
+        $body = "Run took: $FormattedTimespawn`nIt Created '$PosterCount' Images"
+        if ($ScriptMode -eq 'backup') {
+            $body = "Run took: $FormattedTimespawn`nIt Downloaded '$PosterCount' Images"
+        }
+        if ($ScriptMode -eq 'syncjelly' -or $ScriptMode -eq 'syncemby') {
+            $body = "Run took: $FormattedTimespawn`nIt Synced '$UploadCount' Images"
+        }
+
+        if ($ErrorCount -ge '1') {
+            apprise --notification-type="failure" --title="Posterizarr" --body="$body`n`nDuring execution '$ErrorCount' Errors occurred, please check log." "$global:NotifyUrl"
+        } else {
+            apprise --notification-type="success" --title="Posterizarr" --body="$body" "$global:NotifyUrl"
+        }
+        return
+    }
+
+    # 2. Handle Discord
+    if ($global:NotifyUrl -like '*discord*') {
+
+        $desc = "Run took: $FormattedTimespawn"
+        if ($ScriptMode -eq 'backup') {
+            $desc = "Backup Run took: $FormattedTimespawn"
+        }
+        if ($ScriptMode -eq 'syncjelly' -or $ScriptMode -eq 'syncemby') {
+            $desc = "Sync Run took: $FormattedTimespawn"
+        }
+        if ($ScriptMode -eq 'testing') {
+            $desc = "Test run took: $FormattedTimespawn"
+        }
+        if ($ScriptMode -eq 'tautulli' -or $ScriptMode -eq 'arr') {
+            $desc = "Recently added Run took: $FormattedTimespawn"
+        }
+
+        if ($ErrorCount -ge '1') {
+            $desc += "`nDuring execution Errors occurred, please check log."
+        }
+
+        # Build Fields
+        $fieldList = [System.Collections.Generic.List[object]]::new()
+
+        # --- Stats Section ---
+        $fieldList.Add([PSCustomObject]@{ name = ""; value = ":bar_chart:"; inline = $false })
+        if ($ScriptMode -eq 'testing') {
+            $fieldList.Add([PSCustomObject]@{ name = "Truncated"; value = $TruncatedCount; inline = $false })
+        } else {
+            $fieldList.Add([PSCustomObject]@{ name = "Errors"; value = $ErrorCount; inline = $false })
+            $fieldList.Add([PSCustomObject]@{ name = "Fallbacks"; value = $FallbackCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Textless"; value = $TextlessCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Truncated"; value = $TruncatedCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Unknown"; value = $PosterUnknownCount; inline = $true })
+            if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
+                $fieldList.Add([PSCustomObject]@{ name = "TBA Skipped"; value = $SkipTBACount; inline = $true })
+                $fieldList.Add([PSCustomObject]@{ name = "Jap/Chinese Skipped"; value = $SkipJapTitleCount; inline = $true })
+            }
+        }
+
+        # --- Images Section ---
+        $fieldList.Add([PSCustomObject]@{ name = ""; value = ":frame_photo:"; inline = $false })
+        if ($ScriptMode -eq 'backup') {
+            $fieldList.Add([PSCustomObject]@{ name = "Posters Downloaded"; value = ($PosterCount - $SeasonCount - $BackgroundCount - $EpisodeCount); inline = $false })
+            $fieldList.Add([PSCustomObject]@{ name = "Backgrounds Downloaded"; value = $BackgroundCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Seasons Downloaded"; value = $SeasonCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "TitleCards Downloaded"; value = $EpisodeCount; inline = $true })
+        } elseif ($ScriptMode -eq 'syncjelly' -or $ScriptMode -eq 'syncemby') {
+            $fieldList.Add([PSCustomObject]@{ name = "Posters Uploaded"; value = ($UploadCount - $SeasonCount - $BackgroundCount - $EpisodeCount); inline = $false })
+            $fieldList.Add([PSCustomObject]@{ name = "Backgrounds Uploaded"; value = $BackgroundCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Seasons Uploaded"; value = $SeasonCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "TitleCards Uploaded"; value = $EpisodeCount; inline = $true })
+        } else {
+            if ($ScriptMode -eq 'testing') {
+                $fieldList.Add([PSCustomObject]@{ name = "Posters"; value = $posterscount; inline = $false })
+            } else {
+                # For Normal/Arr/Tautulli, $PosterCount IS the total, so subtraction is correct.
+                $fieldList.Add([PSCustomObject]@{ name = "Posters"; value = ($PosterCount - $SeasonCount - $BackgroundCount - $EpisodeCount); inline = $false })
+            }
+            $fieldList.Add([PSCustomObject]@{ name = "Backgrounds"; value = $BackgroundCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Seasons"; value = $SeasonCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "TitleCards"; value = $EpisodeCount; inline = $true })
+        }
+
+        # --- Cleanup Section ---
+        if ($AssetCleanup -eq 'true' -and $ScriptMode -ne 'testing' -and $ScriptMode -ne 'backup' -and $ScriptMode -ne 'syncjelly' -and $ScriptMode -ne 'syncemby') {
+            $fieldList.Add([PSCustomObject]@{ name = ""; value = ":recycle:"; inline = $false })
+            $fieldList.Add([PSCustomObject]@{ name = "Images cleared"; value = $ImagesCleared; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Folders Cleared"; value = $PathsCleared; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Space saved"; value = $SavedSizeString; inline = $true })
+        }
+
+        # Build final payload
+        $payloadObject = [PSCustomObject]@{
+            username   = $global:DiscordUserName
+            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/docs/images/webhook.png"
+            content    = ""
+            embeds     = @(
+                [PSCustomObject]@{
+                    author    = @{
+                        name = "Posterizarr @Github"
+                        url  = "https://github.com/fscorrupt/Posterizarr"
+                    }
+                    description = $desc
+                    timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                    color     = $(if ($ErrorCount -ge '1') { 16711680 } Elseif ($Testing) { 8388736 } Elseif ($FallbackCount -gt '1' -or $PosterUnknownCount -ge '1' -or $TruncatedCount -gt '1') { 15120384 } Else { 5763719 })
+                    fields    = $fieldList
+                    thumbnail = @{
+                        url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/docs/images/webhook.png"
+                    }
+                    footer    = @{
+                        text = "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
+                    }
+                }
+            )
+        }
+
+        $jsonPayload = $payloadObject | ConvertTo-Json -Depth 6
+        $webhookUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
+        Push-ObjectToDiscord -strDiscordWebhook $webhookUrl -objPayload $jsonPayload
+    }
+}
+
 #### FUNCTION END ####
 
 ##### PRE-START #####
 $global:errorCount = 0
+# ---- text-size cache stats (minimal) ----
+if (-not (Get-Variable -Name tsHits -Scope Script -ErrorAction SilentlyContinue)) { [int]  $script:tsHits = 0 }
+if (-not (Get-Variable -Name tsMiss -Scope Script -ErrorAction SilentlyContinue)) { [int]  $script:tsMiss = 0 }
+if (-not (Get-Variable -Name tsRuns -Scope Script -ErrorAction SilentlyContinue)) { [int]  $script:tsRuns = 0 }
+if (-not (Get-Variable -Name tsMs   -Scope Script -ErrorAction SilentlyContinue)) { [int64]$script:tsMs   = 0 }
+# -----------------------------------------
 #region Variables
 # Set Branch
 if ($dev) {
@@ -6679,6 +6574,7 @@ if ($dev) {
 Else {
     $Branch = 'main'
 }
+$Branch = 'dev' # TEMP FORCE DEV FOR TESTING
 # Set some global vars
 Set-OSTypeAndScriptRoot
 # Get platform
@@ -6711,6 +6607,15 @@ $TempPath = Join-Path $global:ScriptRoot 'temp'
 $TestPath = Join-Path $global:ScriptRoot 'test'
 $WatcherPath = Join-Path $global:ScriptRoot 'watcher'
 $CurrentlyRunning = Join-Path $TempPath 'Posterizarr.Running'
+
+# Set Text Size Cache Path
+if (-not $Global:TextSizeCachePath) {
+    $Global:TextSizeCachePath = Join-Path $global:ScriptRoot 'Cache\text_size_cache.json'
+}
+try {
+    $cacheDir = Split-Path -Parent $Global:TextSizeCachePath
+    if ($cacheDir -and -not (Test-Path -LiteralPath $cacheDir)) { New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null }
+} catch {}
 
 Write-Entry -Message "Starting..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
 # Create directories if they don't exist
@@ -7002,6 +6907,7 @@ $BackupPath = RemoveTrailingSlash $config.PrerequisitePart.BackupPath
 $ManualAssetPath = RemoveTrailingSlash $config.PrerequisitePart.ManualAssetPath
 $Upload2Plex = $config.PrerequisitePart.PlexUpload.tolower()
 $SkipAddText = $config.PrerequisitePart.SkipAddText.tolower()
+$SkipAddTextAndOverlay = $config.PrerequisitePart.SkipAddTextAndOverlay.tolower()
 $DisableHashValidation = $config.PrerequisitePart.DisableHashValidation.tolower()
 $global:DisableOnlineAssetFetch = $config.PrerequisitePart.DisableOnlineAssetFetch.tolower()
 
@@ -7056,7 +6962,14 @@ $global:TitleCards = $config.PrerequisitePart.TitleCards.tolower()
 $SkipTBA = $config.PrerequisitePart.SkipTBA.tolower()
 $SkipJapTitle = $config.PrerequisitePart.SkipJapTitle.tolower()
 $AssetCleanup = $config.PrerequisitePart.AssetCleanup.tolower()
-$NewLineOnSpecificSymbols = $config.PrerequisitePart.NewLineOnSpecificSymbols.tolower()
+$NewLineOnSpecificSymbols = $config.PrerequisitePart.NewLineOnSpecificSymbols
+if ($NewLineOnSpecificSymbols) {
+    $NewLineOnSpecificSymbols = $NewLineOnSpecificSymbols.tolower()
+}
+$SymbolsToKeepOnNewLine = $config.PrerequisitePart.SymbolsToKeepOnNewLine
+if ($SymbolsToKeepOnNewLine) {
+    $SymbolsToKeepOnNewLine = $SymbolsToKeepOnNewLine.tolower()
+}
 $NewLineSymbols = $config.PrerequisitePart.NewLineSymbols
 
 # Resolution Part
@@ -7070,6 +6983,19 @@ $4kBackground = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.P
 $1080pBackground = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.Background1080p -join $($joinsymbol))
 $4kTC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.TC4k -join $($joinsymbol))
 $1080pTC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.TC1080p -join $($joinsymbol))
+
+# Optional 4k
+$4KDoVi = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoVi' -join $($joinsymbol))
+$4KHDR10 = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KHDR10' -join $($joinsymbol))
+$4KDoViHDR10 = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViHDR10' -join $($joinsymbol))
+
+$4KDoViBackground = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViBackground' -join $($joinsymbol))
+$4KHDR10Background = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KHDR10Background' -join $($joinsymbol))
+$4KDoViHDR10Background = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViHDR10Background' -join $($joinsymbol))
+
+$4KDoViTC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViTC' -join $($joinsymbol))
+$4KHDR10TC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KHDR10TC' -join $($joinsymbol))
+$4KDoViHDR10TC = Join-Path -Path $global:ScriptRoot -ChildPath ('temp', $config.PrerequisitePart.'4KDoViHDR10TC' -join $($joinsymbol))
 
 # Poster Overlay Part
 $global:ImageProcessing = $config.OverlayPart.ImageProcessing.tolower()
@@ -7555,7 +7481,7 @@ if ($files.Extension -match "\.(ttf|otf)$" -and $env:POSTERIZARR_NON_ROOT -eq 'T
     & fc-cache -fv 1> $null 2> $null
 }
 
-CheckJsonPaths -font "$font" -RTLfont "$RTLfont" -backgroundfont "$backgroundfont "-titlecardfont "$titlecardfont" -Posteroverlay "$Posteroverlay" -Backgroundoverlay "$Backgroundoverlay" -titlecardoverlay "$titlecardoverlay" -Collectionoverlay "$collectionoverlay" -Seasonoverlay "$Seasonoverlay" -Posteroverlay4k "$4kposter" -Posteroverlay1080p "$1080pPoster" -Backgroundoverlay4k "$4kBackground" -Backgroundoverlay1080p "$1080pBackground" -TCoverlay4k "$4kTC" -TCoverlay1080p "$1080pTC"
+CheckJsonPaths -font "$font" -RTLfont "$RTLfont" -backgroundfont "$backgroundfont" -titlecardfont "$titlecardfont" -Posteroverlay "$Posteroverlay" -Backgroundoverlay "$Backgroundoverlay" -titlecardoverlay "$titlecardoverlay" -Collectionoverlay "$collectionoverlay" -Seasonoverlay "$Seasonoverlay" -Posteroverlay4k "$4kposter" -Posteroverlay1080p "$1080pPoster" -Backgroundoverlay4k "$4kBackground" -Backgroundoverlay1080p "$1080pBackground" -TCoverlay4k "$4kTC" -TCoverlay1080p "$1080pTC" -Posteroverlay4KDoVi "$4KDoVi" -Posteroverlay4KHDR10 "$4KHDR10" -Posteroverlay4KDoViHDR10 "$4KDoViHDR10" -Backgroundoverlay4KDoVi "$4KDoViBackground" -Backgroundoverlay4KHDR10 "$4KHDR10Background" -Backgroundoverlay4KDoViHDR10 "$4KDoViHDR10Background" -TCoverlay4KDoVi "$4KDoViTC" -TCoverlay4KHDR10 "$4KHDR10TC" -TCoverlay4KDoViHDR10 "$4KDoViHDR10TC"
 # Check Plex now:
 if (!$SyncJelly -and !$SyncEmby) {
     if ($UsePlex -eq 'true') {
@@ -7573,7 +7499,7 @@ if (!$SyncJelly -and !$SyncEmby) {
 }
 # Check overlay artwork for poster, background, and titlecard dimensions
 Write-Entry -Message "Checking size of overlay files..." -Path $configLogging -Color White -log Info
-CheckOverlayDimensions -Posteroverlay "$Posteroverlay" -Backgroundoverlay "$Backgroundoverlay" -Titlecardoverlay "$titlecardoverlay" -PosterSize "$PosterSize" -BackgroundSize "$BackgroundSize" -Collectionoverlay "$collectionoverlay" -Seasonoverlay "$Seasonoverlay" -Posteroverlay4k "$4kposter" -Posteroverlay1080p "$1080pPoster" -Backgroundoverlay4k "$4kBackground" -Backgroundoverlay1080p "$1080pBackground" -TCoverlay4k "$4kTC" -TCoverlay1080p "$1080pTC"
+CheckOverlayDimensions -Posteroverlay "$Posteroverlay" -Backgroundoverlay "$Backgroundoverlay" -Titlecardoverlay "$titlecardoverlay" -PosterSize "$PosterSize" -BackgroundSize "$BackgroundSize" -Collectionoverlay "$collectionoverlay" -Seasonoverlay "$Seasonoverlay" -Posteroverlay4k "$4kposter" -Posteroverlay1080p "$1080pPoster" -Backgroundoverlay4k "$4kBackground" -Backgroundoverlay1080p "$1080pBackground" -TCoverlay4k "$4kTC" -TCoverlay1080p "$1080pTC" -Posteroverlay4KDoVi "$4KDoVi" -Posteroverlay4KHDR10 "$4KHDR10" -Posteroverlay4KDoViHDR10 "$4KDoViHDR10" -Backgroundoverlay4KDoVi "$4KDoViBackground" -Backgroundoverlay4KHDR10 "$4KHDR10Background" -Backgroundoverlay4KDoViHDR10 "$4KDoViHDR10Background" -TCoverlay4KDoVi "$4KDoViTC" -TCoverlay4KHDR10 "$4KHDR10TC" -TCoverlay4KDoViHDR10 "$4KDoViHDR10TC"
 
 # Check if the FanartTvAPI module is installed
 $module = Get-Module -ListAvailable -Name FanartTvAPI
@@ -7724,30 +7650,46 @@ if ($Manual) {
     $specialsPattern = '^(?:Specials|Extras|Spéciaux|0{1,2}|[Ss]eason ?0{1,2})$' # Add any other language keywords here
 
     if ([string]::IsNullOrEmpty($PicturePath)) {
-        $PicturePath = Read-Host "Enter local path or url to source picture"
         $TriggeredViaCli = 'true'
-    }
-    if ([string]::IsNullOrEmpty($PicturePath)) {
-        if (-not $PSBoundParameters.ContainsKey('SeasonPoster')) {
-            $response = Read-Host "Create Season Poster? (y/n)"
-            if ($response.ToLower() -eq 'y') { $SeasonPoster = $true }
-        }
-        if (-not $PSBoundParameters.ContainsKey('TitleCard')) {
-            $response = Read-Host "Create TitleCard? (y/n)"
-            if ($response.ToLower() -eq 'y') { $TitleCard = $true }
-        }
-        if (-not $PSBoundParameters.ContainsKey('CollectionCard')) {
-            $response = Read-Host "Create Collection? (y/n)"
-            if ($response.ToLower() -eq 'y') { $CollectionCard = $true }
-        }
-        if (-not $PSBoundParameters.ContainsKey('BackgroundCard')) {
-            $response = Read-Host "Create Background? (y/n)"
-            if ($response.ToLower() -eq 'y') { $BackgroundCard = $true }
+        $PicturePath = Read-Host "Enter local path or url to source picture"
+
+        # 1. Define all poster-related parameters
+        $posterParams = @(
+            'SeasonPoster', 'MoviePosterCard', 'ShowPosterCard',
+            'TitleCard', 'CollectionCard', 'BackgroundCard'
+        )
+
+        # 2. Check if *any* of them were provided when the script was run
+        $anyPosterParamBound = $posterParams.Where({ $PSBoundParameters.ContainsKey($_) }).Count -gt 0
+
+        # 3. Only ask questions if *none* were provided
+        if (-not $anyPosterParamBound) {
+            Write-Host "No poster types specified. Please select which to create."
+
+            # Define the variable names and their prompts
+            $posterPrompts = [Ordered]@{
+                'SeasonPoster'     = "Create Season Poster?"
+                'MoviePosterCard'  = "Create Movie Poster?"
+                'ShowPosterCard'   = "Create Show Poster?"
+                'TitleCard'        = "Create TitleCard?"
+                'CollectionCard'   = "Create Collection?"
+                'BackgroundCard'   = "Create Background?"
+            }
+
+            # Loop through each and ask the user
+            foreach ($item in $posterPrompts.GetEnumerator()) {
+                $response = Read-Host "$($item.Value) (y/n)"
+                if ($response.ToLower() -eq 'y') {
+                    # This sets the variable (e.g., $SeasonPoster) to $true
+                    Set-Variable -Name $item.Key -Value $true
+                }
+            }
         }
 
-        # Error handling for missing selection
-        if (-not ($SeasonPoster -or $TitleCard -or $CollectionCard -or $BackgroundCard)) {
+        # Error handling for missing selection (CORRECTED to check all types)
+        if (-not ($SeasonPoster -or $MoviePosterCard -or $ShowPosterCard -or $TitleCard -or $CollectionCard -or $BackgroundCard)) {
             Write-Entry -Message "No poster type selected. Please select at least one type." -Path $global:ScriptRoot\Logs\Manuallog.log -Color Red -log Error
+
             if (Test-Path $CurrentlyRunning) {
                 try {
                     Remove-Item -LiteralPath $CurrentlyRunning -ErrorAction Stop | Out-Null
@@ -7758,6 +7700,7 @@ if ($Manual) {
                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                 }
             }
+
             if ($global:UptimeKumaUrl) {
                 Send-UptimeKumaWebhook -status "down" -msg "No poster type selected"
             }
@@ -7786,7 +7729,7 @@ if ($Manual) {
 
     # Starting to gather more info
     if ($CollectionCard) {
-        if ($Titletext -eq $null) {
+        if ([string]::IsNullOrEmpty($Titletext)) {
             $Titletext = Read-Host "Enter Movie/Show/Collection Title"
         }
         $FolderName = $Titletext
@@ -7795,7 +7738,7 @@ if ($Manual) {
         if ([string]::IsNullOrEmpty($FolderName)) {
             $FolderName = Read-Host "Enter Media Foldername (how plex sees it)"
         }
-        if ($Titletext -eq $null) {
+        if ([string]::IsNullOrEmpty($Titletext)) {
             $Titletext = Read-Host "Enter Movie/Show/Background Title"
         }
     }
@@ -7809,6 +7752,7 @@ if ($Manual) {
     }
     $FolderName = $FolderName.replace('"', '')
     $Titletext = $Titletext.replace('"', '')
+    $SafeFolderName = $FolderName -replace '[\\/:*?"<>|\[\]{}]', '_'
     if ($MoviePosterCard) {
         $PosterType = "Movie"
     }
@@ -7827,9 +7771,10 @@ if ($Manual) {
         $PosterImageoriginal = "$AssetPath\$LibraryName\$FolderName\poster.jpg"
 
         # Create Folder if Missing
-        $TargetFolder = Join-Path -Path "$AssetPath\$LibraryName" -ChildPath $FolderName
-        New-Item -ItemType Directory -Path $TargetFolder -Force | Out-Null
-
+        if (-not $collectionCard) {
+            $TargetFolder = Join-Path -Path "$AssetPath\$LibraryName" -ChildPath $FolderName
+            New-Item -ItemType Directory -Path $TargetFolder -Force | Out-Null
+        }
         if ($SeasonPoster) {
             $PosterType = "Season"
             if ([string]::IsNullOrEmpty($SeasonPosterName)) {
@@ -7882,8 +7827,8 @@ if ($Manual) {
         }
         Elseif ($CollectionCard) {
             $PosterType = "Collection"
-            $PosterImageoriginal = "$AssetPath\Collections\$LibraryName\$FolderName\poster.jpg"
-            $CollectionPath = "$AssetPath\Collections\$LibraryName\$FolderName"
+            $PosterImageoriginal = "$AssetPath\Collections\$LibraryName\$SafeFolderName\poster.jpg"
+            $CollectionPath = "$AssetPath\Collections\$LibraryName\$SafeFolderName"
             # Ensure the Collection directory exists
             if (!(Test-Path $CollectionPath)) {
                 try {
@@ -7985,7 +7930,7 @@ if ($Manual) {
         }
         Elseif ($CollectionCard) {
             $PosterType = "Collection"
-            $PosterImageoriginal = "$AssetPath\Collections\$($FolderName)_poster.jpg"
+            $PosterImageoriginal = "$AssetPath\Collections\$($SafeFolderName)_poster.jpg"
             $CollectionPath = "$AssetPath\Collections"
             # Ensure the Collection directory exists
             if (!(Test-Path $CollectionPath)) {
@@ -8031,7 +7976,12 @@ if ($Manual) {
         }
     }
 
-    $PosterImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$FolderName.jpg"
+    if ($CollectionCard){
+        $PosterImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$SafeFolderName.jpg"
+    }
+    Else {
+        $PosterImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$FolderName.jpg"
+    }
     $PosterImage = $PosterImage.Replace('[', '_').Replace(']', '_').Replace('{', '_').Replace('}', '_')
     if ($global:ImageProcessing -eq 'true') {
         if ($SeasonPoster) {
@@ -8150,15 +8100,15 @@ if ($Manual) {
         InvokeMagickCommand -Command $magick -Arguments $CommentArguments
         if (!$global:ImageMagickError -eq 'true') {
             if ($SeasonPoster) {
-                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
-                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
-                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
@@ -8188,15 +8138,15 @@ if ($Manual) {
                 $collectionCount++
             }
             elseif ($TitleCard) {
-                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
-                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
-                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
@@ -8208,15 +8158,15 @@ if ($Manual) {
             }
             elseif ($BackgroundCard) {
                 # Resize Image to 2000x3000 and apply Border and overlay
-                if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
-                if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
-                if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
@@ -8228,15 +8178,15 @@ if ($Manual) {
             }
             Else {
                 # Resize Image to 2000x3000 and apply Border and overlay
-                if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
-                if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
-                if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
@@ -8257,12 +8207,33 @@ if ($Manual) {
                     # Loop through each symbol and replace it with a newline
                     if ($NewLineOnSpecificSymbols -eq 'true') {
                         foreach ($symbol in $NewLineSymbols) {
-                            $ShowjoinedTitle = $ShowjoinedTitle -replace [regex]::Escape($symbol), "`n"
+                            # Default: Replace the symbol with a newline
+                            $replacementString = "`n"
+
+                            # Check if the symbol should be kept
+                            $keepThisSymbol = $false
+                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                    if ($symbol -like "*$k*") {
+                                        $keepThisSymbol = $true
+                                        break # Match found, no need to keep checking
+                                    }
+                                }
+                            }
+
+                            # If it's a "keep" symbol, change the replacement string
+                            if ($keepThisSymbol) {
+                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                $replacementString = $symbol + "`n"
+                            }
+                            $ShowjoinedTitle = $ShowjoinedTitle -replace [regex]::Escape($symbol), $replacementString
                         }
                     }
                     $ShowjoinedTitlePointSize = $ShowjoinedTitle -replace '""', '""""'
                     $showoptimalFontSize = Get-OptimalPointSize -text $ShowjoinedTitlePointSize -font $fontImagemagick -box_width $ShowOnSeasonMaxWidth  -box_height $ShowOnSeasonMaxHeight -min_pointsize $ShowOnSeasonminPointSize -max_pointsize $ShowOnSeasonmaxPointSize -lineSpacing $ShowOnSeasonlineSpacing
-                    Write-Entry -Subtext "Optimal show font size set to: '$showoptimalFontSize'" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
+                    Write-Entry -Subtext ("Optimal Show font size set to: '{0}' [{1}]" -f $showoptimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
 
                 }
                 if ($AddCollectionTitle -eq 'true' -and $CollectionCard) {
@@ -8270,25 +8241,67 @@ if ($Manual) {
                     # Loop through each symbol and replace it with a newline
                     if ($NewLineOnSpecificSymbols -eq 'true') {
                         foreach ($symbol in $NewLineSymbols) {
-                            $CollectionjoinedTitle = $CollectionjoinedTitle -replace [regex]::Escape($symbol), "`n"
+                            # Default: Replace the symbol with a newline
+                            $replacementString = "`n"
+
+                            # Check if the symbol should be kept
+                            $keepThisSymbol = $false
+                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                    if ($symbol -like "*$k*") {
+                                        $keepThisSymbol = $true
+                                        break # Match found, no need to keep checking
+                                    }
+                                }
+                            }
+
+                            # If it's a "keep" symbol, change the replacement string
+                            if ($keepThisSymbol) {
+                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                $replacementString = $symbol + "`n"
+                            }
+                            $CollectionjoinedTitle = $CollectionjoinedTitle -replace [regex]::Escape($symbol), $replacementString
                         }
                     }
                     $CollectionjoinedTitlePointSize = $CollectionjoinedTitle -replace '""', '""""'
                     $CollectionTitleoptimalFontSize = Get-OptimalPointSize -text $CollectionjoinedTitlePointSize -font $CollectionfontImagemagick -box_width $CollectionTitleMaxWidth  -box_height $CollectionTitleMaxHeight -min_pointsize $CollectionTitleminPointSize -max_pointsize $CollectionTitlemaxPointSize -lineSpacing $CollectionTitlelineSpacing
-                    Write-Entry -Subtext "Optimal Collection Title font size set to: '$CollectionTitleoptimalFontSize'" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
+                    Write-Entry -Subtext ("Optimal Collection Title font size set to: '{0}' [{1}]" -f $CollectionTitleoptimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
 
                 }
                 if ($AddTitleCardEPText -eq 'true' -and $TitleCard) {
                     $EPNumberjoinedTitle = $EPNumberTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                     $EPNumberjoinedTitlePointSize = $EPNumberjoinedTitle -replace '""', '""""'
                     $EPNumberoptimalFontSize = Get-OptimalPointSize -text $EPNumberjoinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
-                    Write-Entry -Subtext "Optimal EP Number font size set to: '$EPNumberoptimalFontSize'" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
+                    Write-Entry -Subtext ("Optimal EP Number font size set to: '{0}' [{1}]" -f $EPNumberoptimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
 
                 }
                 # Loop through each symbol and replace it with a newline
                 if ($NewLineOnSpecificSymbols -eq 'true') {
                     foreach ($symbol in $NewLineSymbols) {
-                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                        # Default: Replace the symbol with a newline
+                        $replacementString = "`n"
+
+                        # Check if the symbol should be kept
+                        $keepThisSymbol = $false
+                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                if ($symbol -like "*$k*") {
+                                    $keepThisSymbol = $true
+                                    break # Match found, no need to keep checking
+                                }
+                            }
+                        }
+
+                        # If it's a "keep" symbol, change the replacement string
+                        if ($keepThisSymbol) {
+                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                            $replacementString = $symbol + "`n"
+                        }
+                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                     }
                 }
 
@@ -8296,7 +8309,7 @@ if ($Manual) {
 
                 if ($SeasonPoster -and $AddSeasonText -eq 'true') {
                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
-                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
+                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                     # Add Stroke
                     if ($AddSeasonTextStroke -eq 'true') {
                         $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Seasonfontcolor`" -stroke `"$Seasonstrokecolor`" -strokewidth `"$Seasonstrokewidth`" -size `"$Seasonboxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Seasonboxsize`" `) -gravity south -geometry +0`"$Seasontext_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
@@ -8389,7 +8402,7 @@ if ($Manual) {
                 }
                 Elseif ($BackgroundCard -and $AddBackgroundText -eq 'true') {
                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
+                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                     # Add Stroke
                     if ($AddTextStroke -eq 'true') {
                         $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$strokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
@@ -8404,7 +8417,7 @@ if ($Manual) {
                 }
                 Elseif ($AddText -eq 'true') {
                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
+                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                     # Add Stroke
                     if ($AddTextStroke -eq 'true') {
                         $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
@@ -8731,7 +8744,7 @@ Elseif ($Testing) {
 
     Write-Entry -Subtext "Poster Part:" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     if ($AddText -eq 'true') {
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsShort = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterShort`""
             $ArgumentsMedium = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterMedium`""
             $ArgumentsLong = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterLong`""
@@ -8740,7 +8753,7 @@ Elseif ($Testing) {
             $ArgumentsLongCAPS = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Poster Borders | Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsShort = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterShort`""
             $ArgumentsMedium = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterMedium`""
             $ArgumentsLong = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterLong`""
@@ -8749,7 +8762,7 @@ Elseif ($Testing) {
             $ArgumentsLongCAPS = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsShort = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$TestPosterShort`""
             $ArgumentsMedium = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$TestPosterMedium`""
             $ArgumentsLong = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$TestPosterLong`""
@@ -8792,15 +8805,15 @@ Elseif ($Testing) {
         InvokeMagickCommand -Command $magick -Arguments $ArgumentsLongCAPS
     }
     Else {
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsTextless = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Borders | Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsTextless = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsTextless = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$TestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
@@ -8880,7 +8893,7 @@ Elseif ($Testing) {
 
     Write-Entry -Subtext "Season Poster Part:" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     if ($AddSeasonText -eq 'true') {
-        if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+        if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsShort = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterShort`""
             $SeasonArgumentsMedium = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterMedium`""
             $SeasonArgumentsLong = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterLong`""
@@ -8889,7 +8902,7 @@ Elseif ($Testing) {
             $SeasonArgumentsLongCAPS = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterLongCAPS`""
             Write-Entry -Subtext "Adding Season Poster Borders | Adding Season Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+        if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsShort = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterShort`""
             $SeasonArgumentsMedium = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterMedium`""
             $SeasonArgumentsLong = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterLong`""
@@ -8898,7 +8911,7 @@ Elseif ($Testing) {
             $SeasonArgumentsLongCAPS = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterLongCAPS`""
             Write-Entry -Subtext "Adding Season Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+        if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsShort = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$TestSeasonPosterShort`""
             $SeasonArgumentsMedium = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$TestSeasonPosterMedium`""
             $SeasonArgumentsLong = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$TestSeasonPosterLong`""
@@ -8941,15 +8954,15 @@ Elseif ($Testing) {
         InvokeMagickCommand -Command $magick -Arguments $SeasonArgumentsLongCAPS
     }
     Else {
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsTextless = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterTextless`""
             Write-Entry -Subtext "Adding Season Poster Borders | Adding Season Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsTextless = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterTextless`""
             Write-Entry -Subtext "Adding Season Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsTextless = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$TestSeasonPosterTextless`""
             Write-Entry -Subtext "Adding Season Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
@@ -9084,7 +9097,7 @@ Elseif ($Testing) {
     Write-Entry -Subtext "Background Part:" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     # Border/Overlay Background Part
     if ($AddBackgroundText -eq 'true') {
-        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $backgroundArgumentsShort = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterShort`""
             $backgroundArgumentsMedium = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterMedium`""
             $backgroundArgumentsLong = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterLong`""
@@ -9093,7 +9106,7 @@ Elseif ($Testing) {
             $backgroundArgumentsLongCAPS = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Background Borders | Adding Background Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $backgroundArgumentsShort = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterShort`""
             $backgroundArgumentsMedium = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterMedium`""
             $backgroundArgumentsLong = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterLong`""
@@ -9102,7 +9115,7 @@ Elseif ($Testing) {
             $backgroundArgumentsLongCAPS = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Background Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $backgroundArgumentsShort = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundTestPosterShort`""
             $backgroundArgumentsMedium = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundTestPosterMedium`""
             $backgroundArgumentsLong = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundTestPosterLong`""
@@ -9144,15 +9157,15 @@ Elseif ($Testing) {
         InvokeMagickCommand -Command $magick -Arguments $backgroundArgumentsLongCAPS
     }
     Else {
-        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $BackgroundArgumentsTextless = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$BackgroundTestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Borders | Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $BackgroundArgumentsTextless = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$BackgroundTestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $BackgroundArgumentsTextless = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$BackgroundTestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
@@ -9229,7 +9242,7 @@ Elseif ($Testing) {
     Write-Entry -Subtext "TitleCard Part:" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     # Border/Overlay TitleCard Part
     if ($AddTitleCardEPTitleText -eq 'true' -or $AddTitleCardEPText -eq 'true') {
-        if ($Addtitlecardborder -eq 'true' -and $Addtitlecardoverlay -eq 'true') {
+        if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $titlecardArgumentsShort = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterShort`""
             $titlecardArgumentsMedium = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterMedium`""
             $titlecardArgumentsLong = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterLong`""
@@ -9238,7 +9251,7 @@ Elseif ($Testing) {
             $titlecardArgumentsLongCAPS = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Background Borders | Adding Background Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($Addtitlecardborder -eq 'true' -and $Addtitlecardoverlay -eq 'false') {
+        if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $titlecardArgumentsShort = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterShort`""
             $titlecardArgumentsMedium = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterMedium`""
             $titlecardArgumentsLong = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterLong`""
@@ -9247,7 +9260,7 @@ Elseif ($Testing) {
             $titlecardArgumentsLongCAPS = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Background Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($Addtitlecardborder -eq 'false' -and $Addtitlecardoverlay -eq 'true') {
+        if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $titlecardArgumentsShort = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$titlecardtestPosterShort`""
             $titlecardArgumentsMedium = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$titlecardtestPosterMedium`""
             $titlecardArgumentsLong = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$titlecardtestPosterLong`""
@@ -9289,15 +9302,15 @@ Elseif ($Testing) {
         InvokeMagickCommand -Command $magick -Arguments $titlecardArgumentsLongCAPS
     }
     Else {
-        if ($Addtitlecardborder -eq 'true' -and $Addtitlecardoverlay -eq 'true') {
+        if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $TitleCardArgumentsTextless = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$TitleCardTestPosterTextless`""
             Write-Entry -Subtext "Adding TitleCard Borders | Adding TitleCard Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($Addtitlecardborder -eq 'true' -and $Addtitlecardoverlay -eq 'false') {
+        if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $TitleCardArgumentsTextless = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$TitleCardTestPosterTextless`""
             Write-Entry -Subtext "Adding TitleCard Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($Addtitlecardborder -eq 'false' -and $Addtitlecardoverlay -eq 'true') {
+        if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $TitleCardArgumentsTextless = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$TitleCardTestPosterTextless`""
             Write-Entry -Subtext "Adding TitleCard Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
@@ -9504,159 +9517,17 @@ Elseif ($Testing) {
     Write-Entry -Subtext "Deleting backgroundtestimage: $backgroundtestimage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     Remove-Item -LiteralPath $backgroundtestimage | out-null
     Write-Entry -Subtext "Poster/Background/TitleCard Tests finished, you can find them here: $(Join-Path $global:ScriptRoot 'test')" -Path (Join-Path $global:ScriptRoot 'Logs\Testinglog.log') -Color Green -log Info
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     $gettestimages = Get-ChildItem $global:ScriptRoot\test
     $titlecardscount = ($gettestimages | Where-Object { $_.name -like 'Title*' }).count
     $backgroundsscount = ($gettestimages | Where-Object { $_.name -like 'back*' }).count
     $posterscount = ($gettestimages | Where-Object { $_.name -like 'poster*' }).count
     $seasonscount = ($gettestimages | Where-Object { $_.name -like 'SeasonPoster*' }).count
-    if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -notlike 'PSDocker*') {
-        $jsonPayload = @"
-        {
-            "username": "$global:DiscordUserName",
-            "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-            "content": "",
-            "embeds": [
-            {
-                "author": {
-                "name": "Posterizarr @Github",
-                "url": "https://github.com/fscorrupt/Posterizarr"
-                },
-                "description": "Test run took: $FormattedTimespawn",
-                "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                "fields": [
-                {
-                    "name": "",
-                    "value": ":bar_chart:",
-                    "inline": false
-                },
-                {
-                    "name": "Truncated",
-                    "value": "$TruncatedCount",
-                    "inline": false
-                },
-                {
-                    "name": "",
-                    "value": ":frame_photo:",
-                    "inline": false
-                },
-                {
-                    "name": "Posters",
-                    "value": "$posterscount",
-                    "inline": true
-                },
-                {
-                    "name": "Seasons",
-                    "value": "$seasonscount",
-                    "inline": true
-                },
-                {
-                    "name": "Backgrounds",
-                    "value": "$backgroundsscount",
-                    "inline": true
-                },
-                {
-                    "name": "TitleCards",
-                    "value": "$titlecardscount",
-                    "inline": true
-                }
-                ],
-                "thumbnail": {
-                    "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                },
-                "footer": {
-                    "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                }
 
-            }
-            ]
-        }
-"@
-        if ($global:SendNotification -eq 'true') {
-            Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-        }
-    }
-    if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*') {
-        if ($global:NotifyUrl -like '*discord*') {
-            $jsonPayload = @"
-            {
-                "username": "$global:DiscordUserName",
-                "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                "content": "",
-                "embeds": [
-                {
-                    "author": {
-                    "name": "Posterizarr @Github",
-                    "url": "https://github.com/fscorrupt/Posterizarr"
-                    },
-                    "description": "Test run took: $FormattedTimespawn",
-                    "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                    "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                    "fields": [
-                    {
-                        "name": "",
-                        "value": ":bar_chart:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Truncated",
-                        "value": "$TruncatedCount",
-                        "inline": false
-                    },
-                    {
-                        "name": "",
-                        "value": ":frame_photo:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Posters",
-                        "value": "$posterscount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Seasons",
-                        "value": "$seasonscount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Backgrounds",
-                        "value": "$backgroundsscount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TitleCards",
-                        "value": "$titlecardscount",
-                        "inline": true
-                    }
-                    ],
-                    "thumbnail": {
-                        "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                    },
-                    "footer": {
-                        "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                    }
+    # Send Notification
+    Send-SummaryNotification -ScriptMode $mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -TruncatedCount $TruncatedCount -PosterCount $posterscount -BackgroundCount $backgroundsscount -SeasonCount $seasonscount -EpisodeCount $titlecardscount
 
-                }
-                ]
-            }
-"@
-            $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-            if ($global:SendNotification -eq 'true') {
-                Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-            }
-        }
-        Else {
-            if ($global:SendNotification -eq 'true') {
-                if ($TruncatedCount -ge '1') {
-                    apprise --notification-type="failure" --title="Posterizarr" --body="Test run took: $FormattedTimespawn`nDuring execution '$TruncatedCount' times the text got truncated, please check log for detailed description." "$global:NotifyUrl"
-                }
-                Else {
-                    apprise --notification-type="success" --title="Posterizarr" --body="Test run took: $FormattedTimespawn" "$global:NotifyUrl"
-                }
-            }
-        }
-    }
     if ((Test-Path $global:ScriptRoot\Logs\ImageChoices.csv)) {
         # Calculate Summary
         $SummaryCount = Import-Csv -LiteralPath "$global:ScriptRoot\Logs\ImageChoices.csv" -Delimiter ';'
@@ -9718,7 +9589,7 @@ Elseif ($Tautulli) {
     # {parent_rating_key}	The unique identifier for the season or album.
     # {grandparent_rating_key}	The unique identifier for the TV show or artist.
     $Mode = "tautulli"
-
+    Write-Entry -Message "Tautulli Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libraries = @()
     if (($RatingKey -or $parentratingkey -or $grandparentratingkey) -and $mediatype) {
         if ($mediatype -eq 'movie') {
@@ -9963,57 +9834,11 @@ Elseif ($Tautulli) {
                 Write-Entry -Subtext "Found [$($tempseasondata.{Show Name})] of type $($tempseasondata.Type) for season $($tempseasondata.{Season Number})" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
             }
         }
-        $Episodedata | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
         if ($Episodedata) {
             Write-Entry -Subtext "Found '$($Episodedata.Episodes.split(',').count)' Episodes..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
         }
     }
 
-    # Test if csv´s are missing and create dummy file.
-    if (!(Get-ChildItem -LiteralPath "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -ErrorAction SilentlyContinue)) {
-        $EpisodeDummycsv = New-Object psobject
-
-        # Add members to the object with empty values
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Show Name" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Type" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "tvdbid" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "tmdbid" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Library Name" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Season Number" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Episodes" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Title" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "RatingKeys" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "PlexTitleCardUrls" -Value $null
-
-        $EpisodeDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-        Write-Entry -Message "No PlexEpisodeExport.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-    }
-    if (!(Get-ChildItem -LiteralPath "$global:ScriptRoot\Logs\PlexLibexport.csv" -ErrorAction SilentlyContinue)) {
-        # Add members to the object with empty values
-        $PlexLibDummycsv = New-Object psobject
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Name" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Type" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Language" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "title" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "originalTitle" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonNames" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonNumbers" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonRatingKeys" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "year" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "tvdbid" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "imdbid" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "tmdbid" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "ratingKey" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Path" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "RootFoldername" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "MultipleVersions" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexPosterUrl" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexBackgroundUrl" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexSeasonUrls" -Value $null
-
-        $PlexLibDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexLibexport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-        Write-Entry -Message "No PlexLibexport.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-    }
     # Store all Files from asset dir in a hashtable
     Write-Entry -Message "Creating Hashtable of all posters in asset dir..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     try {
@@ -10421,21 +10246,24 @@ Elseif ($Tautulli) {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -10446,11 +10274,11 @@ Elseif ($Tautulli) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -10459,13 +10287,34 @@ Elseif ($Tautulli) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                 # Add Stroke
                                                 if ($AddTextStroke -eq 'true') {
@@ -10496,18 +10345,42 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $PosterImage `
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -10551,7 +10424,7 @@ Elseif ($Tautulli) {
 
                                         # Export the array to a CSV file
                                         $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $movietemp.Type -title $movietemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
+                                        SendMessage -type $movietemp.Type -title $movietemp.Title -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
                                     }
                                 }
                             }
@@ -10862,21 +10735,24 @@ Elseif ($Tautulli) {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $backgroundoverlay = $4kBackground }
-                                                '1080p' { $backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -10887,11 +10763,11 @@ Elseif ($Tautulli) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -10900,13 +10776,34 @@ Elseif ($Tautulli) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                 # Add Stroke
                                                 if ($AddBackgroundTextStroke -eq 'true') {
@@ -10937,18 +10834,42 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $backgroundImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -10992,7 +10913,7 @@ Elseif ($Tautulli) {
                                         }
                                         # Export the array to a CSV file
                                         $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
+                                        SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
                                     }
                                 }
                             }
@@ -11391,21 +11312,24 @@ Elseif ($Tautulli) {
                                 if (!$global:ImageMagickError -eq 'true') {
                                     if ($UsePosterResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $Posteroverlay = $4kposter }
-                                            '1080p' { $Posteroverlay = $1080pPoster }
+                                            '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                            '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                            '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                            '4K'            { $Posteroverlay = $4kposter }
+                                            '1080p'         { $Posteroverlay = $1080pPoster }
                                             Default { $Posteroverlay = $Posteroverlay }
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -11416,11 +11340,11 @@ Elseif ($Tautulli) {
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -11429,13 +11353,34 @@ Elseif ($Tautulli) {
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $SeasonlineSpacing
                                         if (!$global:IsTruncated) {
-                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                             # Add Stroke
                                             if ($AddTextStroke -eq 'true') {
@@ -11466,18 +11411,42 @@ Elseif ($Tautulli) {
                                     if (!$global:IsTruncated) {
                                         try {
                                             Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                            $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                            if ($PlexToken) {
-                                                $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                            # Verify variables before uploading
+                                            Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                            $uri = if ($PlexToken) {
+                                                "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                             }
                                             Else {
-                                                $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                            }
+                                            Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            # Try uploading, capturing the response in detail
+                                            $Upload = Invoke-WebRequest -Uri $uri `
+                                                                        -Method Post `
+                                                                        -Headers $extraPlexHeaders `
+                                                                        -InFile $PosterImage`
+                                                                        -ContentType 'image/jpeg' `
+                                                                        -SkipHttpErrorCheck `
+                                                                        -ErrorAction Stop
+
+                                            if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                            }
+                                            else {
+                                                Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                             }
                                         }
                                         catch {
-                                            Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                            $global:errorCount++
+                                            Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                         }
                                         try {
                                             # Attempt to move the item
@@ -11520,7 +11489,7 @@ Elseif ($Tautulli) {
                                     }
                                     # Export the array to a CSV file
                                     $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                    SendMessage -type $showtemp.Type -title $showtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
+                                    SendMessage -type $showtemp.Type -title $showtemp.Title -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
                                 }
                             }
                         }
@@ -11843,21 +11812,24 @@ Elseif ($Tautulli) {
                                 if (!$global:ImageMagickError -eq 'true') {
                                     if ($UseBackgroundResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $Backgroundoverlay = $4kBackground }
-                                            '1080p' { $Backgroundoverlay = $1080pBackground }
+                                            '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                            '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                            '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                            '4K'            { $backgroundoverlay = $4kBackground }
+                                            '1080p'         { $backgroundoverlay = $1080pBackground }
                                             Default { $Backgroundoverlay = $Backgroundoverlay }
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -11868,11 +11840,11 @@ Elseif ($Tautulli) {
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -11881,13 +11853,34 @@ Elseif ($Tautulli) {
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                         if (!$global:IsTruncated) {
-                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                             # Add Stroke
                                             if ($AddBackgroundTextStroke -eq 'true') {
@@ -11923,18 +11916,42 @@ Elseif ($Tautulli) {
                                     if (!$global:IsTruncated) {
                                         try {
                                             Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                            $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                            if ($PlexToken) {
-                                                $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                            # Verify variables before uploading
+                                            Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                            $uri = if ($PlexToken) {
+                                                "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                             }
                                             Else {
-                                                $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                            }
+                                            Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            # Try uploading, capturing the response in detail
+                                            $Upload = Invoke-WebRequest -Uri $uri `
+                                                                        -Method Post `
+                                                                        -Headers $extraPlexHeaders `
+                                                                        -InFile $backgroundImage`
+                                                                        -ContentType 'image/jpeg' `
+                                                                        -SkipHttpErrorCheck `
+                                                                        -ErrorAction Stop
+
+                                            if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                            }
+                                            else {
+                                                Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                             }
                                         }
                                         catch {
-                                            Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                            $global:errorCount++
+                                            Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                         }
                                         try {
                                             # Attempt to move the item
@@ -11978,7 +11995,7 @@ Elseif ($Tautulli) {
                                     }
                                     # Export the array to a CSV file
                                     $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                    SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
+                                    SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
                                 }
                             }
                         }
@@ -12398,15 +12415,15 @@ Elseif ($Tautulli) {
                                         InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                         if (!$global:ImageMagickError -eq 'true') {
                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                            if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -12418,11 +12435,11 @@ Elseif ($Tautulli) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                 if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                     $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -12433,9 +12450,30 @@ Elseif ($Tautulli) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                         if ($AddShowTitletoSeason -eq 'true') {
-                                                            $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                            $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
                                                 }
@@ -12445,8 +12483,8 @@ Elseif ($Tautulli) {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                     $ShowoptimalFontSize = Get-OptimalPointSize -text $joinedShowTitlePointSize -font $fontImagemagick -box_width $ShowOnSeasonMaxWidth  -box_height $ShowOnSeasonMaxHeight -min_pointsize $ShowOnSeasonminPointSize -max_pointsize $ShowOnSeasonmaxPointSize -lineSpacing $ShowOnSeasonlineSpacing
                                                     if (!$global:IsTruncated) {
-                                                        Write-Entry -Subtext "Optimal Season font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                        Write-Entry -Subtext "Optimal Show font size set to: '$ShowoptimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext ("Optimal Season font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext ("Optimal Show font size set to: '{0}' [{1}]" -f $showoptimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         # Season Part
                                                         # Add Stroke
                                                         if ($AddSeasonTextStroke -eq 'true') {
@@ -12479,7 +12517,7 @@ Elseif ($Tautulli) {
                                                 Else {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                     if (!$global:IsTruncated) {
-                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         # Add Stroke
                                                         if ($AddSeasonTextStroke -eq 'true') {
                                                             $Arguments = "`"$SeasonImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Seasonfontcolor`" -stroke `"$Seasonstrokecolor`" -strokewidth `"$Seasonstrokewidth`" -size `"$Seasonboxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$global:seasonTitle`" -trim +repage -extent `"$Seasonboxsize`" `) -gravity south -geometry +0`"$Seasontext_offset`" -quality $global:outputQuality -composite `"$SeasonImage`""
@@ -12572,18 +12610,42 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $SeasonImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -12627,7 +12689,7 @@ Elseif ($Tautulli) {
                                         }
                                         # Export the array to a CSV file
                                         $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $seasontemp.Type -title $seasontemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
+                                        SendMessage -type $seasontemp.Type -title $seasontemp.Title -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
                                     }
                                 }
                             }
@@ -13001,21 +13063,24 @@ Elseif ($Tautulli) {
                                                             if (!$global:ImageMagickError -eq 'true') {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -13026,11 +13091,11 @@ Elseif ($Tautulli) {
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -13042,13 +13107,34 @@ Elseif ($Tautulli) {
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                         # Add Stroke
                                                                         if ($AddTitleCardEPTitleTextStroke -eq 'true') {
                                                                             $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPTitlefontcolor`" -stroke `"$TitleCardEPTitlestrokecolor`" -strokewidth `"$TitleCardEPTitlestrokewidth`" -size `"$TitleCardEPTitleboxsize`" -background none -interline-spacing `"$TitleCardEPTitlelineSpacing`" -gravity `"$TitleCardEPTitletextgravity`" caption:`"$global:EPTitle`" -trim +repage -extent `"$TitleCardEPTitleboxsize`" `) -gravity south -geometry +0`"$TitleCardEPTitletext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -13063,11 +13149,11 @@ Elseif ($Tautulli) {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -13075,7 +13161,7 @@ Elseif ($Tautulli) {
                                                                     $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                         # Add Stroke
                                                                         if ($AddTitleCardTextStroke -eq 'true') {
                                                                             $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPfontcolor`" -stroke `"$TitleCardstrokecolor`" -strokewidth `"$TitleCardstrokewidth`" -size `"$TitleCardEPboxsize`" -background none -interline-spacing `"$TitleCardEPlineSpacing`" -gravity `"$TitleCardEPtextgravity`" caption:`"$global:SeasonEPNumber`" -trim +repage -extent `"$TitleCardEPboxsize`" `) -gravity south -geometry +0`"$TitleCardEPtext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -13155,18 +13241,42 @@ Elseif ($Tautulli) {
                                                         if (!$global:IsTruncated) {
                                                             try {
                                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                if ($PlexToken) {
-                                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                # Verify variables before uploading
+                                                                Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                $uri = if ($PlexToken) {
+                                                                    "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                 }
                                                                 Else {
-                                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                }
+                                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                # Try uploading, capturing the response in detail
+                                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                            -Method Post `
+                                                                                            -Headers $extraPlexHeaders `
+                                                                                            -InFile $EpisodeImage`
+                                                                                            -ContentType 'image/jpeg' `
+                                                                                            -SkipHttpErrorCheck `
+                                                                                            -ErrorAction Stop
+
+                                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                }
+                                                                else {
+                                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                 }
                                                             }
                                                             catch {
-                                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                $global:errorCount++
+                                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                             }
                                                             try {
                                                                 # Attempt to move the item
@@ -13210,7 +13320,7 @@ Elseif ($Tautulli) {
                                                         }
                                                         # Export the array to a CSV file
                                                         $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                        SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                        SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                     }
                                                 }
                                             }
@@ -13562,21 +13672,24 @@ Elseif ($Tautulli) {
                                                         if (!$global:ImageMagickError -eq 'true') {
                                                             if ($UseTCResolutionOverlays -eq 'true') {
                                                                 switch ($global:EPResolution) {
-                                                                    '4K' { $TitleCardoverlay = $4kTC }
-                                                                    '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                    '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                    '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                    '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                    '4K'            { $TitleCardoverlay = $4kTC }
+                                                                    '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                     Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                 }
                                                             }
                                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
@@ -13587,11 +13700,11 @@ Elseif ($Tautulli) {
                                                             $logEntry = "`"$magick`" $Arguments"
                                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -13603,13 +13716,34 @@ Elseif ($Tautulli) {
                                                                 # Loop through each symbol and replace it with a newline
                                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                     foreach ($symbol in $NewLineSymbols) {
-                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                        # Default: Replace the symbol with a newline
+                                                                        $replacementString = "`n"
+
+                                                                        # Check if the symbol should be kept
+                                                                        $keepThisSymbol = $false
+                                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                if ($symbol -like "*$k*") {
+                                                                                    $keepThisSymbol = $true
+                                                                                    break # Match found, no need to keep checking
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        # If it's a "keep" symbol, change the replacement string
+                                                                        if ($keepThisSymbol) {
+                                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                            $replacementString = $symbol + "`n"
+                                                                        }
+                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                 if (!$global:IsTruncated) {
-                                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     # Add Stroke
                                                                     if ($AddTitleCardEPTitleTextStroke -eq 'true') {
                                                                         $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPTitlefontcolor`" -stroke `"$TitleCardEPTitlestrokecolor`" -strokewidth `"$TitleCardEPTitlestrokewidth`" -size `"$TitleCardEPTitleboxsize`" -background none -interline-spacing `"$TitleCardEPTitlelineSpacing`" -gravity `"$TitleCardEPTitletextgravity`" caption:`"$global:EPTitle`" -trim +repage -extent `"$TitleCardEPTitleboxsize`" `) -gravity south -geometry +0`"$TitleCardEPTitletext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -13623,11 +13757,11 @@ Elseif ($Tautulli) {
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
                                                             }
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -13635,7 +13769,7 @@ Elseif ($Tautulli) {
                                                                 $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                 if (!$global:IsTruncated) {
-                                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     # Add Stroke
                                                                     if ($AddTitleCardTextStroke -eq 'true') {
                                                                         $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPfontcolor`" -stroke `"$TitleCardstrokecolor`" -strokewidth `"$TitleCardstrokewidth`" -size `"$TitleCardEPboxsize`" -background none -interline-spacing `"$TitleCardEPlineSpacing`" -gravity `"$TitleCardEPtextgravity`" caption:`"$global:SeasonEPNumber`" -trim +repage -extent `"$TitleCardEPboxsize`" `) -gravity south -geometry +0`"$TitleCardEPtext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -13714,18 +13848,42 @@ Elseif ($Tautulli) {
                                                         if (!$global:IsTruncated) {
                                                             try {
                                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                if ($PlexToken) {
-                                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                # Verify variables before uploading
+                                                                Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                $uri = if ($PlexToken) {
+                                                                    "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                 }
                                                                 Else {
-                                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                }
+                                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                # Try uploading, capturing the response in detail
+                                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                            -Method Post `
+                                                                                            -Headers $extraPlexHeaders `
+                                                                                            -InFile $EpisodeImage`
+                                                                                            -ContentType 'image/jpeg' `
+                                                                                            -SkipHttpErrorCheck `
+                                                                                            -ErrorAction Stop
+
+                                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                }
+                                                                else {
+                                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                 }
                                                             }
                                                             catch {
-                                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                $global:errorCount++
+                                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                             }
                                                             try {
                                                                 # Attempt to move the item
@@ -13769,7 +13927,7 @@ Elseif ($Tautulli) {
                                                         }
                                                         # Export the array to a CSV file
                                                         $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                        SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                        SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                     }
                                                 }
                                             }
@@ -13896,6 +14054,7 @@ Elseif ($Tautulli) {
         $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
         Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Export json
@@ -13948,7 +14107,7 @@ Elseif ($ArrTrigger) {
     $posterCount = 0
     $arrplatform = $arrTriggers['arr_platform']
     $Mode = "arr"
-
+    Write-Entry -Message "ArrTrigger Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     switch ($arrplatform) {
         'Sonarr' {
             Write-Entry -Message "Processing Sonarr trigger" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
@@ -14450,9 +14609,6 @@ Elseif ($ArrTrigger) {
             }
         }
         Write-Entry -Subtext "Found '$($Libraries.count)' Items..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-        $Libraries | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\OtherMediaServerLibExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-        Write-Entry -Message "Export everything to a csv: $global:ScriptRoot\Logs\OtherMediaServerLibExport.csv" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-
         Write-Entry -Message "Starting episode data query now - This can take a while..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -Log Info
 
         $Episodedata = @()
@@ -14542,7 +14698,6 @@ Elseif ($ArrTrigger) {
         }
 
         # Export the formatted data to CSV
-        $FormattedData | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\OtherMediaServerEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
         $Episodedata = $FormattedData
         if ($AllEpisodes) {
             Write-Entry -Subtext "Found '$($AllEpisodes.Items.count)' Episodes..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
@@ -14927,21 +15082,24 @@ Elseif ($ArrTrigger) {
                                         if (!$global:ImageMagickError -eq 'True') {
                                             if ($UsePosterResolutionOverlays -eq 'true') {
                                                 switch ($entry.Resolution) {
-                                                    '4K' { $Posteroverlay = $4kposter }
-                                                    '1080p' { $Posteroverlay = $1080pPoster }
+                                                    '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                    '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                    '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                    '4K'            { $Posteroverlay = $4kposter }
+                                                    '1080p'         { $Posteroverlay = $1080pPoster }
                                                     Default { $Posteroverlay = $Posteroverlay }
                                                 }
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                            if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -14952,11 +15110,11 @@ Elseif ($ArrTrigger) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $fontImagemagick = $RTLfontImagemagick
                                                 }
@@ -14964,13 +15122,34 @@ Elseif ($ArrTrigger) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                 if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     # Add Stroke
                                                     if ($AddTextStroke -eq 'true') {
                                                         $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
@@ -15040,7 +15219,7 @@ Elseif ($ArrTrigger) {
 
                                             # Export the array to a CSV file
                                             $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $movietemp.Type -title $movietemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
+                                            SendMessage -type $movietemp.Type -title $movietemp.Title -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
                                         }
                                     }
                                 }
@@ -15330,21 +15509,24 @@ Elseif ($ArrTrigger) {
                                         if (!$global:ImageMagickError -eq 'True') {
                                             if ($UseBackgroundResolutionOverlays -eq 'true') {
                                                 switch ($entry.Resolution) {
-                                                    '4K' { $backgroundoverlay = $4kBackground }
-                                                    '1080p' { $backgroundoverlay = $1080pBackground }
+                                                    '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                    '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                    '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                    '4K'            { $backgroundoverlay = $4kBackground }
+                                                    '1080p'         { $backgroundoverlay = $1080pBackground }
                                                     Default { $backgroundoverlay = $backgroundoverlay }
                                                 }
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                            if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -15355,11 +15537,11 @@ Elseif ($ArrTrigger) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
                                                 }
@@ -15367,13 +15549,34 @@ Elseif ($ArrTrigger) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                 if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                     # Add Stroke
                                                     if ($AddBackgroundTextStroke -eq 'true') {
@@ -15445,7 +15648,7 @@ Elseif ($ArrTrigger) {
                                             }
                                             # Export the array to a CSV file
                                             $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
+                                            SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
                                         }
                                     }
                                 }
@@ -15815,21 +16018,24 @@ Elseif ($ArrTrigger) {
                                     if (!$global:ImageMagickError -eq 'True') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -15840,11 +16046,11 @@ Elseif ($ArrTrigger) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -15852,13 +16058,34 @@ Elseif ($ArrTrigger) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $SeasonlineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 # Add Stroke
                                                 if ($AddTextStroke -eq 'true') {
                                                     $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
@@ -15928,7 +16155,7 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $showtemp.Type -title $showtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
+                                        SendMessage -type $showtemp.Type -title $showtemp.Title -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
                                     }
                                 }
                             }
@@ -16230,21 +16457,24 @@ Elseif ($ArrTrigger) {
                                     if (!$global:ImageMagickError -eq 'True') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $backgroundoverlay = $4kBackground }
-                                                '1080p' { $backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -16255,11 +16485,11 @@ Elseif ($ArrTrigger) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -16267,13 +16497,34 @@ Elseif ($ArrTrigger) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 # Add Stroke
                                                 if ($AddBackgroundTextStroke -eq 'true') {
                                                     $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
@@ -16343,7 +16594,7 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
+                                        SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
                                     }
                                 }
                             }
@@ -16747,15 +16998,15 @@ Elseif ($ArrTrigger) {
                                                 InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                                 if (!$global:ImageMagickError -eq 'True') {
                                                     # Resize Image to 2000x3000 and apply Border and overlay
-                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                         $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     }
-                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                         $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     }
-                                                    if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                                    if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                         $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     }
@@ -16767,11 +17018,11 @@ Elseif ($ArrTrigger) {
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                         $SkippingText = 'true'
                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                     }
-                                                    if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                         $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                         if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                             $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -16782,9 +17033,30 @@ Elseif ($ArrTrigger) {
                                                         # Loop through each symbol and replace it with a newline
                                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                                             foreach ($symbol in $NewLineSymbols) {
-                                                                $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                                # Default: Replace the symbol with a newline
+                                                                $replacementString = "`n"
+
+                                                                # Check if the symbol should be kept
+                                                                $keepThisSymbol = $false
+                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                        if ($symbol -like "*$k*") {
+                                                                            $keepThisSymbol = $true
+                                                                            break # Match found, no need to keep checking
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                # If it's a "keep" symbol, change the replacement string
+                                                                if ($keepThisSymbol) {
+                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                    $replacementString = $symbol + "`n"
+                                                                }
+                                                                $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                                 if ($AddShowTitletoSeason -eq 'true') {
-                                                                    $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                                    $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                                 }
                                                             }
                                                         }
@@ -16794,8 +17066,8 @@ Elseif ($ArrTrigger) {
                                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                             $ShowoptimalFontSize = Get-OptimalPointSize -text $joinedShowTitlePointSize -font $fontImagemagick -box_width $ShowOnSeasonMaxWidth  -box_height $ShowOnSeasonMaxHeight -min_pointsize $ShowOnSeasonminPointSize -max_pointsize $ShowOnSeasonmaxPointSize -lineSpacing $ShowOnSeasonlineSpacing
                                                             if (!$global:IsTruncated) {
-                                                                Write-Entry -Subtext "Optimal Season font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                                Write-Entry -Subtext "Optimal Show font size set to: '$ShowoptimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                Write-Entry -Subtext ("Optimal Season font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                Write-Entry -Subtext ("Optimal Show font size set to: '{0}' [{1}]" -f $showoptimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 # Season Part
                                                                 # Add Stroke
                                                                 if ($AddSeasonTextStroke -eq 'true') {
@@ -16828,7 +17100,7 @@ Elseif ($ArrTrigger) {
                                                         Else {
                                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                             if (!$global:IsTruncated) {
-                                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 # Add Stroke
                                                                 if ($AddSeasonTextStroke -eq 'true') {
                                                                     $Arguments = "`"$SeasonImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Seasonfontcolor`" -stroke `"$Seasonstrokecolor`" -strokewidth `"$Seasonstrokewidth`" -size `"$Seasonboxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$global:seasonTitle`" -trim +repage -extent `"$Seasonboxsize`" `) -gravity south -geometry +0`"$Seasontext_offset`" -quality $global:outputQuality -composite `"$SeasonImage`""
@@ -16904,7 +17176,7 @@ Elseif ($ArrTrigger) {
                                                 }
                                                 # Export the array to a CSV file
                                                 $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                SendMessage -type $seasontemp.Type -title $seasontemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
+                                                SendMessage -type $seasontemp.Type -title $seasontemp.Title -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
                                             }
                                         }
                                     }
@@ -17242,21 +17514,24 @@ Elseif ($ArrTrigger) {
                                                                 if (!$global:ImageMagickError -eq 'True') {
                                                                     if ($UseTCResolutionOverlays -eq 'true') {
                                                                         switch ($global:EPResolution) {
-                                                                            '4K' { $TitleCardoverlay = $4kTC }
-                                                                            '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                            '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                            '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                            '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                            '4K'            { $TitleCardoverlay = $4kTC }
+                                                                            '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                             Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                         }
                                                                     }
                                                                     # Resize Image to 2000x3000 and apply Border and overlay
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
-                                                                    if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                    if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
@@ -17267,11 +17542,11 @@ Elseif ($ArrTrigger) {
                                                                     $logEntry = "`"$magick`" $Arguments"
                                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                             $global:EPTitle = $global:EPTitle.ToUpper()
                                                                         }
@@ -17282,13 +17557,34 @@ Elseif ($ArrTrigger) {
                                                                         # Loop through each symbol and replace it with a newline
                                                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                             foreach ($symbol in $NewLineSymbols) {
-                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                                # Default: Replace the symbol with a newline
+                                                                                $replacementString = "`n"
+
+                                                                                # Check if the symbol should be kept
+                                                                                $keepThisSymbol = $false
+                                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                        if ($symbol -like "*$k*") {
+                                                                                            $keepThisSymbol = $true
+                                                                                            break # Match found, no need to keep checking
+                                                                                        }
+                                                                                    }
+                                                                                }
+
+                                                                                # If it's a "keep" symbol, change the replacement string
+                                                                                if ($keepThisSymbol) {
+                                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                    $replacementString = $symbol + "`n"
+                                                                                }
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                             }
                                                                         }
                                                                         $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                         if (!$global:IsTruncated) {
-                                                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                             # Add Stroke
                                                                             if ($AddTitleCardEPTitleTextStroke -eq 'true') {
                                                                                 $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPTitlefontcolor`" -stroke `"$TitleCardEPTitlestrokecolor`" -strokewidth `"$TitleCardEPTitlestrokewidth`" -size `"$TitleCardEPTitleboxsize`" -background none -interline-spacing `"$TitleCardEPTitlelineSpacing`" -gravity `"$TitleCardEPTitletextgravity`" caption:`"$global:EPTitle`" -trim +repage -extent `"$TitleCardEPTitleboxsize`" `) -gravity south -geometry +0`"$TitleCardEPTitletext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -17303,11 +17599,11 @@ Elseif ($ArrTrigger) {
                                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                         }
                                                                     }
-                                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                             $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                         }
@@ -17315,7 +17611,7 @@ Elseif ($ArrTrigger) {
                                                                         $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                         if (!$global:IsTruncated) {
-                                                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                                             # Add Stroke
                                                                             if ($AddTitleCardTextStroke -eq 'true') {
@@ -17392,7 +17688,7 @@ Elseif ($ArrTrigger) {
                                                             }
                                                             # Export the array to a CSV file
                                                             $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                            SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                            SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                         }
                                                     }
                                                 }
@@ -17709,21 +18005,24 @@ Elseif ($ArrTrigger) {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     Write-Entry -Subtext "Queried Overlay Resolution: $global:EPResolution" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -17734,11 +18033,11 @@ Elseif ($ArrTrigger) {
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -17749,13 +18048,34 @@ Elseif ($ArrTrigger) {
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                                         # Add Stroke
                                                                         if ($AddTitleCardEPTitleTextStroke -eq 'true') {
@@ -17771,11 +18091,11 @@ Elseif ($ArrTrigger) {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -17783,7 +18103,7 @@ Elseif ($ArrTrigger) {
                                                                     $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                                         # Add Stroke
                                                                         if ($AddTitleCardTextStroke -eq 'true') {
@@ -17858,7 +18178,7 @@ Elseif ($ArrTrigger) {
                                                             }
                                                             # Export the array to a CSV file
                                                             $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                            SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                            SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                         }
                                                     }
                                                 }
@@ -18023,203 +18343,11 @@ Elseif ($ArrTrigger) {
             $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
             Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
+        Write-TextSizeCacheSummary
         Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
         # Send Notification
-        if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-            if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Recently added Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TBA Skipped",
-                            "value": "$SkipTBACount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Jap/Chinese Skipped",
-                            "value": "$SkipJapTitleCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-
-            }
-            Else {
-
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Recently added Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-
-            }
-            $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-            Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-        }
-        Else {
-            if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-                if ($errorCount -ge '1') {
-                    apprise --notification-type="failure" --title="Posterizarr" --body="Recently added Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-                }
-                Else {
-                    apprise --notification-type="success" --title="Posterizarr" --body="Recently added Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-                }
-            }
-        }
+        Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -SkipTBACount $SkipTBACount -SkipJapTitleCount $SkipJapTitleCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount -UploadCount $UploadCount
 
         # Export json
         $jsonObject = [PSCustomObject]@{
@@ -18470,57 +18598,11 @@ Elseif ($ArrTrigger) {
                     Write-Entry -Subtext "Found [$($tempseasondata.{Show Name})] of type $($tempseasondata.Type) for season $($tempseasondata.{Season Number})" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                 }
             }
-            $Episodedata | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
             if ($Episodedata) {
                 Write-Entry -Subtext "Found '$($Episodedata.Episodes.split(',').count)' Episodes..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
             }
         }
 
-        # Test if csv´s are missing and create dummy file.
-        if (!(Get-ChildItem -LiteralPath "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -ErrorAction SilentlyContinue)) {
-            $EpisodeDummycsv = New-Object psobject
-
-            # Add members to the object with empty values
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Show Name" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Type" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "tvdbid" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "tmdbid" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Library Name" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Season Number" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Episodes" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Title" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "RatingKeys" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "PlexTitleCardUrls" -Value $null
-
-            $EpisodeDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-            Write-Entry -Message "No PlexEpisodeExport.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-        }
-        if (!(Get-ChildItem -LiteralPath "$global:ScriptRoot\Logs\PlexLibexport.csv" -ErrorAction SilentlyContinue)) {
-            # Add members to the object with empty values
-            $PlexLibDummycsv = New-Object psobject
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Name" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Type" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Language" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "title" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "originalTitle" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonNames" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonNumbers" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonRatingKeys" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "year" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "tvdbid" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "imdbid" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "tmdbid" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "ratingKey" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Path" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "RootFoldername" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "MultipleVersions" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexPosterUrl" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexBackgroundUrl" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexSeasonUrls" -Value $null
-
-            $PlexLibDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexLibexport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-            Write-Entry -Message "No PlexLibexport.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-        }
         # Store all Files from asset dir in a hashtable
         Write-Entry -Message "Creating Hashtable of all posters in asset dir..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         try {
@@ -18929,21 +19011,24 @@ Elseif ($ArrTrigger) {
                                         if (!$global:ImageMagickError -eq 'true') {
                                             if ($UsePosterResolutionOverlays -eq 'true') {
                                                 switch ($entry.Resolution) {
-                                                    '4K' { $Posteroverlay = $4kposter }
-                                                    '1080p' { $Posteroverlay = $1080pPoster }
+                                                    '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                    '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                    '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                    '4K'            { $Posteroverlay = $4kposter }
+                                                    '1080p'         { $Posteroverlay = $1080pPoster }
                                                     Default { $Posteroverlay = $Posteroverlay }
                                                 }
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                            if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -18954,11 +19039,11 @@ Elseif ($ArrTrigger) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $fontImagemagick = $RTLfontImagemagick
                                                 }
@@ -18967,13 +19052,34 @@ Elseif ($ArrTrigger) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                 if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                     # Add Stroke
                                                     if ($AddTextStroke -eq 'true') {
@@ -19004,18 +19110,42 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $PosterImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                                 try {
                                                     # Attempt to move the item
@@ -19059,7 +19189,7 @@ Elseif ($ArrTrigger) {
 
                                             # Export the array to a CSV file
                                             $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $movietemp.Type -title $movietemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
+                                            SendMessage -type $movietemp.Type -title $movietemp.Title -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
                                         }
                                     }
                                 }
@@ -19370,21 +19500,24 @@ Elseif ($ArrTrigger) {
                                         if (!$global:ImageMagickError -eq 'true') {
                                             if ($UseBackgroundResolutionOverlays -eq 'true') {
                                                 switch ($entry.Resolution) {
-                                                    '4K' { $backgroundoverlay = $4kBackground }
-                                                    '1080p' { $backgroundoverlay = $1080pBackground }
+                                                    '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                    '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                    '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                    '4K'            { $backgroundoverlay = $4kBackground }
+                                                    '1080p'         { $backgroundoverlay = $1080pBackground }
                                                     Default { $backgroundoverlay = $backgroundoverlay }
                                                 }
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                            if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -19395,11 +19528,11 @@ Elseif ($ArrTrigger) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
                                                 }
@@ -19408,13 +19541,34 @@ Elseif ($ArrTrigger) {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                 if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                     # Add Stroke
                                                     if ($AddBackgroundTextStroke -eq 'true') {
@@ -19445,18 +19599,42 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $backgroundImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                                 try {
                                                     # Attempt to move the item
@@ -19500,7 +19678,7 @@ Elseif ($ArrTrigger) {
                                             }
                                             # Export the array to a CSV file
                                             $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
+                                            SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
                                         }
                                     }
                                 }
@@ -19899,21 +20077,24 @@ Elseif ($ArrTrigger) {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -19924,11 +20105,11 @@ Elseif ($ArrTrigger) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -19937,13 +20118,34 @@ Elseif ($ArrTrigger) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $SeasonlineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                 # Add Stroke
                                                 if ($AddTextStroke -eq 'true') {
@@ -19974,18 +20176,42 @@ Elseif ($ArrTrigger) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $PosterImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -20028,7 +20254,7 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $showtemp.Type -title $showtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
+                                        SendMessage -type $showtemp.Type -title $showtemp.Title -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
                                     }
                                 }
                             }
@@ -20351,21 +20577,24 @@ Elseif ($ArrTrigger) {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Backgroundoverlay = $4kBackground }
-                                                '1080p' { $Backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $Backgroundoverlay = $Backgroundoverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -20376,11 +20605,11 @@ Elseif ($ArrTrigger) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -20389,13 +20618,34 @@ Elseif ($ArrTrigger) {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                 # Add Stroke
                                                 if ($AddBackgroundTextStroke -eq 'true') {
@@ -20431,18 +20681,42 @@ Elseif ($ArrTrigger) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $backgroundImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -20486,7 +20760,7 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
+                                        SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
                                     }
                                 }
                             }
@@ -20906,15 +21180,15 @@ Elseif ($ArrTrigger) {
                                             InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                             if (!$global:ImageMagickError -eq 'true') {
                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
-                                                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
@@ -20926,11 +21200,11 @@ Elseif ($ArrTrigger) {
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                     $SkippingText = 'true'
                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                 }
-                                                if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                     $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                     if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                         $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -20941,9 +21215,30 @@ Elseif ($ArrTrigger) {
                                                     # Loop through each symbol and replace it with a newline
                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                         foreach ($symbol in $NewLineSymbols) {
-                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                             if ($AddShowTitletoSeason -eq 'true') {
-                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                             }
                                                         }
                                                     }
@@ -20953,8 +21248,8 @@ Elseif ($ArrTrigger) {
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                         $ShowoptimalFontSize = Get-OptimalPointSize -text $joinedShowTitlePointSize -font $fontImagemagick -box_width $ShowOnSeasonMaxWidth  -box_height $ShowOnSeasonMaxHeight -min_pointsize $ShowOnSeasonminPointSize -max_pointsize $ShowOnSeasonmaxPointSize -lineSpacing $ShowOnSeasonlineSpacing
                                                         if (!$global:IsTruncated) {
-                                                            Write-Entry -Subtext "Optimal Season font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                            Write-Entry -Subtext "Optimal Show font size set to: '$ShowoptimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext ("Optimal Season font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext ("Optimal Show font size set to: '{0}' [{1}]" -f $showoptimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             # Season Part
                                                             # Add Stroke
                                                             if ($AddSeasonTextStroke -eq 'true') {
@@ -20987,7 +21282,7 @@ Elseif ($ArrTrigger) {
                                                     Else {
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                         if (!$global:IsTruncated) {
-                                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             # Add Stroke
                                                             if ($AddSeasonTextStroke -eq 'true') {
                                                                 $Arguments = "`"$SeasonImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Seasonfontcolor`" -stroke `"$Seasonstrokecolor`" -strokewidth `"$Seasonstrokewidth`" -size `"$Seasonboxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$global:seasonTitle`" -trim +repage -extent `"$Seasonboxsize`" `) -gravity south -geometry +0`"$Seasontext_offset`" -quality $global:outputQuality -composite `"$SeasonImage`""
@@ -21079,18 +21374,42 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $SeasonImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                                 try {
                                                     # Attempt to move the item
@@ -21134,7 +21453,7 @@ Elseif ($ArrTrigger) {
                                             }
                                             # Export the array to a CSV file
                                             $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $seasontemp.Type -title $seasontemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
+                                            SendMessage -type $seasontemp.Type -title $seasontemp.Title -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
                                         }
                                     }
                                 }
@@ -21508,21 +21827,24 @@ Elseif ($ArrTrigger) {
                                                                 if (!$global:ImageMagickError -eq 'true') {
                                                                     if ($UseTCResolutionOverlays -eq 'true') {
                                                                         switch ($global:EPResolution) {
-                                                                            '4K' { $TitleCardoverlay = $4kTC }
-                                                                            '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                            '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                            '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                            '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                            '4K'            { $TitleCardoverlay = $4kTC }
+                                                                            '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                             Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                         }
                                                                     }
                                                                     # Resize Image to 2000x3000 and apply Border and overlay
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
-                                                                    if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                    if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
@@ -21533,11 +21855,11 @@ Elseif ($ArrTrigger) {
                                                                     $logEntry = "`"$magick`" $Arguments"
                                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                             $global:EPTitle = $global:EPTitle.ToUpper()
                                                                         }
@@ -21549,13 +21871,34 @@ Elseif ($ArrTrigger) {
                                                                         # Loop through each symbol and replace it with a newline
                                                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                             foreach ($symbol in $NewLineSymbols) {
-                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                                # Default: Replace the symbol with a newline
+                                                                                $replacementString = "`n"
+
+                                                                                # Check if the symbol should be kept
+                                                                                $keepThisSymbol = $false
+                                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                        if ($symbol -like "*$k*") {
+                                                                                            $keepThisSymbol = $true
+                                                                                            break # Match found, no need to keep checking
+                                                                                        }
+                                                                                    }
+                                                                                }
+
+                                                                                # If it's a "keep" symbol, change the replacement string
+                                                                                if ($keepThisSymbol) {
+                                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                    $replacementString = $symbol + "`n"
+                                                                                }
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                             }
                                                                         }
                                                                         $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                         if (!$global:IsTruncated) {
-                                                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                             # Add Stroke
                                                                             if ($AddTitleCardEPTitleTextStroke -eq 'true') {
                                                                                 $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPTitlefontcolor`" -stroke `"$TitleCardEPTitlestrokecolor`" -strokewidth `"$TitleCardEPTitlestrokewidth`" -size `"$TitleCardEPTitleboxsize`" -background none -interline-spacing `"$TitleCardEPTitlelineSpacing`" -gravity `"$TitleCardEPTitletextgravity`" caption:`"$global:EPTitle`" -trim +repage -extent `"$TitleCardEPTitleboxsize`" `) -gravity south -geometry +0`"$TitleCardEPTitletext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -21570,11 +21913,11 @@ Elseif ($ArrTrigger) {
                                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                         }
                                                                     }
-                                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                             $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                         }
@@ -21582,7 +21925,7 @@ Elseif ($ArrTrigger) {
                                                                         $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                         if (!$global:IsTruncated) {
-                                                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                             # Add Stroke
                                                                             if ($AddTitleCardTextStroke -eq 'true') {
                                                                                 $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPfontcolor`" -stroke `"$TitleCardstrokecolor`" -strokewidth `"$TitleCardstrokewidth`" -size `"$TitleCardEPboxsize`" -background none -interline-spacing `"$TitleCardEPlineSpacing`" -gravity `"$TitleCardEPtextgravity`" caption:`"$global:SeasonEPNumber`" -trim +repage -extent `"$TitleCardEPboxsize`" `) -gravity south -geometry +0`"$TitleCardEPtext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -21662,18 +22005,42 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:IsTruncated) {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                    if ($PlexToken) {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    # Verify variables before uploading
+                                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                    $uri = if ($PlexToken) {
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                     }
                                                                     Else {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                    }
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    # Try uploading, capturing the response in detail
+                                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                                -Method Post `
+                                                                                                -Headers $extraPlexHeaders `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
+                                                                                                -ErrorAction Stop
+
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                     }
                                                                 }
                                                                 catch {
-                                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                    $global:errorCount++
+                                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                                 }
                                                                 try {
                                                                     # Attempt to move the item
@@ -21717,7 +22084,7 @@ Elseif ($ArrTrigger) {
                                                             }
                                                             # Export the array to a CSV file
                                                             $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                            SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                            SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                         }
                                                     }
                                                 }
@@ -22069,21 +22436,24 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:ImageMagickError -eq 'true') {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -22094,11 +22464,11 @@ Elseif ($ArrTrigger) {
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -22110,13 +22480,34 @@ Elseif ($ArrTrigger) {
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                         # Add Stroke
                                                                         if ($AddTitleCardEPTitleTextStroke -eq 'true') {
                                                                             $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPTitlefontcolor`" -stroke `"$TitleCardEPTitlestrokecolor`" -strokewidth `"$TitleCardEPTitlestrokewidth`" -size `"$TitleCardEPTitleboxsize`" -background none -interline-spacing `"$TitleCardEPTitlelineSpacing`" -gravity `"$TitleCardEPTitletextgravity`" caption:`"$global:EPTitle`" -trim +repage -extent `"$TitleCardEPTitleboxsize`" `) -gravity south -geometry +0`"$TitleCardEPTitletext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -22130,11 +22521,11 @@ Elseif ($ArrTrigger) {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -22142,7 +22533,7 @@ Elseif ($ArrTrigger) {
                                                                     $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                         # Add Stroke
                                                                         if ($AddTitleCardTextStroke -eq 'true') {
                                                                             $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPfontcolor`" -stroke `"$TitleCardstrokecolor`" -strokewidth `"$TitleCardstrokewidth`" -size `"$TitleCardEPboxsize`" -background none -interline-spacing `"$TitleCardEPlineSpacing`" -gravity `"$TitleCardEPtextgravity`" caption:`"$global:SeasonEPNumber`" -trim +repage -extent `"$TitleCardEPboxsize`" `) -gravity south -geometry +0`"$TitleCardEPtext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -22221,18 +22612,42 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:IsTruncated) {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                    if ($PlexToken) {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    # Verify variables before uploading
+                                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                    $uri = if ($PlexToken) {
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                     }
                                                                     Else {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                    }
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    # Try uploading, capturing the response in detail
+                                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                                -Method Post `
+                                                                                                -Headers $extraPlexHeaders `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
+                                                                                                -ErrorAction Stop
+
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                     }
                                                                 }
                                                                 catch {
-                                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                    $global:errorCount++
+                                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                                 }
                                                                 try {
                                                                     # Attempt to move the item
@@ -22276,7 +22691,7 @@ Elseif ($ArrTrigger) {
                                                             }
                                                             # Export the array to a CSV file
                                                             $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                            SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                            SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                         }
                                                     }
                                                 }
@@ -22403,203 +22818,11 @@ Elseif ($ArrTrigger) {
             $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
             Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
+        Write-TextSizeCacheSummary
         Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
         # Send Notification
-        if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-            if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TBA Skipped",
-                            "value": "$SkipTBACount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Jap/Chinese Skipped",
-                            "value": "$SkipJapTitleCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-
-            }
-            Else {
-
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-
-            }
-            $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-            Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-        }
-        Else {
-            if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-                if ($errorCount -ge '1') {
-                    apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-                }
-                Else {
-                    apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-                }
-            }
-        }
+        Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -SkipTBACount $SkipTBACount -SkipJapTitleCount $SkipJapTitleCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount
 
         # Export json
         $jsonObject = [PSCustomObject]@{
@@ -22653,7 +22876,27 @@ Elseif ($ArrTrigger) {
 }
 #region Backup Mode
 Elseif ($Backup) {
-    MassDownloadPlexArtwork
+    if ($UsePlex -eq 'true') {
+        MassDownloadPlexArtwork
+    }
+    Else {
+        Write-Entry -Message "Backup mode currently works only for Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Warning
+        # Clear Running File
+        if (Test-Path $CurrentlyRunning) {
+            try {
+                Remove-Item -LiteralPath $CurrentlyRunning -ErrorAction Stop | Out-Null
+            }
+            catch {
+                Write-Entry -Message "Failed to delete '$CurrentlyRunning'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                Write-Entry -Subtext "Reason: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Error
+                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            }
+        }
+        if ($global:UptimeKumaUrl) {
+            Send-UptimeKumaWebhook -status "down" -msg "No libs found"
+        }
+        Exit
+    }
 }
 #region Sync Mode
 Elseif ($SyncJelly -or $SyncEmby) {
@@ -22673,6 +22916,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
         $OtherMediaServerUrl = $JellyfinUrl
         $OtherMediaServerApiKey = $JellyfinAPIKey
         $Mode = "syncjelly"
+        Write-Entry -Message "Sync Jelly Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     if ($SyncEmby) {
         # Check Emby now:
@@ -22680,6 +22924,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
         $OtherMediaServerUrl = $EmbyUrl
         $OtherMediaServerApiKey = $EmbyAPIKey
         $Mode = "syncemby"
+        Write-Entry -Message "Sync Emby Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
 
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
@@ -23830,85 +24075,11 @@ Elseif ($SyncJelly -or $SyncEmby) {
     if ($errorCount -ge '1') {
         Write-Entry -Message "During execution '$errorCount' Errors occurred, please check the log for a detailed description where you see [ERROR-HERE]." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
-
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
-    if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-        $jsonPayload = @"
-            {
-                "username": "$global:DiscordUserName",
-                "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                "content": "",
-                "embeds": [
-                {
-                    "author": {
-                    "name": "Posterizarr @Github",
-                    "url": "https://github.com/fscorrupt/Posterizarr"
-                    },
-                    "description": "Sync run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                    "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                    "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                    "fields": [
-                    {
-                        "name": "",
-                        "value": ":bar_chart:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Errors",
-                        "value": "$errorCount",
-                        "inline": false
-                    },
-                    {
-                        "name": "",
-                        "value": ":frame_photo:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Posters Uploaded",
-                        "value": "$($uploadCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                        "inline": false
-                    },
-                    {
-                        "name": "Backgrounds Uploaded",
-                        "value": "$BackgroundCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Seasons Uploaded",
-                        "value": "$SeasonCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TitleCards Uploaded",
-                        "value": "$EpisodeCount",
-                        "inline": true
-                    }
-                    ],
-                    "thumbnail": {
-                        "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                    },
-                    "footer": {
-                        "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                    }
-                }
-                ]
-            }
-"@
-        $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-        Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-    }
-    Else {
-        if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-            if ($errorCount -ge '1') {
-                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-            }
-            Else {
-                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-            }
-        }
-    }
+    Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount -UploadCount $UploadCount
 
     # Export json
     $jsonObject = [PSCustomObject]@{
@@ -23968,9 +24139,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
 
     if ($UISchedule -or $ContainerSchedule) {
         $Mode = "scheduled"
+        Write-Entry -Message "Scheduled Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     Else {
         $Mode = "normal"
+        Write-Entry -Message "Normal Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
 
     Write-Entry -Message "Query Jellyfin/Emby..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
@@ -24758,21 +24931,24 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     if (!$global:ImageMagickError -eq 'True') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -24783,11 +24959,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -24795,13 +24971,34 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 # Add Stroke
                                                 if ($AddTextStroke -eq 'true') {
                                                     $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
@@ -25161,21 +25358,24 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     if (!$global:ImageMagickError -eq 'True') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $backgroundoverlay = $4kBackground }
-                                                '1080p' { $backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -25186,11 +25386,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -25198,13 +25398,34 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                 # Add Stroke
                                                 if ($AddBackgroundTextStroke -eq 'true') {
@@ -25646,21 +25867,24 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 if (!$global:ImageMagickError -eq 'True') {
                                     if ($UsePosterResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $Posteroverlay = $4kposter }
-                                            '1080p' { $Posteroverlay = $1080pPoster }
+                                            '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                            '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                            '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                            '4K'            { $Posteroverlay = $4kposter }
+                                            '1080p'         { $Posteroverlay = $1080pPoster }
                                             Default { $Posteroverlay = $Posteroverlay }
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -25671,11 +25895,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -25683,13 +25907,34 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $SeasonlineSpacing
                                         if (!$global:IsTruncated) {
-                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             # Add Stroke
                                             if ($AddTextStroke -eq 'true') {
                                                 $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
@@ -26061,21 +26306,24 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 if (!$global:ImageMagickError -eq 'True') {
                                     if ($UseBackgroundResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $backgroundoverlay = $4kBackground }
-                                            '1080p' { $backgroundoverlay = $1080pBackground }
+                                            '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                            '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                            '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                            '4K'            { $backgroundoverlay = $4kBackground }
+                                            '1080p'         { $backgroundoverlay = $1080pBackground }
                                             Default { $backgroundoverlay = $backgroundoverlay }
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -26086,11 +26334,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -26098,13 +26346,34 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                         if (!$global:IsTruncated) {
-                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             # Add Stroke
                                             if ($AddBackgroundTextStroke -eq 'true') {
                                                 $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
@@ -26592,15 +26861,15 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                             if (!$global:ImageMagickError -eq 'True') {
                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
-                                                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
@@ -26612,11 +26881,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                     $SkippingText = 'true'
                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                 }
-                                                if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                     $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                     if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                         $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -26627,9 +26896,30 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     # Loop through each symbol and replace it with a newline
                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                         foreach ($symbol in $NewLineSymbols) {
-                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                             if ($AddShowTitletoSeason -eq 'true') {
-                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                             }
                                                         }
                                                     }
@@ -26639,8 +26929,8 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                         $ShowoptimalFontSize = Get-OptimalPointSize -text $joinedShowTitlePointSize -font $fontImagemagick -box_width $ShowOnSeasonMaxWidth  -box_height $ShowOnSeasonMaxHeight -min_pointsize $ShowOnSeasonminPointSize -max_pointsize $ShowOnSeasonmaxPointSize -lineSpacing $ShowOnSeasonlineSpacing
                                                         if (!$global:IsTruncated) {
-                                                            Write-Entry -Subtext "Optimal Season font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                            Write-Entry -Subtext "Optimal Show font size set to: '$ShowoptimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext ("Optimal Season font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext ("Optimal Show font size set to: '{0}' [{1}]" -f $showoptimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             # Season Part
                                                             # Add Stroke
                                                             if ($AddSeasonTextStroke -eq 'true') {
@@ -26673,7 +26963,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     Else {
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                         if (!$global:IsTruncated) {
-                                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             # Add Stroke
                                                             if ($AddSeasonTextStroke -eq 'true') {
                                                                 $Arguments = "`"$SeasonImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Seasonfontcolor`" -stroke `"$Seasonstrokecolor`" -strokewidth `"$Seasonstrokewidth`" -size `"$Seasonboxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$global:seasonTitle`" -trim +repage -extent `"$Seasonboxsize`" `) -gravity south -geometry +0`"$Seasontext_offset`" -quality $global:outputQuality -composite `"$SeasonImage`""
@@ -27087,21 +27377,24 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             if (!$global:ImageMagickError -eq 'True') {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -27112,11 +27405,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -27127,13 +27420,34 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                         # Add Stroke
                                                                         if ($AddTitleCardEPTitleTextStroke -eq 'true') {
                                                                             $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPTitlefontcolor`" -stroke `"$TitleCardEPTitlestrokecolor`" -strokewidth `"$TitleCardEPTitlestrokewidth`" -size `"$TitleCardEPTitleboxsize`" -background none -interline-spacing `"$TitleCardEPTitlelineSpacing`" -gravity `"$TitleCardEPTitletextgravity`" caption:`"$global:EPTitle`" -trim +repage -extent `"$TitleCardEPTitleboxsize`" `) -gravity south -geometry +0`"$TitleCardEPTitletext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -27148,11 +27462,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -27160,7 +27474,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                                         # Add Stroke
                                                                         if ($AddTitleCardTextStroke -eq 'true') {
@@ -27554,21 +27868,24 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             if ($UseTCResolutionOverlays -eq 'true') {
                                                                 Write-Entry -Subtext "Queried Overlay Resolution: $global:EPResolution" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 switch ($global:EPResolution) {
-                                                                    '4K' { $TitleCardoverlay = $4kTC }
-                                                                    '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                    '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                    '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                    '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                    '4K'            { $TitleCardoverlay = $4kTC }
+                                                                    '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                     Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                 }
                                                             }
                                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
@@ -27579,11 +27896,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             $logEntry = "`"$magick`" $Arguments"
                                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -27594,13 +27911,34 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 # Loop through each symbol and replace it with a newline
                                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                     foreach ($symbol in $NewLineSymbols) {
-                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                        # Default: Replace the symbol with a newline
+                                                                        $replacementString = "`n"
+
+                                                                        # Check if the symbol should be kept
+                                                                        $keepThisSymbol = $false
+                                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                if ($symbol -like "*$k*") {
+                                                                                    $keepThisSymbol = $true
+                                                                                    break # Match found, no need to keep checking
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        # If it's a "keep" symbol, change the replacement string
+                                                                        if ($keepThisSymbol) {
+                                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                            $replacementString = $symbol + "`n"
+                                                                        }
+                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                 if (!$global:IsTruncated) {
-                                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                                     # Add Stroke
                                                                     if ($AddTitleCardEPTitleTextStroke -eq 'true') {
@@ -27616,11 +27954,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
                                                             }
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -27628,7 +27966,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                 if (!$global:IsTruncated) {
-                                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                                     # Add Stroke
                                                                     if ($AddTitleCardTextStroke -eq 'true') {
@@ -27951,419 +28289,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
         $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
         Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
-    if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-            if ($AssetCleanup -eq 'true') {
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TBA Skipped",
-                                "value": "$SkipTBACount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Jap/Chinese Skipped",
-                                "value": "$SkipJapTitleCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":recycle:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Images cleared",
-                                "value": "$ImagesCleared",
-                                "inline": true
-                            },
-                            {
-                                "name": "Folders Cleared",
-                                "value": "$PathsCleared",
-                                "inline": true
-                            },
-                            {
-                                "name": "Space saved",
-                                "value": "$savedsizestring",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-            }
-            Else {
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TBA Skipped",
-                            "value": "$SkipTBACount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Jap/Chinese Skipped",
-                            "value": "$SkipJapTitleCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-            }
-        }
-        Else {
-            if ($AssetCleanup -eq 'true') {
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":recycle:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Images cleared",
-                                "value": "$ImagesCleared",
-                                "inline": true
-                            },
-                            {
-                                "name": "Folders Cleared",
-                                "value": "$PathsCleared",
-                                "inline": true
-                            },
-                            {
-                                "name": "Space saved",
-                                "value": "$savedsizestring",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-            }
-            Else {
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-            }
-        }
-        $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-        Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-    }
-    Else {
-        if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-            if ($errorCount -ge '1') {
-                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-            }
-            Else {
-                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-            }
-        }
-    }
+    Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -SkipTBACount $SkipTBACount -SkipJapTitleCount $SkipJapTitleCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount -ImagesCleared $ImagesCleared -PathsCleared $PathsCleared -SavedSizeString $savedsizestring -UploadCount $UploadCount
+
     # Calculate Counts
     $CalculatedCount = $($posterCount - $SeasonCount - $BackgroundCount - $EpisodeCount)
 
@@ -28442,9 +28373,11 @@ ElseIf ($PosterReset) {
 else {
     if ($UISchedule -or $ContainerSchedule) {
         $Mode = "scheduled"
+        Write-Entry -Message "Scheduled Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     Else {
         $Mode = "normal"
+        Write-Entry -Message "Normal Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libsoverview = @()
@@ -29303,21 +29236,24 @@ else {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UsePosterResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $Posteroverlay = $4kposter }
-                                                '1080p' { $Posteroverlay = $1080pPoster }
+                                                '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                                '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                                '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                                '4K'            { $Posteroverlay = $4kposter }
+                                                '1080p'         { $Posteroverlay = $1080pPoster }
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -29328,11 +29264,11 @@ else {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -29341,13 +29277,34 @@ else {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                 # Add Stroke
                                                 if ($AddTextStroke -eq 'true') {
@@ -29379,18 +29336,42 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $PosterImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                             }
                                             try {
@@ -29489,21 +29470,44 @@ else {
                                     GetPlexArtwork -Type "$Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        $fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
-                                        if ($PlexToken) {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        #$fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
+                                        # Verify variables before uploading
+                                        Write-Entry -Subtext "PosterImage: $PosterImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                        $uri = if ($PlexToken) {
+                                            "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                         }
                                         Else {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                         }
-                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        # Try uploading, capturing the response in detail
+                                        $Upload = Invoke-WebRequest -Uri $uri `
+                                                                    -Method Post `
+                                                                    -Headers $extraPlexHeaders `
+                                                                    -InFile $PosterImageoriginal`
+                                                                    -ContentType 'image/jpeg' `
+                                                                    -SkipHttpErrorCheck `
+                                                                    -ErrorAction Stop
+
+                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                        }
+                                        else {
+                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        }
                                         $UploadCount++
                                     }
                                 }
                                 catch {
-                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                    $global:errorCount++
+                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                                 if (Test-Path $PosterImage -ErrorAction SilentlyContinue) {
                                     Remove-Item -LiteralPath $PosterImage | Out-Null
@@ -29788,21 +29792,24 @@ else {
                                     if (!$global:ImageMagickError -eq 'true') {
                                         if ($UseBackgroundResolutionOverlays -eq 'true') {
                                             switch ($entry.Resolution) {
-                                                '4K' { $backgroundoverlay = $4kBackground }
-                                                '1080p' { $backgroundoverlay = $1080pBackground }
+                                                '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                                '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                                '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                                '4K'            { $backgroundoverlay = $4kBackground }
+                                                '1080p'         { $backgroundoverlay = $1080pBackground }
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -29813,11 +29820,11 @@ else {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -29826,13 +29833,34 @@ else {
                                             # Loop through each symbol and replace it with a newline
                                             if ($NewLineOnSpecificSymbols -eq 'true') {
                                                 foreach ($symbol in $NewLineSymbols) {
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                    # Default: Replace the symbol with a newline
+                                                    $replacementString = "`n"
+
+                                                    # Check if the symbol should be kept
+                                                    $keepThisSymbol = $false
+                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                            if ($symbol -like "*$k*") {
+                                                                $keepThisSymbol = $true
+                                                                break # Match found, no need to keep checking
+                                                            }
+                                                        }
+                                                    }
+
+                                                    # If it's a "keep" symbol, change the replacement string
+                                                    if ($keepThisSymbol) {
+                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                        $replacementString = $symbol + "`n"
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                 }
                                             }
                                             $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                             $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                             if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                                 # Add Stroke
                                                 if ($AddBackgroundTextStroke -eq 'true') {
@@ -29864,18 +29892,42 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $backgroundImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                             }
                                             try {
@@ -29974,21 +30026,44 @@ else {
                                     GetPlexArtwork -Type " $Titletext | Backgound Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        $fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
-                                        if ($PlexToken) {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
+                                        # Verify variables before uploading
+                                        Write-Entry -Subtext "BackgroundImage: $backgroundImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                        $uri = if ($PlexToken) {
+                                            "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                         }
                                         Else {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                         }
-                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        # Try uploading, capturing the response in detail
+                                        $Upload = Invoke-WebRequest -Uri $uri `
+                                                                    -Method Post `
+                                                                    -Headers $extraPlexHeaders `
+                                                                    -InFile $backgroundImageoriginal`
+                                                                    -ContentType 'image/jpeg' `
+                                                                    -SkipHttpErrorCheck `
+                                                                    -ErrorAction Stop
+
+                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                        }
+                                        else {
+                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        }
                                         $UploadCount++
                                     }
                                 }
                                 catch {
-                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                    $global:errorCount++
+                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                                 if (Test-Path $backgroundImage -ErrorAction SilentlyContinue) {
                                     Remove-Item -LiteralPath $backgroundImage | Out-Null
@@ -30363,21 +30438,24 @@ else {
                                 if (!$global:ImageMagickError -eq 'true') {
                                     if ($UsePosterResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $Posteroverlay = $4kposter }
-                                            '1080p' { $Posteroverlay = $1080pPoster }
+                                            '4K DoVi/HDR10' { $Posteroverlay = $4KDoViHDR10 }
+                                            '4K DoVi'       { $Posteroverlay = $4KDoVi }
+                                            '4K HDR10'      { $Posteroverlay = $4KHDR10 }
+                                            '4K'            { $Posteroverlay = $4kposter }
+                                            '1080p'         { $Posteroverlay = $1080pPoster }
                                             Default { $Posteroverlay = $Posteroverlay }
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -30388,11 +30466,11 @@ else {
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -30401,13 +30479,34 @@ else {
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                         if (!$global:IsTruncated) {
-                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                             # Add Stroke
                                             if ($AddTextStroke -eq 'true') {
@@ -30439,18 +30538,42 @@ else {
                                         if ($Upload2Plex -eq 'true') {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $PosterImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                         }
                                         try {
@@ -30545,24 +30668,47 @@ else {
                             }
                             Write-Entry -Message "Starting Existing Asset Upload..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             try {
-                                GetPlexArtwork -Type " $Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
+                                GetPlexArtwork -Type "$Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
-                                    if ($PlexToken) {
-                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
+                                    # Verify variables before uploading
+                                    Write-Entry -Subtext "PosterImage: $PosterImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                    $uri = if ($PlexToken) {
+                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                     }
                                     Else {
-                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                     }
-                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    # Try uploading, capturing the response in detail
+                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                -Method Post `
+                                                                -Headers $extraPlexHeaders `
+                                                                -InFile $PosterImageoriginal`
+                                                                -ContentType 'image/jpeg' `
+                                                                -SkipHttpErrorCheck `
+                                                                -ErrorAction Stop
+
+                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                    }
+                                    else {
+                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    }
                                     $UploadCount++
                                 }
                             }
                             catch {
-                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                $global:errorCount++
+                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                             }
                             if (Test-Path $PosterImage -ErrorAction SilentlyContinue) {
                                 Remove-Item -LiteralPath $PosterImage | Out-Null
@@ -30862,21 +31008,24 @@ else {
                                 if (!$global:ImageMagickError -eq 'true') {
                                     if ($UseBackgroundResolutionOverlays -eq 'true') {
                                         switch ($entry.Resolution) {
-                                            '4K' { $backgroundoverlay = $4kBackground }
-                                            '1080p' { $backgroundoverlay = $1080pBackground }
+                                            '4K DoVi/HDR10' { $backgroundoverlay = $4KDoViHDR10Background }
+                                            '4K DoVi'       { $backgroundoverlay = $4KDoViBackground }
+                                            '4K HDR10'      { $backgroundoverlay = $4KHDR10Background }
+                                            '4K'            { $backgroundoverlay = $4kBackground }
+                                            '1080p'         { $backgroundoverlay = $1080pBackground }
                                             Default { $backgroundoverlay = $backgroundoverlay }
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -30887,11 +31036,11 @@ else {
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -30900,13 +31049,34 @@ else {
                                         # Loop through each symbol and replace it with a newline
                                         if ($NewLineOnSpecificSymbols -eq 'true') {
                                             foreach ($symbol in $NewLineSymbols) {
-                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), "`n"
+                                                # Default: Replace the symbol with a newline
+                                                $replacementString = "`n"
+
+                                                # Check if the symbol should be kept
+                                                $keepThisSymbol = $false
+                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                        if ($symbol -like "*$k*") {
+                                                            $keepThisSymbol = $true
+                                                            break # Match found, no need to keep checking
+                                                        }
+                                                    }
+                                                }
+
+                                                # If it's a "keep" symbol, change the replacement string
+                                                if ($keepThisSymbol) {
+                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                    $replacementString = $symbol + "`n"
+                                                }
+                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                             }
                                         }
                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                         if (!$global:IsTruncated) {
-                                            Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
                                             # Add Stroke
                                             if ($AddBackgroundTextStroke -eq 'true') {
@@ -30938,18 +31108,42 @@ else {
                                         if ($Upload2Plex -eq 'true') {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $backgroundImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                         }
                                         try {
@@ -31043,24 +31237,47 @@ else {
                             }
                             Write-Entry -Message "Starting Existing Asset Upload..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             try {
-                                GetPlexArtwork -Type " $Titletext | Background Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
+                                GetPlexArtwork -Type " $Titletext | Backgound Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
-                                    if ($PlexToken) {
-                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
+                                    # Verify variables before uploading
+                                    Write-Entry -Subtext "BackgroundImage: $backgroundImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                    $uri = if ($PlexToken) {
+                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                     }
                                     Else {
-                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                     }
-                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    # Try uploading, capturing the response in detail
+                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                -Method Post `
+                                                                -Headers $extraPlexHeaders `
+                                                                -InFile $backgroundImageoriginal`
+                                                                -ContentType 'image/jpeg' `
+                                                                -SkipHttpErrorCheck `
+                                                                -ErrorAction Stop
+
+                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                    }
+                                    else {
+                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    }
                                     $UploadCount++
                                 }
                             }
                             catch {
-                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                $global:errorCount++
+                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                             }
                             if (Test-Path $backgroundImage -ErrorAction SilentlyContinue) {
                                 Remove-Item -LiteralPath $backgroundImage | Out-Null
@@ -31467,15 +31684,15 @@ else {
                                         InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                         if (!$global:ImageMagickError -eq 'true') {
                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                            if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -31487,11 +31704,11 @@ else {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                 if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                     $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -31502,9 +31719,30 @@ else {
                                                 # Loop through each symbol and replace it with a newline
                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                     foreach ($symbol in $NewLineSymbols) {
-                                                        $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), "`n"
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                         if ($AddShowTitletoSeason -eq 'true') {
-                                                            $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), "`n"
+                                                            $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
                                                 }
@@ -31514,8 +31752,8 @@ else {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                     $ShowoptimalFontSize = Get-OptimalPointSize -text $joinedShowTitlePointSize -font $fontImagemagick -box_width $ShowOnSeasonMaxWidth  -box_height $ShowOnSeasonMaxHeight -min_pointsize $ShowOnSeasonminPointSize -max_pointsize $ShowOnSeasonmaxPointSize -lineSpacing $ShowOnSeasonlineSpacing
                                                     if (!$global:IsTruncated) {
-                                                        Write-Entry -Subtext "Optimal Season font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                        Write-Entry -Subtext "Optimal Show font size set to: '$ShowoptimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext ("Optimal Season font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext ("Optimal Show font size set to: '{0}' [{1}]" -f $showoptimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         # Season Part
                                                         # Add Stroke
                                                         if ($AddSeasonTextStroke -eq 'true') {
@@ -31548,7 +31786,7 @@ else {
                                                 Else {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $SeasonMaxWidth  -box_height $SeasonMaxHeight -min_pointsize $SeasonminPointSize -max_pointsize $SeasonmaxPointSize -lineSpacing $SeasonlineSpacing
                                                     if (!$global:IsTruncated) {
-                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         # Add Stroke
                                                         if ($AddSeasonTextStroke -eq 'true') {
                                                             $Arguments = "`"$SeasonImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Seasonfontcolor`" -stroke `"$Seasonstrokecolor`" -strokewidth `"$Seasonstrokewidth`" -size `"$Seasonboxsize`" -background none -interline-spacing `"$SeasonlineSpacing`" -gravity `"$Seasontextgravity`" caption:`"$global:seasonTitle`" -trim +repage -extent `"$Seasonboxsize`" `) -gravity south -geometry +0`"$Seasontext_offset`" -quality $global:outputQuality -composite `"$SeasonImage`""
@@ -31642,18 +31880,42 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $SeasonImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                             }
                                             try {
@@ -31747,24 +32009,47 @@ else {
                                 }
                                 Write-Entry -Message "Starting Existing Asset Upload..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 try {
-                                    GetPlexArtwork -Type " $Titletext | $global:seasontmp Artwork." -ArtUrl $Arturl -TempImage $SeasonImage
+                                    GetPlexArtwork -Type " $Titletext | $global:seasontmp Artwork."  -ArtUrl $Arturl -TempImage $SeasonImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        $fileContent = [System.IO.File]::ReadAllBytes($SeasonImageoriginal)
-                                        if ($PlexToken) {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImageoriginal)
+                                        # Verify variables before uploading
+                                        Write-Entry -Subtext "SeasonImage: $SeasonImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                        $uri = if ($PlexToken) {
+                                            "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken"
                                         }
                                         Else {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
                                         }
-                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        # Try uploading, capturing the response in detail
+                                        $Upload = Invoke-WebRequest -Uri $uri `
+                                                                    -Method Post `
+                                                                    -Headers $extraPlexHeaders `
+                                                                    -InFile $SeasonImageoriginal`
+                                                                    -ContentType 'image/jpeg' `
+                                                                    -SkipHttpErrorCheck `
+                                                                    -ErrorAction Stop
+
+                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                        }
+                                        else {
+                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        }
                                         $UploadCount++
                                     }
                                 }
                                 catch {
-                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                    $global:errorCount++
+                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                                 if (Test-Path $SeasonImage -ErrorAction SilentlyContinue) {
                                     Remove-Item -LiteralPath $SeasonImage | Out-Null
@@ -32110,21 +32395,24 @@ else {
                                                             if (!$global:ImageMagickError -eq 'true') {
                                                                 if ($UseTCResolutionOverlays -eq 'true') {
                                                                     switch ($global:EPResolution) {
-                                                                        '4K' { $TitleCardoverlay = $4kTC }
-                                                                        '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                        '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                        '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                        '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                        '4K'            { $TitleCardoverlay = $4kTC }
+                                                                        '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -32135,11 +32423,11 @@ else {
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -32151,13 +32439,34 @@ else {
                                                                     # Loop through each symbol and replace it with a newline
                                                                     if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                         foreach ($symbol in $NewLineSymbols) {
-                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                            # Default: Replace the symbol with a newline
+                                                                            $replacementString = "`n"
+
+                                                                            # Check if the symbol should be kept
+                                                                            $keepThisSymbol = $false
+                                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                    if ($symbol -like "*$k*") {
+                                                                                        $keepThisSymbol = $true
+                                                                                        break # Match found, no need to keep checking
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            # If it's a "keep" symbol, change the replacement string
+                                                                            if ($keepThisSymbol) {
+                                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                                $replacementString = $symbol + "`n"
+                                                                            }
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                         # Add Stroke
                                                                         if ($AddTitleCardEPTitleTextStroke -eq 'true') {
                                                                             $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPTitlefontcolor`" -stroke `"$TitleCardEPTitlestrokecolor`" -strokewidth `"$TitleCardEPTitlestrokewidth`" -size `"$TitleCardEPTitleboxsize`" -background none -interline-spacing `"$TitleCardEPTitlelineSpacing`" -gravity `"$TitleCardEPTitletextgravity`" caption:`"$global:EPTitle`" -trim +repage -extent `"$TitleCardEPTitleboxsize`" `) -gravity south -geometry +0`"$TitleCardEPTitletext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -32171,11 +32480,11 @@ else {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -32183,7 +32492,7 @@ else {
                                                                     $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                     if (!$global:IsTruncated) {
-                                                                        Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                         # Add Stroke
                                                                         if ($AddTitleCardTextStroke -eq 'true') {
                                                                             $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPfontcolor`" -stroke `"$TitleCardstrokecolor`" -strokewidth `"$TitleCardstrokewidth`" -size `"$TitleCardEPboxsize`" -background none -interline-spacing `"$TitleCardEPlineSpacing`" -gravity `"$TitleCardEPtextgravity`" caption:`"$global:SeasonEPNumber`" -trim +repage -extent `"$TitleCardEPboxsize`" `) -gravity south -geometry +0`"$TitleCardEPtext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -32264,18 +32573,42 @@ else {
                                                             if ($Upload2Plex -eq 'true') {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                    if ($PlexToken) {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    # Verify variables before uploading
+                                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                    $uri = if ($PlexToken) {
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                     }
                                                                     Else {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                    }
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    # Try uploading, capturing the response in detail
+                                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                                -Method Post `
+                                                                                                -Headers $extraPlexHeaders `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
+                                                                                                -ErrorAction Stop
+
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                     }
                                                                 }
                                                                 catch {
-                                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                    $global:errorCount++
+                                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                                 }
                                                             }
                                                             try {
@@ -32371,25 +32704,48 @@ else {
                                                 }
                                                 Write-Entry -Message "Starting Existing Asset Upload..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 try {
-                                                    GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
-                                                    if ($global:PlexartworkDownloaded -eq 'true') {
-                                                        Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                        $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
-                                                        if ($PlexToken) {
-                                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
-                                                        }
-                                                        Else {
-                                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
-                                                        }
-                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
-                                                        $UploadCount++
-                                                    }
-                                                }
-                                                catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
+                                                if ($global:PlexartworkDownloaded -eq 'true') {
+                                                    Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
 
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
+                                                    }
+                                                    Else {
+                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $EpisodeImageoriginal`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    }
+                                                    $UploadCount++
                                                 }
+                                            }
+                                            catch {
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            }
                                                 if (Test-Path $EpisodeImage -ErrorAction SilentlyContinue) {
                                                     Remove-Item -LiteralPath $EpisodeImage | Out-Null
                                                     Write-Entry -Message "Deleting Temp Image: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
@@ -32709,21 +33065,24 @@ else {
                                                         if (!$global:ImageMagickError -eq 'true') {
                                                             if ($UseTCResolutionOverlays -eq 'true') {
                                                                 switch ($global:EPResolution) {
-                                                                    '4K' { $TitleCardoverlay = $4kTC }
-                                                                    '1080p' { $TitleCardoverlay = $1080pTC }
+                                                                    '4K DoVi/HDR10' { $TitleCardoverlay = $4KDoViHDR10TC }
+                                                                    '4K DoVi'       { $TitleCardoverlay = $4KDoViTC }
+                                                                    '4K HDR10'      { $TitleCardoverlay = $4KHDR10TC }
+                                                                    '4K'            { $TitleCardoverlay = $4kTC }
+                                                                    '1080p'         { $TitleCardoverlay = $1080pTC }
                                                                     Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                 }
                                                             }
                                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
@@ -32734,11 +33093,11 @@ else {
                                                             $logEntry = "`"$magick`" $Arguments"
                                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -32749,13 +33108,34 @@ else {
                                                                 # Loop through each symbol and replace it with a newline
                                                                 if ($NewLineOnSpecificSymbols -eq 'true') {
                                                                     foreach ($symbol in $NewLineSymbols) {
-                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), "`n"
+                                                                        # Default: Replace the symbol with a newline
+                                                                        $replacementString = "`n"
+
+                                                                        # Check if the symbol should be kept
+                                                                        $keepThisSymbol = $false
+                                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                                if ($symbol -like "*$k*") {
+                                                                                    $keepThisSymbol = $true
+                                                                                    break # Match found, no need to keep checking
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        # If it's a "keep" symbol, change the replacement string
+                                                                        if ($keepThisSymbol) {
+                                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                            $replacementString = $symbol + "`n"
+                                                                        }
+                                                                        $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""' -replace '`', ''
                                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                 if (!$global:IsTruncated) {
-                                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     # Add Stroke
                                                                     if ($AddTitleCardEPTitleTextStroke -eq 'true') {
                                                                         $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPTitlefontcolor`" -stroke `"$TitleCardEPTitlestrokecolor`" -strokewidth `"$TitleCardEPTitlestrokewidth`" -size `"$TitleCardEPTitleboxsize`" -background none -interline-spacing `"$TitleCardEPTitlelineSpacing`" -gravity `"$TitleCardEPTitletextgravity`" caption:`"$global:EPTitle`" -trim +repage -extent `"$TitleCardEPTitleboxsize`" `) -gravity south -geometry +0`"$TitleCardEPTitletext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -32770,11 +33150,11 @@ else {
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
                                                             }
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -32782,7 +33162,7 @@ else {
                                                                 $joinedTitlePointSize = $global:SeasonEPNumber -replace '""', '""""'
                                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPMaxWidth  -box_height $TitleCardEPMaxHeight -min_pointsize $TitleCardEPminPointSize -max_pointsize $TitleCardEPmaxPointSize -lineSpacing $TitleCardEPlineSpacing
                                                                 if (!$global:IsTruncated) {
-                                                                    Write-Entry -Subtext "Optimal font size set to: '$optimalFontSize'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     # Add Stroke
                                                                     if ($AddTitleCardTextStroke -eq 'true') {
                                                                         $Arguments = "`"$EpisodeImage`" -gravity center -background None -layers Flatten `( -font `"$TitleCardfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$TitleCardEPfontcolor`" -stroke `"$TitleCardstrokecolor`" -strokewidth `"$TitleCardstrokewidth`" -size `"$TitleCardEPboxsize`" -background none -interline-spacing `"$TitleCardEPlineSpacing`" -gravity `"$TitleCardEPtextgravity`" caption:`"$global:SeasonEPNumber`" -trim +repage -extent `"$TitleCardEPboxsize`" `) -gravity south -geometry +0`"$TitleCardEPtext_offset`" -quality $global:outputQuality -composite `"$EpisodeImage`""
@@ -32862,18 +33242,42 @@ else {
                                                             if ($Upload2Plex -eq 'true') {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                    if ($PlexToken) {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    # Verify variables before uploading
+                                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                    $uri = if ($PlexToken) {
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                     }
                                                                     Else {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                    }
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    # Try uploading, capturing the response in detail
+                                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                                -Method Post `
+                                                                                                -Headers $extraPlexHeaders `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
+                                                                                                -ErrorAction Stop
+
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                     }
                                                                 }
                                                                 catch {
-                                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                    $global:errorCount++
+                                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                                 }
                                                             }
                                                             try {
@@ -32972,21 +33376,44 @@ else {
                                                     GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
                                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                        $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
-                                                        if ($PlexToken) {
-                                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
+                                                        # Verify variables before uploading
+                                                        Write-Entry -Subtext "EpisodeImage: $EpisodeImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                        $uri = if ($PlexToken) {
+                                                            "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                         }
                                                         Else {
-                                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                            "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                         }
-                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        # Try uploading, capturing the response in detail
+                                                        $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                    -Method Post `
+                                                                                    -Headers $extraPlexHeaders `
+                                                                                    -InFile $EpisodeImageoriginal`
+                                                                                    -ContentType 'image/jpeg' `
+                                                                                    -SkipHttpErrorCheck `
+                                                                                    -ErrorAction Stop
+
+                                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                        }
+                                                        else {
+                                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                        }
                                                         $UploadCount++
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                                 if (Test-Path $EpisodeImage -ErrorAction SilentlyContinue) {
                                                     Remove-Item -LiteralPath $EpisodeImage | Out-Null
@@ -33197,419 +33624,12 @@ else {
         $ImageChoicesDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
         Write-Entry -Message "No ImageChoices.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
+    Write-TextSizeCacheSummary
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
-    if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-            if ($AssetCleanup -eq 'true') {
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TBA Skipped",
-                            "value": "$SkipTBACount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Jap/Chinese Skipped",
-                            "value": "$SkipJapTitleCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":recycle:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Images cleared",
-                            "value": "$ImagesCleared",
-                            "inline": true
-                        },
-                        {
-                            "name": "Folders Cleared",
-                            "value": "$PathsCleared",
-                            "inline": true
-                        },
-                        {
-                            "name": "Space saved",
-                            "value": "$savedsizestring",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-            }
-            Else {
-                $jsonPayload = @"
-            {
-                "username": "$global:DiscordUserName",
-                "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                "content": "",
-                "embeds": [
-                {
-                    "author": {
-                    "name": "Posterizarr @Github",
-                    "url": "https://github.com/fscorrupt/Posterizarr"
-                    },
-                    "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                    "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                    "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                    "fields": [
-                    {
-                        "name": "",
-                        "value": ":bar_chart:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Errors",
-                        "value": "$errorCount",
-                        "inline": false
-                    },
-                    {
-                        "name": "Fallbacks",
-                        "value": "$($FallbackCount.count)",
-                        "inline": true
-                    },
-                    {
-                        "name": "Textless",
-                        "value": "$($TextlessCount.count)",
-                        "inline": true
-                    },
-                    {
-                        "name": "Truncated",
-                        "value": "$($TextTruncatedCount.count)",
-                        "inline": true
-                    },
-                    {
-                        "name": "Unknown",
-                        "value": "$PosterUnknownCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TBA Skipped",
-                        "value": "$SkipTBACount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Jap/Chinese Skipped",
-                        "value": "$SkipJapTitleCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "",
-                        "value": ":frame_photo:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Posters",
-                        "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                        "inline": false
-                    },
-                    {
-                        "name": "Backgrounds",
-                        "value": "$BackgroundCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Seasons",
-                        "value": "$SeasonCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TitleCards",
-                        "value": "$EpisodeCount",
-                        "inline": true
-                    }
-                    ],
-                    "thumbnail": {
-                        "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                    },
-                    "footer": {
-                        "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                    }
-                }
-                ]
-            }
-"@
-            }
-        }
-        Else {
-            if ($AssetCleanup -eq 'true') {
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":recycle:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Images cleared",
-                            "value": "$ImagesCleared",
-                            "inline": true
-                        },
-                        {
-                            "name": "Folders Cleared",
-                            "value": "$PathsCleared",
-                            "inline": true
-                        },
-                        {
-                            "name": "Space saved",
-                            "value": "$savedsizestring",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-            }
-            Else {
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-            }
-        }
-        $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-        Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-    }
-    Else {
-        if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-            if ($errorCount -ge '1') {
-                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-            }
-            Else {
-                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-            }
-        }
-    }
+    Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -SkipTBACount $SkipTBACount -SkipJapTitleCount $SkipJapTitleCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount -ImagesCleared $ImagesCleared -PathsCleared $PathsCleared -SavedSizeString $savedsizestring
+
     # Calculate Counts
     $CalculatedCount = $($posterCount - $SeasonCount - $BackgroundCount - $EpisodeCount)
     # Export json

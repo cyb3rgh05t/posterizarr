@@ -197,6 +197,18 @@
       "cancel": "Annuler",
       "start": "Démarrer la synchronisation Emby"
     },
+    "backup": {
+      "title": "Mode Sauvegarde",
+      "info": "Dans ce mode, le script téléchargera toutes les illustrations que vous avez dans Plex.",
+      "description": "Il utilise les valeurs spécifiées dans votre config.json pour trouver et enregistrer les illustrations.",
+      "benefitsTitle": "Avantages du Mode Sauvegarde",
+      "step1Title": "Créer une sauvegarde complète",
+      "step1Text": "Sauvegardez facilement toutes vos illustrations Plex existantes dans un dossier local spécifié dans votre configuration.",
+      "step2Title": "Préparer pour Jellyfin/Emby",
+      "step2Text": "C'est pratique pour créer un deuxième dossier d'assets avec des données EXIF Kometa/TCM, qui peut ensuite être utilisé par Jellyfin ou Emby.",
+      "cancel": "Annuler",
+      "start": "Démarrer la sauvegarde"
+    },
     "status": {
       "running": "Script en cours",
       "stopFirst": "Arrêtez le script avant de lancer un autre mode",
@@ -363,6 +375,8 @@
     "dashboard": "Tableau de bord",
     "runModes": "Modes d'exécution",
     "runtimeHistory": "Historique d'exécution",
+    "plexExport": "Export Plex",
+    "mediaServerExport": "Historique d'exportation du serveur multimédia",
     "assets": "Ressources",
     "config": "Configuration",
     "galleries": "Galeries",
@@ -569,7 +583,10 @@
     "autoScrollStatus": "Défilement auto : {{status}}",
     "on": "Activé",
     "off": "Désactivé",
-    "receivingUpdates": "Réception des mises à jour en direct"
+    "receivingUpdates": "Réception des mises à jour en direct",
+    "loadFull": "Charger le fichier journal complet",
+    "loadingFullLog": "Chargement du fichier journal complet...",
+    "loadedFullLog": "Fichier journal complet chargé"
   },
   "libraryExclusion": {
     "configNotFound": "Configuration du serveur multimédia non trouvée",
@@ -589,7 +606,9 @@
     "clickToFetch": "Cliquez sur \"Récupérer les bibliothèques\" pour charger les bibliothèques depuis votre serveur {{server}}.",
     "noLibraries": "Aucune bibliothèque de films ou de séries TV trouvée sur ce serveur.",
     "excludedCount": "Bibliothèques exclues ({{count}}) :",
-    "includedCount": "Bibliothèques incluses ({{count}}) :"
+    "includedCount": "Bibliothèques incluses ({{count}}) :",
+    "noneExcluded": "Aucune bibliothèque exclue - toutes les bibliothèques seront traitées",
+    "allExcluded": "Toutes les bibliothèques exclues - aucun traitement ne sera effectué"
   },
   "languageOrderSelector": {
     "noLanguages": "Aucune langue sélectionnée. Ajoutez des langues à l'aide du menu déroulant ci-dessous.",
@@ -801,7 +820,9 @@
     "deleteError": "Erreur lors de la suppression : {{message}}",
     "bulkDeletePartial": "Supprimé {{deleted}} affiche(s), mais {{failed}} ont échoué.",
     "bulkDeleteSuccess": "Supprimé avec succès {{count}} affiche(s)",
-    "assetReplaced": "Ressource remplacée avec succès !"
+    "assetReplaced": "Ressource remplacée avec succès !",
+    "selectPage": "Sélectionner la page",
+    "deselectPage": "Désélectionner la page"
   },
   "toast": {
     "success": "Succès",
@@ -817,6 +838,7 @@
     "runMigration": "Lancer la migration",
     "importing": "Importation...",
     "importJson": "Importer JSON",
+	"loading": "Chargement en cours...",
     "summary": "Résumé ({{days}} derniers jours)",
     "days": "{{count}} jours",
     "totalRuns": "Exécutions totales",
@@ -860,6 +882,11 @@
       "previous": "Précédent",
       "next": "Suivant"
     }
+  },
+  "pagination": {
+    "page": "Page {{page}} • Affichage de {{count}} entrées",
+    "previous": "Précédent",
+    "next": "Suivant"
   },
   "schedulerSettings": {
     "loading": "Chargement des paramètres du planificateur...",
@@ -1334,7 +1361,25 @@
     "updateFailed": "Échec de la mise à jour de {{title}}",
     "unresolveFailed": "Échec de la réactivation de {{title}}",
     "updateError": "Erreur lors de la mise à jour de la ressource : {{error}}",
-    "unresolveError": "Erreur : {{error}}"
+    "unresolveError": "Erreur : {{error}}",
+    "selectAsset": "Sélectionner la ressource",
+    "selectAll": "Tout sélectionner",
+    "selectAllFiltered": "Sélectionner toutes les ressources filtrées",
+    "selectedCount": "{{count}} sélectionné(s)",
+    "markSelectedAsResolved": "Marquer sélectionnés comme résolus",
+    "clearSelection": "Effacer la sélection",
+    "processing": "Traitement...",
+    "bulkMarkSuccess": "{{count}} ressource(s) marquée(s) comme résolue(s) avec succès",
+    "bulkMarkPartial": "{{success}} marqué(s) comme résolu(s), {{failed}} échoué(s)",
+    "bulkMarkFailed": "Échec de marquer les ressources comme résolues",
+    "bulkMarkError": "Erreur : {{error}}",
+    "addedOn": "Ajouté le",
+    "noAssetsToMark": "Aucun asset filtré à marquer comme résolu.",
+    "bulkMarkAllFilteredConfirm": "Êtes-vous sûr de vouloir marquer les {{count}} assets filtrés comme résolus ?\n\nCela les supprimera de la vue 'Non résolus'. Cette action ne peut pas être annulée facilement.",
+    "markAllFilteredTooltip": "Marquer tous les assets filtrés comme résolus",
+    "markAllFiltered": "Tout marquer ({{count}}) comme résolu",
+    "bulkMarkAllFilteredTitle": "Tout marquer comme résolu ?",
+    "confirmMarkAll": "Confirmer et tout marquer ({{count}})"
   },
   "common": {
     "save": "Enregistrer",
@@ -1500,7 +1545,14 @@
     "startTime": "Heure de début",
     "endTime": "Heure de fin",
     "notificationSent": "Notification envoyée",
-    "notes": "Notes"
+    "notes": "Notes",
+    "lastRun": "Dernière exécution",
+    "searchLogs": "Rechercher dans les logs",
+    "searchPlaceholder": "Filtrer les journaux...",
+    "filterLevel": "Filtrer par niveau",
+    "allLevels": "Tous les niveaux",
+    "noMatchingLogs": "Aucune entrée de log ne correspond à vos filtres.",
+    "adjustFilters": "Essayez d'ajuster vos filtres de recherche ou de niveau."
   },
   "dangerZone": {
     "title": "Zone de danger",
@@ -1570,7 +1622,11 @@
     "deleteMultipleMessage": "Êtes-vous sûr de vouloir supprimer {{count}} ressource(s) sélectionnée(s) ?",
     "deleteAssetMessage": "Êtes-vous sûr de vouloir supprimer cette ressource ?",
     "deleteButton": "Supprimer",
-    "assetReplaced": "Ressource remplacée avec succès !"
+    "assetReplaced": "Ressource remplacée avec succès !",
+    "itemsPerPage": "Éléments par page",
+    "paginationPage": "Page {{current}} sur {{total}}",
+    "paginationPrevious": "Précédent",
+    "paginationNext": "Suivant"
   },
   "autoTriggers": {
     "header": {
@@ -1858,5 +1914,51 @@
         }
       ]
     }
+  },
+  "plexExport": {
+    "pageTitle": "Historique d'export Plex",
+    "description": "Suivre et interroger vos exports de bibliothèque Plex au fil du temps",
+    "refresh": "Actualiser",
+    "import": "Importer",
+    "importing": "Importation...",
+    "totalRuns": "Exécutions totales",
+    "libraryRecords": "Enregistrements de bibliothèque",
+    "episodeRecords": "Enregistrements d'épisodes",
+    "latestRun": "Dernier import",
+    "noData": "Aucune donnée",
+    "selectRun": "Sélectionner l'exécution",
+    "search": "Rechercher...",
+    "library": "Bibliothèque",
+    "episodes": "Épisodes",
+    "title": "Titre",
+    "year": "Année",
+    "resolution": "Résolution",
+    "actions": "Actions",
+    "show": "Série",
+    "season": "Saison",
+    "noResults": "Aucun résultat correspondant",
+    "showing": "Affichage de",
+    "to": "à",
+    "of": "sur",
+    "results": "résultats",
+    "page": "Page",
+    "originalTitle": "Titre original",
+    "libraryType": "Type de bibliothèque",
+    "ratingKey": "Clé de notation",
+    "path": "Chemin",
+    "folder": "Dossier racine",
+    "labels": "Étiquettes",
+    "episodeNumbers": "Numéros d'épisodes",
+    "episodeTitles": "Titres d'épisodes",
+    "resolutions": "Résolutions",
+    "importedAt": "Importé le",
+    "alreadyImported": "Données déjà importées",
+    "importSuccess": "Importation réussie"
+  },
+  "mediaServerExport": {
+    "pageTitle": "Historique d'exportation du serveur multimédia",
+    "description": "Suivre et interroger vos exports de bibliothèque de serveur multimédia au fil du temps",
+    "plex": "Plex",
+    "jellyfinEmby": "Jellyfin / Emby"
   }
 }
