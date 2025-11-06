@@ -1,0 +1,65 @@
+site_name: Posterizarr
+site_url: https://fscorrupt.github.io/Posterizarr/
+repo_url: https://github.com/fscorrupt/Posterizarr
+repo_name: fscorrupt/Posterizarr
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: images/logo_banner.png
+  favicon: images/webhook.png
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+    - content.code.copy
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+# Page navigation
+# Page navigation
+nav:
+  - 'Home': 'index.md'
+  - 'Getting Started':
+    - 'Quick Start': 'installation.md'
+    - 'Walkthrough': 'walkthrough.md'
+    - 'Requirements': 'requirements.md'
+  - 'Configuration': 'configuration.md'
+  - 'Usage & Guides':
+    - 'Usage & Modes': 'modes.md'
+    - 'Manual UI Installation': 'uiinstallation.md'
+  - 'Advanced':
+    - 'Search Order': 'searchorder.md'
+    - 'Naming Convention': 'namingconvention.md'
+    - 'Platform & Tools': 'platformandtools.md'
+  - 'Reference':
+    - 'Showcase': 'showcase.md'
+
+
+# Extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences

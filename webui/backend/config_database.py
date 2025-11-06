@@ -111,6 +111,16 @@ class ConfigDB:
         """Determine the type of a value for storage"""
         if isinstance(value, bool):
             return "boolean"
+        elif isinstance(value, str):
+            lower_value = value.lower()
+            # Recognize lowercase string booleans
+            if lower_value == "true" or lower_value == "false":
+                return "boolean"
+            # Optional: Recognize capitalized string booleans (like "True"/"False")
+            elif value == "True" or value == "False":
+                return "boolean"
+            else:
+                return "string"
         elif isinstance(value, int):
             return "integer"
         elif isinstance(value, float):

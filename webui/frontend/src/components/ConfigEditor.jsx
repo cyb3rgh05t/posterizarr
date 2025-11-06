@@ -38,66 +38,66 @@ const API_URL = "/api";
 
 // Mapping von Gruppen zu README-Abschnitten
 const README_LINKS = {
-  "WebUI Settings": "https://github.com/fscorrupt/Posterizarr#webui",
-  "API Keys & Tokens": "https://github.com/fscorrupt/Posterizarr#apipart",
-  ApiPart: "https://github.com/fscorrupt/Posterizarr#apipart",
-  "Language & Preferences": "https://github.com/fscorrupt/Posterizarr#apipart",
-  "Image Filters": "https://github.com/fscorrupt/Posterizarr#apipart",
-  "Plex Settings": "https://github.com/fscorrupt/Posterizarr#plexpart",
-  PlexPart: "https://github.com/fscorrupt/Posterizarr#plexpart",
-  "Jellyfin Settings": "https://github.com/fscorrupt/Posterizarr#jellyfinpart",
-  JellyfinPart: "https://github.com/fscorrupt/Posterizarr#jellyfinpart",
-  "Emby Settings": "https://github.com/fscorrupt/Posterizarr#embypart",
-  EmbyPart: "https://github.com/fscorrupt/Posterizarr#embypart",
-  Notifications: "https://github.com/fscorrupt/Posterizarr#notification",
-  Notification: "https://github.com/fscorrupt/Posterizarr#notification",
+  "WebUI Settings": "https://fscorrupt.github.io/Posterizarr/configuration/#webui",
+  "API Keys & Tokens": "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+  ApiPart: "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+  "Language & Preferences": "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+  "Image Filters": "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+  "Plex Settings": "https://fscorrupt.github.io/Posterizarr/configuration/#plexpart",
+  PlexPart: "https://fscorrupt.github.io/Posterizarr/configuration/#plexpart",
+  "Jellyfin Settings": "https://fscorrupt.github.io/Posterizarr/configuration/#jellyfinpart",
+  JellyfinPart: "https://fscorrupt.github.io/Posterizarr/configuration/#jellyfinpart",
+  "Emby Settings": "https://fscorrupt.github.io/Posterizarr/configuration/#embypart",
+  EmbyPart: "https://fscorrupt.github.io/Posterizarr/configuration/#embypart",
+  Notifications: "https://fscorrupt.github.io/Posterizarr/configuration/#notification",
+  Notification: "https://fscorrupt.github.io/Posterizarr/configuration/#notification",
   "General Settings":
-    "https://github.com/fscorrupt/Posterizarr#prerequisitepart",
-  PrerequisitePart: "https://github.com/fscorrupt/Posterizarr#prerequisitepart",
-  "Overlay Files": "https://github.com/fscorrupt/Posterizarr#prerequisitepart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+  PrerequisitePart: "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+  "Overlay Files": "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
   "Resolution Overlays":
-    "https://github.com/fscorrupt/Posterizarr#prerequisitepart",
-  Fonts: "https://github.com/fscorrupt/Posterizarr#prerequisitepart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+  Fonts: "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
   "Text Formatting":
-    "https://github.com/fscorrupt/Posterizarr#prerequisitepart",
-  "Image Processing": "https://github.com/fscorrupt/Posterizarr#overlaypart",
-  OverlayPart: "https://github.com/fscorrupt/Posterizarr#overlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+  "Image Processing": "https://fscorrupt.github.io/Posterizarr/configuration/#overlaypart",
+  OverlayPart: "https://fscorrupt.github.io/Posterizarr/configuration/#overlaypart",
   "Poster Settings":
-    "https://github.com/fscorrupt/Posterizarr#posteroverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#posteroverlaypart",
   PosterOverlayPart:
-    "https://github.com/fscorrupt/Posterizarr#posteroverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#posteroverlaypart",
   "Season Poster Settings":
-    "https://github.com/fscorrupt/Posterizarr#seasonposteroverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#seasonposteroverlaypart",
   SeasonPosterOverlayPart:
-    "https://github.com/fscorrupt/Posterizarr#seasonposteroverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#seasonposteroverlaypart",
   "Show Title on Season":
-    "https://github.com/fscorrupt/Posterizarr#showtilteonseasonposterpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#showtilteonseasonposterpart",
   ShowTitleOnSeasonPosterPart:
-    "https://github.com/fscorrupt/Posterizarr#showtilteonseasonposterpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#showtilteonseasonposterpart",
   "Background Settings":
-    "https://github.com/fscorrupt/Posterizarr#backgroundoverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#backgroundoverlaypart",
   BackgroundOverlayPart:
-    "https://github.com/fscorrupt/Posterizarr#backgroundoverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#backgroundoverlaypart",
   "Title Card Overlay":
-    "https://github.com/fscorrupt/Posterizarr#titlecardoverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardoverlaypart",
   TitleCardOverlayPart:
-    "https://github.com/fscorrupt/Posterizarr#titlecardoverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardoverlaypart",
   "Title Card Title Text":
-    "https://github.com/fscorrupt/Posterizarr#titlecardtitletextpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardtitletextpart",
   TitleCardTitleTextPart:
-    "https://github.com/fscorrupt/Posterizarr#titlecardtitletextpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardtitletextpart",
   "Title Card Episode Text":
-    "https://github.com/fscorrupt/Posterizarr#titlecardepisodetextpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardepisodetextpart",
   TitleCardEPTextPart:
-    "https://github.com/fscorrupt/Posterizarr#titlecardepisodetextpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardepisodetextpart",
   "Collection Poster":
-    "https://github.com/fscorrupt/Posterizarr#collectionposteroverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#collectionposteroverlaypart",
   CollectionPosterOverlayPart:
-    "https://github.com/fscorrupt/Posterizarr#collectionposteroverlaypart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#collectionposteroverlaypart",
   "Collection Title":
-    "https://github.com/fscorrupt/Posterizarr#collectiontitleposterpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#collectiontitleposterpart",
   CollectionTitlePosterPart:
-    "https://github.com/fscorrupt/Posterizarr#collectiontitleposterpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#collectiontitleposterpart",
 };
 
 // Comprehensive tooltip descriptions for all config variables
@@ -2349,29 +2349,37 @@ const getConfigTooltips = (language) => {
 
 // Helper function to remove redundant prefixes from setting keys for display
 const getCleanSettingKey = (key) => {
-  const prefixes = [
-    "CollectionTitle",
-    "CollectionPoster",
-    "SeasonPoster",
-    "TitleCardTitle",
-    "TitleCardEP",
-    "TitleCard",
-    "ShowTitle",
-    "Background",
-    "Poster",
-  ];
+    // FIX: Exclude the main feature toggles from prefix removal
+    const keysToExclude = ["Posters", "SeasonPosters", "BackgroundPosters", "TitleCards"];
 
-  for (const prefix of prefixes) {
-    if (key.startsWith(prefix)) {
-      const remainder = key.slice(prefix.length);
-      // Only remove prefix if there's something left after it
-      if (remainder) {
-        return remainder;
-      }
+    if (keysToExclude.includes(key)) {
+        return key;
     }
-  }
 
-  return key;
+    const prefixes = [
+        "CollectionTitle",
+        "CollectionPoster",
+        "SeasonPoster",
+        "TitleCardTitle",
+        "TitleCardEP",
+        "TitleCard",
+        "ShowTitle",
+        "Background",
+        "Poster",
+    ];
+
+    for (const prefix of prefixes) {
+        if (key.startsWith(prefix)) {
+            const remainder = key.slice(prefix.length);
+            // Only remove prefix if there's something left after it
+            // The original logic is fine for fields *within* groups (e.g., PosterAddBorder -> AddBorder)
+            if (remainder) {
+                return remainder;
+            }
+        }
+    }
+
+    return key;
 };
 
 function ConfigEditor() {
@@ -4077,95 +4085,98 @@ function ConfigEditor() {
     const stringValue =
       value === null || value === undefined ? "" : String(value);
 
+    // List of fields stored as real booleans (true/false)
+    const booleanFields = ["basicAuthEnabled"];
+
+    // List of fields stored as string "true"/"false" (lowercase)
+    const lowercaseStringBooleanFields = [
+      "UsePlex",
+      "UseJellyfin",
+      "UseEmby",
+      "WidthHeightFilter",
+      "PlexUploadExistingAssets",
+      "JellyfinUploadExistingAssets",
+      "JellyfinReplaceThumbwithBackdrop",
+      "EmbyUploadExistingAssets",
+      "EmbyReplaceThumbwithBackdrop",
+      "show_skipped",
+      "AssetCleanup",
+      "FollowSymlink",
+      "SkipTBA",
+      "SkipJapTitle",
+      "SkipAddText",
+      "SkipAddTextAndOverlay",
+      "DisableOnlineAssetFetch",
+      "AutoUpdateIM",
+      "AutoUpdatePosterizarr",
+      "ForceRunningDeletion",
+      "DisableHashValidation",
+      "ImageProcessing",
+      "NewLineOnSpecificSymbols",
+      "Posters",
+      "SeasonPosters",
+      "BackgroundPosters",
+      "TitleCards",
+      "LibraryFolders",
+      "PlexUpload",
+      "PosterFontAllCaps",
+      "PosterAddBorder",
+      "PosterAddText",
+      "PosterAddOverlay",
+      "PosterAddTextStroke",
+      "BackgroundFontAllCaps",
+      "BackgroundAddOverlay",
+      "BackgroundAddBorder",
+      "BackgroundAddText",
+      "BackgroundAddTextStroke",
+      "TitleCardUseBackgroundAsTitleCard",
+      "TitleCardAddOverlay",
+      "TitleCardAddBorder",
+      "TitleCardBackgroundFallback",
+      "TitleCardTitleFontAllCaps",
+      "TitleCardTitleAddEPTitleText",
+      "TitleCardTitleAddTextStroke",
+      "TitleCardEPFontAllCaps",
+      "TitleCardEPAddEPText",
+      "TitleCardEPAddTextStroke",
+      "SeasonPosterFontAllCaps",
+      "SeasonPosterAddBorder",
+      "SeasonPosterAddText",
+      "SeasonPosterAddOverlay",
+      "SeasonPosterAddTextStroke",
+      "SeasonPosterShowFallback",
+      "ShowTitleAddShowTitletoSeason",
+      "ShowTitleFontAllCaps",
+      "ShowTitleAddTextStroke",
+      "CollectionTitleAddCollectionTitle",
+      "CollectionTitleFontAllCaps",
+      "CollectionTitleAddTextStroke",
+      "CollectionPosterFontAllCaps",
+      "CollectionPosterAddBorder",
+      "CollectionPosterAddText",
+      "CollectionPosterAddTextStroke",
+      "CollectionPosterAddOverlay",
+      "UsePosterResolutionOverlays",
+      "UseBackgroundResolutionOverlays",
+      "UseTCResolutionOverlays",
+    ];
+
+    // List of fields stored as string "True"/"False" (CAPITAL)
+    const capitalizedStringBooleanFields = [
+      "SendNotification",
+      "UseUptimeKuma",
+    ];
+
     // Enhanced boolean toggle switch - supports 3 types: Boolean, "true"/"false", "True"/"False"
     if (
       type === "boolean" ||
       value === "true" ||
       value === "false" ||
       value === "True" ||
-      value === "False"
+      value === "False" ||
+      lowercaseStringBooleanFields.includes(key) ||
+      capitalizedStringBooleanFields.includes(key)
     ) {
-      // List of fields stored as real booleans (true/false)
-      const booleanFields = ["basicAuthEnabled"];
-
-      // List of fields stored as string "true"/"false" (lowercase)
-      const lowercaseStringBooleanFields = [
-        "UsePlex",
-        "UseJellyfin",
-        "UseEmby",
-        "WidthHeightFilter",
-        "PlexUploadExistingAssets",
-        "JellyfinUploadExistingAssets",
-        "JellyfinReplaceThumbwithBackdrop",
-        "EmbyUploadExistingAssets",
-        "EmbyReplaceThumbwithBackdrop",
-        "show_skipped",
-        "AssetCleanup",
-        "FollowSymlink",
-        "SkipTBA",
-        "SkipJapTitle",
-        "SkipAddText",
-		"SkipAddTextAndOverlay",
-        "DisableOnlineAssetFetch",
-        "AutoUpdateIM",
-        "AutoUpdatePosterizarr",
-        "ForceRunningDeletion",
-        "DisableHashValidation",
-        "ImageProcessing",
-        "NewLineOnSpecificSymbols",
-        "Posters",
-        "SeasonPosters",
-        "BackgroundPosters",
-        "TitleCards",
-        "LibraryFolders",
-        "PlexUpload",
-        "PosterFontAllCaps",
-        "PosterAddBorder",
-        "PosterAddText",
-        "PosterAddOverlay",
-        "PosterAddTextStroke",
-        "BackgroundFontAllCaps",
-        "BackgroundAddOverlay",
-        "BackgroundAddBorder",
-        "BackgroundAddText",
-        "BackgroundAddTextStroke",
-        "TitleCardUseBackgroundAsTitleCard",
-        "TitleCardAddOverlay",
-        "TitleCardAddBorder",
-        "TitleCardBackgroundFallback",
-        "TitleCardTitleFontAllCaps",
-        "TitleCardTitleAddEPTitleText",
-        "TitleCardTitleAddTextStroke",
-        "TitleCardEPFontAllCaps",
-        "TitleCardEPAddEPText",
-        "TitleCardEPAddTextStroke",
-        "SeasonPosterFontAllCaps",
-        "SeasonPosterAddBorder",
-        "SeasonPosterAddText",
-        "SeasonPosterAddOverlay",
-        "SeasonPosterAddTextStroke",
-        "SeasonPosterShowFallback",
-        "ShowTitleAddShowTitletoSeason",
-        "ShowTitleFontAllCaps",
-        "ShowTitleAddTextStroke",
-        "CollectionTitleAddCollectionTitle",
-        "CollectionTitleFontAllCaps",
-        "CollectionTitleAddTextStroke",
-        "CollectionPosterFontAllCaps",
-        "CollectionPosterAddBorder",
-        "CollectionPosterAddText",
-        "CollectionPosterAddTextStroke",
-        "CollectionPosterAddOverlay",
-        "UsePosterResolutionOverlays",
-        "UseBackgroundResolutionOverlays",
-        "UseTCResolutionOverlays",
-      ];
-
-      // List of fields stored as string "True"/"False" (CAPITAL)
-      const capitalizedStringBooleanFields = [
-        "SendNotification",
-        "UseUptimeKuma",
-      ];
 
       // Determine which type to use
       const isBoolean = booleanFields.includes(key);

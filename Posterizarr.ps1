@@ -888,7 +888,7 @@ function SendMessage {
         # Build the final payload object
         $payloadObject = [PSCustomObject]@{
             username   = $global:DiscordUserName
-            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
+            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/docs/images/webhook.png"
             content    = ""
             embeds     = @(
                 [PSCustomObject]@{
@@ -3711,7 +3711,7 @@ function CheckJson {
                         Write-Entry -Message "Missing Main Attribute in your Config file: $partKey." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                         Write-Entry -Subtext "I will copy all settings from 'PosterOverlayPart'..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                         Write-Entry -Subtext "Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                        Write-Entry -Subtext "GH Readme -> https://github.com/fscorrupt/Posterizarr/blob/$($Branch)/README.md#configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                        Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/Posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                         # Convert the updated configuration object back to JSON and save it, then reload it
                         $configJson = $config | ConvertTo-Json -Depth 10
                         $configJson | Set-Content -Path $jsonFilePath -Force
@@ -3720,7 +3720,7 @@ function CheckJson {
                     Else {
                         Write-Entry -Message "Missing Main Attribute in your Config file: $partKey." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                         Write-Entry -Subtext "Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                        Write-Entry -Subtext "GH Readme -> https://github.com/fscorrupt/Posterizarr/blob/$($Branch)/README.md#configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                        Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/Posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                         $config | Add-Member -MemberType NoteProperty -Name $partKey -Value $defaultConfig.$partKey
                         $AttributeChanged = $True
                     }
@@ -3754,7 +3754,7 @@ function CheckJson {
                         if (-not $config.$partKey.PSObject.Properties.Name.tolower().Contains($propertyKey.tolower())) {
                             Write-Entry -Message "Missing Sub-Attribute in your Config file: $partKey.$propertyKey" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                             Write-Entry -Subtext "Adding it for you... In GH Readme, look for $partKey.$propertyKey - if you want to see what changed..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                            Write-Entry -Subtext "GH Readme -> https://github.com/fscorrupt/Posterizarr/blob/$($Branch)/README.md#configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                            Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/Posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                             # Add the property using the expected casing
                             $config.$partKey | Add-Member -MemberType NoteProperty -Name $propertyKey -Value $defaultConfig.$partKey.$propertyKey -Force
                             $AttributeChanged = $True
@@ -6528,7 +6528,7 @@ function Send-SummaryNotification {
         # Build final payload
         $payloadObject = [PSCustomObject]@{
             username   = $global:DiscordUserName
-            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
+            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/docs/images/webhook.png"
             content    = ""
             embeds     = @(
                 [PSCustomObject]@{
@@ -6541,7 +6541,7 @@ function Send-SummaryNotification {
                     color     = $(if ($ErrorCount -ge '1') { 16711680 } Elseif ($Testing) { 8388736 } Elseif ($FallbackCount -gt '1' -or $PosterUnknownCount -ge '1' -or $TruncatedCount -gt '1') { 15120384 } Else { 5763719 })
                     fields    = $fieldList
                     thumbnail = @{
-                        url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
+                        url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/docs/images/webhook.png"
                     }
                     footer    = @{
                         text = "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
