@@ -390,7 +390,7 @@
     "assetsManager": "Overlay Manager",
     "manualAssets": "Manual Assets",
     "generalSettings": "General Settings",
-    "library": "Library",
+    "library": "Languages",
     "notifications": "Notifications",
     "security": "Security",
     "advanced": "Advanced",
@@ -624,6 +624,7 @@
     "moveDown": "Move down",
     "removeLanguage": "Remove language",
     "addLanguage": "Add Language",
+    "selectLanguage": "Select Language",
     "currentOrder": "Current Order:"
   },
   "imageSizeSlider": {
@@ -846,7 +847,7 @@
     "runMigration": "Run Migration",
     "importing": "Importing...",
     "importJson": "Import JSON",
-	"loading": "Loading...",
+    "loading": "Loading...",
     "summary": "Summary (Last {{days}} Days)",
     "days": "{{count}} Days",
     "totalRuns": "Total Runs",
@@ -924,6 +925,7 @@
     "confirmClearAllMessage": "Are you sure you want to clear all schedules? This cannot be undone.",
     "timePlaceholder": "HH:MM (e.g., 14:30)",
     "descriptionPlaceholder": "Description (optional)",
+    "selectTime": "Select Time",
     "hour": "Hour",
     "minute": "Minute",
     "add": "Add",

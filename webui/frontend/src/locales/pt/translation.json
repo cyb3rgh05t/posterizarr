@@ -390,7 +390,7 @@
     "assetsManager": "Gerenciador de sobreposição",
     "manualAssets": "Ativos manuais",
     "generalSettings": "Configurações gerais",
-    "library": "Biblioteca",
+    "library": "Idiomas",
     "notifications": "Notificações",
     "security": "Segurança",
     "advanced": "Avançado",
@@ -616,6 +616,7 @@
     "moveDown": "Mover para baixo",
     "removeLanguage": "Remover idioma",
     "addLanguage": "Adicionar idioma",
+    "selectLanguage": "Selecionar idioma",
     "currentOrder": "Ordem atual:"
   },
   "imageSizeSlider": {
@@ -838,7 +839,7 @@
     "runMigration": "Executar migração",
     "importing": "Importando...",
     "importJson": "Importar JSON",
-	"loading": "Carregando...",
+    "loading": "Carregando...",
     "summary": "Resumo (Últimos {{days}} dias)",
     "days": "{{count}} dias",
     "totalRuns": "Execuções totais",
@@ -916,6 +917,7 @@
     "confirmClearAllMessage": "Tem certeza de que deseja limpar todos os agendamentos? Isso não pode ser desfeito.",
     "timePlaceholder": "HH:MM (ex: 14:30)",
     "descriptionPlaceholder": "Descrição (opcional)",
+    "selectTime": "Selecionar Hora",
     "hour": "Hora",
     "minute": "Minuto",
     "add": "Adicionar",

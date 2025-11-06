@@ -390,7 +390,7 @@
     "assetsManager": "Gestore overlay",
     "manualAssets": "Asset manuali",
     "generalSettings": "Impostazioni generali",
-    "library": "Libreria",
+    "library": "Lingue",
     "notifications": "Notifiche",
     "security": "Sicurezza",
     "advanced": "Avanzate",
@@ -616,6 +616,7 @@
     "moveDown": "Sposta giù",
     "removeLanguage": "Rimuovi lingua",
     "addLanguage": "Aggiungi lingua",
+    "selectLanguage": "Seleziona lingua",
     "currentOrder": "Ordine corrente:"
   },
   "imageSizeSlider": {
@@ -838,7 +839,7 @@
     "runMigration": "Esegui migrazione",
     "importing": "Importazione...",
     "importJson": "Importa JSON",
-	"loading": "Caricamento in corso...",
+    "loading": "Caricamento in corso...",
     "summary": "Riepilogo (ultimi {{days}} giorni)",
     "days": "{{count}} giorni",
     "totalRuns": "Esecuzioni totali",
@@ -916,6 +917,7 @@
     "confirmClearAllMessage": "Sei sicuro di voler cancellare tutte le pianificazioni? Questa azione non può essere annullata.",
     "timePlaceholder": "HH:MM (es. 14:30)",
     "descriptionPlaceholder": "Descrizione (opzionale)",
+    "selectTime": "Seleziona Ora",
     "hour": "Ora",
     "minute": "Minuto",
     "add": "Aggiungi",

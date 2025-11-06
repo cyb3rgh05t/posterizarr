@@ -390,7 +390,7 @@
     "assetsManager": "Overlay-Manager",
     "manualAssets": "Manuelle Assets",
     "generalSettings": "Allgemeine Einstellungen",
-    "library": "Bibliothek",
+    "library": "Sprachen",
     "notifications": "Benachrichtigungen",
     "security": "Sicherheit",
     "advanced": "Erweitert",
@@ -617,6 +617,7 @@
     "moveDown": "Nach unten",
     "removeLanguage": "Sprache entfernen",
     "addLanguage": "Sprache hinzufügen",
+    "selectLanguage": "Sprache auswählen",
     "currentOrder": "Aktuelle Reihenfolge:"
   },
   "imageSizeSlider": {
@@ -839,7 +840,7 @@
     "runMigration": "Migration ausführen",
     "importing": "Importiere...",
     "importJson": "JSON importieren",
-	"loading": "Wird geladen...",
+    "loading": "Wird geladen...",
     "summary": "Zusammenfassung (Letzte {{days}} Tage)",
     "days": "{{count}} Tage",
     "totalRuns": "Gesamtläufe",
@@ -917,6 +918,7 @@
     "confirmClearAllMessage": "Sind Sie sicher, dass Sie alle Zeitpläne löschen möchten? Dies kann nicht rückgängig gemacht werden.",
     "timePlaceholder": "HH:MM (z.B. 14:30)",
     "descriptionPlaceholder": "Beschreibung (optional)",
+    "selectTime": "Zeit auswählen",
     "hour": "Stunde",
     "minute": "Minute",
     "add": "Hinzufügen",

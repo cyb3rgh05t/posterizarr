@@ -262,25 +262,27 @@ const LanguageOrderSelector = ({ value = [], onChange, label, helpText }) => {
               />
 
               {/* Dropdown Content */}
-              <div
-                className="absolute z-20 w-full mt-2 bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-64 overflow-y-auto"
-                style={{ scrollbarWidth: "thin" }}
-              >
-                {availableLanguages.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => addLanguage(lang.code)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-theme-hover transition-all text-left border-b border-theme last:border-b-0"
-                  >
-                    <span className="font-mono text-sm text-theme-primary font-semibold w-8">
-                      {lang.code}
-                    </span>
-                    <span className="text-sm text-theme-muted">•</span>
-                    <span className="text-sm text-theme-text hover:text-theme-primary">
-                      {lang.name}
-                    </span>
-                  </button>
-                ))}
+              <div className="absolute z-20 w-full mt-2 rounded-lg bg-theme-card border border-theme shadow-lg max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-theme-primary scrollbar-track-theme-bg">
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                    {t("languageOrderSelector.selectLanguage")}
+                  </div>
+                  {availableLanguages.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => addLanguage(lang.code)}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-theme-hover text-left"
+                    >
+                      <span className="font-mono text-sm text-theme-primary font-semibold w-8">
+                        {lang.code}
+                      </span>
+                      <span className="text-sm text-theme-muted">•</span>
+                      <span className="text-sm text-gray-300 hover:text-white">
+                        {lang.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </>
           )}

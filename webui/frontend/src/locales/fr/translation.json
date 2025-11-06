@@ -390,7 +390,7 @@
     "assetsManager": "Gestionnaire de superposition",
     "manualAssets": "Ressources manuelles",
     "generalSettings": "Paramètres généraux",
-    "library": "Bibliothèque",
+    "library": "Langues",
     "notifications": "Notifications",
     "security": "Sécurité",
     "advanced": "Avancé",
@@ -616,6 +616,7 @@
     "moveDown": "Descendre",
     "removeLanguage": "Supprimer la langue",
     "addLanguage": "Ajouter une langue",
+    "selectLanguage": "Sélectionner la langue",
     "currentOrder": "Ordre actuel :"
   },
   "imageSizeSlider": {
@@ -838,7 +839,7 @@
     "runMigration": "Lancer la migration",
     "importing": "Importation...",
     "importJson": "Importer JSON",
-	"loading": "Chargement en cours...",
+    "loading": "Chargement en cours...",
     "summary": "Résumé ({{days}} derniers jours)",
     "days": "{{count}} jours",
     "totalRuns": "Exécutions totales",
@@ -916,6 +917,7 @@
     "confirmClearAllMessage": "Êtes-vous sûr de vouloir effacer toutes les planifications ? Cette action est irréversible.",
     "timePlaceholder": "HH:MM (ex., 14:30)",
     "descriptionPlaceholder": "Description (facultatif)",
+    "selectTime": "Sélectionner l'heure",
     "hour": "Heure",
     "minute": "Minute",
     "add": "Ajouter",

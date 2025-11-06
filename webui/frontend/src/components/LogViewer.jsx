@@ -40,7 +40,11 @@ const LogLevelFilter = ({ levelFilters, setLevelFilters }) => {
   const filters = [
     { key: "DEBUG", color: "text-purple-400", border: "border-purple-500/50" },
     { key: "INFO", color: "text-blue-400", border: "border-blue-500/50" },
-    { key: "WARNING", color: "text-yellow-400", border: "border-yellow-500/50" },
+    {
+      key: "WARNING",
+      color: "text-yellow-400",
+      border: "border-yellow-500/50",
+    },
     { key: "ERROR", color: "text-red-400", border: "border-red-500/50" },
   ];
 
@@ -498,7 +502,6 @@ function LogViewer() {
     }
   }, [selectedLog]);
 
-
   const filteredLogs = useMemo(() => {
     const query = searchTerm.toLowerCase();
 
@@ -565,7 +568,7 @@ function LogViewer() {
     }
 
     // Download the currently filtered logs from state
-    const logText = filteredLogs.map(p => p.raw).join("\n");
+    const logText = filteredLogs.map((p) => p.raw).join("\n");
     const blob = new Blob([logText], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -722,30 +725,41 @@ function LogViewer() {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute z-10 w-full mt-2 bg-theme-card border border-theme-primary rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {availableLogs.map((log) => (
-                    <button
-                      key={log.name}
-                      onClick={() => {
-                        console.log(`User selected log: ${log.name}`);
-                        setSelectedLog(log.name);
-                        setDropdownOpen(false);
-                      }}
-                      className={`w-full px-4 py-3 text-left text-sm transition-all ${
-                        selectedLog === log.name
-                          ? "bg-theme-primary text-white"
-                          : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{log.name}</span>
-                        <span className="text-xs opacity-80">
-                          {(log.size / 1024).toFixed(2)} KB
-                        </span>
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setDropdownOpen(false)}
+                  />
+                  <div className="absolute z-50 w-full mt-2 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto">
+                    <div className="p-2">
+                      <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                        {t("logViewer.selectLogFile")}
                       </div>
-                    </button>
-                  ))}
-                </div>
+                      {availableLogs.map((log) => (
+                        <button
+                          key={log.name}
+                          onClick={() => {
+                            console.log(`User selected log: ${log.name}`);
+                            setSelectedLog(log.name);
+                            setDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                            selectedLog === log.name
+                              ? "bg-theme-primary text-white"
+                              : "text-gray-300 hover:bg-theme-hover"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{log.name}</span>
+                            <span className="text-xs opacity-80">
+                              {(log.size / 1024).toFixed(2)} KB
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -911,7 +925,8 @@ function LogViewer() {
             </div>
           ) : (
             <div className="font-mono text-[11px] leading-relaxed">
-              {filteredLogs.map((parsed, index) => { // 'parsed' is { raw, level }
+              {filteredLogs.map((parsed, index) => {
+                // 'parsed' is { raw, level }
                 // Get color based on parsed level
                 const logColor = getLogColor(parsed.level); // Use parsed.level
 
@@ -922,7 +937,9 @@ function LogViewer() {
                     style={{ color: logColor }}
                   >
                     {/* Render the raw line */}
-                    <pre className="whitespace-pre-wrap m-0 p-0">{parsed.raw}</pre>
+                    <pre className="whitespace-pre-wrap m-0 p-0">
+                      {parsed.raw}
+                    </pre>
                   </div>
                 );
               })}

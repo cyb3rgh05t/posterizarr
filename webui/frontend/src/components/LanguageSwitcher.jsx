@@ -48,33 +48,46 @@ const LanguageSwitcher = ({ compact = false }) => {
         </button>
 
         {isOpen && (
-          <div className="absolute right-0 mt-2 w-48 bg-theme-card border border-theme-primary rounded-lg shadow-xl z-50 overflow-hidden">
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => handleLanguageChange(lang.code)}
-                className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${
-                  i18n.language === lang.code
-                    ? "bg-theme-primary text-white"
-                    : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`text-sm font-bold ${
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setIsOpen(false)}
+            />
+            <div className="absolute right-0 top-full mt-2 w-48 rounded-lg bg-theme-card border border-theme shadow-lg z-50">
+              <div className="p-2">
+                <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                  {t("language.selectLanguage")}
+                </div>
+                {languages.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => handleLanguageChange(lang.code)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
                       i18n.language === lang.code
-                        ? "text-white"
-                        : "text-theme-primary"
+                        ? "bg-theme-primary text-white"
+                        : "text-gray-300 hover:bg-theme-hover"
                     }`}
                   >
-                    {lang.flag}
-                  </span>
-                  <span className="text-sm font-medium">{lang.name}</span>
-                </div>
-                {i18n.language === lang.code && <Check className="w-4 h-4" />}
-              </button>
-            ))}
-          </div>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`text-sm font-bold ${
+                          i18n.language === lang.code
+                            ? "text-white"
+                            : "text-theme-primary"
+                        }`}
+                      >
+                        {lang.flag}
+                      </span>
+                      <span>{lang.name}</span>
+                    </div>
+                    {i18n.language === lang.code && (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
       </div>
     );
@@ -98,33 +111,44 @@ const LanguageSwitcher = ({ compact = false }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 mt-2 bg-theme-card border border-theme-primary rounded-lg shadow-xl z-50 overflow-hidden">
-          {languages.map((lang) => (
-            <button
-              key={lang.code}
-              onClick={() => handleLanguageChange(lang.code)}
-              className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${
-                i18n.language === lang.code
-                  ? "bg-theme-primary text-white"
-                  : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={`text-sm font-bold ${
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute left-0 right-0 mt-2 rounded-lg bg-theme-card border border-theme shadow-lg z-50">
+            <div className="p-2">
+              <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                {t("language.selectLanguage")}
+              </div>
+              {languages.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => handleLanguageChange(lang.code)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
                     i18n.language === lang.code
-                      ? "text-white"
-                      : "text-theme-primary"
+                      ? "bg-theme-primary text-white"
+                      : "text-gray-300 hover:bg-theme-hover"
                   }`}
                 >
-                  {lang.flag}
-                </span>
-                <span className="text-sm font-medium">{lang.name}</span>
-              </div>
-              {i18n.language === lang.code && <Check className="w-4 h-4" />}
-            </button>
-          ))}
-        </div>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`text-sm font-bold ${
+                        i18n.language === lang.code
+                          ? "text-white"
+                          : "text-theme-primary"
+                      }`}
+                    >
+                      {lang.flag}
+                    </span>
+                    <span>{lang.name}</span>
+                  </div>
+                  {i18n.language === lang.code && <Check className="w-4 h-4" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
