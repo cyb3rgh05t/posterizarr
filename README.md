@@ -70,4 +70,4 @@ Feel free to customize the script further to meet your specific preferences or a
 >   - this is required because the script checks against this file if a newer version is available.
 > - Do not include images on a PR.
 
-![versioning](/images/versioning.jpg)
+![versioning](/docs/images/versioning.jpg)
