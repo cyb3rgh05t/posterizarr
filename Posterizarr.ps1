@@ -4278,6 +4278,11 @@ function CheckPlexAccess {
                 Write-Entry -Subtext "Plex access is working..." -Path $configLogging -Color Green -log Info
                 # Check if libs are available
                 [XML]$Libs = $response.Content
+                # Plex Debug info
+                Write-Entry -Subtext "Plex Server Version: $($Libs.MediaContainer.version)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "My Plex Server: $($Libs.MediaContainer.myPlex)"-Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server Signin State: $($Libs.MediaContainer.myPlexSigninState)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server allow Deletion: $($Libs.MediaContainer.allowMediaDeletion)" -Path $configLogging -Color Cyan -log Debug
                 if ($Libs.MediaContainer.size -ge 1) {
                     return $Libs
                 }
@@ -4884,6 +4889,7 @@ function MassDownloadPlexArtwork {
         }
     }
     $Mode = "backup"
+    Write-Entry -Message "Backup Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libsoverview = @()
     foreach ($lib in $Libs.MediaContainer.Directory) {
@@ -7106,6 +7112,7 @@ $BackupPath = RemoveTrailingSlash $config.PrerequisitePart.BackupPath
 $ManualAssetPath = RemoveTrailingSlash $config.PrerequisitePart.ManualAssetPath
 $Upload2Plex = $config.PrerequisitePart.PlexUpload.tolower()
 $SkipAddText = $config.PrerequisitePart.SkipAddText.tolower()
+$SkipAddTextAndOverlay = $config.PrerequisitePart.SkipAddTextAndOverlay.tolower()
 $DisableHashValidation = $config.PrerequisitePart.DisableHashValidation.tolower()
 $global:DisableOnlineAssetFetch = $config.PrerequisitePart.DisableOnlineAssetFetch.tolower()
 
@@ -7950,6 +7957,7 @@ if ($Manual) {
     }
     $FolderName = $FolderName.replace('"', '')
     $Titletext = $Titletext.replace('"', '')
+    $SafeFolderName = $FolderName -replace '[\\/:*?"<>|\[\]{}]', '_'
     if ($MoviePosterCard) {
         $PosterType = "Movie"
     }
@@ -7968,9 +7976,10 @@ if ($Manual) {
         $PosterImageoriginal = "$AssetPath\$LibraryName\$FolderName\poster.jpg"
 
         # Create Folder if Missing
-        $TargetFolder = Join-Path -Path "$AssetPath\$LibraryName" -ChildPath $FolderName
-        New-Item -ItemType Directory -Path $TargetFolder -Force | Out-Null
-
+        if (-not $collectionCard) {
+            $TargetFolder = Join-Path -Path "$AssetPath\$LibraryName" -ChildPath $FolderName
+            New-Item -ItemType Directory -Path $TargetFolder -Force | Out-Null
+        }
         if ($SeasonPoster) {
             $PosterType = "Season"
             if ([string]::IsNullOrEmpty($SeasonPosterName)) {
@@ -8023,8 +8032,8 @@ if ($Manual) {
         }
         Elseif ($CollectionCard) {
             $PosterType = "Collection"
-            $PosterImageoriginal = "$AssetPath\Collections\$LibraryName\$FolderName\poster.jpg"
-            $CollectionPath = "$AssetPath\Collections\$LibraryName\$FolderName"
+            $PosterImageoriginal = "$AssetPath\Collections\$LibraryName\$SafeFolderName\poster.jpg"
+            $CollectionPath = "$AssetPath\Collections\$LibraryName\$SafeFolderName"
             # Ensure the Collection directory exists
             if (!(Test-Path $CollectionPath)) {
                 try {
@@ -8126,7 +8135,7 @@ if ($Manual) {
         }
         Elseif ($CollectionCard) {
             $PosterType = "Collection"
-            $PosterImageoriginal = "$AssetPath\Collections\$($FolderName)_poster.jpg"
+            $PosterImageoriginal = "$AssetPath\Collections\$($SafeFolderName)_poster.jpg"
             $CollectionPath = "$AssetPath\Collections"
             # Ensure the Collection directory exists
             if (!(Test-Path $CollectionPath)) {
@@ -8172,7 +8181,12 @@ if ($Manual) {
         }
     }
 
-    $PosterImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$FolderName.jpg"
+    if ($CollectionCard){
+        $PosterImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$SafeFolderName.jpg"
+    }
+    Else {
+        $PosterImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$FolderName.jpg"
+    }
     $PosterImage = $PosterImage.Replace('[', '_').Replace(']', '_').Replace('{', '_').Replace('}', '_')
     if ($global:ImageProcessing -eq 'true') {
         if ($SeasonPoster) {
@@ -8291,15 +8305,15 @@ if ($Manual) {
         InvokeMagickCommand -Command $magick -Arguments $CommentArguments
         if (!$global:ImageMagickError -eq 'true') {
             if ($SeasonPoster) {
-                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
-                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
-                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
@@ -8329,15 +8343,15 @@ if ($Manual) {
                 $collectionCount++
             }
             elseif ($TitleCard) {
-                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
-                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
-                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                 }
@@ -8349,15 +8363,15 @@ if ($Manual) {
             }
             elseif ($BackgroundCard) {
                 # Resize Image to 2000x3000 and apply Border and overlay
-                if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
-                if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
-                if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
@@ -8369,15 +8383,15 @@ if ($Manual) {
             }
             Else {
                 # Resize Image to 2000x3000 and apply Border and overlay
-                if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
-                if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
-                if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                     $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                 }
@@ -8935,7 +8949,7 @@ Elseif ($Testing) {
 
     Write-Entry -Subtext "Poster Part:" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     if ($AddText -eq 'true') {
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsShort = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterShort`""
             $ArgumentsMedium = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterMedium`""
             $ArgumentsLong = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterLong`""
@@ -8944,7 +8958,7 @@ Elseif ($Testing) {
             $ArgumentsLongCAPS = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Poster Borders | Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsShort = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterShort`""
             $ArgumentsMedium = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterMedium`""
             $ArgumentsLong = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterLong`""
@@ -8953,7 +8967,7 @@ Elseif ($Testing) {
             $ArgumentsLongCAPS = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsShort = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$TestPosterShort`""
             $ArgumentsMedium = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$TestPosterMedium`""
             $ArgumentsLong = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$TestPosterLong`""
@@ -8996,15 +9010,15 @@ Elseif ($Testing) {
         InvokeMagickCommand -Command $magick -Arguments $ArgumentsLongCAPS
     }
     Else {
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsTextless = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Borders | Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsTextless = "`"$testimage`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$TestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $ArgumentsTextless = "`"$testimage`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$TestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
@@ -9084,7 +9098,7 @@ Elseif ($Testing) {
 
     Write-Entry -Subtext "Season Poster Part:" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     if ($AddSeasonText -eq 'true') {
-        if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+        if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsShort = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterShort`""
             $SeasonArgumentsMedium = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterMedium`""
             $SeasonArgumentsLong = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterLong`""
@@ -9093,7 +9107,7 @@ Elseif ($Testing) {
             $SeasonArgumentsLongCAPS = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterLongCAPS`""
             Write-Entry -Subtext "Adding Season Poster Borders | Adding Season Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+        if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsShort = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterShort`""
             $SeasonArgumentsMedium = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterMedium`""
             $SeasonArgumentsLong = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterLong`""
@@ -9102,7 +9116,7 @@ Elseif ($Testing) {
             $SeasonArgumentsLongCAPS = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterLongCAPS`""
             Write-Entry -Subtext "Adding Season Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+        if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsShort = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$TestSeasonPosterShort`""
             $SeasonArgumentsMedium = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$TestSeasonPosterMedium`""
             $SeasonArgumentsLong = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$TestSeasonPosterLong`""
@@ -9145,15 +9159,15 @@ Elseif ($Testing) {
         InvokeMagickCommand -Command $magick -Arguments $SeasonArgumentsLongCAPS
     }
     Else {
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsTextless = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterTextless`""
             Write-Entry -Subtext "Adding Season Poster Borders | Adding Season Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsTextless = "`"$testimage`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$TestSeasonPosterTextless`""
             Write-Entry -Subtext "Adding Season Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $SeasonArgumentsTextless = "`"$testimage`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$TestSeasonPosterTextless`""
             Write-Entry -Subtext "Adding Season Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
@@ -9288,7 +9302,7 @@ Elseif ($Testing) {
     Write-Entry -Subtext "Background Part:" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     # Border/Overlay Background Part
     if ($AddBackgroundText -eq 'true') {
-        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $backgroundArgumentsShort = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterShort`""
             $backgroundArgumentsMedium = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterMedium`""
             $backgroundArgumentsLong = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterLong`""
@@ -9297,7 +9311,7 @@ Elseif ($Testing) {
             $backgroundArgumentsLongCAPS = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Background Borders | Adding Background Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $backgroundArgumentsShort = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterShort`""
             $backgroundArgumentsMedium = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterMedium`""
             $backgroundArgumentsLong = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterLong`""
@@ -9306,7 +9320,7 @@ Elseif ($Testing) {
             $backgroundArgumentsLongCAPS = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundTestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Background Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $backgroundArgumentsShort = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundTestPosterShort`""
             $backgroundArgumentsMedium = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundTestPosterMedium`""
             $backgroundArgumentsLong = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundTestPosterLong`""
@@ -9348,15 +9362,15 @@ Elseif ($Testing) {
         InvokeMagickCommand -Command $magick -Arguments $backgroundArgumentsLongCAPS
     }
     Else {
-        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $BackgroundArgumentsTextless = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$BackgroundTestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Borders | Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $BackgroundArgumentsTextless = "`"$backgroundtestimage`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$BackgroundTestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $BackgroundArgumentsTextless = "`"$backgroundtestimage`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$BackgroundTestPosterTextless`""
             Write-Entry -Subtext "Adding Poster Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
@@ -9433,7 +9447,7 @@ Elseif ($Testing) {
     Write-Entry -Subtext "TitleCard Part:" -Path $global:ScriptRoot\Logs\Testinglog.log -Color Green -log Info
     # Border/Overlay TitleCard Part
     if ($AddTitleCardEPTitleText -eq 'true' -or $AddTitleCardEPText -eq 'true') {
-        if ($Addtitlecardborder -eq 'true' -and $Addtitlecardoverlay -eq 'true') {
+        if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $titlecardArgumentsShort = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterShort`""
             $titlecardArgumentsMedium = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterMedium`""
             $titlecardArgumentsLong = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterLong`""
@@ -9442,7 +9456,7 @@ Elseif ($Testing) {
             $titlecardArgumentsLongCAPS = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Background Borders | Adding Background Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($Addtitlecardborder -eq 'true' -and $Addtitlecardoverlay -eq 'false') {
+        if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $titlecardArgumentsShort = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterShort`""
             $titlecardArgumentsMedium = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterMedium`""
             $titlecardArgumentsLong = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterLong`""
@@ -9451,7 +9465,7 @@ Elseif ($Testing) {
             $titlecardArgumentsLongCAPS = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$titlecardtestPosterLongCAPS`""
             Write-Entry -Subtext "Adding Background Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($Addtitlecardborder -eq 'false' -and $Addtitlecardoverlay -eq 'true') {
+        if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $titlecardArgumentsShort = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$titlecardtestPosterShort`""
             $titlecardArgumentsMedium = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$titlecardtestPosterMedium`""
             $titlecardArgumentsLong = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$titlecardtestPosterLong`""
@@ -9493,15 +9507,15 @@ Elseif ($Testing) {
         InvokeMagickCommand -Command $magick -Arguments $titlecardArgumentsLongCAPS
     }
     Else {
-        if ($Addtitlecardborder -eq 'true' -and $Addtitlecardoverlay -eq 'true') {
+        if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $TitleCardArgumentsTextless = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$TitleCardTestPosterTextless`""
             Write-Entry -Subtext "Adding TitleCard Borders | Adding TitleCard Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($Addtitlecardborder -eq 'true' -and $Addtitlecardoverlay -eq 'false') {
+        if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
             $TitleCardArgumentsTextless = "`"$backgroundtestimage`" -shave `"$titlecardborderwidthsecond`"  -bordercolor `"$titlecardbordercolor`" -border `"$titlecardborderwidth`" `"$TitleCardTestPosterTextless`""
             Write-Entry -Subtext "Adding TitleCard Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
-        if ($Addtitlecardborder -eq 'false' -and $Addtitlecardoverlay -eq 'true') {
+        if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
             $TitleCardArgumentsTextless = "`"$backgroundtestimage`" `"$titlecardoverlay`" -gravity south -quality $global:outputQuality -composite `"$TitleCardTestPosterTextless`""
             Write-Entry -Subtext "Adding TitleCard Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         }
@@ -9923,7 +9937,7 @@ Elseif ($Tautulli) {
     # {parent_rating_key}	The unique identifier for the season or album.
     # {grandparent_rating_key}	The unique identifier for the TV show or artist.
     $Mode = "tautulli"
-
+    Write-Entry -Message "Tautulli Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libraries = @()
     if (($RatingKey -or $parentratingkey -or $grandparentratingkey) -and $mediatype) {
         if ($mediatype -eq 'movie') {
@@ -10168,57 +10182,11 @@ Elseif ($Tautulli) {
                 Write-Entry -Subtext "Found [$($tempseasondata.{Show Name})] of type $($tempseasondata.Type) for season $($tempseasondata.{Season Number})" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
             }
         }
-        $Episodedata | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
         if ($Episodedata) {
             Write-Entry -Subtext "Found '$($Episodedata.Episodes.split(',').count)' Episodes..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
         }
     }
 
-    # Test if csv´s are missing and create dummy file.
-    if (!(Get-ChildItem -LiteralPath "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -ErrorAction SilentlyContinue)) {
-        $EpisodeDummycsv = New-Object psobject
-
-        # Add members to the object with empty values
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Show Name" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Type" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "tvdbid" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "tmdbid" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Library Name" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Season Number" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Episodes" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Title" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "RatingKeys" -Value $null
-        $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "PlexTitleCardUrls" -Value $null
-
-        $EpisodeDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-        Write-Entry -Message "No PlexEpisodeExport.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-    }
-    if (!(Get-ChildItem -LiteralPath "$global:ScriptRoot\Logs\PlexLibexport.csv" -ErrorAction SilentlyContinue)) {
-        # Add members to the object with empty values
-        $PlexLibDummycsv = New-Object psobject
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Name" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Type" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Language" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "title" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "originalTitle" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonNames" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonNumbers" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonRatingKeys" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "year" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "tvdbid" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "imdbid" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "tmdbid" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "ratingKey" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Path" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "RootFoldername" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "MultipleVersions" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexPosterUrl" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexBackgroundUrl" -Value $null
-        $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexSeasonUrls" -Value $null
-
-        $PlexLibDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexLibexport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-        Write-Entry -Message "No PlexLibexport.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-    }
     # Store all Files from asset dir in a hashtable
     Write-Entry -Message "Creating Hashtable of all posters in asset dir..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     try {
@@ -10635,15 +10603,15 @@ Elseif ($Tautulli) {
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -10654,11 +10622,11 @@ Elseif ($Tautulli) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -10725,18 +10693,42 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $PosterImage `
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -11100,15 +11092,15 @@ Elseif ($Tautulli) {
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -11119,11 +11111,11 @@ Elseif ($Tautulli) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -11190,18 +11182,42 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $backgroundImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -11653,15 +11669,15 @@ Elseif ($Tautulli) {
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -11672,11 +11688,11 @@ Elseif ($Tautulli) {
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -11743,18 +11759,42 @@ Elseif ($Tautulli) {
                                     if (!$global:IsTruncated) {
                                         try {
                                             Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                            $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                            if ($PlexToken) {
-                                                $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                            # Verify variables before uploading
+                                            Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                            $uri = if ($PlexToken) {
+                                                "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                             }
                                             Else {
-                                                $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                            }
+                                            Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            # Try uploading, capturing the response in detail
+                                            $Upload = Invoke-WebRequest -Uri $uri `
+                                                                        -Method Post `
+                                                                        -Headers $extraPlexHeaders `
+                                                                        -InFile $PosterImage`
+                                                                        -ContentType 'image/jpeg' `
+                                                                        -SkipHttpErrorCheck `
+                                                                        -ErrorAction Stop
+
+                                            if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                            }
+                                            else {
+                                                Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                             }
                                         }
                                         catch {
-                                            Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                            $global:errorCount++
+                                            Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                         }
                                         try {
                                             # Attempt to move the item
@@ -12129,15 +12169,15 @@ Elseif ($Tautulli) {
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -12148,11 +12188,11 @@ Elseif ($Tautulli) {
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -12224,18 +12264,42 @@ Elseif ($Tautulli) {
                                     if (!$global:IsTruncated) {
                                         try {
                                             Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                            $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                            if ($PlexToken) {
-                                                $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                            # Verify variables before uploading
+                                            Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                            $uri = if ($PlexToken) {
+                                                "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                             }
                                             Else {
-                                                $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                            }
+                                            Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                            # Try uploading, capturing the response in detail
+                                            $Upload = Invoke-WebRequest -Uri $uri `
+                                                                        -Method Post `
+                                                                        -Headers $extraPlexHeaders `
+                                                                        -InFile $backgroundImage`
+                                                                        -ContentType 'image/jpeg' `
+                                                                        -SkipHttpErrorCheck `
+                                                                        -ErrorAction Stop
+
+                                            if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                            }
+                                            else {
+                                                Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                             }
                                         }
                                         catch {
-                                            Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                            $global:errorCount++
+                                            Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                         }
                                         try {
                                             # Attempt to move the item
@@ -12699,15 +12763,15 @@ Elseif ($Tautulli) {
                                         InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                         if (!$global:ImageMagickError -eq 'true') {
                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                            if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -12719,11 +12783,11 @@ Elseif ($Tautulli) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                 if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                     $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -12894,18 +12958,42 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $SeasonImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -13332,15 +13420,15 @@ Elseif ($Tautulli) {
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -13351,11 +13439,11 @@ Elseif ($Tautulli) {
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -13409,11 +13497,11 @@ Elseif ($Tautulli) {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -13501,18 +13589,42 @@ Elseif ($Tautulli) {
                                                         if (!$global:IsTruncated) {
                                                             try {
                                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                if ($PlexToken) {
-                                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                # Verify variables before uploading
+                                                                Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                $uri = if ($PlexToken) {
+                                                                    "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                 }
                                                                 Else {
-                                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                }
+                                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                # Try uploading, capturing the response in detail
+                                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                            -Method Post `
+                                                                                            -Headers $extraPlexHeaders `
+                                                                                            -InFile $EpisodeImage`
+                                                                                            -ContentType 'image/jpeg' `
+                                                                                            -SkipHttpErrorCheck `
+                                                                                            -ErrorAction Stop
+
+                                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                }
+                                                                else {
+                                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                 }
                                                             }
                                                             catch {
-                                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                $global:errorCount++
+                                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                             }
                                                             try {
                                                                 # Attempt to move the item
@@ -13917,15 +14029,15 @@ Elseif ($Tautulli) {
                                                                 }
                                                             }
                                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
@@ -13936,11 +14048,11 @@ Elseif ($Tautulli) {
                                                             $logEntry = "`"$magick`" $Arguments"
                                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -13993,11 +14105,11 @@ Elseif ($Tautulli) {
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
                                                             }
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -14084,18 +14196,42 @@ Elseif ($Tautulli) {
                                                         if (!$global:IsTruncated) {
                                                             try {
                                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                if ($PlexToken) {
-                                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                # Verify variables before uploading
+                                                                Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                $uri = if ($PlexToken) {
+                                                                    "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                 }
                                                                 Else {
-                                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                }
+                                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                # Try uploading, capturing the response in detail
+                                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                            -Method Post `
+                                                                                            -Headers $extraPlexHeaders `
+                                                                                            -InFile $EpisodeImage`
+                                                                                            -ContentType 'image/jpeg' `
+                                                                                            -SkipHttpErrorCheck `
+                                                                                            -ErrorAction Stop
+
+                                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                }
+                                                                else {
+                                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                 }
                                                             }
                                                             catch {
-                                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                $global:errorCount++
+                                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                             }
                                                             try {
                                                                 # Attempt to move the item
@@ -14319,7 +14455,7 @@ Elseif ($ArrTrigger) {
     $posterCount = 0
     $arrplatform = $arrTriggers['arr_platform']
     $Mode = "arr"
-
+    Write-Entry -Message "ArrTrigger Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     switch ($arrplatform) {
         'Sonarr' {
             Write-Entry -Message "Processing Sonarr trigger" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
@@ -14821,9 +14957,6 @@ Elseif ($ArrTrigger) {
             }
         }
         Write-Entry -Subtext "Found '$($Libraries.count)' Items..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-        $Libraries | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\OtherMediaServerLibExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-        Write-Entry -Message "Export everything to a csv: $global:ScriptRoot\Logs\OtherMediaServerLibExport.csv" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-
         Write-Entry -Message "Starting episode data query now - This can take a while..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -Log Info
 
         $Episodedata = @()
@@ -14913,7 +15046,6 @@ Elseif ($ArrTrigger) {
         }
 
         # Export the formatted data to CSV
-        $FormattedData | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\OtherMediaServerEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
         $Episodedata = $FormattedData
         if ($AllEpisodes) {
             Write-Entry -Subtext "Found '$($AllEpisodes.Items.count)' Episodes..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
@@ -15307,15 +15439,15 @@ Elseif ($ArrTrigger) {
                                                 }
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                            if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -15326,11 +15458,11 @@ Elseif ($ArrTrigger) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $fontImagemagick = $RTLfontImagemagick
                                                 }
@@ -15734,15 +15866,15 @@ Elseif ($ArrTrigger) {
                                                 }
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                            if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -15753,11 +15885,11 @@ Elseif ($ArrTrigger) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
                                                 }
@@ -16243,15 +16375,15 @@ Elseif ($ArrTrigger) {
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -16262,11 +16394,11 @@ Elseif ($ArrTrigger) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -16682,15 +16814,15 @@ Elseif ($ArrTrigger) {
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -16701,11 +16833,11 @@ Elseif ($ArrTrigger) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -17214,15 +17346,15 @@ Elseif ($ArrTrigger) {
                                                 InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                                 if (!$global:ImageMagickError -eq 'True') {
                                                     # Resize Image to 2000x3000 and apply Border and overlay
-                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                         $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     }
-                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                         $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     }
-                                                    if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                                    if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                         $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     }
@@ -17234,11 +17366,11 @@ Elseif ($ArrTrigger) {
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                         $SkippingText = 'true'
                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                     }
-                                                    if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                         $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                         if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                             $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -17739,15 +17871,15 @@ Elseif ($ArrTrigger) {
                                                                         }
                                                                     }
                                                                     # Resize Image to 2000x3000 and apply Border and overlay
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
-                                                                    if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                    if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
@@ -17758,11 +17890,11 @@ Elseif ($ArrTrigger) {
                                                                     $logEntry = "`"$magick`" $Arguments"
                                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                             $global:EPTitle = $global:EPTitle.ToUpper()
                                                                         }
@@ -17815,11 +17947,11 @@ Elseif ($ArrTrigger) {
                                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                         }
                                                                     }
-                                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                             $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                         }
@@ -18230,15 +18362,15 @@ Elseif ($ArrTrigger) {
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -18249,11 +18381,11 @@ Elseif ($ArrTrigger) {
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -18307,11 +18439,11 @@ Elseif ($ArrTrigger) {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -19007,57 +19139,11 @@ Elseif ($ArrTrigger) {
                     Write-Entry -Subtext "Found [$($tempseasondata.{Show Name})] of type $($tempseasondata.Type) for season $($tempseasondata.{Season Number})" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                 }
             }
-            $Episodedata | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
             if ($Episodedata) {
                 Write-Entry -Subtext "Found '$($Episodedata.Episodes.split(',').count)' Episodes..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
             }
         }
 
-        # Test if csv´s are missing and create dummy file.
-        if (!(Get-ChildItem -LiteralPath "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -ErrorAction SilentlyContinue)) {
-            $EpisodeDummycsv = New-Object psobject
-
-            # Add members to the object with empty values
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Show Name" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Type" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "tvdbid" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "tmdbid" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Library Name" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Season Number" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Episodes" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "Title" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "RatingKeys" -Value $null
-            $EpisodeDummycsv | Add-Member -MemberType NoteProperty -Name "PlexTitleCardUrls" -Value $null
-
-            $EpisodeDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexEpisodeExport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-            Write-Entry -Message "No PlexEpisodeExport.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-        }
-        if (!(Get-ChildItem -LiteralPath "$global:ScriptRoot\Logs\PlexLibexport.csv" -ErrorAction SilentlyContinue)) {
-            # Add members to the object with empty values
-            $PlexLibDummycsv = New-Object psobject
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Name" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Type" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Library Language" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "title" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "originalTitle" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonNames" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonNumbers" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "SeasonRatingKeys" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "year" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "tvdbid" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "imdbid" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "tmdbid" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "ratingKey" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "Path" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "RootFoldername" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "MultipleVersions" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexPosterUrl" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexBackgroundUrl" -Value $null
-            $PlexLibDummycsv | Add-Member -MemberType NoteProperty -Name "PlexSeasonUrls" -Value $null
-
-            $PlexLibDummycsv | Select-Object * | Export-Csv -Path "$global:ScriptRoot\Logs\PlexLibexport.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force
-            Write-Entry -Message "No PlexLibexport.csv found, creating dummy file for you..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-        }
         # Store all Files from asset dir in a hashtable
         Write-Entry -Message "Creating Hashtable of all posters in asset dir..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
         try {
@@ -19475,15 +19561,15 @@ Elseif ($ArrTrigger) {
                                                 }
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                            if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -19494,11 +19580,11 @@ Elseif ($ArrTrigger) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $fontImagemagick = $RTLfontImagemagick
                                                 }
@@ -19565,18 +19651,42 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $PosterImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                                 try {
                                                     # Attempt to move the item
@@ -19940,15 +20050,15 @@ Elseif ($ArrTrigger) {
                                                 }
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                            if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -19959,11 +20069,11 @@ Elseif ($ArrTrigger) {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
                                                 }
@@ -20030,18 +20140,42 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $backgroundImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                                 try {
                                                     # Attempt to move the item
@@ -20493,15 +20627,15 @@ Elseif ($ArrTrigger) {
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -20512,11 +20646,11 @@ Elseif ($ArrTrigger) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -20583,18 +20717,42 @@ Elseif ($ArrTrigger) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $PosterImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -20969,15 +21127,15 @@ Elseif ($ArrTrigger) {
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -20988,11 +21146,11 @@ Elseif ($ArrTrigger) {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -21064,18 +21222,42 @@ Elseif ($ArrTrigger) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $backgroundImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                             try {
                                                 # Attempt to move the item
@@ -21539,15 +21721,15 @@ Elseif ($ArrTrigger) {
                                             InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                             if (!$global:ImageMagickError -eq 'true') {
                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
-                                                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
@@ -21559,11 +21741,11 @@ Elseif ($ArrTrigger) {
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                     $SkippingText = 'true'
                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                 }
-                                                if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                     $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                     if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                         $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -21733,18 +21915,42 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $SeasonImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                                 try {
                                                     # Attempt to move the item
@@ -22171,15 +22377,15 @@ Elseif ($ArrTrigger) {
                                                                         }
                                                                     }
                                                                     # Resize Image to 2000x3000 and apply Border and overlay
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
-                                                                    if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                    if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                     }
@@ -22190,11 +22396,11 @@ Elseif ($ArrTrigger) {
                                                                     $logEntry = "`"$magick`" $Arguments"
                                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                             $global:EPTitle = $global:EPTitle.ToUpper()
                                                                         }
@@ -22248,11 +22454,11 @@ Elseif ($ArrTrigger) {
                                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                         }
                                                                     }
-                                                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                             $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                         }
@@ -22340,18 +22546,42 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:IsTruncated) {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                    if ($PlexToken) {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    # Verify variables before uploading
+                                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                    $uri = if ($PlexToken) {
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                     }
                                                                     Else {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                    }
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    # Try uploading, capturing the response in detail
+                                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                                -Method Post `
+                                                                                                -Headers $extraPlexHeaders `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
+                                                                                                -ErrorAction Stop
+
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                     }
                                                                 }
                                                                 catch {
-                                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                    $global:errorCount++
+                                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                                 }
                                                                 try {
                                                                     # Attempt to move the item
@@ -22756,15 +22986,15 @@ Elseif ($ArrTrigger) {
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -22775,11 +23005,11 @@ Elseif ($ArrTrigger) {
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -22832,11 +23062,11 @@ Elseif ($ArrTrigger) {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -22923,18 +23153,42 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:IsTruncated) {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                    if ($PlexToken) {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    # Verify variables before uploading
+                                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                    $uri = if ($PlexToken) {
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                     }
                                                                     Else {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                    }
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    # Try uploading, capturing the response in detail
+                                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                                -Method Post `
+                                                                                                -Headers $extraPlexHeaders `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
+                                                                                                -ErrorAction Stop
+
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                     }
                                                                 }
                                                                 catch {
-                                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                    $global:errorCount++
+                                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                                 }
                                                                 try {
                                                                     # Attempt to move the item
@@ -23356,7 +23610,27 @@ Elseif ($ArrTrigger) {
 }
 #region Backup Mode
 Elseif ($Backup) {
-    MassDownloadPlexArtwork
+    if ($UsePlex -eq 'true') {
+        MassDownloadPlexArtwork
+    }
+    Else {
+        Write-Entry -Message "Backup mode currently works only for Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Warning
+        # Clear Running File
+        if (Test-Path $CurrentlyRunning) {
+            try {
+                Remove-Item -LiteralPath $CurrentlyRunning -ErrorAction Stop | Out-Null
+            }
+            catch {
+                Write-Entry -Message "Failed to delete '$CurrentlyRunning'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                Write-Entry -Subtext "Reason: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Error
+                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            }
+        }
+        if ($global:UptimeKumaUrl) {
+            Send-UptimeKumaWebhook -status "down" -msg "No libs found"
+        }
+        Exit
+    }
 }
 #region Sync Mode
 Elseif ($SyncJelly -or $SyncEmby) {
@@ -23376,6 +23650,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
         $OtherMediaServerUrl = $JellyfinUrl
         $OtherMediaServerApiKey = $JellyfinAPIKey
         $Mode = "syncjelly"
+        Write-Entry -Message "Sync Jelly Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     if ($SyncEmby) {
         # Check Emby now:
@@ -23383,8 +23658,9 @@ Elseif ($SyncJelly -or $SyncEmby) {
         $OtherMediaServerUrl = $EmbyUrl
         $OtherMediaServerApiKey = $EmbyAPIKey
         $Mode = "syncemby"
+        Write-Entry -Message "Sync Emby Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
-
+    
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libsoverview = @()
     foreach ($lib in $Libs.MediaContainer.Directory) {
@@ -24671,9 +24947,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
 
     if ($UISchedule -or $ContainerSchedule) {
         $Mode = "scheduled"
+        Write-Entry -Message "Scheduled Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     Else {
         $Mode = "normal"
+        Write-Entry -Message "Normal Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
 
     Write-Entry -Message "Query Jellyfin/Emby..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
@@ -25470,15 +25748,15 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -25489,11 +25767,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -25897,15 +26175,15 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -25916,11 +26194,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -26406,15 +26684,15 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -26425,11 +26703,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -26845,15 +27123,15 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -26864,11 +27142,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -27391,15 +27669,15 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                             if (!$global:ImageMagickError -eq 'True') {
                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
-                                                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                                if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 }
@@ -27411,11 +27689,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                     $SkippingText = 'true'
                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                 }
-                                                if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                     $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                     if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                         $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -27916,15 +28194,15 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -27935,11 +28213,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -27992,11 +28270,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -28407,15 +28685,15 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 }
                                                             }
                                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
@@ -28426,11 +28704,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             $logEntry = "`"$magick`" $Arguments"
                                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -28484,11 +28762,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
                                                             }
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -29311,9 +29589,11 @@ ElseIf ($PosterReset) {
 else {
     if ($UISchedule -or $ContainerSchedule) {
         $Mode = "scheduled"
+        Write-Entry -Message "Scheduled Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     Else {
         $Mode = "normal"
+        Write-Entry -Message "Normal Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libsoverview = @()
@@ -30181,15 +30461,15 @@ else {
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                        if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -30200,11 +30480,11 @@ else {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -30272,18 +30552,42 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $PosterImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                             }
                                             try {
@@ -30382,21 +30686,44 @@ else {
                                     GetPlexArtwork -Type "$Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        $fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
-                                        if ($PlexToken) {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        #$fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
+                                        # Verify variables before uploading
+                                        Write-Entry -Subtext "PosterImage: $PosterImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                        $uri = if ($PlexToken) {
+                                            "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                         }
                                         Else {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                         }
-                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        # Try uploading, capturing the response in detail
+                                        $Upload = Invoke-WebRequest -Uri $uri `
+                                                                    -Method Post `
+                                                                    -Headers $extraPlexHeaders `
+                                                                    -InFile $PosterImageoriginal`
+                                                                    -ContentType 'image/jpeg' `
+                                                                    -SkipHttpErrorCheck `
+                                                                    -ErrorAction Stop
+
+                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                        }
+                                        else {
+                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        }
                                         $UploadCount++
                                     }
                                 }
                                 catch {
-                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                    $global:errorCount++
+                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                                 if (Test-Path $PosterImage -ErrorAction SilentlyContinue) {
                                     Remove-Item -LiteralPath $PosterImage | Out-Null
@@ -30690,15 +31017,15 @@ else {
                                             }
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
-                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                        if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                         }
@@ -30709,11 +31036,11 @@ else {
                                         $logEntry = "`"$magick`" $Arguments"
                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                        if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                        if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -30781,18 +31108,42 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $backgroundImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                             }
                                             try {
@@ -30891,21 +31242,44 @@ else {
                                     GetPlexArtwork -Type " $Titletext | Backgound Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        $fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
-                                        if ($PlexToken) {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
+                                        # Verify variables before uploading
+                                        Write-Entry -Subtext "BackgroundImage: $backgroundImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                        $uri = if ($PlexToken) {
+                                            "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                         }
                                         Else {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                         }
-                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        # Try uploading, capturing the response in detail
+                                        $Upload = Invoke-WebRequest -Uri $uri `
+                                                                    -Method Post `
+                                                                    -Headers $extraPlexHeaders `
+                                                                    -InFile $backgroundImageoriginal`
+                                                                    -ContentType 'image/jpeg' `
+                                                                    -SkipHttpErrorCheck `
+                                                                    -ErrorAction Stop
+
+                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                        }
+                                        else {
+                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        }
                                         $UploadCount++
                                     }
                                 }
                                 catch {
-                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                    $global:errorCount++
+                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                                 if (Test-Path $backgroundImage -ErrorAction SilentlyContinue) {
                                     Remove-Item -LiteralPath $backgroundImage | Out-Null
@@ -31289,15 +31663,15 @@ else {
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
+                                    if ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -31308,11 +31682,11 @@ else {
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -31380,18 +31754,42 @@ else {
                                         if ($Upload2Plex -eq 'true') {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $PosterImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                         }
                                         try {
@@ -31486,24 +31884,47 @@ else {
                             }
                             Write-Entry -Message "Starting Existing Asset Upload..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             try {
-                                GetPlexArtwork -Type " $Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
+                                GetPlexArtwork -Type "$Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
-                                    if ($PlexToken) {
-                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
+                                    # Verify variables before uploading
+                                    Write-Entry -Subtext "PosterImage: $PosterImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                    $uri = if ($PlexToken) {
+                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?X-Plex-Token=$PlexToken"
                                     }
                                     Else {
-                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/posters"
                                     }
-                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    # Try uploading, capturing the response in detail
+                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                -Method Post `
+                                                                -Headers $extraPlexHeaders `
+                                                                -InFile $PosterImageoriginal`
+                                                                -ContentType 'image/jpeg' `
+                                                                -SkipHttpErrorCheck `
+                                                                -ErrorAction Stop
+
+                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                    }
+                                    else {
+                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    }
                                     $UploadCount++
                                 }
                             }
                             catch {
-                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                $global:errorCount++
+                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                             }
                             if (Test-Path $PosterImage -ErrorAction SilentlyContinue) {
                                 Remove-Item -LiteralPath $PosterImage | Out-Null
@@ -31812,15 +32233,15 @@ else {
                                         }
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
-                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
+                                    if ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                     }
@@ -31831,11 +32252,11 @@ else {
                                     $logEntry = "`"$magick`" $Arguments"
                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                    if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                    if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -31903,18 +32324,42 @@ else {
                                         if ($Upload2Plex -eq 'true') {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
-                                                if ($PlexToken) {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                # Verify variables before uploading
+                                                Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                $uri = if ($PlexToken) {
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                                 }
                                                 Else {
-                                                    $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
+                                                }
+                                                Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                # Try uploading, capturing the response in detail
+                                                $Upload = Invoke-WebRequest -Uri $uri `
+                                                                            -Method Post `
+                                                                            -Headers $extraPlexHeaders `
+                                                                            -InFile $backgroundImage`
+                                                                            -ContentType 'image/jpeg' `
+                                                                            -SkipHttpErrorCheck `
+                                                                            -ErrorAction Stop
+
+                                                if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                    Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                }
+                                                else {
+                                                    Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                             }
                                             catch {
-                                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                             }
                                         }
                                         try {
@@ -32008,24 +32453,47 @@ else {
                             }
                             Write-Entry -Message "Starting Existing Asset Upload..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             try {
-                                GetPlexArtwork -Type " $Titletext | Background Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
+                                GetPlexArtwork -Type " $Titletext | Backgound Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
-                                    if ($PlexToken) {
-                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
+                                    # Verify variables before uploading
+                                    Write-Entry -Subtext "BackgroundImage: $backgroundImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                    $uri = if ($PlexToken) {
+                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?X-Plex-Token=$PlexToken"
                                     }
                                     Else {
-                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($entry.ratingkey)/arts?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        "$PlexUrl/library/metadata/$($entry.ratingkey)/arts"
                                     }
-                                    Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    # Try uploading, capturing the response in detail
+                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                -Method Post `
+                                                                -Headers $extraPlexHeaders `
+                                                                -InFile $backgroundImageoriginal`
+                                                                -ContentType 'image/jpeg' `
+                                                                -SkipHttpErrorCheck `
+                                                                -ErrorAction Stop
+
+                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                    }
+                                    else {
+                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                    }
                                     $UploadCount++
                                 }
                             }
                             catch {
-                                Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                $global:errorCount++
+                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                             }
                             if (Test-Path $backgroundImage -ErrorAction SilentlyContinue) {
                                 Remove-Item -LiteralPath $backgroundImage | Out-Null
@@ -32432,15 +32900,15 @@ else {
                                         InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                         if (!$global:ImageMagickError -eq 'true') {
                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
-                                            if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
+                                            if ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             }
@@ -32452,11 +32920,11 @@ else {
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
+                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                 $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                 if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                     $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -32628,18 +33096,42 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
-                                                    if ($PlexToken) {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken"
                                                     }
                                                     Else {
-                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $SeasonImage`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                             }
                                             try {
@@ -32733,24 +33225,47 @@ else {
                                 }
                                 Write-Entry -Message "Starting Existing Asset Upload..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 try {
-                                    GetPlexArtwork -Type " $Titletext | $global:seasontmp Artwork." -ArtUrl $Arturl -TempImage $SeasonImage
+                                    GetPlexArtwork -Type " $Titletext | $global:seasontmp Artwork."  -ArtUrl $Arturl -TempImage $SeasonImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        $fileContent = [System.IO.File]::ReadAllBytes($SeasonImageoriginal)
-                                        if ($PlexToken) {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                        #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImageoriginal)
+                                        # Verify variables before uploading
+                                        Write-Entry -Subtext "SeasonImage: $SeasonImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                        $uri = if ($PlexToken) {
+                                            "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?X-Plex-Token=$PlexToken"
                                         }
                                         Else {
-                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                            "$PlexUrl/library/metadata/$($global:SeasonRatingKey)/posters"
                                         }
-                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                        # Try uploading, capturing the response in detail
+                                        $Upload = Invoke-WebRequest -Uri $uri `
+                                                                    -Method Post `
+                                                                    -Headers $extraPlexHeaders `
+                                                                    -InFile $SeasonImageoriginal`
+                                                                    -ContentType 'image/jpeg' `
+                                                                    -SkipHttpErrorCheck `
+                                                                    -ErrorAction Stop
+
+                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                        }
+                                        else {
+                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                        }
                                         $UploadCount++
                                     }
                                 }
                                 catch {
-                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                    $global:errorCount++
+                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                                 if (Test-Path $SeasonImage -ErrorAction SilentlyContinue) {
                                     Remove-Item -LiteralPath $SeasonImage | Out-Null
@@ -33105,15 +33620,15 @@ else {
                                                                     }
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
-                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                                if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 }
@@ -33124,11 +33639,11 @@ else {
                                                                 $logEntry = "`"$magick`" $Arguments"
                                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -33181,11 +33696,11 @@ else {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
-                                                                if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                                if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -33274,18 +33789,42 @@ else {
                                                             if ($Upload2Plex -eq 'true') {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                    if ($PlexToken) {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    # Verify variables before uploading
+                                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                    $uri = if ($PlexToken) {
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                     }
                                                                     Else {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                    }
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    # Try uploading, capturing the response in detail
+                                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                                -Method Post `
+                                                                                                -Headers $extraPlexHeaders `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
+                                                                                                -ErrorAction Stop
+
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                     }
                                                                 }
                                                                 catch {
-                                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                    $global:errorCount++
+                                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                                 }
                                                             }
                                                             try {
@@ -33381,25 +33920,48 @@ else {
                                                 }
                                                 Write-Entry -Message "Starting Existing Asset Upload..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 try {
-                                                    GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
-                                                    if ($global:PlexartworkDownloaded -eq 'true') {
-                                                        Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                        $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
-                                                        if ($PlexToken) {
-                                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
-                                                        }
-                                                        Else {
-                                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
-                                                        }
-                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
-                                                        $UploadCount++
-                                                    }
-                                                }
-                                                catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
+                                                if ($global:PlexartworkDownloaded -eq 'true') {
+                                                    Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
+                                                    # Verify variables before uploading
+                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
 
+                                                    $uri = if ($PlexToken) {
+                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
+                                                    }
+                                                    Else {
+                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                    }
+                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    # Try uploading, capturing the response in detail
+                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                -Method Post `
+                                                                                -Headers $extraPlexHeaders `
+                                                                                -InFile $EpisodeImageoriginal`
+                                                                                -ContentType 'image/jpeg' `
+                                                                                -SkipHttpErrorCheck `
+                                                                                -ErrorAction Stop
+
+                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                    }
+                                                    else {
+                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                    }
+                                                    $UploadCount++
                                                 }
+                                            }
+                                            catch {
+                                                Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+
+                                                $global:errorCount++
+                                                Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                            }
                                                 if (Test-Path $EpisodeImage -ErrorAction SilentlyContinue) {
                                                     Remove-Item -LiteralPath $EpisodeImage | Out-Null
                                                     Write-Entry -Message "Deleting Temp Image: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
@@ -33728,15 +34290,15 @@ else {
                                                                 }
                                                             }
                                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
-                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
+                                                            if ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddTextAndOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             }
@@ -33747,11 +34309,11 @@ else {
                                                             $logEntry = "`"$magick`" $Arguments"
                                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -33804,11 +34366,11 @@ else {
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
                                                             }
-                                                            if ($SkipAddText -eq 'true' -and $global:PosterWithText) {
+                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
+                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -33896,18 +34458,42 @@ else {
                                                             if ($Upload2Plex -eq 'true') {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
-                                                                    if ($PlexToken) {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    # Verify variables before uploading
+                                                                    Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                                    $uri = if ($PlexToken) {
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                                     }
                                                                     Else {
-                                                                        $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                                        "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
+                                                                    }
+                                                                    Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                                    # Try uploading, capturing the response in detail
+                                                                    $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                                -Method Post `
+                                                                                                -Headers $extraPlexHeaders `
+                                                                                                -InFile $EpisodeImage`
+                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -SkipHttpErrorCheck `
+                                                                                                -ErrorAction Stop
+
+                                                                    if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                                        Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                        Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                                    }
+                                                                    else {
+                                                                        Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                                     }
                                                                 }
                                                                 catch {
-                                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                                    $global:errorCount++
+                                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                                 }
                                                             }
                                                             try {
@@ -34006,21 +34592,44 @@ else {
                                                     GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
                                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                        $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
-                                                        if ($PlexToken) {
-                                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                        #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
+                                                        # Verify variables before uploading
+                                                        Write-Entry -Subtext "EpisodeImage: $EpisodeImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        Write-Entry -Subtext "File size: $($fileContent.Length) bytes" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+
+                                                        $uri = if ($PlexToken) {
+                                                            "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?X-Plex-Token=$PlexToken"
                                                         }
                                                         Else {
-                                                            $Upload = Invoke-WebRequest -Uri "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters?" -Method Post -Headers $extraPlexHeaders -Body $fileContent -ContentType 'application/octet-stream'
+                                                            "$PlexUrl/library/metadata/$($global:episode_ratingkey)/posters"
                                                         }
-                                                        Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                        Write-Entry -Subtext "Upload URI: $(RedactMediaServerUrl -url $uri)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        # Try uploading, capturing the response in detail
+                                                        $Upload = Invoke-WebRequest -Uri $uri `
+                                                                                    -Method Post `
+                                                                                    -Headers $extraPlexHeaders `
+                                                                                    -InFile $EpisodeImageoriginal`
+                                                                                    -ContentType 'image/jpeg' `
+                                                                                    -SkipHttpErrorCheck `
+                                                                                    -ErrorAction Stop
+
+                                                        if ($Upload.StatusCode -ne 200 -and $Upload.StatusCode -ne 201) {
+                                                            Write-Entry -Subtext "Upload failed: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                            Write-Entry -Subtext "Response body:`n$($Upload.Content)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan-log Debug
+                                                        }
+                                                        else {
+                                                            Write-Entry -Subtext "Upload OK: HTTP $($Upload.StatusCode)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Debug
+                                                            Write-Entry -Subtext "Artwork uploaded successfully..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                                                        }
                                                         $UploadCount++
                                                     }
                                                 }
                                                 catch {
-                                                    Write-Entry -Subtext "Could not upload Artwork to plex, Error Message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    Write-Entry -Subtext "Invoke-WebRequest failed at transport level: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
+                                                    $global:errorCount++
+                                                    Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                 }
                                                 if (Test-Path $EpisodeImage -ErrorAction SilentlyContinue) {
                                                     Remove-Item -LiteralPath $EpisodeImage | Out-Null

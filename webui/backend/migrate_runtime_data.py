@@ -37,6 +37,12 @@ def migrate_runtime_data():
     """
     logger.info("Starting runtime data migration...")
 
+    # Check if migration has already been run
+    if runtime_db._is_migrated():
+        logger.warning("Migration has already been performed. Skipping.")
+        logger.warning("If you need to re-run migration, you must manually clear the 'migration_info' table in runtime.db")
+        return 0, 0
+
     # Check for rotated logs
     rotated_logs_dir = BASE_DIR / "RotatedLogs"
     log_files_to_check = []
@@ -88,6 +94,12 @@ def migrate_runtime_data():
     logger.info(
         f"Migration complete: {imported_count} imported, {skipped_count} skipped"
     )
+
+    # Mark migration as complete
+    if imported_count > 0:
+        logger.info(f"Marking migration as complete in database...")
+        runtime_db._mark_as_migrated(imported_count)
+
     return imported_count, skipped_count
 
 

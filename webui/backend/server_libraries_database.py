@@ -6,6 +6,9 @@ Separate database for media server library management
 import sqlite3
 from pathlib import Path
 import logging
+import threading
+from typing import Optional, List, Dict
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -21,51 +24,56 @@ class ServerLibrariesDB:
             db_path: Path to the database file
         """
         self.db_path = db_path
-        self.connection = None
+        # REMOVED: self.connection
+        self.lock = threading.RLock()  # Thread-safety lock
+
+    def _get_connection(self):
+        """Helper to create a new, thread-safe connection"""
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     def connect(self):
-        """Establish database connection"""
+        """Establish database connection (now just ensures tables exist)"""
         logger.debug(
-            f"Attempting to connect to server libraries database: {self.db_path}"
+            f"Attempting to initialize server libraries database: {self.db_path}"
         )
-        try:
-            self.connection = sqlite3.connect(self.db_path, check_same_thread=False)
-            self.connection.row_factory = sqlite3.Row
-            logger.info(f"Connected to server libraries database: {self.db_path}")
-        except sqlite3.Error as e:
-            logger.error(f"Error connecting to database: {e}")
-            raise
+        self.create_tables()
+
 
     def close(self):
-        """Close database connection"""
-        if self.connection:
-            self.connection.close()
-            logger.info("Server libraries database connection closed")
+        """Close connection - No longer needed."""
+        pass
 
     def create_tables(self):
         """Create the media_server_libraries table if it doesn't exist"""
-        logger.debug("Creating tables if they don't exist...")
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(
+        with self.lock:
+            logger.debug("Creating tables if they don't exist...")
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS media_server_libraries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        server_type TEXT NOT NULL,
+                        library_name TEXT NOT NULL,
+                        library_type TEXT,
+                        is_excluded INTEGER DEFAULT 0,
+                        last_fetched TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                        UNIQUE(server_type, library_name)
+                    )
                 """
-                CREATE TABLE IF NOT EXISTS media_server_libraries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    server_type TEXT NOT NULL,
-                    library_name TEXT NOT NULL,
-                    library_type TEXT,
-                    is_excluded INTEGER DEFAULT 0,
-                    last_fetched TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(server_type, library_name)
                 )
-            """
-            )
-
-            self.connection.commit()
-            logger.info("Server libraries table created or already exists")
-        except sqlite3.Error as e:
-            logger.error(f"Error creating table: {e}")
-            raise
+                conn.commit()
+                conn.close()
+                logger.info("Server libraries table created or already exists")
+            except sqlite3.Error as e:
+                logger.error(f"Error creating table: {e}")
+                if 'conn' in locals():
+                    conn.rollback()
+                    conn.close()
+                raise
 
     def initialize(self):
         """Initialize the database (connect and create tables)"""
@@ -78,15 +86,10 @@ class ServerLibrariesDB:
 
         if db_exists:
             logger.info(f"Database already exists: {self.db_path}")
-            file_size = self.db_path.stat().st_size
-            logger.debug(
-                f"Database file size: {file_size} bytes ({file_size/1024:.2f} KB)"
-            )
         else:
             logger.info(f"Creating new server libraries database: {self.db_path}")
 
-        self.connect()
-        self.create_tables()
+        self.connect() # This creates the tables
 
         logger.info("Server libraries database initialization complete")
         logger.info("=" * 60)
@@ -95,151 +98,141 @@ class ServerLibrariesDB:
         self, server_type: str, libraries: list, excluded_libraries: list = None
     ):
         """
-        Save media server libraries to database
-
-        Args:
-            server_type: Type of media server ('plex', 'jellyfin', 'emby')
-            libraries: List of library dicts with 'name' and 'type' keys
-            excluded_libraries: Optional list of library names that are excluded
+        Save media server libraries to database using a batch operation.
         """
         logger.info(f"Saving {len(libraries)} libraries for {server_type}")
-        try:
-            cursor = self.connection.cursor()
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
 
-            if excluded_libraries is None:
-                excluded_libraries = []
-
-            # Get existing exclusion status before deleting
-            cursor.execute(
-                "SELECT library_name, is_excluded FROM media_server_libraries WHERE server_type = ?",
-                (server_type,),
-            )
-            existing_exclusions = {row[0]: row[1] for row in cursor.fetchall()}
-
-            # Delete existing libraries for this server type
-            cursor.execute(
-                "DELETE FROM media_server_libraries WHERE server_type = ?",
-                (server_type,),
-            )
-
-            # Insert new libraries, preserving exclusion status
-            for lib in libraries:
-                lib_name = lib["name"]
-                # Use provided excluded_libraries list, or preserve existing status
-                is_excluded = (
-                    1
-                    if lib_name in excluded_libraries
-                    else existing_exclusions.get(lib_name, 0)
-                )
-
+                # Get existing exclusion status
                 cursor.execute(
-                    """
-                    INSERT INTO media_server_libraries (server_type, library_name, library_type, is_excluded)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (server_type, lib_name, lib.get("type", ""), is_excluded),
+                    "SELECT library_name, is_excluded FROM media_server_libraries WHERE server_type = ?",
+                    (server_type,),
+                )
+                existing_exclusions = {row["library_name"]: row["is_excluded"] for row in cursor.fetchall()}
+
+                excluded_set = set(excluded_libraries) if excluded_libraries is not None else set(k for k, v in existing_exclusions.items() if v == 1)
+
+                # Delete existing libraries
+                cursor.execute(
+                    "DELETE FROM media_server_libraries WHERE server_type = ?",
+                    (server_type,),
                 )
 
-            self.connection.commit()
-            logger.info(
-                f"Successfully saved {len(libraries)} libraries for {server_type}"
-            )
+                # Prepare new libraries for batch insert
+                libraries_to_insert = []
+                for lib in libraries:
+                    lib_name = lib["name"]
+                    is_excluded = 1 if lib_name in excluded_set else 0
+                    libraries_to_insert.append(
+                        (server_type, lib_name, lib.get("type", ""), is_excluded)
+                    )
 
-        except sqlite3.Error as e:
-            logger.error(f"Error saving media server libraries: {e}")
-            raise
+                if libraries_to_insert:
+                    cursor.executemany(
+                        """
+                        INSERT INTO media_server_libraries (server_type, library_name, library_type, is_excluded)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        libraries_to_insert,
+                    )
+
+                conn.commit()
+                conn.close()
+                logger.info(
+                    f"Successfully saved {len(libraries)} libraries for {server_type}"
+                )
+            except sqlite3.Error as e:
+                logger.error(f"Error saving media server libraries: {e}")
+                if 'conn' in locals():
+                    conn.rollback()
+                    conn.close()
+                raise
 
     def update_library_exclusions(self, server_type: str, excluded_libraries: list):
-        """
-        Update the exclusion status of libraries
-
-        Args:
-            server_type: Type of media server ('plex', 'jellyfin', 'emby')
-            excluded_libraries: List of library names that should be excluded
-        """
+        """Update the exclusion status of libraries"""
         logger.info(f"Updating exclusions for {server_type}: {excluded_libraries}")
-        try:
-            cursor = self.connection.cursor()
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
 
-            # First, set all libraries for this server to included (0)
-            cursor.execute(
-                "UPDATE media_server_libraries SET is_excluded = 0 WHERE server_type = ?",
-                (server_type,),
-            )
-
-            # Then, set the specified libraries to excluded (1)
-            if excluded_libraries:
-                placeholders = ",".join("?" * len(excluded_libraries))
+                # Set all to included
                 cursor.execute(
-                    f"""
-                    UPDATE media_server_libraries 
-                    SET is_excluded = 1 
-                    WHERE server_type = ? AND library_name IN ({placeholders})
-                    """,
-                    [server_type] + excluded_libraries,
+                    "UPDATE media_server_libraries SET is_excluded = 0 WHERE server_type = ?",
+                    (server_type,),
                 )
 
-            self.connection.commit()
-            logger.info(f"Successfully updated exclusions for {server_type}")
+                # Set specified to excluded
+                if excluded_libraries:
+                    placeholders = ",".join("?" * len(excluded_libraries))
+                    cursor.execute(
+                        f"""
+                        UPDATE media_server_libraries
+                        SET is_excluded = 1
+                        WHERE server_type = ? AND library_name IN ({placeholders})
+                        """,
+                        [server_type] + excluded_libraries,
+                    )
 
-        except sqlite3.Error as e:
-            logger.error(f"Error updating library exclusions: {e}")
-            raise
+                conn.commit()
+                conn.close()
+                logger.info(f"Successfully updated exclusions for {server_type}")
+            except sqlite3.Error as e:
+                logger.error(f"Error updating library exclusions: {e}")
+                if 'conn' in locals():
+                    conn.rollback()
+                    conn.close()
+                raise
 
     def get_media_server_libraries(self, server_type: str):
-        """
-        Get media server libraries from database
-
-        Args:
-            server_type: Type of media server ('plex', 'jellyfin', 'emby')
-
-        Returns:
-            dict: Dict with 'libraries' (all libraries) and 'excluded' (excluded library names)
-        """
+        """Get media server libraries from database"""
         logger.debug(f"Fetching libraries for {server_type}")
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(
-                """
-                SELECT library_name, library_type, is_excluded, last_fetched
-                FROM media_server_libraries
-                WHERE server_type = ?
-                ORDER BY library_name
-                """,
-                (server_type,),
-            )
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT library_name, library_type, is_excluded, last_fetched
+                    FROM media_server_libraries
+                    WHERE server_type = ?
+                    ORDER BY library_name
+                    """,
+                    (server_type,),
+                )
 
-            rows = cursor.fetchall()
-            libraries = []
-            excluded = []
+                rows = cursor.fetchall()
+                conn.close()
 
-            for row in rows:
-                lib_data = {"name": row[0], "type": row[1], "last_fetched": row[3]}
-                libraries.append(lib_data)
+                libraries = []
+                excluded = []
+                for row in rows:
+                    lib_data = {
+                        "name": row["library_name"],
+                        "type": row["library_type"],
+                        "last_fetched": row["last_fetched"]
+                    }
+                    libraries.append(lib_data)
+                    if row["is_excluded"] == 1:
+                        excluded.append(row["library_name"])
 
-                # Add to excluded list if is_excluded is 1
-                if row[2] == 1:
-                    excluded.append(row[0])
+                logger.debug(
+                    f"Found {len(libraries)} libraries for {server_type} ({len(excluded)} excluded)"
+                )
+                return {"libraries": libraries, "excluded": excluded}
 
-            logger.debug(
-                f"Found {len(libraries)} libraries for {server_type} ({len(excluded)} excluded)"
-            )
-            return {"libraries": libraries, "excluded": excluded}
-
-        except sqlite3.Error as e:
-            logger.error(f"Error fetching media server libraries: {e}")
-            return {"libraries": [], "excluded": []}
-
+            except sqlite3.Error as e:
+                logger.error(f"Error fetching media server libraries: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                return {"libraries": [], "excluded": []}
 
 def init_server_libraries_db(db_path: Path) -> ServerLibrariesDB:
     """
     Initialize the server libraries database
-
-    Args:
-        db_path: Path to the database file
-
-    Returns:
-        ServerLibrariesDB: Initialized database instance
     """
     db = ServerLibrariesDB(db_path)
     db.initialize()

@@ -197,6 +197,18 @@
       "cancel": "Cancelar",
       "start": "Iniciar sincronização do Emby"
     },
+    "backup": {
+      "title": "Modo de Backup",
+      "info": "Neste modo, o script irá baixar todas as artes que você tem no Plex.",
+      "description": "Ele usa os valores especificados no seu config.json para encontrar e salvar as artes.",
+      "benefitsTitle": "Benefícios do Modo de Backup",
+      "step1Title": "Criar um Backup Completo",
+      "step1Text": "Faça backup facilmente de todas as suas artes existentes no Plex para uma pasta local especificada em sua configuração.",
+      "step2Title": "Preparar para Jellyfin/Emby",
+      "step2Text": "Isso é útil para criar uma segunda pasta de ativos com dados EXIF Kometa/TCM, que pode então ser usada pelo Jellyfin ou Emby.",
+      "cancel": "Cancelar",
+      "start": "Iniciar Backup"
+    },
     "status": {
       "running": "Script em execução",
       "stopFirst": "Pare o script antes de executar outro modo",
@@ -571,7 +583,10 @@
     "autoScrollStatus": "Rolagem automática: {{status}}",
     "on": "Ligado",
     "off": "Desligado",
-    "receivingUpdates": "Recebendo atualizações ao vivo"
+    "receivingUpdates": "Recebendo atualizações ao vivo",
+    "loadFull": "Carregar arquivo de log completo",
+    "loadingFullLog": "Carregando arquivo de log completo...",
+    "loadedFullLog": "Arquivo de log completo carregado"
   },
   "libraryExclusion": {
     "configNotFound": "Configuração do servidor de mídia não encontrada",
@@ -805,7 +820,9 @@
     "deleteError": "Erro ao excluir: {{message}}",
     "bulkDeletePartial": "Excluídos {{deleted}} cartazes, mas {{failed}} falharam.",
     "bulkDeleteSuccess": "Excluídos {{count}} cartaz(es) com sucesso",
-    "assetReplaced": "Ativo substituído com sucesso!"
+    "assetReplaced": "Ativo substituído com sucesso!",
+    "selectPage": "Selecionar Página",
+    "deselectPage": "Desselecionar Página"
   },
   "toast": {
     "success": "Sucesso",
@@ -821,6 +838,7 @@
     "runMigration": "Executar migração",
     "importing": "Importando...",
     "importJson": "Importar JSON",
+	"loading": "Carregando...",
     "summary": "Resumo (Últimos {{days}} dias)",
     "days": "{{count}} dias",
     "totalRuns": "Execuções totais",
@@ -864,6 +882,11 @@
       "previous": "Anterior",
       "next": "Próximo"
     }
+  },
+  "pagination": {
+    "page": "Página {{page}} • Mostrando {{count}} entradas",
+    "previous": "Anterior",
+    "next": "Próximo"
   },
   "schedulerSettings": {
     "loading": "Carregando configurações do agendador...",
@@ -1349,7 +1372,14 @@
     "bulkMarkSuccess": "{{count}} ativo(s) marcado(s) como resolvido(s) com sucesso",
     "bulkMarkPartial": "{{success}} marcado(s) como resolvido(s), {{failed}} falharam",
     "bulkMarkFailed": "Falha ao marcar ativos como resolvidos",
-    "bulkMarkError": "Erro: {{error}}"
+    "bulkMarkError": "Erro: {{error}}",
+    "addedOn": "Adicionado em",
+    "noAssetsToMark": "Nenhum ativo filtrado para marcar como resolvido.",
+    "bulkMarkAllFilteredConfirm": "Tem certeza de que deseja marcar todos os {{count}} ativos filtrados como resolvidos?\n\nIsso os removerá da visualização 'Não resolvidos'. Esta ação não pode ser desfeita facilmente.",
+    "markAllFilteredTooltip": "Marcar todos os ativos filtrados como resolvidos",
+    "markAllFiltered": "Marcar Todos ({{count}}) como Resolvidos",
+    "bulkMarkAllFilteredTitle": "Marcar tudo como resolvido?",
+    "confirmMarkAll": "Confirmar e Marcar Tudo ({{count}})"
   },
   "common": {
     "save": "Salvar",
@@ -1515,7 +1545,14 @@
     "startTime": "Hora de início",
     "endTime": "Hora de término",
     "notificationSent": "Notificação enviada",
-    "notes": "Notas"
+    "notes": "Notas",
+    "lastRun": "Última execução",
+    "searchLogs": "Pesquisar nos Logs",
+    "searchPlaceholder": "Digite para filtrar os logs...",
+    "filterLevel": "Filtrar por Nível",
+    "allLevels": "Todos os Níveis",
+    "noMatchingLogs": "Nenhuma entrada de log corresponde aos seus filtros.",
+    "adjustFilters": "Tente ajustar seus filtros de pesquisa ou nível."
   },
   "dangerZone": {
     "title": "Zona de perigo",

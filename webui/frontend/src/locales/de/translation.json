@@ -197,6 +197,18 @@
       "cancel": "Abbrechen",
       "start": "Emby Sync starten"
     },
+    "backup": {
+      "title": "Backup-Modus",
+      "info": "In diesem Modus lädt das Skript jedes Artwork herunter, das Sie in Plex haben.",
+      "description": "Es verwendet die in Ihrer config.json angegebenen Werte, um die Artworks zu finden und zu speichern.",
+      "benefitsTitle": "Vorteile des Backup-Modus",
+      "step1Title": "Vollständiges Backup erstellen",
+      "step1Text": "Sichern Sie einfach alle Ihre vorhandenen Plex-Artworks in einem lokalen Ordner, der in Ihrer Konfiguration angegeben ist.",
+      "step2Title": "Vorbereitung für Jellyfin/Emby",
+      "step2Text": "Dies ist nützlich, um einen zweiten Asset-Ordner mit Kometa/TCM EXIF-Daten zu erstellen, der dann von Jellyfin oder Emby verwendet werden kann.",
+      "cancel": "Abbrechen",
+      "start": "Backup starten"
+    },
     "status": {
       "running": "Skript läuft",
       "stopFirst": "Stoppe das Skript, bevor du einen anderen Modus ausführst",
@@ -572,7 +584,10 @@
     "autoScrollStatus": "Auto-Scroll: {{status}}",
     "on": "Ein",
     "off": "Aus",
-    "receivingUpdates": "Empfange Live-Updates"
+    "receivingUpdates": "Empfange Live-Updates",
+    "loadFull": "Vollständige Logdatei laden",
+    "loadingFullLog": "Lade vollständige Logdatei...",
+    "loadedFullLog": "Vollständige Logdatei geladen"
   },
   "libraryExclusion": {
     "configNotFound": "Medienserver-Konfiguration nicht gefunden",
@@ -806,7 +821,9 @@
     "deleteError": "Fehler beim Löschen: {{message}}",
     "bulkDeletePartial": "{{deleted}} Poster gelöscht, aber {{failed}} fehlgeschlagen.",
     "bulkDeleteSuccess": "{{count}} Poster erfolgreich gelöscht",
-    "assetReplaced": "Asset erfolgreich ersetzt!"
+    "assetReplaced": "Asset erfolgreich ersetzt!",
+    "selectPage": "Seite auswählen",
+    "deselectPage": "Seitenauswahl aufheben"
   },
   "toast": {
     "success": "Erfolg",
@@ -822,6 +839,7 @@
     "runMigration": "Migration ausführen",
     "importing": "Importiere...",
     "importJson": "JSON importieren",
+	"loading": "Wird geladen...",
     "summary": "Zusammenfassung (Letzte {{days}} Tage)",
     "days": "{{count}} Tage",
     "totalRuns": "Gesamtläufe",
@@ -865,6 +883,11 @@
       "previous": "Zurück",
       "next": "Weiter"
     }
+  },
+  "pagination": {
+    "page": "Seite {{page}} • Zeige {{count}} Einträge",
+    "previous": "Zurück",
+    "next": "Weiter"
   },
   "schedulerSettings": {
     "loading": "Lade Zeitplaner-Einstellungen...",
@@ -1402,7 +1425,14 @@
     "bulkMarkSuccess": "{{count}} Asset(s) erfolgreich als gelöst markiert",
     "bulkMarkPartial": "{{success}} als gelöst markiert, {{failed}} fehlgeschlagen",
     "bulkMarkFailed": "Assets konnten nicht als gelöst markiert werden",
-    "bulkMarkError": "Fehler: {{error}}"
+    "bulkMarkError": "Fehler: {{error}}",
+    "addedOn": "Hinzugefügt am",
+    "noAssetsToMark": "Keine gefilterten Assets zum Auflösen vorhanden.",
+    "bulkMarkAllFilteredConfirm": "Sind Sie sicher, dass Sie alle {{count}} gefilterten Assets als aufgelöst markieren möchten?\n\nDadurch werden sie aus der Ansicht 'Nicht aufgelöst' entfernt. Diese Aktion kann nicht einfach rückgängig gemacht werden.",
+    "markAllFilteredTooltip": "Alle gefilterten Assets als aufgelöst markieren",
+    "markAllFiltered": "Alle ({{count}}) als aufgelöst markieren",
+    "bulkMarkAllFilteredTitle": "Alle als aufgelöst markieren?",
+    "confirmMarkAll": "Bestätigen & Alle ({{count}}) markieren"
   },
   "common": {
     "save": "Speichern",
@@ -1568,7 +1598,14 @@
     "startTime": "Startzeit",
     "endTime": "Endzeit",
     "notificationSent": "Benachrichtigung gesendet",
-    "notes": "Notizen"
+    "notes": "Notizen",
+    "lastRun": "Letzter Lauf",
+    "searchLogs": "Logs durchsuchen",
+    "searchPlaceholder": "Logs filtern...",
+    "filterLevel": "Nach Level filtern",
+    "allLevels": "Alle Level",
+    "noMatchingLogs": "Keine Log-Einträge entsprechen Ihren Filtern.",
+    "adjustFilters": "Passen Sie Ihre Such- oder Level-Filter an."
   },
   "dangerZone": {
     "title": "Gefahrenzone",
@@ -1638,7 +1675,11 @@
     "deleteMultipleMessage": "Sind Sie sicher, dass Sie {{count}} ausgewählte(s) Asset(s) löschen möchten?",
     "deleteAssetMessage": "Sind Sie sicher, dass Sie dieses Asset löschen möchten?",
     "deleteButton": "Löschen",
-    "assetReplaced": "Asset erfolgreich ersetzt!"
+    "assetReplaced": "Asset erfolgreich ersetzt!",
+    "itemsPerPage": "Einträge pro Seite",
+    "paginationPage": "Seite {{current}} von {{total}}",
+    "paginationPrevious": "Zurück",
+    "paginationNext": "Weiter"
   },
   "autoTriggers": {
     "header": {
