@@ -856,343 +856,82 @@ function SendMessage {
         [string]$fallback,
         [string]$truncated
     )
-    if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*') {
-        if ($global:NotifyUrl -like '*discord*') {
-            if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-                $jsonPayload = @"
-    {
-        "username": "$global:DiscordUserName",
-        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-        "content": "",
-        "embeds": [
-        {
-            "author": {
-            "name": "Posterizarr @Github",
-            "url": "https://github.com/fscorrupt/Posterizarr"
-            },
-            "description": "Recently Added\n\n",
-            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true'){15120384}Else{5763719}),
-            "fields": [
-            {
-                "name": "",
-                "value": ":bar_chart:",
-                "inline": false
-            },
-            {
-                "name": "Type",
-                "value": "$type",
-                "inline": false
-            },
-            {
-                "name": "Fallback",
-                "value": "$fallback",
-                "inline": true
-            },
-            {
-                "name": "Language",
-                "value": "$lang",
-                "inline": true
-            },
-            {
-                "name": "Truncated",
-                "value": "$truncated",
-                "inline": true
-            },
-            {
-                "name": "TBA Skipped",
-                "value": "$SkipTBACount",
-                "inline": true
-            },
-            {
-                "name": "Jap/Chinese Skipped",
-                "value": "$SkipJapTitleCount",
-                "inline": true
-            },
-            {
-                "name": "",
-                "value": ":frame_photo:",
-                "inline": false
-            },
-            {
-                "name": "Title",
-                "value": "$title",
-                "inline": false
-            },
-            {
-                "name": "Library",
-                "value": "$Lib",
-                "inline": true
-            },
-            {
-                "name": "Fav Url",
-                "value": "$favurl",
-                "inline": true
-            }
-            ],
-            "thumbnail": {
-                "url": "$DLSource"
-            },
-            "footer": {
-                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-            }
+    function Build-DiscordPayload {
 
+        # Create a list for the fields
+        $fieldList = [System.Collections.Generic.List[object]]::new()
+
+        # Add all common fields
+        $fieldList.Add([PSCustomObject]@{ name = ""; value = ":bar_chart:"; inline = $false })
+        $fieldList.Add([PSCustomObject]@{ name = "Type"; value = $type; inline = $false })
+        $fieldList.Add([PSCustomObject]@{ name = "Fallback"; value = $fallback; inline = $true })
+        $fieldList.Add([PSCustomObject]@{ name = "Language"; value = $lang; inline = $true })
+        $fieldList.Add([PSCustomObject]@{ name = "Truncated"; value = $truncated; inline = $true })
+
+        # Add conditional fields
+        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
+            $fieldList.Add([PSCustomObject]@{ name = "TBA Skipped"; value = "$SkipTBACount"; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Jap/Chinese Skipped"; value = "$SkipJapTitleCount"; inline = $true })
         }
-        ]
+
+        # Add remaining fields
+        $fieldList.Add([PSCustomObject]@{ name = ""; value = ":frame_photo:"; inline = $false })
+
+        # Add the title. ConvertTo-Json will handle any special characters in $title
+        $fieldList.Add([PSCustomObject]@{ name = "Title"; value = $title; inline = $false })
+
+        $fieldList.Add([PSCustomObject]@{ name = "Library"; value = $Lib; inline = $true })
+
+        # Add the URL. ConvertTo-Json will handle any special characters in $favurl
+        $fieldList.Add([PSCustomObject]@{ name = "Fav Url"; value = $favurl; inline = $true })
+
+        # Build the final payload object
+        $payloadObject = [PSCustomObject]@{
+            username   = $global:DiscordUserName
+            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
+            content    = ""
+            embeds     = @(
+                [PSCustomObject]@{
+                    author      = @{
+                        name = "Posterizarr @Github"
+                        url  = "https://github.com/fscorrupt/Posterizarr"
+                    }
+                    description = "Recently Added`n`n"
+                    timestamp   = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                    color       = $(if ($errorCount -ge '1') { 16711680 } Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true') { 15120384 } Else { 5763719 })
+                    fields      = $fieldList
+                    thumbnail   = @{
+                        url = $DLSource
+                    }
+                    footer      = @{
+                        text = "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
+                    }
+                }
+            )
+        }
+
+        # Convert the entire object to a JSON string safely
+        # -Depth 6 is needed to make sure it nests everything (payload->embeds->fields)
+        return $payloadObject | ConvertTo-Json -Depth 6
     }
-"@
+
+    if ($global:NotifyUrl -and $global:SendNotification -eq 'true') {
+
+        # Handle Discord notifications
+        if ($global:NotifyUrl -like '*discord*') {
+            $jsonPayload = Build-DiscordPayload
+            $webhookUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
+            Push-ObjectToDiscord -strDiscordWebhook $webhookUrl -objPayload $jsonPayload
+        }
+
+        # Handle Apprise notifications
+        Elseif ($env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*') {
+            if ($errorCount -ge '1') {
+                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
             }
             Else {
-                $jsonPayload = @"
-    {
-        "username": "$global:DiscordUserName",
-        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-        "content": "",
-        "embeds": [
-        {
-            "author": {
-            "name": "Posterizarr @Github",
-            "url": "https://github.com/fscorrupt/Posterizarr"
-            },
-            "description": "Recently Added\n\n",
-            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true'){15120384}Else{5763719}),
-            "fields": [
-            {
-                "name": "",
-                "value": ":bar_chart:",
-                "inline": false
-            },
-            {
-                "name": "Type",
-                "value": "$type",
-                "inline": false
-            },
-            {
-                "name": "Fallback",
-                "value": "$fallback",
-                "inline": true
-            },
-            {
-                "name": "Language",
-                "value": "$lang",
-                "inline": true
-            },
-            {
-                "name": "Truncated",
-                "value": "$truncated",
-                "inline": true
-            },
-            {
-                "name": "",
-                "value": ":frame_photo:",
-                "inline": false
-            },
-            {
-                "name": "Title",
-                "value": "$title",
-                "inline": false
-            },
-            {
-                "name": "Library",
-                "value": "$Lib",
-                "inline": true
-            },
-            {
-                "name": "Fav Url",
-                "value": "$favurl",
-                "inline": true
+                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
             }
-            ],
-            "thumbnail": {
-                "url": "$DLSource"
-            },
-            "footer": {
-                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-            }
-
-        }
-        ]
-    }
-"@
-            }
-            $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-            if ($global:SendNotification -eq 'true') {
-                Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-            }
-        }
-        Else {
-            if ($global:SendNotification -eq 'true') {
-                if ($errorCount -ge '1') {
-                    apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-                }
-                Else {
-                    apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-                }
-            }
-        }
-    }
-    if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -notlike 'PSDocker*') {
-        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-            $jsonPayload = @"
-    {
-        "username": "$global:DiscordUserName",
-        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-        "content": "",
-        "embeds": [
-        {
-            "author": {
-            "name": "Posterizarr @Github",
-            "url": "https://github.com/fscorrupt/Posterizarr"
-            },
-            "description": "Recently Added\n\n",
-            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true'){15120384}Else{5763719}),
-            "fields": [
-            {
-                "name": "",
-                "value": ":bar_chart:",
-                "inline": false
-            },
-            {
-                "name": "Type",
-                "value": "$type",
-                "inline": false
-            },
-            {
-                "name": "Fallback",
-                "value": "$fallback",
-                "inline": true
-            },
-            {
-                "name": "Language",
-                "value": "$lang",
-                "inline": true
-            },
-            {
-                "name": "Truncated",
-                "value": "$truncated",
-                "inline": true
-            },
-            {
-                "name": "TBA Skipped",
-                "value": "$SkipTBACount",
-                "inline": true
-            },
-            {
-                "name": "Jap/Chinese Skipped",
-                "value": "$SkipJapTitleCount",
-                "inline": true
-            },
-            {
-                "name": "",
-                "value": ":frame_photo:",
-                "inline": false
-            },
-            {
-                "name": "Title",
-                "value": "$title",
-                "inline": false
-            },
-            {
-                "name": "Library",
-                "value": "$Lib",
-                "inline": true
-            },
-            {
-                "name": "Fav Url",
-                "value": "$favurl",
-                "inline": true
-            }
-            ],
-            "thumbnail": {
-                "url": "$DLSource"
-            },
-            "footer": {
-                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-            }
-
-        }
-        ]
-    }
-"@
-        }
-        Else {
-            jsonPayload = @"
-    {
-        "username": "$global:DiscordUserName",
-        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-        "content": "",
-        "embeds": [
-        {
-            "author": {
-            "name": "Posterizarr @Github",
-            "url": "https://github.com/fscorrupt/Posterizarr"
-            },
-            "description": "Recently Added\n\n",
-            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($global:IsFallback -eq 'true' -or $global:IsTruncated -eq 'true'){15120384}Else{5763719}),
-            "fields": [
-            {
-                "name": "",
-                "value": ":bar_chart:",
-                "inline": false
-            },
-            {
-                "name": "Type",
-                "value": "$type",
-                "inline": false
-            },
-            {
-                "name": "Fallback",
-                "value": "$fallback",
-                "inline": true
-            },
-            {
-                "name": "Language",
-                "value": "$lang",
-                "inline": true
-            },
-            {
-                "name": "Truncated",
-                "value": "$truncated",
-                "inline": true
-            },
-            {
-                "name": "",
-                "value": ":frame_photo:",
-                "inline": false
-            },
-            {
-                "name": "Title",
-                "value": "$title",
-                "inline": false
-            },
-            {
-                "name": "Library",
-                "value": "$Lib",
-                "inline": true
-            },
-            {
-                "name": "Fav Url",
-                "value": "$favurl",
-                "inline": true
-            }
-            ],
-            "thumbnail": {
-                "url": "$DLSource"
-            },
-            "footer": {
-                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-            }
-
-        }
-        ]
-    }
-"@
-        }
-        if ($global:SendNotification -eq 'true') {
-            Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
         }
     }
 }
@@ -3863,15 +3602,35 @@ function Push-ObjectToDiscord {
 
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [object]$objPayload
+        [string]$objPayload
     )
+
     try {
         $null = Invoke-RestMethod -Method Post -Uri $strDiscordWebhook -Body $objPayload -ContentType 'Application/Json'
+
+        # This is a good, simple way to help avoid rate limits.
         Start-Sleep -Seconds 1
     }
     catch {
-        Write-Entry -Message "Unable to send to Discord. $($_)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-        Write-Entry -Message "$objPayload" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+        $errorMessage = "Unable to send to Discord."
+        $discordErrorBody = "N/A"
+        $statusCode = "N/A"
+
+        $response = $_.Exception.Response
+        if ($response) {
+            $statusCode = $response.StatusCode
+            $stream = $response.GetResponseStream()
+            $reader = New-Object System.IO.StreamReader($stream)
+            $discordErrorBody = $reader.ReadToEnd() # This is the JSON error from Discord
+
+            $errorMessage = "Unable to send to Discord. Status: $statusCode. Reason: $discordErrorBody"
+        }
+        else {
+            # This was a general network error (e.g., DNS failure)
+            $errorMessage = "Unable to send to Discord. Error: $($_.Exception.Message)"
+        }
+        Write-Entry -Message $errorMessage -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+        Write-Entry -Message "Failing Payload: $objPayload" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
     }
 }
 function CheckJson {
@@ -4279,10 +4038,12 @@ function CheckPlexAccess {
                 # Check if libs are available
                 [XML]$Libs = $response.Content
                 # Plex Debug info
-                Write-Entry -Subtext "Plex Server Version: $($Libs.MediaContainer.version)" -Path $configLogging -Color Cyan -log Debug
-                Write-Entry -Subtext "My Plex Server: $($Libs.MediaContainer.myPlex)"-Path $configLogging -Color Cyan -log Debug
-                Write-Entry -Subtext "Plex Server Signin State: $($Libs.MediaContainer.myPlexSigninState)" -Path $configLogging -Color Cyan -log Debug
-                Write-Entry -Subtext "Plex Server allow Deletion: $($Libs.MediaContainer.allowMediaDeletion)" -Path $configLogging -Color Cyan -log Debug
+                $plexdebuginfo = Invoke-WebRequest -Uri "$PlexUrl/?X-Plex-Token=$PlexToken" -ErrorAction Stop -Headers $extraPlexHeaders
+                [XML]$plexdebuginfo = $plexdebuginfo.Content
+                Write-Entry -Subtext "Plex Server Version: $($plexdebuginfo.MediaContainer.version)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "My Plex Server: $($plexdebuginfo.MediaContainer.myPlex)"-Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server Signin State: $($plexdebuginfo.MediaContainer.myPlexSigninState)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server allow Deletion: $($plexdebuginfo.MediaContainer.allowMediaDeletion)" -Path $configLogging -Color Cyan -log Debug
                 if ($Libs.MediaContainer.size -ge 1) {
                     return $Libs
                 }
@@ -4355,6 +4116,13 @@ function CheckPlexAccess {
                 Write-Entry -Subtext "Plex access is working..." -Path $configLogging -Color Green -log Info
                 # Check if libs are available
                 [XML]$Libs = $result.Content
+                # Plex Debug info
+                $plexdebuginfo = Invoke-WebRequest -Uri "$PlexUrl" -ErrorAction Stop -Headers $extraPlexHeaders
+                [XML]$plexdebuginfo = $plexdebuginfo.Content
+                Write-Entry -Subtext "Plex Server Version: $($plexdebuginfo.MediaContainer.version)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "My Plex Server: $($plexdebuginfo.MediaContainer.myPlex)"-Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server Signin State: $($plexdebuginfo.MediaContainer.myPlexSigninState)" -Path $configLogging -Color Cyan -log Debug
+                Write-Entry -Subtext "Plex Server allow Deletion: $($plexdebuginfo.MediaContainer.allowMediaDeletion)" -Path $configLogging -Color Cyan -log Debug
                 if ($Libs.MediaContainer.size -ge 1) {
                     Write-Entry -Subtext "Found libs on Plex..." -Path $configLogging -Color White -log Info
                     return $Libs
@@ -6381,126 +6149,7 @@ function MassDownloadPlexArtwork {
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
-    if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-            $jsonPayload = @"
-        {
-            "username": "$global:DiscordUserName",
-            "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-            "content": "",
-            "embeds": [
-            {
-                "author": {
-                "name": "Posterizarr @Github",
-                "url": "https://github.com/fscorrupt/Posterizarr"
-                },
-                "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                "fields": [
-                {
-                    "name": "",
-                    "value": ":frame_photo:",
-                    "inline": false
-                },
-                {
-                    "name": "Posters Downloaded",
-                    "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                    "inline": false
-                },
-                {
-                    "name": "Backgrounds Downloaded",
-                    "value": "$BackgroundCount",
-                    "inline": true
-                },
-                {
-                    "name": "Seasons Downloaded",
-                    "value": "$SeasonCount",
-                    "inline": true
-                },
-                {
-                    "name": "TitleCards Downloaded",
-                    "value": "$EpisodeCount",
-                    "inline": true
-                }
-                ],
-                "thumbnail": {
-                    "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                },
-                "footer": {
-                    "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                }
-            }
-            ]
-        }
-"@
-        }
-        Else {
-            $jsonPayload = @"
-            {
-                "username": "$global:DiscordUserName",
-                "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                "content": "",
-                "embeds": [
-                {
-                    "author": {
-                    "name": "Posterizarr @Github",
-                    "url": "https://github.com/fscorrupt/Posterizarr"
-                    },
-                    "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                    "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                    "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                    "fields": [
-                    {
-                        "name": "",
-                        "value": ":frame_photo:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Posters Downloaded",
-                        "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                        "inline": false
-                    },
-                    {
-                        "name": "Backgrounds Downloaded",
-                        "value": "$BackgroundCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Seasons Downloaded",
-                        "value": "$SeasonCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TitleCards Downloaded",
-                        "value": "$EpisodeCount",
-                        "inline": true
-                    }
-                    ],
-                    "thumbnail": {
-                        "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                    },
-                    "footer": {
-                        "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                    }
-                }
-                ]
-            }
-"@
-        }
-        $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-        Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-    }
-    Else {
-        if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-            if ($errorCount -ge '1') {
-                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Downloaded '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-            }
-            Else {
-                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Downloaded '$posterCount' Images" "$global:NotifyUrl"
-            }
-        }
-    }
+    Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount
 
     # Export json
     $jsonObject = [PSCustomObject]@{
@@ -6751,14 +6400,160 @@ function Send-UptimeKumaWebhook {
 }
 
 function Write-TextSizeCacheSummary {
-  param([string]$Label = "Text-size cache")
-  $total=$script:tsHits+$script:tsMiss
-  $rate = if($total){[math]::Round(100*$script:tsHits/$total,2)}else{0}
-  $avg  = if($script:tsRuns){[math]::Round($script:tsMs/$script:tsRuns,2)}else{0}
-  $saved=[TimeSpan]::FromMilliseconds([double]($script:tsHits*$avg))
-  Write-Entry -Subtext ("{0}: hits='{1}', misses='{2}' ({3}%); magick_calls='{4}' in '{5} ms'; est_saved='{6}h {7}m {8}s'" -f `
+    param([string]$Label = "Text-size cache")
+    $total=$script:tsHits+$script:tsMiss
+    $rate = if($total){[math]::Round(100*$script:tsHits/$total,2)}else{0}
+    $avg  = if($script:tsRuns){[math]::Round($script:tsMs/$script:tsRuns,2)}else{0}
+    $saved=[TimeSpan]::FromMilliseconds([double]($script:tsHits*$avg))
+    Write-Entry -Subtext ("{0}: hits='{1}', misses='{2}' ({3}%); magick_calls='{4}' in '{5} ms'; est_saved='{6}h {7}m {8}s'" -f `
     $Label,$script:tsHits,$script:tsMiss,$rate,$script:tsRuns,$script:tsMs,$saved.Hours,$saved.Minutes,$saved.Seconds) `
     -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+}
+
+function Send-SummaryNotification {
+    param (
+        [string]$ScriptMode,
+        [string]$FormattedTimespawn,
+        [int]$ErrorCount,
+        [int]$FallbackCount,
+        [int]$TextlessCount,
+        [int]$TruncatedCount,
+        [int]$PosterUnknownCount,
+        [int]$SkipTBACount,
+        [int]$SkipJapTitleCount,
+        [int]$PosterCount,
+        [int]$BackgroundCount,
+        [int]$SeasonCount,
+        [int]$EpisodeCount,
+        [int]$ImagesCleared,
+        [int]$PathsCleared,
+        [string]$SavedSizeString,
+        [int]$UploadCount
+    )
+
+    if (-not ($global:NotifyUrl -and $global:SendNotification -eq 'true')) {
+        return # Do nothing if notifications are off
+    }
+
+    # 1. Handle Apprise (Docker)
+    if ($global:NotifyUrl -notlike '*discord*' -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*') {
+        $body = "Run took: $FormattedTimespawn`nIt Created '$PosterCount' Images"
+        if ($ScriptMode -eq 'backup') {
+            $body = "Run took: $FormattedTimespawn`nIt Downloaded '$PosterCount' Images"
+        }
+        if ($ScriptMode -eq 'syncjelly' -or $ScriptMode -eq 'syncemby') {
+            $body = "Run took: $FormattedTimespawn`nIt Synced '$UploadCount' Images"
+        }
+
+        if ($ErrorCount -ge '1') {
+            apprise --notification-type="failure" --title="Posterizarr" --body="$body`n`nDuring execution '$ErrorCount' Errors occurred, please check log." "$global:NotifyUrl"
+        } else {
+            apprise --notification-type="success" --title="Posterizarr" --body="$body" "$global:NotifyUrl"
+        }
+        return
+    }
+
+    # 2. Handle Discord
+    if ($global:NotifyUrl -like '*discord*') {
+
+        $desc = "Run took: $FormattedTimespawn"
+        if ($ScriptMode -eq 'backup') {
+            $desc = "Backup Run took: $FormattedTimespawn"
+        }
+        if ($ScriptMode -eq 'syncjelly' -or $ScriptMode -eq 'syncemby') {
+            $desc = "Sync Run took: $FormattedTimespawn"
+        }
+        if ($ScriptMode -eq 'testing') {
+            $desc = "Test run took: $FormattedTimespawn"
+        }
+        if ($ScriptMode -eq 'tautulli' -or $ScriptMode -eq 'arr') {
+            $desc = "Recently added Run took: $FormattedTimespawn"
+        }
+
+        if ($ErrorCount -ge '1') {
+            $desc += "`nDuring execution Errors occurred, please check log."
+        }
+
+        # Build Fields
+        $fieldList = [System.Collections.Generic.List[object]]::new()
+
+        # --- Stats Section ---
+        $fieldList.Add([PSCustomObject]@{ name = ""; value = ":bar_chart:"; inline = $false })
+        if ($ScriptMode -eq 'testing') {
+            $fieldList.Add([PSCustomObject]@{ name = "Truncated"; value = $TruncatedCount; inline = $false })
+        } else {
+            $fieldList.Add([PSCustomObject]@{ name = "Errors"; value = $ErrorCount; inline = $false })
+            $fieldList.Add([PSCustomObject]@{ name = "Fallbacks"; value = $FallbackCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Textless"; value = $TextlessCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Truncated"; value = $TruncatedCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Unknown"; value = $PosterUnknownCount; inline = $true })
+            if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
+                $fieldList.Add([PSCustomObject]@{ name = "TBA Skipped"; value = $SkipTBACount; inline = $true })
+                $fieldList.Add([PSCustomObject]@{ name = "Jap/Chinese Skipped"; value = $SkipJapTitleCount; inline = $true })
+            }
+        }
+
+        # --- Images Section ---
+        $fieldList.Add([PSCustomObject]@{ name = ""; value = ":frame_photo:"; inline = $false })
+        if ($ScriptMode -eq 'backup') {
+            $fieldList.Add([PSCustomObject]@{ name = "Posters Downloaded"; value = ($PosterCount - $SeasonCount - $BackgroundCount - $EpisodeCount); inline = $false })
+            $fieldList.Add([PSCustomObject]@{ name = "Backgrounds Downloaded"; value = $BackgroundCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Seasons Downloaded"; value = $SeasonCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "TitleCards Downloaded"; value = $EpisodeCount; inline = $true })
+        } elseif ($ScriptMode -eq 'syncjelly' -or $ScriptMode -eq 'syncemby') {
+            $fieldList.Add([PSCustomObject]@{ name = "Posters Uploaded"; value = ($UploadCount - $SeasonCount - $BackgroundCount - $EpisodeCount); inline = $false })
+            $fieldList.Add([PSCustomObject]@{ name = "Backgrounds Uploaded"; value = $BackgroundCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Seasons Uploaded"; value = $SeasonCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "TitleCards Uploaded"; value = $EpisodeCount; inline = $true })
+        } else {
+            if ($ScriptMode -eq 'testing') {
+                $fieldList.Add([PSCustomObject]@{ name = "Posters"; value = $posterscount; inline = $false })
+            } else {
+                # For Normal/Arr/Tautulli, $PosterCount IS the total, so subtraction is correct.
+                $fieldList.Add([PSCustomObject]@{ name = "Posters"; value = ($PosterCount - $SeasonCount - $BackgroundCount - $EpisodeCount); inline = $false })
+            }
+            $fieldList.Add([PSCustomObject]@{ name = "Backgrounds"; value = $BackgroundCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Seasons"; value = $SeasonCount; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "TitleCards"; value = $EpisodeCount; inline = $true })
+        }
+
+        # --- Cleanup Section ---
+        if ($AssetCleanup -eq 'true' -and $ScriptMode -ne 'testing' -and $ScriptMode -ne 'backup' -and $ScriptMode -ne 'syncjelly' -and $ScriptMode -ne 'syncemby') {
+            $fieldList.Add([PSCustomObject]@{ name = ""; value = ":recycle:"; inline = $false })
+            $fieldList.Add([PSCustomObject]@{ name = "Images cleared"; value = $ImagesCleared; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Folders Cleared"; value = $PathsCleared; inline = $true })
+            $fieldList.Add([PSCustomObject]@{ name = "Space saved"; value = $SavedSizeString; inline = $true })
+        }
+
+        # Build final payload
+        $payloadObject = [PSCustomObject]@{
+            username   = $global:DiscordUserName
+            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
+            content    = ""
+            embeds     = @(
+                [PSCustomObject]@{
+                    author    = @{
+                        name = "Posterizarr @Github"
+                        url  = "https://github.com/fscorrupt/Posterizarr"
+                    }
+                    description = $desc
+                    timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                    color     = $(if ($ErrorCount -ge '1') { 16711680 } Elseif ($Testing) { 8388736 } Elseif ($FallbackCount -gt '1' -or $PosterUnknownCount -ge '1' -or $TruncatedCount -gt '1') { 15120384 } Else { 5763719 })
+                    fields    = $fieldList
+                    thumbnail = @{
+                        url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
+                    }
+                    footer    = @{
+                        text = "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
+                    }
+                }
+            )
+        }
+
+        $jsonPayload = $payloadObject | ConvertTo-Json -Depth 6
+        $webhookUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
+        Push-ObjectToDiscord -strDiscordWebhook $webhookUrl -objPayload $jsonPayload
+    }
 }
 
 #### FUNCTION END ####
@@ -9729,153 +9524,10 @@ Elseif ($Testing) {
     $backgroundsscount = ($gettestimages | Where-Object { $_.name -like 'back*' }).count
     $posterscount = ($gettestimages | Where-Object { $_.name -like 'poster*' }).count
     $seasonscount = ($gettestimages | Where-Object { $_.name -like 'SeasonPoster*' }).count
-    if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -notlike 'PSDocker*') {
-        $jsonPayload = @"
-        {
-            "username": "$global:DiscordUserName",
-            "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-            "content": "",
-            "embeds": [
-            {
-                "author": {
-                "name": "Posterizarr @Github",
-                "url": "https://github.com/fscorrupt/Posterizarr"
-                },
-                "description": "Test run took: $FormattedTimespawn",
-                "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                "fields": [
-                {
-                    "name": "",
-                    "value": ":bar_chart:",
-                    "inline": false
-                },
-                {
-                    "name": "Truncated",
-                    "value": "$TruncatedCount",
-                    "inline": false
-                },
-                {
-                    "name": "",
-                    "value": ":frame_photo:",
-                    "inline": false
-                },
-                {
-                    "name": "Posters",
-                    "value": "$posterscount",
-                    "inline": true
-                },
-                {
-                    "name": "Seasons",
-                    "value": "$seasonscount",
-                    "inline": true
-                },
-                {
-                    "name": "Backgrounds",
-                    "value": "$backgroundsscount",
-                    "inline": true
-                },
-                {
-                    "name": "TitleCards",
-                    "value": "$titlecardscount",
-                    "inline": true
-                }
-                ],
-                "thumbnail": {
-                    "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                },
-                "footer": {
-                    "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                }
 
-            }
-            ]
-        }
-"@
-        if ($global:SendNotification -eq 'true') {
-            Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-        }
-    }
-    if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*') {
-        if ($global:NotifyUrl -like '*discord*') {
-            $jsonPayload = @"
-            {
-                "username": "$global:DiscordUserName",
-                "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                "content": "",
-                "embeds": [
-                {
-                    "author": {
-                    "name": "Posterizarr @Github",
-                    "url": "https://github.com/fscorrupt/Posterizarr"
-                    },
-                    "description": "Test run took: $FormattedTimespawn",
-                    "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                    "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                    "fields": [
-                    {
-                        "name": "",
-                        "value": ":bar_chart:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Truncated",
-                        "value": "$TruncatedCount",
-                        "inline": false
-                    },
-                    {
-                        "name": "",
-                        "value": ":frame_photo:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Posters",
-                        "value": "$posterscount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Seasons",
-                        "value": "$seasonscount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Backgrounds",
-                        "value": "$backgroundsscount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TitleCards",
-                        "value": "$titlecardscount",
-                        "inline": true
-                    }
-                    ],
-                    "thumbnail": {
-                        "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                    },
-                    "footer": {
-                        "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                    }
+    # Send Notification
+    Send-SummaryNotification -ScriptMode $mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -TruncatedCount $TruncatedCount -PosterCount $posterscount -BackgroundCount $backgroundsscount -SeasonCount $seasonscount -EpisodeCount $titlecardscount
 
-                }
-                ]
-            }
-"@
-            $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-            if ($global:SendNotification -eq 'true') {
-                Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-            }
-        }
-        Else {
-            if ($global:SendNotification -eq 'true') {
-                if ($TruncatedCount -ge '1') {
-                    apprise --notification-type="failure" --title="Posterizarr" --body="Test run took: $FormattedTimespawn`nDuring execution '$TruncatedCount' times the text got truncated, please check log for detailed description." "$global:NotifyUrl"
-                }
-                Else {
-                    apprise --notification-type="success" --title="Posterizarr" --body="Test run took: $FormattedTimespawn" "$global:NotifyUrl"
-                }
-            }
-        }
-    }
     if ((Test-Path $global:ScriptRoot\Logs\ImageChoices.csv)) {
         # Calculate Summary
         $SummaryCount = Import-Csv -LiteralPath "$global:ScriptRoot\Logs\ImageChoices.csv" -Delimiter ';'
@@ -10772,7 +10424,7 @@ Elseif ($Tautulli) {
 
                                         # Export the array to a CSV file
                                         $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $movietemp.Type -title $movietemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
+                                        SendMessage -type $movietemp.Type -title $movietemp.Title -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
                                     }
                                 }
                             }
@@ -11261,7 +10913,7 @@ Elseif ($Tautulli) {
                                         }
                                         # Export the array to a CSV file
                                         $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
+                                        SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
                                     }
                                 }
                             }
@@ -11837,7 +11489,7 @@ Elseif ($Tautulli) {
                                     }
                                     # Export the array to a CSV file
                                     $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                    SendMessage -type $showtemp.Type -title $showtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
+                                    SendMessage -type $showtemp.Type -title $showtemp.Title -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
                                 }
                             }
                         }
@@ -12343,7 +11995,7 @@ Elseif ($Tautulli) {
                                     }
                                     # Export the array to a CSV file
                                     $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                    SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
+                                    SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
                                 }
                             }
                         }
@@ -13037,7 +12689,7 @@ Elseif ($Tautulli) {
                                         }
                                         # Export the array to a CSV file
                                         $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $seasontemp.Type -title $seasontemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
+                                        SendMessage -type $seasontemp.Type -title $seasontemp.Title -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
                                     }
                                 }
                             }
@@ -13668,7 +13320,7 @@ Elseif ($Tautulli) {
                                                         }
                                                         # Export the array to a CSV file
                                                         $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                        SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                        SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                     }
                                                 }
                                             }
@@ -14275,7 +13927,7 @@ Elseif ($Tautulli) {
                                                         }
                                                         # Export the array to a CSV file
                                                         $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                        SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                        SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                     }
                                                 }
                                             }
@@ -15567,7 +15219,7 @@ Elseif ($ArrTrigger) {
 
                                             # Export the array to a CSV file
                                             $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $movietemp.Type -title $movietemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
+                                            SendMessage -type $movietemp.Type -title $movietemp.Title -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
                                         }
                                     }
                                 }
@@ -15996,7 +15648,7 @@ Elseif ($ArrTrigger) {
                                             }
                                             # Export the array to a CSV file
                                             $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
+                                            SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
                                         }
                                     }
                                 }
@@ -16503,7 +16155,7 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $showtemp.Type -title $showtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
+                                        SendMessage -type $showtemp.Type -title $showtemp.Title -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
                                     }
                                 }
                             }
@@ -16942,7 +16594,7 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
+                                        SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
                                     }
                                 }
                             }
@@ -17524,7 +17176,7 @@ Elseif ($ArrTrigger) {
                                                 }
                                                 # Export the array to a CSV file
                                                 $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                SendMessage -type $seasontemp.Type -title $seasontemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
+                                                SendMessage -type $seasontemp.Type -title $seasontemp.Title -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
                                             }
                                         }
                                     }
@@ -18036,7 +17688,7 @@ Elseif ($ArrTrigger) {
                                                             }
                                                             # Export the array to a CSV file
                                                             $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                            SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                            SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                         }
                                                     }
                                                 }
@@ -18526,7 +18178,7 @@ Elseif ($ArrTrigger) {
                                                             }
                                                             # Export the array to a CSV file
                                                             $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                            SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                            SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                         }
                                                     }
                                                 }
@@ -18695,200 +18347,7 @@ Elseif ($ArrTrigger) {
         Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
         # Send Notification
-        if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-            if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Recently added Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TBA Skipped",
-                            "value": "$SkipTBACount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Jap/Chinese Skipped",
-                            "value": "$SkipJapTitleCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-
-            }
-            Else {
-
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Recently added Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-
-            }
-            $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-            Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-        }
-        Else {
-            if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-                if ($errorCount -ge '1') {
-                    apprise --notification-type="failure" --title="Posterizarr" --body="Recently added Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-                }
-                Else {
-                    apprise --notification-type="success" --title="Posterizarr" --body="Recently added Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-                }
-            }
-        }
+        Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -SkipTBACount $SkipTBACount -SkipJapTitleCount $SkipJapTitleCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount -UploadCount $UploadCount
 
         # Export json
         $jsonObject = [PSCustomObject]@{
@@ -19730,7 +19189,7 @@ Elseif ($ArrTrigger) {
 
                                             # Export the array to a CSV file
                                             $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $movietemp.Type -title $movietemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
+                                            SendMessage -type $movietemp.Type -title $movietemp.Title -Lib $movietemp.LibraryName -DLSource $movietemp.'Download Source' -lang $movietemp.Language -favurl $movietemp.'Fav Provider Link' -fallback $movietemp.Fallback -Truncated $movietemp.TextTruncated
                                         }
                                     }
                                 }
@@ -20219,7 +19678,7 @@ Elseif ($ArrTrigger) {
                                             }
                                             # Export the array to a CSV file
                                             $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
+                                            SendMessage -type $moviebackgroundtemp.Type -title $moviebackgroundtemp.Title -Lib $moviebackgroundtemp.LibraryName -DLSource $moviebackgroundtemp.'Download Source' -lang $moviebackgroundtemp.Language -favurl $moviebackgroundtemp.'Fav Provider Link' -fallback $moviebackgroundtemp.Fallback -Truncated $moviebackgroundtemp.TextTruncated
                                         }
                                     }
                                 }
@@ -20795,7 +20254,7 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $showtemp.Type -title $showtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
+                                        SendMessage -type $showtemp.Type -title $showtemp.Title -Lib $showtemp.LibraryName -DLSource $showtemp.'Download Source' -lang $showtemp.Language -favurl $showtemp.'Fav Provider Link' -fallback $showtemp.Fallback -Truncated $showtemp.TextTruncated
                                     }
                                 }
                             }
@@ -21301,7 +20760,7 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                        SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
+                                        SendMessage -type $showbackgroundtemp.Type -title $showbackgroundtemp.Title -Lib $showbackgroundtemp.LibraryName -DLSource $showbackgroundtemp.'Download Source' -lang $showbackgroundtemp.Language -favurl $showbackgroundtemp.'Fav Provider Link' -fallback $showbackgroundtemp.Fallback -Truncated $showbackgroundtemp.TextTruncated
                                     }
                                 }
                             }
@@ -21994,7 +21453,7 @@ Elseif ($ArrTrigger) {
                                             }
                                             # Export the array to a CSV file
                                             $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                            SendMessage -type $seasontemp.Type -title $seasontemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "") -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
+                                            SendMessage -type $seasontemp.Type -title $seasontemp.Title -Lib $seasontemp.LibraryName -DLSource $seasontemp.'Download Source' -lang $seasontemp.Language -favurl $seasontemp.'Fav Provider Link' -fallback $seasontemp.Fallback -Truncated $seasontemp.TextTruncated
                                         }
                                     }
                                 }
@@ -22625,7 +22084,7 @@ Elseif ($ArrTrigger) {
                                                             }
                                                             # Export the array to a CSV file
                                                             $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                            SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                            SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                         }
                                                     }
                                                 }
@@ -23232,7 +22691,7 @@ Elseif ($ArrTrigger) {
                                                             }
                                                             # Export the array to a CSV file
                                                             $episodetemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-                                                            SendMessage -type $episodetemp.Type -title $($global:show_name.replace('"', '\"').replace("`r", "").replace("`n", "") + " | " + $episodetemp.Title.replace('"', '\"').replace("`r", "").replace("`n", "")) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
+                                                            SendMessage -type $episodetemp.Type -title $($global:show_name + " | " + $episodetemp.Title) -Lib $episodetemp.LibraryName -DLSource $episodetemp.'Download Source' -lang $episodetemp.Language -favurl $episodetemp.'Fav Provider Link' -fallback $episodetemp.Fallback -Truncated $episodetemp.TextTruncated
                                                         }
                                                     }
                                                 }
@@ -23363,200 +22822,7 @@ Elseif ($ArrTrigger) {
         Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
         # Send Notification
-        if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-            if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TBA Skipped",
-                            "value": "$SkipTBACount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Jap/Chinese Skipped",
-                            "value": "$SkipJapTitleCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-
-            }
-            Else {
-
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-
-            }
-            $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-            Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-        }
-        Else {
-            if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-                if ($errorCount -ge '1') {
-                    apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-                }
-                Else {
-                    apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-                }
-            }
-        }
+        Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -SkipTBACount $SkipTBACount -SkipJapTitleCount $SkipJapTitleCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount
 
         # Export json
         $jsonObject = [PSCustomObject]@{
@@ -23660,7 +22926,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
         $Mode = "syncemby"
         Write-Entry -Message "Sync Emby Mode Started..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     }
-    
+
     Write-Entry -Message "Query plex libs..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     $Libsoverview = @()
     foreach ($lib in $Libs.MediaContainer.Directory) {
@@ -24813,81 +24079,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
-    if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-        $jsonPayload = @"
-            {
-                "username": "$global:DiscordUserName",
-                "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                "content": "",
-                "embeds": [
-                {
-                    "author": {
-                    "name": "Posterizarr @Github",
-                    "url": "https://github.com/fscorrupt/Posterizarr"
-                    },
-                    "description": "Sync run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                    "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                    "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                    "fields": [
-                    {
-                        "name": "",
-                        "value": ":bar_chart:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Errors",
-                        "value": "$errorCount",
-                        "inline": false
-                    },
-                    {
-                        "name": "",
-                        "value": ":frame_photo:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Posters Uploaded",
-                        "value": "$($uploadCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                        "inline": false
-                    },
-                    {
-                        "name": "Backgrounds Uploaded",
-                        "value": "$BackgroundCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Seasons Uploaded",
-                        "value": "$SeasonCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TitleCards Uploaded",
-                        "value": "$EpisodeCount",
-                        "inline": true
-                    }
-                    ],
-                    "thumbnail": {
-                        "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                    },
-                    "footer": {
-                        "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                    }
-                }
-                ]
-            }
-"@
-        $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-        Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-    }
-    Else {
-        if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-            if ($errorCount -ge '1') {
-                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-            }
-            Else {
-                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-            }
-        }
-    }
+    Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount -UploadCount $UploadCount
 
     # Export json
     $jsonObject = [PSCustomObject]@{
@@ -29101,416 +28293,8 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
-    if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-            if ($AssetCleanup -eq 'true') {
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TBA Skipped",
-                                "value": "$SkipTBACount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Jap/Chinese Skipped",
-                                "value": "$SkipJapTitleCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":recycle:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Images cleared",
-                                "value": "$ImagesCleared",
-                                "inline": true
-                            },
-                            {
-                                "name": "Folders Cleared",
-                                "value": "$PathsCleared",
-                                "inline": true
-                            },
-                            {
-                                "name": "Space saved",
-                                "value": "$savedsizestring",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-            }
-            Else {
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TBA Skipped",
-                            "value": "$SkipTBACount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Jap/Chinese Skipped",
-                            "value": "$SkipJapTitleCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-            }
-        }
-        Else {
-            if ($AssetCleanup -eq 'true') {
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":recycle:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Images cleared",
-                                "value": "$ImagesCleared",
-                                "inline": true
-                            },
-                            {
-                                "name": "Folders Cleared",
-                                "value": "$PathsCleared",
-                                "inline": true
-                            },
-                            {
-                                "name": "Space saved",
-                                "value": "$savedsizestring",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-            }
-            Else {
-                $jsonPayload = @"
-                    {
-                        "username": "$global:DiscordUserName",
-                        "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                        "content": "",
-                        "embeds": [
-                        {
-                            "author": {
-                            "name": "Posterizarr @Github",
-                            "url": "https://github.com/fscorrupt/Posterizarr"
-                            },
-                            "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                            "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                            "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                            "fields": [
-                            {
-                                "name": "",
-                                "value": ":bar_chart:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Errors",
-                                "value": "$errorCount",
-                                "inline": false
-                            },
-                            {
-                                "name": "Fallbacks",
-                                "value": "$($FallbackCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Textless",
-                                "value": "$($TextlessCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Truncated",
-                                "value": "$($TextTruncatedCount.count)",
-                                "inline": true
-                            },
-                            {
-                                "name": "Unknown",
-                                "value": "$PosterUnknownCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "",
-                                "value": ":frame_photo:",
-                                "inline": false
-                            },
-                            {
-                                "name": "Posters",
-                                "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                                "inline": false
-                            },
-                            {
-                                "name": "Backgrounds",
-                                "value": "$BackgroundCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "Seasons",
-                                "value": "$SeasonCount",
-                                "inline": true
-                            },
-                            {
-                                "name": "TitleCards",
-                                "value": "$EpisodeCount",
-                                "inline": true
-                            }
-                            ],
-                            "thumbnail": {
-                                "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                            },
-                            "footer": {
-                                "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                            }
-                        }
-                        ]
-                    }
-"@
-            }
-        }
-        $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-        Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-    }
-    Else {
-        if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-            if ($errorCount -ge '1') {
-                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-            }
-            Else {
-                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-            }
-        }
-    }
+    Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -SkipTBACount $SkipTBACount -SkipJapTitleCount $SkipJapTitleCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount -ImagesCleared $ImagesCleared -PathsCleared $PathsCleared -SavedSizeString $savedsizestring -UploadCount $UploadCount
+
     # Calculate Counts
     $CalculatedCount = $($posterCount - $SeasonCount - $BackgroundCount - $EpisodeCount)
 
@@ -34844,416 +33628,8 @@ else {
     Write-Entry -Message "Script execution time: $FormattedTimespawn" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
 
     # Send Notification
-    if ($global:NotifyUrl -like '*discord*' -and $global:SendNotification -eq 'true') {
-        if ($SkipTBA -eq 'true' -or $SkipJapTitle -eq 'true') {
-            if ($AssetCleanup -eq 'true') {
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TBA Skipped",
-                            "value": "$SkipTBACount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Jap/Chinese Skipped",
-                            "value": "$SkipJapTitleCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":recycle:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Images cleared",
-                            "value": "$ImagesCleared",
-                            "inline": true
-                        },
-                        {
-                            "name": "Folders Cleared",
-                            "value": "$PathsCleared",
-                            "inline": true
-                        },
-                        {
-                            "name": "Space saved",
-                            "value": "$savedsizestring",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-            }
-            Else {
-                $jsonPayload = @"
-            {
-                "username": "$global:DiscordUserName",
-                "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                "content": "",
-                "embeds": [
-                {
-                    "author": {
-                    "name": "Posterizarr @Github",
-                    "url": "https://github.com/fscorrupt/Posterizarr"
-                    },
-                    "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                    "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                    "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                    "fields": [
-                    {
-                        "name": "",
-                        "value": ":bar_chart:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Errors",
-                        "value": "$errorCount",
-                        "inline": false
-                    },
-                    {
-                        "name": "Fallbacks",
-                        "value": "$($FallbackCount.count)",
-                        "inline": true
-                    },
-                    {
-                        "name": "Textless",
-                        "value": "$($TextlessCount.count)",
-                        "inline": true
-                    },
-                    {
-                        "name": "Truncated",
-                        "value": "$($TextTruncatedCount.count)",
-                        "inline": true
-                    },
-                    {
-                        "name": "Unknown",
-                        "value": "$PosterUnknownCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TBA Skipped",
-                        "value": "$SkipTBACount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Jap/Chinese Skipped",
-                        "value": "$SkipJapTitleCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "",
-                        "value": ":frame_photo:",
-                        "inline": false
-                    },
-                    {
-                        "name": "Posters",
-                        "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                        "inline": false
-                    },
-                    {
-                        "name": "Backgrounds",
-                        "value": "$BackgroundCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "Seasons",
-                        "value": "$SeasonCount",
-                        "inline": true
-                    },
-                    {
-                        "name": "TitleCards",
-                        "value": "$EpisodeCount",
-                        "inline": true
-                    }
-                    ],
-                    "thumbnail": {
-                        "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                    },
-                    "footer": {
-                        "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                    }
-                }
-                ]
-            }
-"@
-            }
-        }
-        Else {
-            if ($AssetCleanup -eq 'true') {
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":recycle:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Images cleared",
-                            "value": "$ImagesCleared",
-                            "inline": true
-                        },
-                        {
-                            "name": "Folders Cleared",
-                            "value": "$PathsCleared",
-                            "inline": true
-                        },
-                        {
-                            "name": "Space saved",
-                            "value": "$savedsizestring",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-            }
-            Else {
-                $jsonPayload = @"
-                {
-                    "username": "$global:DiscordUserName",
-                    "avatar_url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png",
-                    "content": "",
-                    "embeds": [
-                    {
-                        "author": {
-                        "name": "Posterizarr @Github",
-                        "url": "https://github.com/fscorrupt/Posterizarr"
-                        },
-                        "description": "Run took: $FormattedTimespawn $(if ($errorCount -ge '1') {"\n During execution Errors occurred, please check log for detailed description."})",
-                        "timestamp": "$(((Get-Date).ToUniversalTime()).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"))",
-                        "color": $(if ($errorCount -ge '1') {16711680}Elseif ($Testing){8388736}Elseif ($FallbackCount.count -gt '1' -or $PosterUnknownCount -ge '1' -or $TextTruncatedCount.count -gt '1'){15120384}Else{5763719}),
-                        "fields": [
-                        {
-                            "name": "",
-                            "value": ":bar_chart:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Errors",
-                            "value": "$errorCount",
-                            "inline": false
-                        },
-                        {
-                            "name": "Fallbacks",
-                            "value": "$($FallbackCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Textless",
-                            "value": "$($TextlessCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Truncated",
-                            "value": "$($TextTruncatedCount.count)",
-                            "inline": true
-                        },
-                        {
-                            "name": "Unknown",
-                            "value": "$PosterUnknownCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "",
-                            "value": ":frame_photo:",
-                            "inline": false
-                        },
-                        {
-                            "name": "Posters",
-                            "value": "$($posterCount-$SeasonCount-$BackgroundCount-$EpisodeCount)",
-                            "inline": false
-                        },
-                        {
-                            "name": "Backgrounds",
-                            "value": "$BackgroundCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "Seasons",
-                            "value": "$SeasonCount",
-                            "inline": true
-                        },
-                        {
-                            "name": "TitleCards",
-                            "value": "$EpisodeCount",
-                            "inline": true
-                        }
-                        ],
-                        "thumbnail": {
-                            "url": "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/images/webhook.png"
-                        },
-                        "footer": {
-                            "text": "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
-                        }
-                    }
-                    ]
-                }
-"@
-            }
-        }
-        $global:NotifyUrl = $global:NotifyUrl.replace('discord://', 'https://discord.com/api/webhooks/')
-        Push-ObjectToDiscord -strDiscordWebhook $global:NotifyUrl -objPayload $jsonPayload
-    }
-    Else {
-        if ($global:NotifyUrl -and $env:POWERSHELL_DISTRIBUTION_CHANNEL -like 'PSDocker*' -and $global:SendNotification -eq 'true') {
-            if ($errorCount -ge '1') {
-                apprise --notification-type="failure" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images`n`nDuring execution '$errorCount' Errors occurred, please check log for detailed description." "$global:NotifyUrl"
-            }
-            Else {
-                apprise --notification-type="success" --title="Posterizarr" --body="Run took: $FormattedTimespawn`nIt Created '$posterCount' Images" "$global:NotifyUrl"
-            }
-        }
-    }
+    Send-SummaryNotification -ScriptMode $Mode -FormattedTimespawn $FormattedTimespawn -ErrorCount $errorCount -FallbackCount $FallbackCount.count -TextlessCount $TextlessCount.count -TruncatedCount $TextTruncatedCount.count -PosterUnknownCount $PosterUnknownCount -SkipTBACount $SkipTBACount -SkipJapTitleCount $SkipJapTitleCount -PosterCount $posterCount -BackgroundCount $BackgroundCount -SeasonCount $SeasonCount -EpisodeCount $EpisodeCount -ImagesCleared $ImagesCleared -PathsCleared $PathsCleared -SavedSizeString $savedsizestring
+
     # Calculate Counts
     $CalculatedCount = $($posterCount - $SeasonCount - $BackgroundCount - $EpisodeCount)
     # Export json

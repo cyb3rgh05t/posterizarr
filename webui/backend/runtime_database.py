@@ -9,6 +9,7 @@ from typing import List, Dict, Optional
 import logging
 import os
 import threading  # Import threading
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -161,11 +162,16 @@ class RuntimeDatabase:
                 self._auto_migrate()
             else:
                 logger.info(f"Runtime database initialized at {self.db_path}")
+                # Always run migrations on startup
                 if not self._is_migrated():
                     logger.info("Migration not yet performed, running auto-migration...")
                     self._auto_migrate()
                 else:
                     logger.debug("Migration already completed, skipping")
+
+                # --- NEW: Run date format migration ---
+                self._migrate_date_formats()
+                # --- END NEW ---
 
             logger.info("=" * 60)
 
@@ -195,6 +201,106 @@ class RuntimeDatabase:
                 if 'conn' in locals():
                     conn.close()
                 return False
+
+    def _migrate_date_formats(self):
+        """
+        One-time migration to fix 'YYYY-MM-DD HH:MM:SS' and 'DD.MM.YYYY HH:MM:SS'
+        formats to the correct ISO 'YYYY-MM-DDTHH:MM:SS' format.
+        """
+        migration_key = "date_format_v1_migrated"
+
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+
+                # Check if this specific migration has already run
+                cursor.execute("SELECT value FROM migration_info WHERE key = ?", (migration_key,))
+                if cursor.fetchone():
+                    logger.debug("Date format migration (v1) already completed.")
+                    conn.close()
+                    return
+
+                logger.info("--- Starting Runtime Database Date Format Migration ---")
+                logger.info("Checking for old date formats (YYYY-MM-DD HH:MM:SS or DD.MM.YYYY HH:MM:SS)...")
+
+                cursor.execute("SELECT id, timestamp, start_time, end_time FROM runtime_stats")
+                rows = cursor.fetchall()
+
+                updates_to_make = []  # List of (timestamp, start_time, end_time, id)
+
+                # This is the helper function that was missing its logic
+                def reformat_date(date_str: str, row_id: int) -> Optional[str]:
+                    if not date_str:
+                        return None
+
+                    # Check if it's already in the correct ISO format (with 'T')
+                    if 'T' in date_str and re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", date_str):
+                        return date_str  # Already correct, no change needed
+
+                    # Try 'DD.MM.YYYY HH:MM:SS'
+                    try:
+                        dt = datetime.strptime(date_str, '%d.%m.%Y %H:%M:%S')
+                        iso_date = dt.isoformat()
+                        logger.info(f"  [Row {row_id}] Fixing DD.MM.YYYY: '{date_str}' -> '{iso_date}'")
+                        return iso_date
+                    except (ValueError, TypeError):
+                        pass  # Not this format
+
+                    # Try 'YYYY-MM-DD HH:MM:SS' (with space)
+                    try:
+                        dt = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                        iso_date = dt.isoformat()
+                        logger.info(f"  [Row {row_id}] Fixing YYYY-MM-DD (space): '{date_str}' -> '{iso_date}'")
+                        return iso_date
+                    except (ValueError, TypeError):
+                        pass  # Not this format
+
+                    # Unknown format
+                    logger.warning(f"  [Row {row_id}] Skipping unknown or already-fixed date format: '{date_str}'")
+                    return date_str # Return original if we can't parse it
+
+                for row in rows:
+                    row_id = row['id']
+                    ts, start, end = row['timestamp'], row['start_time'], row['end_time']
+
+                    new_ts = reformat_date(ts, row_id)
+                    new_start = reformat_date(start, row_id)
+                    new_end = reformat_date(end, row_id)
+
+                    # Add to our update list if any changes were made
+                    if new_ts != ts or new_start != start or new_end != end:
+                        updates_to_make.append((new_ts, new_start, new_end, row_id))
+
+                if updates_to_make:
+                    logger.info(f"Found {len(updates_to_make)} rows to update. Applying changes...")
+                    cursor.executemany(
+                        """
+                        UPDATE runtime_stats
+                        SET timestamp = ?, start_time = ?, end_time = ?
+                        WHERE id = ?
+                        """,
+                        updates_to_make
+                    )
+                    conn.commit()
+                    logger.info(f"Successfully updated {len(updates_to_make)} rows.")
+                else:
+                    logger.info("No date format changes needed.")
+
+                # Mark this migration as complete
+                cursor.execute(
+                    "INSERT OR REPLACE INTO migration_info (key, value, updated_at) VALUES (?, ?, ?)",
+                    (migration_key, "true", datetime.now().isoformat()),
+                )
+                conn.commit()
+                conn.close()
+                logger.info("--- Date Format Migration Finished ---")
+
+            except Exception as e:
+                logger.error(f"Error during date format migration: {e}")
+                if 'conn' in locals():
+                    conn.rollback()
+                    conn.close()
 
     def _mark_as_migrated(self, imported_count: int):
         """Mark migration as completed"""
@@ -418,7 +524,16 @@ class RuntimeDatabase:
 
                 conn = self._get_connection()
                 cursor = conn.cursor()
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S') # Use local time string
+
+                # --- START TIMESTAMP FIX ---
+                # Use the 'start_time' (which is now ISO format) as the primary timestamp.
+                # If it's missing (e.g., from an old log), use the current time in ISO format.
+                timestamp_to_insert = None
+                if start_time:
+                    timestamp_to_insert = start_time
+                else:
+                    timestamp_to_insert = datetime.now().isoformat()
+                # --- END TIMESTAMP FIX ---
 
                 cursor.execute(
                     """
@@ -432,7 +547,7 @@ class RuntimeDatabase:
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
-                        timestamp, mode, runtime_seconds, runtime_formatted,
+                        timestamp_to_insert, mode, runtime_seconds, runtime_formatted,
                         total_images, posters, seasons, backgrounds, titlecards, collections,
                         errors, tba_skipped, jap_chines_skipped, 1 if notification_sent else 0, 1 if uptime_kuma else 0,
                         images_cleared, folders_cleared, space_saved, script_version, im_version,

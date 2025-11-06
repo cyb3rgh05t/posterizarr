@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -211,24 +212,7 @@ def save_runtime_to_db(log_path: Path, mode: str = "normal"):
 def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]:
     """
     Parse runtime statistics from a JSON file
-
-    Supported JSON files:
-    - normal.json
-    - manual.json
-    - testing.json
-    - tautulli.json
-    - arr.json
-    - syncjelly.json
-    - syncemby.json
-    - backup.json
-    - scheduled.json
-
-    Args:
-        json_path: Path to the JSON file
-        mode: The run mode (will be inferred from filename if not provided)
-
-    Returns:
-        Dictionary with parsed runtime data or None if parsing failed
+    ... (omitted docstring for brevity) ...
     """
     try:
         if not json_path.exists():
@@ -262,15 +246,11 @@ def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]
         )
 
         # Parse fallback count - support both old and new formats
-        # New format: "Fallbacks": 5 (direct number)
-        # Old format: "Fallbacks": [{...}] (array, count items with Fallback: "true")
         fallback_count = 0
         fallbacks_data = data.get("Fallbacks", 0)
         if isinstance(fallbacks_data, int):
-            # New format: direct number
             fallback_count = fallbacks_data
         elif isinstance(fallbacks_data, list):
-            # Old format: count items with Fallback: "true"
             for item in fallbacks_data:
                 if isinstance(item, dict):
                     fallback_value = str(item.get("Fallback", "false")).lower()
@@ -292,6 +272,29 @@ def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]
         # Parse truncated and text counts (direct numbers in new format)
         truncated_count = data.get("Truncated", 0)
         text_count = data.get("Text", 0)
+
+        # --- START DATE FORMAT FIX ---
+        start_time_raw = data.get("Start time", "")
+        end_time_raw = data.get("End Time", "")
+
+        def reformat_date(date_str):
+            if not date_str:
+                return ""
+            try:
+                # Parse the "DD.MM.YYYY HH:MM:SS" format
+                dt = datetime.strptime(date_str, '%d.%m.%Y %H:%M:%S')
+                # Convert to "YYYY-MM-DDTHH:MM:SS" (ISO format)
+                return dt.isoformat()
+            except (ValueError, TypeError):
+                # If it's already in a good format (like ISO) or is "N/A", return as-is
+                if re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", date_str):
+                    return date_str
+                logger.warning(f"Could not parse date '{date_str}', returning as-is.")
+                return date_str
+
+        start_time_formatted = reformat_date(start_time_raw)
+        end_time_formatted = reformat_date(end_time_raw)
+        # --- END DATE FORMAT FIX ---
 
         # Build the result dictionary
         result = {
@@ -319,8 +322,8 @@ def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]
             "space_saved": data.get("Space saved", ""),
             "script_version": data.get("Script Version", ""),
             "im_version": data.get("IM Version", ""),
-            "start_time": data.get("Start time", ""),
-            "end_time": data.get("End Time", ""),
+            "start_time": start_time_formatted, # Use formatted version
+            "end_time": end_time_formatted,   # Use formatted version
             "log_file": json_path.name,
         }
 
@@ -335,7 +338,6 @@ def parse_runtime_from_json(json_path: Path, mode: str = None) -> Optional[Dict]
     except Exception as e:
         logger.error(f"Error parsing runtime from JSON: {e}")
         return None
-
 
 def _parse_runtime_to_seconds(runtime_str: str) -> int:
     """

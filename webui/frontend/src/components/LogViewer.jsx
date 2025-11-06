@@ -131,15 +131,13 @@ function LogViewer() {
     running: false,
     current_mode: null,
   });
-
   const logContainerRef = useRef(null);
   const wsRef = useRef(null);
   const dropdownRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const currentLogFileRef = useRef(null); // Set to null initially
   const isInitialLoad = useRef(true); // Prevent useEffect [selectedLog] from firing on init
-
-  // <-- MODIFIED parseLogLine -->
+  const logBufferRef = useRef([]);
   const parseLogLine = (line) => {
     const cleanedLine = line.replace(/\x00/g, "").trim();
     if (!cleanedLine) return { raw: null, level: null };
@@ -171,7 +169,6 @@ function LogViewer() {
     // Return as raw if no match
     return { raw: line, level: null }; // level is null
   };
-  // <-- END MODIFICATION -->
 
   const fetchStatus = async () => {
     try {
@@ -237,6 +234,32 @@ function LogViewer() {
     return colors[levelLower] || colors.default;
   };
 
+  useEffect(() => {
+    const flushBuffer = () => {
+      // Read the logs to flush into a local constant FIRST.
+      const logsToFlush = logBufferRef.current;
+
+      // If there's nothing to flush, do nothing.
+      if (logsToFlush.length === 0) {
+        return;
+      }
+
+      // Clear the ref so new logs can start buffering.
+      logBufferRef.current = [];
+
+      // Pass the updater function to setLogs.
+      setLogs((prevLogs) => [...prevLogs, ...logsToFlush]);
+    };
+
+    // Flush the buffer every 500ms
+    const flushInterval = setInterval(flushBuffer, 500);
+
+    return () => {
+      clearInterval(flushInterval);
+      flushBuffer(); // Flush any remaining logs on unmount
+    };
+  }, []);
+
   const fetchAvailableLogs = async (showToast = false) => {
     setIsRefreshing(true);
     try {
@@ -274,10 +297,14 @@ function LogViewer() {
       }
       const data = await response.json();
       const strippedContent = data.content.map((line) => line.trim());
-      setLogs(strippedContent); // Replace logs
+      // Parse all lines at once
+      const parsedLogs = strippedContent
+        .map(parseLogLine)
+        .filter((p) => p.raw !== null); // Filter out empty/invalid lines
+      setLogs(parsedLogs);
       showSuccess(
         t("logViewer.loadedFullLog", {
-          count: strippedContent.length,
+          count: parsedLogs.length,
           name: logName,
         })
       );
@@ -347,7 +374,10 @@ function LogViewer() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === "log") {
-            setLogs((prev) => [...prev, data.content]);
+            const parsedLine = parseLogLine(data.content);
+            if (parsedLine.raw) {
+              logBufferRef.current.push(parsedLine);
+            }
           } else if (data.type === "log_file_changed") {
             console.log(`Backend wants to switch to: ${data.log_file}`);
             if (selectedLog === currentLogFileRef.current) {
@@ -468,28 +498,20 @@ function LogViewer() {
     }
   }, [selectedLog]);
 
-  // Effect for autoscroll
-  useEffect(() => {
-    if (autoScroll && logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
-  }, [logs, autoScroll]);
 
-  // <-- MODIFIED filteredLogs -->
   const filteredLogs = useMemo(() => {
     const query = searchTerm.toLowerCase();
 
-    return logs.filter((line) => {
-      const parsed = parseLogLine(line); // Use our new parser
-      if (parsed.raw === null) return false;
+    // 'logs' is now an array of { raw, level } objects
+    return logs.filter((parsed) => {
+      // We no longer need to call parseLogLine here!
 
       const level = (parsed.level || "UNKNOWN").toUpperCase().trim();
       const message = parsed.raw.toLowerCase(); // Filter against the raw line
 
       let levelMatch = false;
       if (parsed.level === null) {
-        // This is a raw line that didn't parse, or an empty line
-        // Only show it if there's a search term and it matches
+        // This is a raw line that didn't parse
         levelMatch = !query || message.includes(query);
       } else if (level === "INFO") {
         levelMatch = levelFilters.INFO;
@@ -511,7 +533,6 @@ function LogViewer() {
       return searchMatch;
     });
   }, [logs, searchTerm, levelFilters]);
-  // <-- END MODIFICATION -->
 
   useEffect(() => {
     if (autoScroll && logContainerRef.current) {
@@ -544,7 +565,7 @@ function LogViewer() {
     }
 
     // Download the currently filtered logs from state
-    const logText = filteredLogs.join("\n");
+    const logText = filteredLogs.map(p => p.raw).join("\n");
     const blob = new Blob([logText], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -889,32 +910,23 @@ function LogViewer() {
               </p>
             </div>
           ) : (
-            // <-- MODIFIED RENDER LOGIC -->
             <div className="font-mono text-[11px] leading-relaxed">
-              {filteredLogs.map((line, index) => {
-                // We parse again here to get the level for coloring
-                const parsed = parseLogLine(line);
-
-                if (parsed.raw === null) {
-                  return null;
-                }
-
+              {filteredLogs.map((parsed, index) => { // 'parsed' is { raw, level }
                 // Get color based on parsed level
-                const logColor = getLogColor(parsed.level);
+                const logColor = getLogColor(parsed.level); // Use parsed.level
 
                 return (
                   <div
                     key={index}
-                    className="px-2 py-0.5 hover:bg-gray-900/50 transition-colors rounded border-l-2 border-transparent hover:border-theme-primary/50"
+                    // ...
                     style={{ color: logColor }}
                   >
-                    {/* Render the raw line, preserving whitespace */}
+                    {/* Render the raw line */}
                     <pre className="whitespace-pre-wrap m-0 p-0">{parsed.raw}</pre>
                   </div>
                 );
               })}
             </div>
-            // <-- END MODIFICATION -->
           )}
         </div>
 

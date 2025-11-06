@@ -346,10 +346,11 @@ class PosterizarrScheduler:
             # Better error logging with full stack trace
             logger.error(f"Error during scheduled script execution: {e}", exc_info=True)
         finally:
-            # --- MODIFICATION ---
-            # DO NOT clean up self.is_running or self.current_process here.
-            # That state is now "reaped" by the get_status() function in main.py
-            # to prevent race conditions.
+            # Safely set state back to "not running"
+            with self._lock:
+                self.is_running = False
+                self.current_process = None
+                logger.info("Scheduler has set is_running to False.")
 
             # Safely update the next run time
             with self._lock:

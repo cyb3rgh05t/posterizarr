@@ -817,11 +817,7 @@ function Dashboard() {
                       <p className="text-xs text-theme-muted">
                         Started:{" "}
                         <span className="font-mono">
-                          {formatDateTimeInTimezone(
-                            status.start_time,
-                            schedulerStatus?.timezone || "Europe/Berlin",
-                            "N/A"
-                          )}
+                          {new Date(status.start_time).toLocaleString("sv-SE").replace("T", " ")}
                         </span>
                       </p>
                     )}
@@ -880,11 +876,7 @@ function Dashboard() {
                         {schedulerStatus.next_run && (
                           <p className="text-xs text-blue-400">
                             {t("dashboard.nextRun")}:{" "}
-                            {formatDateTimeInTimezone(
-                              schedulerStatus.next_run,
-                              schedulerStatus.timezone || "Europe/Berlin",
-                              "N/A"
-                            )}
+                            {new Date(schedulerStatus.next_run).toLocaleString("sv-SE").replace("T", " ")}
                           </p>
                         )}
                       </>
