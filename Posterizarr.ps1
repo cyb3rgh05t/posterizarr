@@ -52,7 +52,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.1"
+$CurrentScriptVersion = "2.1.3"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -10280,7 +10280,7 @@ Elseif ($Tautulli) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -10769,7 +10769,7 @@ Elseif ($Tautulli) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -11346,7 +11346,7 @@ Elseif ($Tautulli) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -11846,7 +11846,7 @@ Elseif ($Tautulli) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -12441,7 +12441,7 @@ Elseif ($Tautulli) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
                                                 $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                 if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                     $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -13097,7 +13097,7 @@ Elseif ($Tautulli) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -13155,7 +13155,7 @@ Elseif ($Tautulli) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -13706,7 +13706,7 @@ Elseif ($Tautulli) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -13763,7 +13763,7 @@ Elseif ($Tautulli) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -15116,7 +15116,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                                 if ($global:direction -eq "RTL") {
                                                     $fontImagemagick = $RTLfontImagemagick
                                                 }
@@ -15543,7 +15543,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
                                                 }
@@ -16052,7 +16052,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -16491,7 +16491,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -17024,7 +17024,7 @@ Elseif ($ArrTrigger) {
                                                         $SkippingText = 'true'
                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                     }
-                                                    if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                    if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
                                                         $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                         if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                             $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -17548,7 +17548,7 @@ Elseif ($ArrTrigger) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                         if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                             $global:EPTitle = $global:EPTitle.ToUpper()
                                                                         }
@@ -17605,7 +17605,7 @@ Elseif ($ArrTrigger) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                    if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                         if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                             $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                         }
@@ -18039,7 +18039,7 @@ Elseif ($ArrTrigger) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -18097,7 +18097,7 @@ Elseif ($ArrTrigger) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -19045,7 +19045,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                                 if ($global:direction -eq "RTL") {
                                                     $fontImagemagick = $RTLfontImagemagick
                                                 }
@@ -19534,7 +19534,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
                                                 }
@@ -20111,7 +20111,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -20611,7 +20611,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -21206,7 +21206,7 @@ Elseif ($ArrTrigger) {
                                                     $SkippingText = 'true'
                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                 }
-                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
                                                     $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                     if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                         $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -21861,7 +21861,7 @@ Elseif ($ArrTrigger) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                         if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                             $global:EPTitle = $global:EPTitle.ToUpper()
                                                                         }
@@ -21919,7 +21919,7 @@ Elseif ($ArrTrigger) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                    if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                         if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                             $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                         }
@@ -22470,7 +22470,7 @@ Elseif ($ArrTrigger) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -22527,7 +22527,7 @@ Elseif ($ArrTrigger) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -24965,7 +24965,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -25392,7 +25392,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -25901,7 +25901,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -26340,7 +26340,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -26887,7 +26887,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $SkippingText = 'true'
                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                 }
-                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
                                                     $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                     if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                         $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -27411,7 +27411,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -27468,7 +27468,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -27902,7 +27902,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -27960,7 +27960,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -29270,7 +29270,7 @@ else {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -29826,7 +29826,7 @@ else {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -30472,7 +30472,7 @@ else {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -31042,7 +31042,7 @@ else {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -31710,7 +31710,7 @@ else {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddSeasonText -eq 'true' -and $SkippingText -eq 'false') {
                                                 $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                 if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                     $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -32429,7 +32429,7 @@ else {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -32486,7 +32486,7 @@ else {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -33099,7 +33099,7 @@ else {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and $SkippingText -eq 'false') {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -33156,7 +33156,7 @@ else {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
