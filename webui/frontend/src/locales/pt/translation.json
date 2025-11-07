@@ -163,7 +163,12 @@
       "step2": "A imagem é editada com suas sobreposições e texto configurados",
       "step3": "O cartaz final é colocado no local do ativo",
       "step4": "O cartaz é sincronizado com o seu servidor de mídia",
-      "viewDocs": "Ver documentação completa"
+      "viewDocs": "Ver documentação completa",
+      "selectLibraryTitle": "Selecionar das bibliotecas existentes",
+      "selectLibraryButton": "Selecionar Biblioteca",
+      "selectLibraryFirstTooltip": "Selecione a Biblioteca primeiro",
+      "selectFolderTitle": "Selecionar das pastas existentes",
+      "selectFolderButton": "Selecionar Pasta"
     },
     "jellyfin": {
       "title": "Modo de sincronização do Jellyfin",
@@ -250,20 +255,41 @@
         "libraryPlaceholder": "Filmes",
         "libraryDescription": "Nome da biblioteca Plex onde a coleção existe"
       },
-      "folderNameLabel": "Nome da pasta",
+      "folderNameLabel": "Nome da Pasta",
       "tvShowPlaceholder": "Breaking Bad (2008) {tmdb-1396}",
-      "tvShowDescription": "Nome exato da pasta da série (como aparece na sua biblioteca Plex)",
-      "tvLibraryPlaceholder": "Séries",
-      "tvLibraryDescription": "Nome da biblioteca Plex (ex: Séries, Animes)",
-      "collectionLabel": "Nome da coleção",
+      "tvShowDescription": "Nome exato da pasta da série de TV (como aparece na sua biblioteca Plex)",
+      "tvLibraryPlaceholder": "Séries de TV",
+      "tvLibraryDescription": "Nome da biblioteca Plex (ex: Séries de TV, Anime)",
+      "collectionLabel": "Nome da Pasta",
       "collectionPlaceholder": "Marvel Cinematic Universe",
-      "collectionDescription": "Nome exato da coleção (como aparece na sua biblioteca Plex)",
+      "collectionDescription": "Nome exato da pasta da coleção",
       "collectionLibraryDescription": "Nome da biblioteca Plex onde a coleção existe",
-      "moviePlaceholder": "Perdido em Marte (2015) {tmdb-286217}",
+      "moviePlaceholder": "The Martian (2015) {tmdb-286217}",
       "movieDescription": "Nome exato da pasta do filme (como aparece na sua biblioteca Plex)",
       "movieLibraryPlaceholder": "Filmes",
-      "movieLibraryDescription": "Nome da biblioteca Plex (ex: Filmes, Séries)",
+      "movieLibraryDescription": "Nome da biblioteca Plex (ex: Filmes, Séries de TV)",
       "defaultDescription": "Nome exato da pasta (como aparece na sua biblioteca Plex)"
+    },
+    "folderSelector": {
+      "title": "Selecionar Pasta de assets '{{libraryName}}'",
+      "folderCount_one": "{{count}} pasta",
+      "folderCount_other": "{{count}} pastas",
+      "searchPlaceholder": "Procurar pastas...",
+      "loading": "A carregar pastas...",
+      "noFolders": "Nenhuma pasta encontrada em assets '{{libraryName}}'",
+      "noFoldersSubtext": "Verifique se o nome da biblioteca corresponde a uma pasta no seu diretório de assets",
+      "folderPrefix": "Pasta"
+    },
+    "librarySelector": {
+      "title": "Selecionar Biblioteca de assets/",
+      "libraryCount_one": "{{count}} biblioteca",
+      "libraryCount_other": "{{count}} bibliotecas",
+      "searchPlaceholder": "Procurar bibliotecas...",
+      "loading": "A carregar bibliotecas...",
+      "noLibraries": "Nenhuma pasta de biblioteca encontrada em assets/",
+      "noLibrariesSubtext": "Adicione pastas de biblioteca ao seu diretório de assets",
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} itens"
     }
   },
   "releasesSection": {
@@ -627,7 +653,13 @@
     "gridDescription": "Navegue por todos os ativos por tipo (cartazes, fundos, temporadas, cartões de título)",
     "folderDescription": "Navegue pelos ativos navegando por bibliotecas e pastas",
     "gridView": "Visão em grade",
-    "folderView": "Visão de pastas"
+    "folderView": "Visão de pastas",
+    "assetsRoot": "Assets",
+    "searchCurrentFolder": "Pesquisar na pasta atual...",
+    "folders": "Pastas",
+    "assets": "Assets",
+    "noItemsFound": "Nenhum item encontrado",
+    "items": "itens"
   },
   "howItWorks": {
     "header": {

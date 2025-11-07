@@ -163,7 +163,12 @@
       "step2": "Bild wird mit deinen konfigurierten Overlays und Text bearbeitet",
       "step3": "Fertiges Poster wird im Asset-Speicherort platziert",
       "step4": "Poster wird mit deinem Medienserver synchronisiert",
-      "viewDocs": "Vollständige Dokumentation ansehen"
+      "viewDocs": "Vollständige Dokumentation ansehen",
+      "selectLibraryTitle": "Aus bestehenden Bibliotheken auswählen",
+      "selectLibraryButton": "Bibliothek wählen",
+      "selectLibraryFirstTooltip": "Bitte zuerst Bibliothek auswählen",
+      "selectFolderTitle": "Aus bestehenden Ordnern auswählen",
+      "selectFolderButton": "Ordner wählen"
     },
     "jellyfin": {
       "title": "Jellyfin Sync-Modus",
@@ -253,17 +258,38 @@
       "folderNameLabel": "Ordnername",
       "tvShowPlaceholder": "Breaking Bad (2008) {tmdb-1396}",
       "tvShowDescription": "Exakter Ordnername der TV-Serie (wie er in deiner Plex-Bibliothek erscheint)",
-      "tvLibraryPlaceholder": "TV-Serien",
-      "tvLibraryDescription": "Name der Plex-Bibliothek (z.B. TV-Serien, Anime)",
-      "collectionLabel": "Sammlungsname",
+      "tvLibraryPlaceholder": "Serien",
+      "tvLibraryDescription": "Name der Plex-Bibliothek (z.B. Serien, Anime)",
+      "collectionLabel": "Ordnername",
       "collectionPlaceholder": "Marvel Cinematic Universe",
-      "collectionDescription": "Exakter Name der Sammlung (wie sie in deiner Plex-Bibliothek erscheint)",
-      "collectionLibraryDescription": "Name der Plex-Bibliothek, in der die Sammlung existiert",
+      "collectionDescription": "Exakter Ordnername der Sammlung",
+      "collectionLibraryDescription": "Name der Plex-Bibliothek, in der sich die Sammlung befindet",
       "moviePlaceholder": "The Martian (2015) {tmdb-286217}",
       "movieDescription": "Exakter Ordnername des Films (wie er in deiner Plex-Bibliothek erscheint)",
       "movieLibraryPlaceholder": "Filme",
-      "movieLibraryDescription": "Name der Plex-Bibliothek (z.B. Filme, TV-Serien)",
+      "movieLibraryDescription": "Name der Plex-Bibliothek (z.B. Filme, Serien)",
       "defaultDescription": "Exakter Ordnername (wie er in deiner Plex-Bibliothek erscheint)"
+    },
+    "folderSelector": {
+      "title": "Ordner aus assets '{{libraryName}}' auswählen",
+      "folderCount_one": "{{count}} Ordner",
+      "folderCount_other": "{{count}} Ordner",
+      "searchPlaceholder": "Ordner suchen...",
+      "loading": "Lade Ordner...",
+      "noFolders": "Keine Ordner in assets '{{libraryName}}' gefunden",
+      "noFoldersSubtext": "Bitte prüfen Sie, ob der Bibliotheksname mit einem Ordner in Ihrem Assets-Verzeichnis übereinstimmt",
+      "folderPrefix": "Ordner"
+    },
+    "librarySelector": {
+      "title": "Bibliothek aus assets auswählen",
+      "libraryCount_one": "{{count}} Bibliothek",
+      "libraryCount_other": "{{count}} Bibliotheken",
+      "searchPlaceholder": "Bibliotheken suchen...",
+      "loading": "Lade Bibliotheken...",
+      "noLibraries": "Keine Bibliotheksordner in assets gefunden",
+      "noLibrariesSubtext": "Bitte fügen Sie Bibliotheksordner zu Ihrem Assets-Verzeichnis hinzu",
+      "itemCount_one": "{{count}} Element",
+      "itemCount_other": "{{count}} Elemente"
     }
   },
   "releasesSection": {
@@ -334,11 +360,11 @@
   },
   "manualAssets": {
     "title": "Manuelle Assets",
-    "description": "Assets ohne Overlay-Verarbeitung gespeichert (aus dem manualassets/ Ordner)",
+    "description": "Assets ohne Overlay-Verarbeitung gespeichert (aus dem manualassets Ordner)",
     "loadingAssets": "Lade manuelle Assets...",
     "errorLoadingAssets": "Fehler beim Laden der manuellen Assets",
     "noAssetsFound": "Keine manuellen Assets gefunden",
-    "noAssetsDescription": "Assets, die ohne Overlay-Verarbeitung gespeichert wurden, werden hier angezeigt. Verwenden Sie den Asset-Ersetzer mit deaktiviertem Overlay-Toggle, um Assets im manualassets/ Ordner zu speichern.",
+    "noAssetsDescription": "Assets, die ohne Overlay-Verarbeitung gespeichert wurden, werden hier angezeigt. Verwenden Sie den Asset-Ersetzer mit deaktiviertem Overlay-Toggle, um Assets im manualassets Ordner zu speichern.",
     "totalAssets": "Asset(s) insgesamt",
     "libraries": "Bibliothek(en)",
     "folders": "Ordner",
@@ -628,7 +654,13 @@
     "gridDescription": "Alle Assets nach Typ durchsuchen (Poster, Hintergründe, Staffeln, Titelkarten)",
     "folderDescription": "Assets durch Navigation in Bibliotheken und Ordnern durchsuchen",
     "gridView": "Rasteransicht",
-    "folderView": "Ordneransicht"
+    "folderView": "Ordneransicht",
+    "assetsRoot": "Assets",
+    "searchCurrentFolder": "Aktuellen Ordner durchsuchen...",
+    "folders": "Ordner",
+    "assets": "Assets",
+    "noItemsFound": "Keine Elemente gefunden",
+    "items": "Elemente"
   },
   "howItWorks": {
     "header": {

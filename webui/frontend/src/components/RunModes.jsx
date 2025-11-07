@@ -642,7 +642,6 @@ function RunModes() {
     showSuccess(`Folder "${folderName}" selected`);
   };
 
-  // Load library items from assets directory
   const loadLibraryItems = async () => {
     setLoadingLibraries(true);
     setShowLibrarySelector(true);
@@ -653,13 +652,19 @@ function RunModes() {
       const data = await response.json();
 
       if (data.success) {
-        setLibraryItems(data.libraries || []);
-        console.log(
-          `Loaded ${data.libraries?.length || 0} libraries from assets/`
+        // Filter out the "Collections" folder by checking the 'name' property
+        const allLibraries = data.libraries || [];
+        const filteredLibraries = allLibraries.filter(
+          (library) => library.name !== "Collections"
         );
 
-        if (data.libraries?.length === 0) {
-          showError("No library folders found in assets directory");
+        setLibraryItems(filteredLibraries);
+        console.log(
+          `Loaded ${filteredLibraries.length || 0} libraries from assets`
+        );
+
+        if (filteredLibraries.length === 0) {
+          showError("No library folders found in assets directory (after filtering)");
         }
       } else {
         showError(`Failed to load libraries: ${data.error}`);
@@ -756,11 +761,8 @@ function RunModes() {
       return;
     }
 
-    // Folder name is NOT required for collection posters
-    if (
-      manualForm.posterType !== "collection" &&
-      !manualForm.folderName.trim()
-    ) {
+    // Folder name is required for all types
+    if (!manualForm.folderName.trim()) {
       showError(t("runModes.validation.folderRequired"));
       return;
     }
@@ -2352,10 +2354,10 @@ function RunModes() {
                 onClick={loadLibraryItems}
                 disabled={loading || status.running}
                 className="px-4 py-2 bg-theme-primary hover:bg-theme-primary/80 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
-                title="Select from existing libraries"
+                title={t("runModes.manual.selectLibraryTitle")}
               >
                 <FolderHeart className="w-4 h-4" />
-                Select Library
+                {t("runModes.manual.selectLibraryButton")}
               </button>
             </div>
             <p className="text-xs text-theme-muted mt-1">
@@ -2363,23 +2365,24 @@ function RunModes() {
             </p>
           </div>
 
-          {/* Folder Name Field - Hidden for collections (uses titletext as folder name) - AFTER LIBRARY */}
-          {manualForm.posterType !== "collection" && (
-            <div>
-              <label className="block text-sm font-medium text-theme-text mb-2">
-                {hints.folderName.label} <span className="text-red-400">*</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={manualForm.folderName}
-                  onChange={(e) =>
-                    setManualForm({ ...manualForm, folderName: e.target.value })
-                  }
-                  placeholder={hints.folderName.placeholder}
-                  disabled={loading || status.running}
-                  className="flex-1 px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+          {/* Folder Name Field - AFTER LIBRARY */}
+          <div>
+            <label className="block text-sm font-medium text-theme-text mb-2">
+              {hints.folderName.label} <span className="text-red-400">*</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualForm.folderName}
+                onChange={(e) =>
+                  setManualForm({ ...manualForm, folderName: e.target.value })
+                }
+                placeholder={hints.folderName.placeholder}
+                disabled={loading || status.running}
+                className="flex-1 px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              {/* Hide 'Select Folder' button for collections */}
+              {manualForm.posterType !== "collection" && (
                 <button
                   type="button"
                   onClick={loadFolderItems}
@@ -2389,19 +2392,19 @@ function RunModes() {
                   className="px-4 py-2 bg-theme-primary hover:bg-theme-primary/80 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
                   title={
                     !manualForm.libraryName.trim()
-                      ? "Please select Library first"
-                      : "Select from existing folders"
+                      ? t("runModes.manual.selectLibraryFirstTooltip")
+                      : t("runModes.manual.selectFolderTitle")
                   }
                 >
                   <FolderOpen className="w-4 h-4" />
-                  Select Folder
+                  {t("runModes.manual.selectFolderButton")}
                 </button>
-              </div>
-              <p className="text-xs text-theme-muted mt-1">
-                {hints.folderName.description}
-              </p>
+              )}
             </div>
-          )}
+            <p className="text-xs text-theme-muted mt-1">
+              {hints.folderName.description}
+            </p>
+          </div>
 
           {/* CONDITIONAL FIELDS MOVED HERE FOR BETTER UX */}
           {/* Season Poster Name (only shown for season type) */}
@@ -2609,224 +2612,223 @@ function RunModes() {
         onStatusUpdate={fetchStatus}
       />
 
-      {/* Folder Selector Modal */}
-      {showFolderSelector && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-theme-card border border-theme-primary rounded-xl max-w-4xl w-full max-h-[80vh] shadow-2xl animate-in fade-in duration-200 flex flex-col">
-            {/* Header */}
-            <div className="bg-theme-primary px-6 py-4 rounded-t-xl flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center">
-                <FolderOpen className="w-6 h-6 mr-3 text-white" />
-                <h3 className="text-xl font-bold text-white">
-                  Select Folder from assets/{manualForm.libraryName}
-                  {folderItems.length > 0 && ` (${folderItems.length} folders)`}
-                </h3>
+    {/* Folder Selector Modal */}
+    {showFolderSelector && (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-theme-card border border-theme-primary rounded-xl max-w-4xl w-full max-h-[80vh] shadow-2xl animate-in fade-in duration-200 flex flex-col">
+          {/* Header */}
+          <div className="bg-theme-primary px-6 py-4 rounded-t-xl flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center">
+              <FolderOpen className="w-6 h-6 mr-3 text-white" />
+              <h3 className="text-xl font-bold text-white">
+                {t('runModes.folderSelector.title', { libraryName: manualForm.libraryName })}
+                {folderItems.length > 0 && ` (${t('runModes.folderSelector.folderCount', { count: folderItems.length })})`}
+              </h3>
+            </div>
+            <button
+              onClick={() => {
+                setShowFolderSelector(false);
+                setFolderSearchQuery("");
+              }}
+              className="text-white/80 hover:text-white transition-colors p-1 hover:bg-white/10 rounded"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="px-6 py-4 border-b border-theme-primary/30">
+            <input
+              type="text"
+              value={folderSearchQuery}
+              onChange={(e) => setFolderSearchQuery(e.target.value)}
+              placeholder={t('runModes.folderSelector.searchPlaceholder')}
+              className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
+            />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {loadingFolders ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-12 h-12 text-theme-primary animate-spin mb-4" />
+                <p className="text-theme-muted">{t('runModes.folderSelector.loading')}</p>
               </div>
-              <button
-                onClick={() => {
-                  setShowFolderSelector(false);
-                  setFolderSearchQuery("");
-                }}
-                className="text-white/80 hover:text-white transition-colors p-1 hover:bg-white/10 rounded"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Search Bar */}
-            <div className="px-6 py-4 border-b border-theme-primary/30">
-              <input
-                type="text"
-                value={folderSearchQuery}
-                onChange={(e) => setFolderSearchQuery(e.target.value)}
-                placeholder="Search folders..."
-                className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
-              />
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {loadingFolders ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="w-12 h-12 text-theme-primary animate-spin mb-4" />
-                  <p className="text-theme-muted">Loading folders...</p>
-                </div>
-              ) : folderItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <FolderOpen className="w-16 h-16 text-theme-muted mb-4" />
-                  <p className="text-theme-muted text-center">
-                    No folders found in assets/{manualForm.libraryName}
-                  </p>
-                  <p className="text-theme-muted text-sm mt-2">
-                    Please check the library name matches a folder in your
-                    assets directory
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2">
-                  {folderItems
-                    .filter((item) =>
-                      folderSearchQuery
-                        ? item.folderName
-                            .toLowerCase()
-                            .includes(folderSearchQuery.toLowerCase()) ||
-                          item.title
-                            .toLowerCase()
-                            .includes(folderSearchQuery.toLowerCase())
-                        : true
-                    )
-                    .map((item, index) => (
-                      <button
-                        key={index}
-                        onClick={() =>
-                          handleFolderSelect(item.folderName, item.title)
-                        }
-                        className="w-full text-left px-4 py-3 bg-theme-bg hover:bg-theme-primary/20 border border-theme rounded-lg transition-all duration-200 group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-theme-text font-medium truncate">
-                              {item.title}
-                              {item.year && (
-                                <span className="text-theme-muted ml-2">
-                                  ({item.year})
-                                </span>
-                              )}
-                            </p>
-                            <p className="text-xs text-theme-muted mt-1 truncate">
-                              Folder: {item.folderName}
-                            </p>
-                          </div>
-                          <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <CheckCircle className="w-5 h-5 text-green-400" />
-                          </div>
+            ) : folderItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <FolderOpen className="w-16 h-16 text-theme-muted mb-4" />
+                <p className="text-theme-muted text-center">
+                  {t('runModes.folderSelector.noFolders', { libraryName: manualForm.libraryName })}
+                </p>
+                <p className="text-theme-muted text-sm mt-2">
+                  {t('runModes.folderSelector.noFoldersSubtext')}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2">
+                {folderItems
+                  .filter((item) =>
+                    folderSearchQuery
+                      ? item.folderName
+                          .toLowerCase()
+                          .includes(folderSearchQuery.toLowerCase()) ||
+                        item.title
+                          .toLowerCase()
+                          .includes(folderSearchQuery.toLowerCase())
+                      : true
+                  )
+                  .map((item, index) => (
+                    <button
+                      key={index}
+                      onClick={() =>
+                        handleFolderSelect(item.folderName, item.title)
+                      }
+                      className="w-full text-left px-4 py-3 bg-theme-bg hover:bg-theme-primary/20 border border-theme rounded-lg transition-all duration-200 group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-theme-text font-medium truncate">
+                            {item.title}
+                            {item.year && (
+                              <span className="text-theme-muted ml-2">
+                                ({item.year})
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-theme-muted mt-1 truncate">
+                            {t('runModes.folderSelector.folderPrefix')}: {item.folderName}
+                          </p>
                         </div>
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
+                        <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <CheckCircle className="w-5 h-5 text-green-400" />
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-theme-primary/30 flex justify-end">
-              <button
-                onClick={() => {
-                  setShowFolderSelector(false);
-                  setFolderSearchQuery("");
-                }}
-                className="px-4 py-2 bg-theme-bg hover:bg-theme-bg/80 text-theme-text rounded-lg transition-all duration-200"
-              >
-                Cancel
-              </button>
-            </div>
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-theme-primary/30 flex justify-end">
+            <button
+              onClick={() => {
+                setShowFolderSelector(false);
+                setFolderSearchQuery("");
+              }}
+              className="px-4 py-2 bg-theme-bg hover:bg-theme-bg/80 text-theme-text rounded-lg transition-all duration-200"
+            >
+              {t('common.cancel')}
+            </button>
           </div>
         </div>
-      )}
+      </div>
+    )}
 
-      {/* Library Selector Modal */}
-      {showLibrarySelector && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-theme-card border border-theme-primary rounded-xl max-w-3xl w-full max-h-[70vh] shadow-2xl animate-in fade-in duration-200 flex flex-col">
-            {/* Header */}
-            <div className="bg-theme-primary px-6 py-4 rounded-t-xl flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center">
-                <FolderHeart className="w-6 h-6 mr-3 text-white" />
-                <h3 className="text-xl font-bold text-white">
-                  Select Library from assets/
-                  {libraryItems.length > 0 &&
-                    ` (${libraryItems.length} libraries)`}
-                </h3>
+    {/* Library Selector Modal */}
+    {showLibrarySelector && (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-theme-card border border-theme-primary rounded-xl max-w-3xl w-full max-h-[70vh] shadow-2xl animate-in fade-in duration-200 flex flex-col">
+          {/* Header */}
+          <div className="bg-theme-primary px-6 py-4 rounded-t-xl flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center">
+              <FolderHeart className="w-6 h-6 mr-3 text-white" />
+              <h3 className="text-xl font-bold text-white">
+                {t('runModes.librarySelector.title')}
+                {libraryItems.length > 0 &&
+                  ` (${t('runModes.librarySelector.libraryCount', { count: libraryItems.length })})`}
+              </h3>
+            </div>
+            <button
+              onClick={() => {
+                setShowLibrarySelector(false);
+                setLibrarySearchQuery("");
+              }}
+              className="text-white/80 hover:text-white transition-colors p-1 hover:bg-white/10 rounded"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="px-6 py-4 border-b border-theme-primary/30">
+            <input
+              type="text"
+              value={librarySearchQuery}
+              onChange={(e) => setLibrarySearchQuery(e.target.value)}
+              placeholder={t('runModes.librarySelector.searchPlaceholder')}
+              className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
+            />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {loadingLibraries ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-12 h-12 text-theme-primary animate-spin mb-4" />
+                <p className="text-theme-muted">{t('runModes.librarySelector.loading')}</p>
               </div>
-              <button
-                onClick={() => {
-                  setShowLibrarySelector(false);
-                  setLibrarySearchQuery("");
-                }}
-                className="text-white/80 hover:text-white transition-colors p-1 hover:bg-white/10 rounded"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Search Bar */}
-            <div className="px-6 py-4 border-b border-theme-primary/30">
-              <input
-                type="text"
-                value={librarySearchQuery}
-                onChange={(e) => setLibrarySearchQuery(e.target.value)}
-                placeholder="Search libraries..."
-                className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
-              />
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {loadingLibraries ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="w-12 h-12 text-theme-primary animate-spin mb-4" />
-                  <p className="text-theme-muted">Loading libraries...</p>
-                </div>
-              ) : libraryItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <FolderHeart className="w-16 h-16 text-theme-muted mb-4" />
-                  <p className="text-theme-muted text-center">
-                    No library folders found in assets/
-                  </p>
-                  <p className="text-theme-muted text-sm mt-2">
-                    Please add library folders to your assets directory
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2">
-                  {libraryItems
-                    .filter((lib) =>
-                      librarySearchQuery
-                        ? lib.name
-                            .toLowerCase()
-                            .includes(librarySearchQuery.toLowerCase())
-                        : true
-                    )
-                    .map((lib, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleLibrarySelect(lib.name)}
-                        className="w-full text-left px-4 py-3 bg-theme-bg hover:bg-theme-primary/20 border border-theme rounded-lg transition-all duration-200 group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-theme-text font-medium truncate">
-                              {lib.name}
-                            </p>
-                            <p className="text-xs text-theme-muted mt-1">
-                              {lib.itemCount}{" "}
-                              {lib.itemCount === 1 ? "item" : "items"}
-                            </p>
-                          </div>
-                          <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <CheckCircle className="w-5 h-5 text-green-400" />
-                          </div>
+            ) : libraryItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <FolderHeart className="w-16 h-16 text-theme-muted mb-4" />
+                <p className="text-theme-muted text-center">
+                  {t('runModes.librarySelector.noLibraries')}
+                </p>
+                <p className="text-theme-muted text-sm mt-2">
+                  {t('runModes.librarySelector.noLibrariesSubtext')}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2">
+                {libraryItems
+                  .filter((lib) =>
+                    librarySearchQuery
+                      ? lib.name
+                          .toLowerCase()
+                          .includes(librarySearchQuery.toLowerCase())
+                      : true
+                  )
+                  .map((lib, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleLibrarySelect(lib.name)}
+                      className="w-full text-left px-4 py-3 bg-theme-bg hover:bg-theme-primary/20 border border-theme rounded-lg transition-all duration-200 group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-theme-text font-medium truncate">
+                            {lib.name}
+                          </p>
+                          <p className="text-xs text-theme-muted mt-1">
+                            {t('runModes.librarySelector.itemCount', { count: lib.itemCount })}
+                          </p>
                         </div>
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
+                        <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <CheckCircle className="w-5 h-5 text-green-400" />
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-theme-primary/30 flex justify-end">
-              <button
-                onClick={() => {
-                  setShowLibrarySelector(false);
-                  setLibrarySearchQuery("");
-                }}
-                className="px-4 py-2 bg-theme-bg hover:bg-theme-bg/80 text-theme-text rounded-lg transition-all duration-200"
-              >
-                Cancel
-              </button>
-            </div>
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-theme-primary/30 flex justify-end">
+            <button
+              onClick={() => {
+                setShowLibrarySelector(false);
+                setLibrarySearchQuery("");
+              }}
+              className="px-4 py-2 bg-theme-bg hover:bg-theme-bg/80 text-theme-text rounded-lg transition-all duration-200"
+            >
+              {t('common.cancel')}
+            </button>
           </div>
         </div>
-      )}
+      </div>
+    )}
+
     </div>
   );
 }

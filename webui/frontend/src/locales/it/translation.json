@@ -163,7 +163,12 @@
       "step2": "L'immagine viene modificata con le sovrapposizioni e il testo configurati",
       "step3": "La locandina finale viene posizionata nella posizione degli asset",
       "step4": "La locandina viene sincronizzata con il tuo media server",
-      "viewDocs": "Visualizza la documentazione completa"
+      "viewDocs": "Visualizza la documentazione completa",
+      "selectLibraryTitle": "Seleziona da librerie esistenti",
+      "selectLibraryButton": "Scegli Libreria",
+      "selectLibraryFirstTooltip": "Seleziona prima la libreria",
+      "selectFolderTitle": "Seleziona da cartelle esistenti",
+      "selectFolderButton": "Scegli Cartella"
     },
     "jellyfin": {
       "title": "Modalità di sincronizzazione Jellyfin",
@@ -250,20 +255,41 @@
         "libraryPlaceholder": "Film",
         "libraryDescription": "Nome della libreria Plex in cui esiste la collezione"
       },
-      "folderNameLabel": "Nome cartella",
+      "folderNameLabel": "Nome Cartella",
       "tvShowPlaceholder": "Breaking Bad (2008) {tmdb-1396}",
       "tvShowDescription": "Nome esatto della cartella della serie TV (come appare nella tua libreria Plex)",
       "tvLibraryPlaceholder": "Serie TV",
       "tvLibraryDescription": "Nome della libreria Plex (es. Serie TV, Anime)",
-      "collectionLabel": "Nome collezione",
+      "collectionLabel": "Nome Cartella",
       "collectionPlaceholder": "Marvel Cinematic Universe",
-      "collectionDescription": "Nome esatto della collezione (come appare nella tua libreria Plex)",
+      "collectionDescription": "Nome esatto della cartella della collezione",
       "collectionLibraryDescription": "Nome della libreria Plex in cui esiste la collezione",
       "moviePlaceholder": "The Martian (2015) {tmdb-286217}",
       "movieDescription": "Nome esatto della cartella del film (come appare nella tua libreria Plex)",
       "movieLibraryPlaceholder": "Film",
       "movieLibraryDescription": "Nome della libreria Plex (es. Film, Serie TV)",
       "defaultDescription": "Nome esatto della cartella (come appare nella tua libreria Plex)"
+    },
+    "folderSelector": {
+      "title": "Seleziona cartella da assets '{{libraryName}}'",
+      "folderCount_one": "{{count}} cartella",
+      "folderCount_other": "{{count}} cartelle",
+      "searchPlaceholder": "Cerca cartelle...",
+      "loading": "Caricamento cartelle...",
+      "noFolders": "Nessuna cartella trovata in assets '{{libraryName}}'",
+      "noFoldersSubtext": "Verifica che il nome della libreria corrisponda a una cartella nella tua directory assets",
+      "folderPrefix": "Cartella"
+    },
+    "librarySelector": {
+      "title": "Seleziona libreria da assets/",
+      "libraryCount_one": "{{count}} libreria",
+      "libraryCount_other": "{{count}} librerie",
+      "searchPlaceholder": "Cerca librerie...",
+      "loading": "Caricamento librerie...",
+      "noLibraries": "Nessuna cartella libreria trovata in assets/",
+      "noLibrariesSubtext": "Aggiungi le cartelle della libreria alla tua directory assets",
+      "itemCount_one": "{{count}} elemento",
+      "itemCount_other": "{{count}} elementi"
     }
   },
   "releasesSection": {
@@ -627,7 +653,13 @@
     "gridDescription": "Sfoglia tutti gli asset per tipo (locandine, sfondi, stagioni, schede titolo)",
     "folderDescription": "Sfoglia gli asset navigando tra librerie e cartelle",
     "gridView": "Vista griglia",
-    "folderView": "Vista cartelle"
+    "folderView": "Vista cartelle",
+    "assetsRoot": "Asset",
+    "searchCurrentFolder": "Cerca nella cartella corrente...",
+    "folders": "Cartelle",
+    "assets": "Asset",
+    "noItemsFound": "Nessun elemento trovato",
+    "items": "elementi"
   },
   "howItWorks": {
     "header": {
