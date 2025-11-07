@@ -1,1074 +1,461 @@
-import React, { useState, useEffect, useRef } from "react"; // Import useRef
+import React, { useState, useEffect, useRef } from "react";
 import {
   Folder,
-  ChevronRight,
-  Home,
   ImageIcon,
-  Trash2,
-  RefreshCw,
   Loader2,
   Search,
-  Film,
-  Tv,
-  FileImage,
+  ChevronRight,
+  Home,
+  ChevronDown,
+  RefreshCw,
+  Trash2,
   CheckSquare,
   Square,
-  Check,
-  ChevronDown, // Import ChevronDown
+  Eye,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import CompactImageSizeSlider from "./CompactImageSizeSlider";
-import Notification from "./Notification";
 import { useToast } from "../context/ToastContext";
+import CompactImageSizeSlider from "./CompactImageSizeSlider";
 import ConfirmDialog from "./ConfirmDialog";
-import AssetReplacer from "./AssetReplacer";
-import ScrollToButtons from "./ScrollToButtons";
 import ImagePreviewModal from "./ImagePreviewModal";
+import ScrollToButtons from "./ScrollToButtons";
 
 const API_URL = "/api";
 
 function FolderView() {
   const { t } = useTranslation();
-  const { showSuccess, showError, showInfo } = useToast();
-  const [currentPath, setCurrentPath] = useState([]); // Navigation breadcrumb
-  const [folders, setFolders] = useState([]); // Current level folders
-  const [assets, setAssets] = useState([]); // Assets in current folder
+  const { showSuccess, showError } = useToast();
+
+  // Navigation and data state
+  const [currentPath, setCurrentPath] = useState(""); // e.g., "Collections/Movies"
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [deletingImage, setDeletingImage] = useState(null);
+  // UI state
   const [searchTerm, setSearchTerm] = useState("");
-
-  // --- Pagination State (MODIFIED) ---
-  const [currentPage, setCurrentPage] = useState(1);
-  // Load pageSize from localStorage, default to 50
-  const [pageSize, setPageSize] = useState(() => {
-    const saved = localStorage.getItem("folder-view-page-size");
-    return saved ? parseInt(saved) : 25;
-  });
-
-  // --- Page Size Dropdown State (NEW) ---
-  const [pageSizeDropdownOpen, setPageSizeDropdownOpen] = useState(false);
-  const [pageSizeDropdownUp, setPageSizeDropdownUp] = useState(false);
-  const pageSizeDropdownRef = useRef(null);
-  // ------------------------------------
-
-  // Multi-select state
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedAssets, setSelectedAssets] = useState([]);
-  const [selectedFolders, setSelectedFolders] = useState([]);
-
-  // Asset replacer state
-  const [replacerOpen, setReplacerOpen] = useState(false);
-  const [assetToReplace, setAssetToReplace] = useState(null);
-
-  // Cache busting timestamp
+  const [selectedImage, setSelectedImage] = useState(null);
   const [cacheBuster, setCacheBuster] = useState(Date.now());
+
+  // Bulk delete state
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedAssets, setSelectedAssets] = useState(new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Image size state
   const [imageSize, setImageSize] = useState(() => {
-    const saved = localStorage.getItem("folder-view-image-size");
+    const saved = localStorage.getItem("gallery-folder-size");
     return saved ? parseInt(saved) : 5;
   });
 
-  // Grid column classes based on size
-  const getGridClass = (size) => {
-    const classes = {
-      2: "grid-cols-2 lg:grid-cols-2",
-      3: "grid-cols-2 lg:grid-cols-3",
-      4: "grid-cols-2 lg:grid-cols-4",
-      5: "grid-cols-2 lg:grid-cols-5",
-      6: "grid-cols-2 lg:grid-cols-6",
-      7: "grid-cols-2 lg:grid-cols-7",
-      8: "grid-cols-2 lg:grid-cols-8",
-      9: "grid-cols-2 lg:grid-cols-9",
-      10: "grid-cols-2 lg:grid-cols-10",
-    };
-    return classes[size] || classes[5];
-  };
-
-  // Save image size to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem("folder-view-image-size", imageSize.toString());
+    localStorage.setItem("gallery-folder-size", imageSize);
   }, [imageSize]);
 
-  // Load data when path changes
-  useEffect(() => {
-    loadCurrentLevel();
-    // Clear select mode and selections when navigating
-    setSelectMode(false);
-    setSelectedAssets([]);
-    setSelectedFolders([]);
-    setCurrentPage(1); // Reset page on navigation
-  }, [currentPath]);
-
-  // --- Dropdown Click Outside Detection (NEW) ---
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        pageSizeDropdownRef.current &&
-        !pageSizeDropdownRef.current.contains(event.target)
-      ) {
-        setPageSizeDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-  // -------------------------------------------
-
-  // --- Dropdown Position Calculator (NEW) ---
-  const calculateDropdownPosition = (ref) => {
-    if (!ref.current) return false;
-    const rect = ref.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    return spaceAbove > spaceBelow;
-  };
-  // ----------------------------------------
-
-  // --- Page Size Change Handler (NEW) ---
-  const handlePageSizeChange = (value) => {
-    setPageSize(value);
-    localStorage.setItem("folder-view-page-size", value.toString());
-    setCurrentPage(1); // Reset to page 1 when size changes
-    setPageSizeDropdownOpen(false);
-  };
-  // ------------------------------------
-
-  const loadCurrentLevel = async () => {
+  // Fetch data from the new recursive API
+  const fetchData = async (path, showToast = false) => {
     setLoading(true);
-    showError(null);
-
+    setError(null);
+    setSelectMode(false);
+    setSelectedAssets(new Set());
     try {
-      if (currentPath.length === 0) {
-        await loadLibraries();
-      } else if (currentPath.length === 1) {
-        await loadItemFolders(currentPath[0]);
-      } else if (currentPath.length === 2) {
-        await loadItemAssets(currentPath[0], currentPath[1]);
+      const response = await fetch(
+        `${API_URL}/folder-view/browse?path=${encodeURIComponent(path)}`
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      if (data.success) {
+        setItems(data.items || []);
+        setCurrentPath(data.path || "");
+        if (showToast) {
+          showSuccess(`Loaded content for ${data.path || "root"}`);
+        }
+      } else {
+        throw new Error(data.error || "Failed to load folder items");
       }
     } catch (err) {
-      console.error("Error loading folder view:", err);
-      showError(err.message || "Failed to load content");
+      console.error("Error fetching folder items:", err);
+      setError(err.message);
+      showError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadLibraries = async () => {
-    const response = await fetch(`${API_URL}/assets-folders`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+  // Initial load
+  useEffect(() => {
+    fetchData("");
+  }, []);
 
-    const data = await response.json();
-    setFolders(data.folders || []);
-    setAssets([]);
+  // Handle navigation
+  const navigateTo = (path) => {
+    fetchData(path);
   };
 
-  const loadItemFolders = async (libraryPath) => {
-    const response = await fetch(`${API_URL}/folder-view/items/${libraryPath}`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-    const data = await response.json();
-    setFolders(data.folders || []);
-    setAssets([]);
-  };
-
-  const loadItemAssets = async (libraryPath, itemPath) => {
-    const fullPath = `${libraryPath}/${itemPath}`;
-    const response = await fetch(
-      `${API_URL}/folder-view/assets/${encodeURIComponent(fullPath)}`
-    );
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-    const data = await response.json();
-    setFolders([]);
-    setAssets(data.assets || []);
-  };
-
-  const navigateToFolder = (folderName) => {
-    setCurrentPath([...currentPath, folderName]);
-    setSearchTerm("");
-  };
-
-  const navigateToLevel = (level) => {
-    setCurrentPath(currentPath.slice(0, level));
-    setSearchTerm("");
-  };
-
-  const navigateHome = () => {
-    setCurrentPath([]);
-    setSearchTerm("");
-  };
-
-
-  const handleRefresh = async () => {
-    showSuccess(null);
-    showError(null);
-    await loadCurrentLevel();
-    showSuccess(t("folderView.refreshSuccess"));
-  };
-
-  const deletePoster = async (imagePath, imageName) => {
-    setDeletingImage(imagePath);
-    try {
-      const response = await fetch(
-        `${API_URL}/gallery/${encodeURIComponent(imagePath)}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail || "Failed to delete image");
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        showSuccess(t("folderView.deleteSuccess", { name: imageName }));
-
-        // Close modal if open
-        if (selectedImage && selectedImage.path === imagePath) {
-          setSelectedImage(null);
-        }
-
-        // Reload current level
-        await loadCurrentLevel();
-      } else {
-        throw new Error(data.message || "Failed to delete image");
-      }
-    } catch (error) {
-      console.error("Error deleting image:", error);
-      showError(
-        error.message || t("folderView.deleteError", { name: imageName })
-      );
-    } finally {
-      setDeletingImage(null);
-      setDeleteConfirm(null);
+  // Handle breadcrumb navigation
+  const navigateToBreadcrumb = (index) => {
+    if (index < 0) {
+      fetchData(""); // Go home
+      return;
     }
+    const pathParts = currentPath.split("/");
+    const newPath = pathParts.slice(0, index + 1).join("/");
+    fetchData(newPath);
   };
 
-  // Multi-select functions for assets
+  // Bulk delete actions
+  const toggleSelectMode = () => {
+    setSelectMode(!selectMode);
+    setSelectedAssets(new Set());
+  };
+
   const toggleAssetSelection = (assetPath) => {
-    setSelectedAssets((prev) =>
-      prev.includes(assetPath)
-        ? prev.filter((p) => p !== assetPath)
-        : [...prev, assetPath]
-    );
+    setSelectedAssets((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(assetPath)) {
+        newSet.delete(assetPath);
+      } else {
+        newSet.add(assetPath);
+      }
+      return newSet;
+    });
   };
 
-  const selectAllAssets = () => {
-    setSelectedAssets(filteredAssets.map((asset) => asset.path));
-  };
-
-  const deselectAllAssets = () => {
-    setSelectedAssets([]);
-  };
-
-  // Multi-select functions for folders
-  const toggleFolderSelection = (folderPath) => {
-    setSelectedFolders((prev) =>
-      prev.includes(folderPath)
-        ? prev.filter((p) => p !== folderPath)
-        : [...prev, folderPath]
-    );
-  };
-
-  const selectAllFolders = () => {
-    setSelectedFolders(
-      filteredFolders.map((folder) => folder.path || folder.name)
-    );
-  };
-
-  const deselectAllFolders = () => {
-    setSelectedFolders([]);
-  };
-
-  const cancelSelectMode = () => {
-    setSelectMode(false);
-    setSelectedAssets([]);
-    setSelectedFolders([]);
+  const toggleSelectAll = () => {
+    const allAssetPaths = filteredItems
+      .filter((item) => item.type === "asset")
+      .map((item) => item.path);
+    if (selectedAssets.size === allAssetPaths.length) {
+      setSelectedAssets(new Set());
+    } else {
+      setSelectedAssets(new Set(allAssetPaths));
+    }
   };
 
   const bulkDeleteAssets = async () => {
-    const count = selectedAssets.length;
-    setDeletingImage("bulk");
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const assetPath of selectedAssets) {
-      try {
-        const response = await fetch(
-          `${API_URL}/gallery/${encodeURIComponent(assetPath)}`,
-          {
-            method: "DELETE",
-          }
-        );
-
-        if (response.ok) {
-          successCount++;
-        } else {
-          failCount++;
-        }
-      } catch (error) {
-        console.error(`Error deleting ${assetPath}:`, error);
-        failCount++;
-      }
-    }
-
-    setDeletingImage(null);
-    setDeleteConfirm(null);
-    cancelSelectMode();
-
-    if (successCount > 0) {
-      showSuccess(t("folderView.bulkDeleteSuccess", { count: successCount }));
-    }
-
-    if (failCount > 0) {
-      showError(t("folderView.bulkDeleteError", { count: failCount }));
-    }
-
-    // Reload current level
-    await loadCurrentLevel();
-  };
-
-  const bulkDeleteFolders = async () => {
-    const count = selectedFolders.length;
-    setDeletingImage("bulk-folders");
-
-    let successCount = 0;
-    let failCount = 0;
-    let totalDeleted = 0;
-
-    // For folders, we need to get all assets in each folder and delete them
-    for (const folderIdentifier of selectedFolders) {
-      try {
-        // Build the full path based on current level
-        let fullPath;
-        if (currentPath.length === 0) {
-          // Library level - folderIdentifier is the library name
-          fullPath = folderIdentifier;
-        } else if (currentPath.length === 1) {
-          // Item level - folderIdentifier is the item name
-          fullPath = `${currentPath[0]}/${folderIdentifier}`;
-        }
-
-        // Fetch assets in this folder/item
-        const response = await fetch(
-          `${API_URL}/folder-view/assets/${encodeURIComponent(fullPath)}`
-        );
-
-        if (response.ok) {
+    if (selectedAssets.size === 0) return;
+    setDeleteConfirm({
+      bulk: true,
+      count: selectedAssets.size,
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`${API_URL}/manual-assets/bulk-delete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paths: Array.from(selectedAssets) }),
+          });
           const data = await response.json();
-          const assets = data.assets || [];
-
-          // Delete each asset
-          for (const asset of assets) {
-            try {
-              const deleteResponse = await fetch(
-                `${API_URL}/gallery/${encodeURIComponent(asset.path)}`,
-                {
-                  method: "DELETE",
-                }
-              );
-              if (deleteResponse.ok) {
-                totalDeleted++;
-              }
-            } catch (error) {
-              console.error(`Error deleting asset ${asset.path}:`, error);
-            }
+          if (!response.ok) throw new Error(data.detail || "Bulk delete failed");
+          if (data.failed?.length > 0) {
+            showError(
+              `Deleted ${data.deleted.length}, but ${data.failed.length} failed.`
+            );
+          } else {
+            showSuccess(`Successfully deleted ${data.deleted.length} asset(s)`);
           }
-          successCount++;
-        } else {
-          failCount++;
+          fetchData(currentPath); // Refresh
+        } catch (error) {
+          showError(`Bulk delete failed: ${error.message}`);
         }
-      } catch (error) {
-        console.error(`Error processing folder ${folderIdentifier}:`, error);
-        failCount++;
-      }
-    }
-
-    setDeletingImage(null);
-    setDeleteConfirm(null);
-    cancelSelectMode();
-
-    if (successCount > 0) {
-      showSuccess(
-        t("folderView.bulkDeleteFoldersSuccess", {
-          folderCount: successCount,
-          assetCount: totalDeleted,
-        })
-      );
-    }
-
-    if (failCount > 0) {
-      showError(t("folderView.bulkDeleteFoldersError", { count: failCount }));
-    }
-
-    // Reload current level
-    await loadCurrentLevel();
+      },
+    });
   };
 
-
-  // Filter folders and assets based on search
-  const filteredFolders = folders.filter((folder) =>
-    folder.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Calculate folder pagination
-  const totalFolderPages = Math.ceil(filteredFolders.length / pageSize);
-  const paginatedFolders = filteredFolders.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
-  const filteredAssets = assets.filter((asset) =>
-    asset.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Calculate asset pagination
-  const totalAssetPages = Math.ceil(filteredAssets.length / pageSize);
-  const paginatedAssets = filteredAssets.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
-  const getAssetTypeIcon = (assetName) => {
-    const name = assetName.toLowerCase();
-    if (name.includes("poster")) return <ImageIcon className="w-4 h-4" />;
-    if (name.includes("background")) return <FileImage className="w-4 h-4" />;
-    if (name.includes("season")) return <Tv className="w-4 h-4" />;
-    if (name.includes("titlecard")) return <Film className="w-4 h-4" />;
-    return <ImageIcon className="w-4 h-4" />;
+  // Single asset delete
+  const deleteAsset = (asset) => {
+    setDeleteConfirm({
+      bulk: false,
+      name: asset.name,
+      onConfirm: async () => {
+        try {
+          const response = await fetch(
+            `${API_URL}/manual-assets/${encodeURIComponent(asset.path)}`,
+            {
+              method: "DELETE",
+            }
+          );
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.detail || "Failed to delete asset");
+          }
+          showSuccess(`Deleted "${asset.name}"`);
+          fetchData(currentPath); // Refresh list
+        } catch (error) {
+          showError(`Failed to delete: ${error.message}`);
+        }
+      },
+    });
   };
 
-  const getAssetAspectRatio = (assetName) => {
-    const name = assetName.toLowerCase();
-    // Backgrounds and titlecards (SXXEXX pattern) are horizontal (16:9)
-    if (
-      name.includes("background") ||
-      name.includes("titlecard") ||
-      /s\d{2}e\d{2}/i.test(name)
-    ) {
-      return "aspect-[16/9] w-full";
-    }
-    // Posters and seasons are vertical (2:3)
-    return "aspect-[2/3] w-full";
-  };
-
-  const isHorizontalAsset = (assetName) => {
-    const name = assetName.toLowerCase();
-    return (
-      name.includes("background") ||
-      name.includes("titlecard") ||
-      /s\d{2}e\d{2}/i.test(name)
-    );
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-  };
-
-  const getAssetType = (assetName) => {
-    const name = assetName.toLowerCase();
-    if (name.includes("poster")) return "poster";
-    if (name.includes("background")) return "background";
-    if (name.includes("season")) return "season";
-    if (name.includes("titlecard") || /s\d{2}e\d{2}/i.test(name))
-      return "titlecard";
-    return "poster"; // default
-  };
-
-  // Helper function to get media type from filename/path
-  const getMediaType = (assetPath, assetName) => {
-    const path = assetPath.toLowerCase();
-    const name = assetName.toLowerCase();
-
-    // Check the folder structure
-    if (path.includes("/seasons/") || path.includes("\\seasons\\")) {
-      return "Season";
-    }
-    if (path.includes("/titlecards/") || path.includes("\\titlecards\\")) {
-      return "Episode";
-    }
-    if (path.includes("/backgrounds/") || path.includes("\\backgrounds\\")) {
-      return "Background";
-    }
-
-    // Check filename patterns
-    if (
-      name.includes("season") &&
-      (name.includes("poster") || name.match(/s\d+/i))
-    ) {
-      return "Season";
-    }
-    if (name.includes("background")) {
-      return "Background";
-    }
-    if (name.includes("titlecard") || /s\d{2}e\d{2}/i.test(name)) {
-      return "Episode";
-    }
-
-    // Check if it's a show (has series/show in path)
-    if (
-      path.includes("/series/") ||
-      path.includes("\\series\\") ||
-      path.includes("/shows/") ||
-      path.includes("\\shows\\")
-    ) {
-      return "Show";
-    }
-
-    // Default to Movie for posters
-    return "Movie";
-  };
-
-  // Get color for media type badge
-  const getTypeColor = (type) => {
+  // Get asset type badge color
+  const getAssetTypeBadgeColor = (type) => {
     switch (type) {
-      case "Movie":
+      case "poster":
         return "bg-blue-500/20 text-blue-400 border-blue-500/50";
-      case "Show":
-        return "bg-purple-500/20 text-purple-400 border-purple-500/50";
-      case "Season":
-        return "bg-indigo-500/20 text-indigo-400 border-indigo-500/50";
-      case "Episode":
-        return "bg-cyan-500/20 text-cyan-400 border-cyan-500/50";
-      case "Background":
+      case "background":
         return "bg-pink-500/20 text-pink-400 border-pink-500/50";
+      case "season":
+        return "bg-indigo-500/20 text-indigo-400 border-indigo-500/50";
+      case "titlecard":
+        return "bg-cyan-500/20 text-cyan-400 border-cyan-500/50";
       default:
         return "bg-gray-500/20 text-gray-400 border-gray-500/50";
     }
   };
 
-  // Format timestamp for display
-  const formatTimestamp = () => {
-    try {
-      return new Date().toLocaleString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
-    } catch (e) {
-      return "Unknown";
+  // Get asset aspect ratio
+  const getAssetAspectRatio = (type) => {
+    switch (type) {
+      case "background":
+      case "titlecard":
+        return "aspect-[16/9]";
+      case "poster":
+      case "season":
+      default:
+        return "aspect-[2/3]";
     }
   };
 
-
-  // --- Reusable Pagination Component (MODIFIED) ---
-  const PaginationControls = ({
-    currentPage,
-    totalPages,
-    onPageChange,
-    pageSize,
-    onPageSizeChange,
-    pageSizeDropdownOpen,
-    onPageSizeDropdownToggle,
-    pageSizeDropdownRef,
-    pageSizeDropdownUp,
-  }) => {
-    if (totalPages <= 1) return null;
-
-    const handlePrev = () => {
-      onPageChange(Math.max(1, currentPage - 1));
+  // Grid column classes
+  const getGridClass = (size) => {
+    const classes = {
+      2: "grid-cols-2 md:grid-cols-2 lg:grid-cols-2",
+      3: "grid-cols-2 md:grid-cols-3 lg:grid-cols-3",
+      4: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+      5: "grid-cols-2 md:grid-cols-4 lg:grid-cols-5",
+      6: "grid-cols-2 md:grid-cols-4 lg:grid-cols-6",
+      7: "grid-cols-2 md:grid-cols-5 lg:grid-cols-7",
+      8: "grid-cols-2 md:grid-cols-5 lg:grid-cols-8",
+      9: "grid-cols-2 md:grid-cols-6 lg:grid-cols-9",
+      10: "grid-cols-2 md:grid-cols-6 lg:grid-cols-10",
     };
-
-    const handleNext = () => {
-      onPageChange(Math.min(totalPages, currentPage + 1));
-    };
-
-    return (
-      <div className="flex flex-col sm:flex-row items-center justify-between mt-6 gap-4">
-        {/* Left Side: Page Size Dropdown */}
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-theme-text">
-            {t("folderView.itemsPerPage", "Items per page")}
-          </label>
-          <div className="relative" ref={pageSizeDropdownRef}>
-            <button
-              onClick={onPageSizeDropdownToggle}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-bg text-theme-text border border-theme-border rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all shadow-sm"
-            >
-              <span>{pageSize}</span>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform ${
-                  pageSizeDropdownOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-            {pageSizeDropdownOpen && (
-              <div
-                className={`absolute z-50 right-0 ${
-                  pageSizeDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
-              >
-                {[25, 50, 100, 200, 500].map((value) => (
-                  <button
-                    key={value}
-                    onClick={() => onPageSizeChange(value)}
-                    className={`w-full px-4 py-2 text-sm transition-all text-center ${
-                      pageSize === value
-                        ? "bg-theme-primary text-white"
-                        : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                    }`}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Side: Page Nav */}
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-theme-muted">
-            {t("folderView.paginationPage", {
-              current: currentPage,
-              total: totalPages,
-            })}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={handlePrev}
-              disabled={currentPage === 1}
-              className="px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t("folderView.paginationPrevious", "Previous")}
-            </button>
-            <button
-              onClick={handleNext}
-              disabled={currentPage === totalPages}
-              className="px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t("folderView.paginationNext", "Next")}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return classes[size] || classes[5];
   };
-  // -----------------------------------------
+
+  // Filter items based on search
+  const filteredItems = items.filter((item) =>
+    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const folderItems = filteredItems.filter((item) => item.type === "folder");
+  const assetItems = filteredItems.filter((item) => item.type === "asset");
 
   return (
     <div className="space-y-6">
       <ScrollToButtons />
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={deleteConfirm !== null}
-        onClose={() => setDeleteConfirm(null)}
-        onConfirm={() => {
-          if (deleteConfirm) {
-            if (deleteConfirm.bulkFolders) {
-              bulkDeleteFolders();
-            } else if (deleteConfirm.bulk) {
-              bulkDeleteAssets();
-            } else {
-              deletePoster(deleteConfirm.path, deleteConfirm.name);
-            }
-          }
-        }}
-        title={
-          deleteConfirm?.bulkFolders
-            ? t("folderView.deleteAllAssetsTitle")
-            : deleteConfirm?.bulk
-            ? t("folderView.deleteMultipleTitle")
-            : t("folderView.deleteAssetTitle")
-        }
-        message={
-          deleteConfirm?.bulkFolders
-            ? t("folderView.deleteAllAssetsMessage", {
-                count: deleteConfirm.count,
-              })
-            : deleteConfirm?.bulk
-            ? t("folderView.deleteMultipleMessage", {
-                count: deleteConfirm.count,
-              })
-            : t("folderView.deleteAssetMessage")
-        }
-        itemName={
-          deleteConfirm?.bulk || deleteConfirm?.bulkFolders
-            ? undefined
-            : deleteConfirm?.name
-        }
-        confirmText={t("folderView.deleteButton")}
-        type="danger"
-      />
 
-      {/* Header with Breadcrumb */}
-      <div className="bg-theme-card border border-theme-border rounded-lg p-4 space-y-4">
-        {/* Breadcrumb Navigation */}
+      {/* Navigation and Controls */}
+      <div className="bg-theme-card border border-theme rounded-lg p-4 space-y-4">
+        {/* Breadcrumbs */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={navigateHome}
-            className="flex items-center gap-2 px-3 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all"
+            onClick={() => navigateToBreadcrumb(-1)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all text-sm font-medium ${
+              currentPath === ""
+                ? "bg-theme-primary text-white scale-105"
+                : "bg-theme-hover hover:bg-theme-primary/70 border border-theme text-theme-text"
+            }`}
           >
             <Home className="w-4 h-4" />
-            <span className="text-sm font-medium text-theme-text">
-              {t("folderView.assets")}
-            </span>
+            <span>{t("galleryHub.assetsRoot")}</span>
           </button>
-
-          {currentPath.map((folder, index) => (
-            <React.Fragment key={index}>
-              <ChevronRight className="w-4 h-4 text-theme-muted" />
-              <button
-                onClick={() => navigateToLevel(index + 1)}
-                className={`px-3 py-2 rounded-lg transition-all text-sm font-medium ${
-                  index === currentPath.length - 1
-                    ? "bg-theme-primary text-white scale-105"
-                    : "bg-theme-hover hover:bg-theme-primary/70 border border-theme-border text-theme-text"
-                }`}
-              >
-                {folder}
-              </button>
-            </React.Fragment>
-          ))}
+          {currentPath.split("/").map(
+            (part, index) =>
+              part && (
+                <React.Fragment key={index}>
+                  <ChevronRight className="w-4 h-4 text-theme-muted" />
+                  <button
+                    onClick={() => navigateToBreadcrumb(index)}
+                    className={`px-3 py-2 rounded-lg transition-all text-sm font-medium ${
+                      index === currentPath.split("/").length - 1
+                        ? "bg-theme-primary text-white scale-105"
+                        : "bg-theme-hover hover:bg-theme-primary/70 border border-theme text-theme-text"
+                    }`}
+                  >
+                    {part}
+                  </button>
+                </React.Fragment>
+              )
+          )}
         </div>
 
-        {/* Search and Controls */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
-              <input
-                type="text"
-                placeholder={
-                  currentPath.length === 0
-                    ? t("folderView.searchLibraries")
-                    : currentPath.length === 1
-                    ? t("folderView.searchItems")
-                    : t("folderView.searchAssets")
-                }
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1); // Reset page on search
-                }}
-                className="w-full pl-10 pr-4 py-2 bg-theme-bg border border-theme-primary/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-theme-primary text-sm"
-              />
-            </div>
+        {/* Search and Actions */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="relative flex-1 w-full min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
+            <input
+              type="text"
+              placeholder={t("galleryHub.searchCurrentFolder")}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-theme-bg border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-theme-primary text-sm text-theme-text"
+            />
           </div>
 
-          {/* Image Size Slider (only when showing assets) */}
-          {currentPath.length === 2 && assets.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
             <CompactImageSizeSlider
               value={imageSize}
               onChange={setImageSize}
-              min={2}
-              max={10}
+              storageKey="gallery-folder-size"
             />
-          )}
-
-          {/* Select Mode Controls */}
-          {((currentPath.length < 2 && folders.length > 0) ||
-            (currentPath.length === 2 && assets.length > 0)) && (
-            <>
-              {selectMode && (
-                <>
-                  {/* Controls for Folders */}
-                  {currentPath.length < 2 && (
-                    <>
-                      <button
-                        onClick={selectAllFolders}
-                        disabled={
-                          selectedFolders.length === filteredFolders.length &&
-                          filteredFolders.length > 0
-                        }
-                        className="flex items-center gap-2 px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <CheckSquare className="w-5 h-5" />
-                        {t("folderView.selectAll", {
-                          count: filteredFolders.length,
-                        })}
-                      </button>
-                      <button
-                        onClick={deselectAllFolders}
-                        disabled={selectedFolders.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Square className="w-5 h-5" />
-                        {t("folderView.deselectAll")}
-                      </button>
-                      {selectedFolders.length > 0 && (
-                        <button
-                          onClick={() =>
-                            setDeleteConfirm({
-                              bulkFolders: true,
-                              count: selectedFolders.length,
-                            })
-                          }
-                          disabled={deletingImage === "bulk-folders"}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-all font-medium shadow-lg"
-                        >
-                          <Trash2
-                            className={`w-5 h-5 ${
-                              deletingImage === "bulk-folders"
-                                ? "animate-spin"
-                                : ""
-                            }`}
-                          />
-                          {t("folderView.deleteAllAssets", {
-                            count: selectedFolders.length,
-                          })}
-                        </button>
-                      )}
-                    </>
-                  )}
-
-                  {/* Controls for Assets */}
-                  {currentPath.length === 2 && (
-                    <>
-                      <button
-                        onClick={selectAllAssets}
-                        disabled={
-                          selectedAssets.length === filteredAssets.length &&
-                          filteredAssets.length > 0
-                        }
-                        className="flex items-center gap-2 px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <CheckSquare className="w-5 h-5" />
-                        {t("folderView.selectAll", {
-                          count: filteredAssets.length,
-                        })}
-                      </button>
-                      <button
-                        onClick={deselectAllAssets}
-                        disabled={selectedAssets.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Square className="w-5 h-5" />
-                        {t("folderView.deselectAll")}
-                      </button>
-                      {selectedAssets.length > 0 && (
-                        <button
-                          onClick={() =>
-                            setDeleteConfirm({
-                              bulk: true,
-                              count: selectedAssets.length,
-                            })
-                          }
-                          disabled={deletingImage === "bulk"}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-all font-medium shadow-lg"
-                        >
-                          <Trash2
-                            className={`w-5 h-5 ${
-                              deletingImage === "bulk" ? "animate-spin" : ""
-                            }`}
-                          />
-                          {t("folderView.delete", {
-                            count: selectedAssets.length,
-                          })}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
+            {assetItems.length > 0 && (
               <button
-                onClick={() => {
-                  if (selectMode) {
-                    cancelSelectMode();
-                  } else {
-                    setSelectMode(true);
-                  }
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all shadow-lg ${
+                onClick={toggleSelectMode}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${
                   selectMode
-                    ? "bg-orange-600 hover:bg-orange-700"
-                    : "bg-theme-primary hover:bg-theme-primary/90"
+                    ? "bg-orange-600 hover:bg-orange-700 text-white"
+                    : "bg-theme-primary hover:bg-theme-primary/90 text-white"
                 }`}
               >
                 {selectMode ? (
-                  <>
-                    <Square className="w-5 h-5" />
-                    {t("folderView.cancelSelect")}
-                  </>
+                  <Square className="w-4 h-4" />
                 ) : (
-                  <>
-                    <CheckSquare className="w-5 h-5" />
-                    {t("folderView.select")}
-                  </>
+                  <CheckSquare className="w-4 h-4" />
                 )}
+                <span>{selectMode ? t("common.cancel") : t("common.select")}</span>
               </button>
-            </>
-          )}
-
-          <button
-            onClick={handleRefresh}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text font-medium transition-all shadow-sm disabled:bg-gray-600 disabled:cursor-not-allowed text-sm"
-          >
-            <RefreshCw
-              className={`w-4 h-4 sm:w-5 sm:h-5 text-theme-primary${
-                loading ? " animate-spin" : ""
-              }`}
-            />
-            <span className="hidden sm:inline">{t("folderView.refresh")}</span>
-            <span className="sm:hidden">Refresh</span>
-          </button>
+            )}
+            <button
+              onClick={() => fetchData(currentPath, true)}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+            >
+              <RefreshCw
+                className={`w-4 h-4 text-theme-primary ${
+                  loading ? "animate-spin" : ""
+                }`}
+              />
+            </button>
+          </div>
         </div>
+
+        {/* Bulk Actions Bar */}
+        {selectMode && (
+          <div className="pt-4 border-t border-theme flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-2 px-3 py-2 bg-theme-hover hover:bg-theme-primary/20 border border-theme rounded-lg transition-all font-medium text-sm"
+              >
+                {selectedAssets.size === assetItems.length ? (
+                  <Square className="w-4 h-4" />
+                ) : (
+                  <CheckSquare className="w-4 h-4" />
+                )}
+                <span>
+                  {selectedAssets.size === assetItems.length
+                    ? t("gallery.deselectAll")
+                    : t("gallery.selectAll")}
+                </span>
+              </button>
+              <span className="text-sm text-theme-text">
+                {t("gallery.selected", { count: selectedAssets.size })}
+              </span>
+            </div>
+            <button
+              onClick={bulkDeleteAssets}
+              disabled={selectedAssets.size === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all font-medium shadow-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" />
+              {t("gallery.deleteSelected", { count: selectedAssets.size })}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content Area */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-theme-primary mx-auto mb-4" />
-            <p className="text-theme-muted">{t("folderView.loading")}</p>
-          </div>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-12 h-12 animate-spin text-theme-primary" />
+        </div>
+      ) : error ? (
+        <div className="text-center py-20 bg-theme-card border border-red-500/30 rounded-lg">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <p className="text-red-400">{error}</p>
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="text-center py-20 bg-theme-card border border-theme rounded-lg">
+          <Search className="w-12 h-12 text-theme-muted mx-auto mb-4" />
+          <p className="text-theme-muted">{t("galleryHub.noItemsFound")}</p>
         </div>
       ) : (
-        <>
-          {/* Folder Grid (Libraries or Items) */}
-          {filteredFolders.length > 0 && (
-            <>
+        <div className="space-y-6">
+          {/* Folders */}
+          {folderItems.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold text-theme-text px-1">
+                {t("galleryHub.folders")} ({folderItems.length})
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {/* Use paginatedFolders */}
-                {paginatedFolders.map((folder) => {
-                  const folderIdentifier = folder.path || folder.name;
-                  const isSelected = selectedFolders.includes(folderIdentifier);
-                  return (
-                    <button
-                      key={folderIdentifier}
-                      onClick={() => {
-                        if (selectMode) {
-                          toggleFolderSelection(folderIdentifier);
-                        } else {
-                          navigateToFolder(folder.name);
-                        }
-                      }}
-                      className={`group relative bg-theme-card border rounded-lg p-4 transition-all text-left shadow-sm hover:shadow-md ${
-                        isSelected
-                          ? "border-theme-primary ring-2 ring-theme-primary"
-                          : "border-theme-border hover:border-theme-primary"
-                      }`}
-                    >
-                      {/* ... (rest of folder content) ... */}
-                      {/* Selection Checkbox (visible in select mode) */}
-                      {selectMode && (
-                        <div className="absolute top-2 right-2 z-10">
-                          <div
-                            className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-all ${
-                              isSelected
-                                ? "bg-theme-primary border-theme-primary"
-                                : "bg-white/90 border-gray-300"
-                            }`}
-                          >
-                            {isSelected && (
-                              <Check className="w-4 h-4 text-white" />
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-start gap-3">
-                        <div className="p-3 rounded-lg border border-theme-border group-hover:bg-theme-primary group-hover:border-theme-primary transition-colors">
-                          <Folder className="w-6 h-6 text-theme-muted group-hover:text-white transition-colors" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-theme-text truncate mb-1">
-                            {folder.name}
-                          </h3>
-                          <div className="text-xs text-theme-muted space-y-1">
-                            {currentPath.length === 0 && (
-                              <>
-                                <div>
-                                  {t("folderView.total", {
-                                    count: folder.total_count || 0,
-                                  })}
-                                </div>
-                                {folder.poster_count > 0 && (
-                                  <div>
-                                    {t("folderView.posters", {
-                                      count: folder.poster_count,
-                                    })}
-                                  </div>
-                                )}
-                                {folder.background_count > 0 && (
-                                  <div>
-                                    {t("folderView.backgrounds", {
-                                      count: folder.background_count,
-                                    })}
-                                  </div>
-                                )}
-                                {folder.season_count > 0 && (
-                                  <div>
-                                    {t("folderView.seasons", {
-                                      count: folder.season_count,
-                                    })}
-                                  </div>
-                                )}
-                                {folder.titlecard_count > 0 && (
-                                  <div>
-                                    {t("folderView.episodes", {
-                                      count: folder.titlecard_count,
-                                    })}
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            {currentPath.length === 1 && folder.asset_count && (
-                              <div>
-                                {t("folderView.assetsCount", {
-                                  count: folder.asset_count,
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                {folderItems.map((item) => (
+                  <button
+                    key={item.path}
+                    onClick={() => navigateTo(item.path)}
+                    className="group relative bg-theme-card border border-theme rounded-lg p-4 transition-all text-left shadow-sm hover:shadow-md hover:border-theme-primary"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 rounded-lg border border-theme group-hover:bg-theme-primary group-hover:border-theme-primary transition-colors">
+                        <Folder className="w-6 h-6 text-theme-muted group-hover:text-white transition-colors" />
                       </div>
-                    </button>
-                  );
-                })}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-theme-text truncate mb-1">
+                          {item.name}
+                        </h3>
+                        <span className="text-xs text-theme-muted">
+                          {item.item_count} {t("galleryHub.items")}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-theme-muted flex-shrink-0" />
+                    </div>
+                  </button>
+                ))}
               </div>
-              {/* --- MODIFIED Pagination Controls Call --- */}
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalFolderPages}
-                onPageChange={setCurrentPage}
-                pageSize={pageSize}
-                onPageSizeChange={handlePageSizeChange}
-                pageSizeDropdownOpen={pageSizeDropdownOpen}
-                onPageSizeDropdownToggle={() => {
-                  const shouldOpenUp =
-                    calculateDropdownPosition(pageSizeDropdownRef);
-                  setPageSizeDropdownUp(shouldOpenUp);
-                  setPageSizeDropdownOpen(!pageSizeDropdownOpen);
-                }}
-                pageSizeDropdownRef={pageSizeDropdownRef}
-                pageSizeDropdownUp={pageSizeDropdownUp}
-              />
-            </>
+            </div>
           )}
 
-          {/* Assets Grid */}
-          {filteredAssets.length > 0 && (
-            <>
-              <div className="asset-grid" style={{ "--grid-size": imageSize }}>
-                {/* Use paginatedAssets */}
-                {paginatedAssets.map((asset) => {
-                  const isHorizontal = isHorizontalAsset(asset.name);
-                  const isSelected = selectedAssets.includes(asset.path);
-                  return (
+          {/* Assets */}
+          {assetItems.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold text-theme-text px-1">
+                {t("galleryHub.assets")} ({assetItems.length})
+              </h3>
+              <div className={`grid ${getGridClass(imageSize)} gap-4`}>
+                {assetItems.map((asset) => (
+                  <div
+                    key={asset.path}
+                    className={`relative group bg-theme-card border rounded-lg overflow-hidden transition-all shadow-sm ${
+                      selectMode && selectedAssets.has(asset.path)
+                        ? "ring-2 ring-theme-primary border-theme-primary"
+                        : "border-theme hover:border-theme-primary/50"
+                    }`}
+                  >
+                    {/* Select Checkbox */}
+                    {selectMode && (
+                      <div
+                        className="absolute top-2 left-2 z-10 cursor-pointer"
+                        onClick={() => toggleAssetSelection(asset.path)}
+                      >
+                        <div
+                          className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-all ${
+                            selectedAssets.has(asset.path)
+                              ? "bg-theme-primary border-theme-primary"
+                              : "bg-white/90 border-gray-300"
+                          }`}
+                        >
+                          {selectedAssets.has(asset.path) && (
+                            <Check className="w-4 h-4 text-white" />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Image */}
                     <div
-                      key={asset.path}
-                      className={`group relative bg-theme-card border rounded-lg overflow-hidden transition-all cursor-pointer shadow-sm hover:shadow-md flex flex-col ${
-                        isSelected
-                          ? "border-theme-primary ring-2 ring-theme-primary"
-                          : "border-theme-border hover:border-theme-primary"
-                      }`}
+                      className={`${getAssetAspectRatio(
+                        asset.asset_type
+                      )} bg-theme-darker relative cursor-pointer overflow-hidden`}
                       onClick={() => {
                         if (selectMode) {
                           toggleAssetSelection(asset.path);
@@ -1077,270 +464,105 @@ function FolderView() {
                         }
                       }}
                     >
-                      {/* ... (rest of asset content) ... */}
-                      {/* Selection Checkbox (visible in select mode) */}
-                      {selectMode && (
-                        <div className="absolute top-2 left-2 z-20">
-                          <div
-                            className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-all ${
-                              isSelected
-                                ? "bg-theme-primary border-theme-primary"
-                                : "bg-white/90 border-gray-300"
-                            }`}
-                          >
-                            {isSelected && (
-                              <Check className="w-4 h-4 text-white" />
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Asset Image */}
-                      <div
-                        className={`${getAssetAspectRatio(
-                          asset.name
-                        )} relative flex-shrink-0`}
-                      >
-                        <img
-                          src={`${asset.url}?t=${cacheBuster}`}
-                          alt={asset.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-
-                        {/* Replace Button (hidden in select mode) */}
-                        {!selectMode && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAssetToReplace({
-                                path: asset.path,
-                                url: asset.url,
-                                name: asset.name,
-                                type: getAssetType(asset.name),
-                              });
-                              setReplacerOpen(true);
-                            }}
-                            className="absolute top-2 left-2 z-10 p-2 rounded-lg bg-theme-primary/95 hover:bg-theme-primary opacity-0 group-hover:opacity-100 transition-all shadow-lg backdrop-blur-sm hover:scale-110 active:scale-95"
-                            title={t("folderView.replaceImage")}
-                          >
-                            <RefreshCw className="w-4 h-4 text-white" />
-                          </button>
-                        )}
-
-                        {/* Delete Button (hidden in select mode) */}
-                        {!selectMode && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteConfirm({
-                                path: asset.path,
-                                name: asset.name,
-                              });
-                            }}
-                            disabled={deletingImage === asset.path}
-                            className={`absolute top-2 right-2 z-10 p-2 rounded-lg transition-all shadow-lg backdrop-blur-sm ${
-                              deletingImage === asset.path
-                                ? "bg-theme-muted cursor-not-allowed opacity-70"
-                                : "bg-red-600/95 hover:bg-red-700 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
-                            }`}
-                            title={t("folderView.deleteImage")}
-                          >
-                            <Trash2
-                              className={`w-4 h-4 text-white ${
-                                deletingImage === asset.path
-                                  ? "animate-spin"
-                                  : ""
-                              }`}
-                            />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Asset Info */}
-                      <div className="p-2 space-y-1">
-                        <div className="flex items-center gap-2">
-                          {getAssetTypeIcon(asset.name)}
-                          <span className="text-xs font-medium text-theme-text truncate">
-                            {asset.name}
-                          </span>
-                        </div>
-                        <div className="text-xs text-theme-muted">
-                          {formatFileSize(asset.size)}
-                        </div>
+                      <img
+                        src={`${asset.url}?t=${cacheBuster}`}
+                        alt={asset.name}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Eye className="w-6 h-6 text-white drop-shadow-lg" />
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-              {/* --- MODIFIED Pagination Controls Call --- */}
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalAssetPages}
-                onPageChange={setCurrentPage}
-                pageSize={pageSize}
-                onPageSizeChange={handlePageSizeChange}
-                pageSizeDropdownOpen={pageSizeDropdownOpen}
-                onPageSizeDropdownToggle={() => {
-                  const shouldOpenUp =
-                    calculateDropdownPosition(pageSizeDropdownRef);
-                  setPageSizeDropdownUp(shouldOpenUp);
-                  setPageSizeDropdownOpen(!pageSizeDropdownOpen);
-                }}
-                pageSizeDropdownRef={pageSizeDropdownRef}
-                pageSizeDropdownUp={pageSizeDropdownUp}
-              />
-            </>
-          )}
 
-          {/* Empty State */}
-          {filteredFolders.length === 0 && filteredAssets.length === 0 && (
-            <div className="text-center py-12">
-              <Folder className="w-16 h-16 text-theme-muted mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-theme-text mb-2">
-                {searchTerm
-                  ? t("folderView.noResults")
-                  : currentPath.length === 0
-                  ? t("folderView.noLibraries")
-                  : currentPath.length === 1
-                  ? t("folderView.noItems")
-                  : t("folderView.noAssets")}
-              </h3>
-              <p className="text-theme-muted">
-                {searchTerm
-                  ? t("folderView.adjustSearch")
-                  : t("folderView.emptyFolder")}
-              </p>
+                    {/* Info */}
+                    <div className="p-2.5">
+                      <p
+                        className="text-xs text-theme-text font-semibold truncate mb-1"
+                        title={asset.name}
+                      >
+                        {asset.name}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-theme-muted">
+                          {(asset.size / 1024).toFixed(0)} KB
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-xs font-medium ${getAssetTypeBadgeColor(
+                            asset.asset_type
+                          )}`}
+                        >
+                          {asset.asset_type.charAt(0).toUpperCase() +
+                            asset.asset_type.slice(1)}
+                        </span>
+                      </div>
+                      {!selectMode && (
+                        <div className="flex gap-1.5 mt-2">
+                          <button
+                            onClick={() => setSelectedImage(asset)}
+                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-theme-bg hover:bg-theme-hover border border-theme rounded text-xs transition-all"
+                          >
+                            <Eye className="w-3 h-3" />
+                            {t("common.view")}
+                          </button>
+                          <button
+                            onClick={() => deleteAsset(asset)}
+                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded text-xs transition-all"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            {t("common.delete")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-        </>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {deleteConfirm && (
+        <ConfirmDialog
+          isOpen={!!deleteConfirm}
+          onClose={() => setDeleteConfirm(null)}
+          onConfirm={() => {
+            deleteConfirm.onConfirm();
+            setDeleteConfirm(null);
+          }}
+          title={
+            deleteConfirm.bulk
+              ? t("gallery.deleteMultipleTitle")
+              : t("gallery.deletePosterTitle")
+          }
+          message={
+            deleteConfirm.bulk
+              ? t("gallery.deleteMultipleMessage", { count: deleteConfirm.count })
+              : t("gallery.deletePosterMessage")
+          }
+          itemName={deleteConfirm.bulk ? undefined : deleteConfirm.name}
+          confirmText={t("common.delete")}
+          type="danger"
+        />
       )}
 
       {/* Image Preview Modal */}
-      <ImagePreviewModal
-        selectedImage={selectedImage}
-        onClose={() => setSelectedImage(null)}
-        onDelete={(image) => {
-          setDeleteConfirm({
-            path: image.path,
-            name: image.name,
-          });
-        }}
-        onReplace={(image) => {
-          setAssetToReplace({
-            path: image.path,
-            url: image.url,
-            name: image.name,
-            type: getAssetType(image.name),
-          });
-          setReplacerOpen(true);
-          setSelectedImage(null);
-        }}
-        isDeleting={deletingImage === selectedImage?.path}
-        cacheBuster={cacheBuster}
-        formatDisplayPath={(path) =>
-          `/${currentPath.join("/")}/${selectedImage?.name || ""}`
-        }
-        formatTimestamp={formatTimestamp}
-        getMediaType={getMediaType}
-        getTypeColor={getTypeColor}
-      />
-
-      {/* Asset Grid Styles */}
-      <style jsx>{`
-        .asset-grid {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 1rem;
-          align-items: flex-end;
-        }
-
-        /* Dynamic grid item sizing based on image size slider */
-        .asset-grid > div {
-          flex: 0 0
-            calc((100% - (var(--grid-size) - 1) * 1rem) / var(--grid-size));
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-        }
-
-        /* Image container maintains aspect ratio */
-        .asset-grid > div > div:first-child {
-          flex-shrink: 0;
-          width: 100%;
-        }
-
-        /* Info section */
-        .asset-grid > div > div:last-child {
-          display: flex;
-          flex-direction: column;
-        }
-
-        /* Responsive breakpoints */
-        @media (max-width: 1280px) {
-          .asset-grid > div {
-            flex: 0 0
-              calc(
-                (100% - (min(var(--grid-size), 8) - 1) * 1rem) /
-                  min(var(--grid-size), 8)
-              );
-          }
-        }
-
-        @media (max-width: 1024px) {
-          .asset-grid > div {
-            flex: 0 0
-              calc(
-                (100% - (min(var(--grid-size), 6) - 1) * 1rem) /
-                  min(var(--grid-size), 6)
-              );
-          }
-        }
-
-        @media (max-width: 768px) {
-          .asset-grid > div {
-            flex: 0 0
-              calc(
-                (100% - (min(var(--grid-size), 4) - 1) * 1rem) /
-                  min(var(--grid-size), 4)
-              );
-          }
-        }
-
-        @media (max-width: 640px) {
-          .asset-grid > div {
-            flex: 0 0 calc((100% - 1rem) / 2);
-            min-width: 140px;
-          }
-        }
-      `}</style>
-
-      {/* Asset Replacer Modal */}
-      {replacerOpen && assetToReplace && (
-        <AssetReplacer
-          asset={assetToReplace}
-          onClose={() => {
-            setReplacerOpen(false);
-            setAssetToReplace(null);
+      {selectedImage && (
+        <ImagePreviewModal
+          selectedImage={selectedImage}
+          onClose={() => setSelectedImage(null)}
+          onDelete={deleteAsset}
+          onReplace={() => {
+            /* Replace functionality can be added here */
           }}
-          onSuccess={() => {
-            // Force cache refresh by updating timestamp
-            setCacheBuster(Date.now());
-
-            // Update selectedImage if it's still open to show the new image
-            if (selectedImage && assetToReplace) {
-              setSelectedImage({
-                ...selectedImage,
-                url: `${selectedImage.url.split("?")[0]}?t=${Date.now()}`,
-              });
-            }
-
-            // Refetch images after successful replacement
-            setTimeout(() => {
-              loadCurrentLevel();
-            }, 500);
-            showSuccess(t("folderView.assetReplaced"));
-          }}
+          isDeleting={false} // Add state for this if needed
+          cacheBuster={cacheBuster}
+          formatDisplayPath={(p) => p}
+          formatTimestamp={() => new Date().toLocaleString("sv-SE")}
+          getMediaType={(p, n) => selectedImage.full_type}
+          getTypeColor={(t) => getAssetTypeBadgeColor(selectedImage.asset_type)}
         />
       )}
     </div>

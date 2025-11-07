@@ -163,7 +163,12 @@
       "step2": "Image is edited with your configured overlays and text",
       "step3": "Final poster is placed in the asset location",
       "step4": "Poster is synced to your media server",
-      "viewDocs": "View Full Documentation"
+      "viewDocs": "View Full Documentation",
+      "selectLibraryTitle": "Select from existing libraries",
+      "selectLibraryButton": "Select Library",
+      "selectLibraryFirstTooltip": "Please select Library first",
+      "selectFolderTitle": "Select from existing folders",
+      "selectFolderButton": "Select Folder"
     },
     "jellyfin": {
       "title": "Jellyfin Sync Mode",
@@ -255,15 +260,36 @@
       "tvShowDescription": "Exact folder name of the TV show (as it appears in your Plex library)",
       "tvLibraryPlaceholder": "TV Shows",
       "tvLibraryDescription": "Name of the Plex library (e.g., TV Shows, Anime)",
-      "collectionLabel": "Collection Name",
+      "collectionLabel": "Folder Name",
       "collectionPlaceholder": "Marvel Cinematic Universe",
-      "collectionDescription": "Exact name of the collection (as it appears in your Plex library)",
+      "collectionDescription": "Exact folder name of the collection",
       "collectionLibraryDescription": "Name of the Plex library where the collection exists",
       "moviePlaceholder": "The Martian (2015) {tmdb-286217}",
       "movieDescription": "Exact folder name of the movie (as it appears in your Plex library)",
       "movieLibraryPlaceholder": "Movies",
       "movieLibraryDescription": "Name of the Plex library (e.g., Movies, TV Shows)",
       "defaultDescription": "Exact folder name (as it appears in your Plex library)"
+    },
+    "folderSelector": {
+      "title": "Select Folder from assets '{{libraryName}}'",
+      "folderCount_one": "{{count}} folder",
+      "folderCount_other": "{{count}} folders",
+      "searchPlaceholder": "Search folders...",
+      "loading": "Loading folders...",
+      "noFolders": "No folders found in assets '{{libraryName}}'",
+      "noFoldersSubtext": "Please check the library name matches a folder in your assets directory",
+      "folderPrefix": "Folder"
+    },
+    "librarySelector": {
+      "title": "Select Library from assets",
+      "libraryCount_one": "{{count}} library",
+      "libraryCount_other": "{{count}} libraries",
+      "searchPlaceholder": "Search libraries...",
+      "loading": "Loading libraries...",
+      "noLibraries": "No library folders found in assets",
+      "noLibrariesSubtext": "Please add library folders to your assets directory",
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} items"
     }
   },
   "releasesSection": {
@@ -634,7 +660,13 @@
     "gridDescription": "Browse all assets by type (posters, backgrounds, seasons, titlecards)",
     "folderDescription": "Browse assets by navigating through libraries and folders",
     "gridView": "Grid View",
-    "folderView": "Folder View"
+    "folderView": "Folder View",
+    "assetsRoot": "Assets",
+    "searchCurrentFolder": "Search current folder...",
+    "folders": "Folders",
+    "assets": "Assets",
+    "noItemsFound": "No items found",
+    "items": "items"
   },
   "howItWorks": {
     "header": {

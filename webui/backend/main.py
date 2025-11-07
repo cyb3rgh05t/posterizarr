@@ -6266,10 +6266,7 @@ async def run_manual_mode(request: ManualModeRequest):
         ):
             raise HTTPException(status_code=400, detail="Title text is required")
 
-        # Folder name is NOT required for collection posters
-        if request.posterType != "collection" and (
-            not request.folderName or not request.folderName.strip()
-        ):
+        if  not request.folderName or not request.folderName.strip():
             raise HTTPException(status_code=400, detail="Folder name is required")
 
         if not request.libraryName or not request.libraryName.strip():
@@ -6342,6 +6339,8 @@ async def run_manual_mode(request: ManualModeRequest):
                     "-CollectionCard",
                     "-Titletext",
                     request.titletext.strip(),
+                    "-FolderName",
+                    request.folderName.strip(),
                     "-LibraryName",
                     request.libraryName.strip(),
                 ]
@@ -6405,6 +6404,7 @@ async def run_manual_mode(request: ManualModeRequest):
                 logger.info(f"  Season: {request.seasonPosterName}")
             elif request.posterType == "collection":
                 logger.info(f"  Title: {request.titletext}")
+                logger.info(f"  Folder: {request.folderName}")
                 logger.info(f"  Library: {request.libraryName}")
             else:
                 logger.info(f"  Title: {request.titletext}")
@@ -6506,11 +6506,9 @@ async def run_manual_mode_upload(
             )
             raise HTTPException(status_code=400, detail=error_msg)
 
-        if posterType != "collection" and not folderName.strip():
+        if not folderName.strip():
             error_msg = "Folder name is required"
-            logger.error(
-                f"Manual upload validation failed: {error_msg} (posterType: {posterType})"
-            )
+            logger.error(f"Manual upload validation failed: {error_msg} (posterType: {posterType})")
             raise HTTPException(status_code=400, detail=error_msg)
 
         if not libraryName.strip():
@@ -6712,6 +6710,8 @@ async def run_manual_mode_upload(
                         "-CollectionCard",
                         "-Titletext",
                         titletext.strip(),
+                        "-FolderName",
+                        folderName.strip(),
                         "-LibraryName",
                         libraryName.strip(),
                     ]
@@ -8274,95 +8274,110 @@ async def get_assets_folder_images_filtered(image_type: str, folder_path: str):
         logger.error(f"Error getting folder images from cache: {e}")
         return {"images": []}
 
-
-@app.get("/api/folder-view/items/{library_path:path}")
-async def get_folder_view_items(library_path: str):
+# ============================================================================
+# FOLDER VIEW (RECURSIVE)
+# ============================================================================
+# This new endpoint REPLACES get_folder_view_items and get_folder_view_assets
+@app.get("/api/folder-view/browse")
+async def get_folder_view_browse(path: Optional[str] = Query(None)):
     """
-    Get list of item folders (movies/shows) within a library for folder view navigation
-    Returns folders like "Movie Name (Year) {tmdb-123}" within the specified library
+    Recursively browse the assets directory.
+    Returns a list of folders and assets at the specified path.
     """
     try:
-        if not ASSETS_DIR.exists():
-            return {"folders": []}
+        current_dir = ASSETS_DIR
+        relative_path_str = ""
 
-        library_full_path = ASSETS_DIR / library_path
-        if not library_full_path.exists() or not library_full_path.is_dir():
-            return {"folders": []}
+        if path:
+            # Sanitize path to prevent traversal
+            # This is a simple sanitization; a more robust one might be needed
+            if ".." in path:
+                raise HTTPException(status_code=400, detail="Invalid path")
 
-        folders = []
-        for item in library_full_path.iterdir():
-            # Skip @eaDir folders from Synology NAS
-            if item.is_dir() and item.name == "@eaDir":
+            full_path = (ASSETS_DIR / path).resolve()
+
+            # Security check: Ensure the path is within ASSETS_DIR
+            if not str(full_path).startswith(str(ASSETS_DIR.resolve())):
+                raise HTTPException(status_code=403, detail="Access denied: Invalid path")
+
+            if not full_path.exists() or not full_path.is_dir():
+                raise HTTPException(status_code=404, detail="Path not found")
+
+            current_dir = full_path
+            relative_path_str = str(full_path.relative_to(ASSETS_DIR)).replace("\\", "/")
+
+        logger.info(f"Browsing folder view: {current_dir}")
+
+        items = []
+        # Determine library folder (first part of path) for media type detection
+        library_folder = relative_path_str.split('/')[0] if relative_path_str else None
+
+        for item in current_dir.iterdir():
+            if item.name == "@eaDir": # Skip Synology index folders
                 continue
 
             if item.is_dir():
-                # Count assets in this folder
-                asset_count = 0
-                for ext in ["*.jpg", "*.jpeg", "*.png", "*.webp"]:
-                    asset_count += len(list(item.glob(ext)))
+                # This is a folder
+                try:
+                    # Count items inside this subfolder
+                    item_count = sum(1 for sub_item in item.iterdir() if sub_item.name != "@eaDir")
 
-                folders.append(
-                    {"name": item.name, "path": item.name, "asset_count": asset_count}
-                )
+                    folder_path = item.relative_to(ASSETS_DIR)
+                    items.append({
+                        "type": "folder",
+                        "name": item.name,
+                        "path": str(folder_path).replace("\\", "/"),
+                        "item_count": item_count,
+                    })
+                except Exception as e:
+                    logger.warning(f"Could not scan subfolder {item.name}: {e}")
 
-        # Sort by name
-        folders.sort(key=lambda x: x["name"])
-        return {"folders": folders}
-
-    except Exception as e:
-        logger.error(f"Error getting folder view items: {e}")
-        return {"folders": []}
-
-
-@app.get("/api/folder-view/assets/{item_path:path}")
-async def get_folder_view_assets(item_path: str):
-    """
-    Get all assets (poster, background, seasons, etc.) for a specific item in folder view
-    item_path should be like "4K/Movie Name (Year) {tmdb-123}"
-    """
-    try:
-        if not ASSETS_DIR.exists():
-            return {"assets": []}
-
-        item_full_path = ASSETS_DIR / item_path
-        if not item_full_path.exists() or not item_full_path.is_dir():
-            return {"assets": []}
-
-        # Extract library folder from item_path for media type determination
-        path_parts = item_path.split("/")
-        library_folder = path_parts[0] if len(path_parts) > 0 else None
-
-        assets = []
-        for ext in ["*.jpg", "*.jpeg", "*.png", "*.webp"]:
-            for image_path in item_full_path.glob(ext):
-                if image_path.is_file():
-                    # Create relative path from ASSETS_DIR
-                    relative_path = image_path.relative_to(ASSETS_DIR)
-                    url_path = str(relative_path).replace("\\", "/")
-                    # URL encode the path to handle special characters like #
+            elif item.is_file():
+                # This is a file, check if it's an image
+                file_ext = item.suffix.lower()
+                if file_ext in {".jpg", ".jpeg", ".png", ".webp"}:
+                    # This is an asset
+                    file_path = item.relative_to(ASSETS_DIR)
+                    url_path = str(file_path).replace("\\", "/")
                     encoded_url_path = quote(url_path, safe="/")
 
-                    # Determine media type using library folder
-                    media_type = determine_media_type(image_path.name, library_folder)
+                    # Determine asset type (poster, background, etc.)
+                    asset_type_str = determine_media_type(item.name, library_folder)
 
-                    assets.append(
-                        {
-                            "name": image_path.name,
-                            "path": str(relative_path).replace("\\", "/"),
-                            "url": f"/poster_assets/{encoded_url_path}",
-                            "size": image_path.stat().st_size,
-                            "type": media_type,  # Add type field for correct badge display
-                        }
-                    )
+                    # Map to simple types for frontend (poster, background, season, titlecard)
+                    asset_type_simple = "poster" # default
+                    if "background" in asset_type_str.lower():
+                        asset_type_simple = "background"
+                    elif "season" in asset_type_str.lower():
+                        asset_type_simple = "season"
+                    elif "episode" in asset_type_str.lower():
+                        asset_type_simple = "titlecard"
 
-        # Sort by name
-        assets.sort(key=lambda x: x["name"])
-        return {"assets": assets}
+                    items.append({
+                        "type": "asset",
+                        "name": item.name,
+                        "path": url_path,
+                        "url": f"/poster_assets/{encoded_url_path}",
+                        "size": item.stat().st_size,
+                        "asset_type": asset_type_simple, # e.g., 'poster', 'background'
+                        "full_type": asset_type_str, # e.g., 'Movie', 'Show Background'
+                    })
 
+        # Sort: folders first, then assets
+        items.sort(key=lambda x: (x["type"] != "folder", x["name"]))
+
+        return {
+            "success": True,
+            "path": relative_path_str,
+            "items": items,
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting folder view assets: {e}")
-        return {"assets": []}
-
+        logger.error(f"[ERROR] Error browsing folder view at path '{path}': {str(e)}")
+        logger.exception("Full traceback:")
+        return {"success": False, "error": str(e), "items": []}
 
 @app.get("/api/recent-assets")
 async def get_recent_assets():
@@ -8447,8 +8462,6 @@ async def get_recent_assets():
             if rootfolder:
                 is_fallback = asset_dict.get("Fallback", "").lower() == "true"
                 if is_fallback:
-                    continue
-                if manual_field == "No":
                     continue
 
                 # Find the asset file path in our fast cache map
