@@ -203,7 +203,9 @@ function RecentAssets({ refreshTrigger = 0 }) {
 
       switch (activeTab) {
         case "Posters":
-          return type === "movie" || type === "poster" || type === "show";
+          return type === "movie" || type === "poster" || type === "show" || type === "collection";
+        case "Collections":
+          return type === "collection";
         case "Backgrounds":
           return type.includes("background");
         case "Seasons":
@@ -223,6 +225,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
       case "movie":
       case "poster":
         return "bg-blue-500/20 text-blue-400 border-blue-500/50";
+      case "collection":
+        return "bg-blue-500/20 text-blue-400 border-blue-500/50";
       case "show":
         return "bg-purple-500/20 text-purple-400 border-purple-500/50";
       case "season":
@@ -241,6 +245,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
   const getTypeLabel = (type) => {
     switch (type?.toLowerCase()) {
       case "titlecard":
+      case "collection":
       case "title_card":
         return "Episode";
       default:
@@ -254,6 +259,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
 
     switch (type) {
       case "movie":
+      case "collection":
+        return "collection";
       case "poster":
         return "Movie";
       case "show":
@@ -306,6 +313,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
   const allTabs = [
     { id: "All", label: "All" },
     { id: "Posters", label: "Posters" },
+    { id: "Collections", label: "Collections" },
     { id: "Backgrounds", label: "Backgrounds" },
     { id: "Seasons", label: "Seasons" },
     { id: "TitleCards", label: "TitleCards" },
@@ -322,6 +330,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
       switch (tab.id) {
         case "Posters":
           return type === "movie" || type === "poster" || type === "show";
+        case "Collections":
+          return type === "collection";
         case "Backgrounds":
           return type.includes("background");
         case "Seasons":

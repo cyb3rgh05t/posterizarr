@@ -163,7 +163,12 @@
       "step2": "L'image est modifiée avec vos superpositions et votre texte configurés",
       "step3": "L'affiche finale est placée dans l'emplacement des ressources",
       "step4": "L'affiche est synchronisée avec votre serveur multimédia",
-      "viewDocs": "Voir la documentation complète"
+      "viewDocs": "Voir la documentation complète",
+      "selectLibraryTitle": "Sélectionner parmi les bibliothèques existantes",
+      "selectLibraryButton": "Choisir Bibliothèque",
+      "selectLibraryFirstTooltip": "Veuillez d'abord sélectionner une bibliothèque",
+      "selectFolderTitle": "Sélectionner parmi les dossiers existants",
+      "selectFolderButton": "Choisir Dossier"
     },
     "jellyfin": {
       "title": "Mode de synchronisation Jellyfin",
@@ -250,20 +255,41 @@
         "libraryPlaceholder": "Films",
         "libraryDescription": "Nom de la bibliothèque Plex où la collection existe"
       },
-      "folderNameLabel": "Nom du dossier",
+      "folderNameLabel": "Nom du Dossier",
       "tvShowPlaceholder": "Breaking Bad (2008) {tmdb-1396}",
       "tvShowDescription": "Nom exact du dossier de la série TV (tel qu'il apparaît dans votre bibliothèque Plex)",
       "tvLibraryPlaceholder": "Séries TV",
-      "tvLibraryDescription": "Nom de la bibliothèque Plex (ex : Séries TV, Anime)",
-      "collectionLabel": "Nom de la collection",
-      "collectionPlaceholder": "Univers cinématographique Marvel",
-      "collectionDescription": "Nom exact de la collection (tel qu'il apparaît dans votre bibliothèque Plex)",
-      "collectionLibraryDescription": "Nom de la bibliothèque Plex où la collection existe",
-      "moviePlaceholder": "Seul sur Mars (2015) {tmdb-286217}",
+      "tvLibraryDescription": "Nom de la bibliothèque Plex (ex: Séries TV, Anime)",
+      "collectionLabel": "Nom du Dossier",
+      "collectionPlaceholder": "Marvel Cinematic Universe",
+      "collectionDescription": "Nom exact du dossier de la collection",
+      "collectionLibraryDescription": "Nom de la bibliothèque Plex où se trouve la collection",
+      "moviePlaceholder": "The Martian (2015) {tmdb-286217}",
       "movieDescription": "Nom exact du dossier du film (tel qu'il apparaît dans votre bibliothèque Plex)",
       "movieLibraryPlaceholder": "Films",
-      "movieLibraryDescription": "Nom de la bibliothèque Plex (ex : Films, Séries TV)",
+      "movieLibraryDescription": "Nom de la bibliothèque Plex (ex: Films, Séries TV)",
       "defaultDescription": "Nom exact du dossier (tel qu'il apparaît dans votre bibliothèque Plex)"
+    },
+    "folderSelector": {
+      "title": "Sélectionner un dossier dans assets '{{libraryName}}'",
+      "folderCount_one": "{{count}} dossier",
+      "folderCount_other": "{{count}} dossiers",
+      "searchPlaceholder": "Rechercher des dossiers...",
+      "loading": "Chargement des dossiers...",
+      "noFolders": "Aucun dossier trouvé dans assets '{{libraryName}}'",
+      "noFoldersSubtext": "Veuillez vérifier que le nom de la bibliothèque correspond à un dossier dans votre répertoire assets",
+      "folderPrefix": "Dossier"
+    },
+    "librarySelector": {
+      "title": "Sélectionner une bibliothèque dans assets/",
+      "libraryCount_one": "{{count}} bibliothèque",
+      "libraryCount_other": "{{count}} bibliothèques",
+      "searchPlaceholder": "Rechercher des bibliothèques...",
+      "loading": "Chargement des bibliothèques...",
+      "noLibraries": "Aucune bibliothèque trouvée dans assets/",
+      "noLibrariesSubtext": "Veuillez ajouter des dossiers de bibliothèque à votre répertoire assets",
+      "itemCount_one": "{{count}} élément",
+      "itemCount_other": "{{count}} éléments"
     }
   },
   "releasesSection": {
@@ -626,7 +652,13 @@
     "gridDescription": "Parcourez toutes les ressources par type (affiches, arrière-plans, saisons, cartons de titre)",
     "folderDescription": "Parcourez les ressources en naviguant dans les bibliothèques et les dossiers",
     "gridView": "Vue en grille",
-    "folderView": "Vue par dossier"
+    "folderView": "Vue par dossier",
+    "assetsRoot": "Assets",
+    "searchCurrentFolder": "Rechercher dans le dossier actuel...",
+    "folders": "Dossiers",
+    "assets": "Assets",
+    "noItemsFound": "Aucun élément trouvé",
+    "items": "éléments"
   },
   "howItWorks": {
     "header": {

@@ -52,7 +52,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.0"
+$CurrentScriptVersion = "2.1.2"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -7732,7 +7732,9 @@ if ($Manual) {
         if ([string]::IsNullOrEmpty($Titletext)) {
             $Titletext = Read-Host "Enter Movie/Show/Collection Title"
         }
-        $FolderName = $Titletext
+        if ([string]::IsNullOrEmpty($FolderName)) {
+            $FolderName = Read-Host "Enter Asset Foldername"
+        }
     }
     else {
         if ([string]::IsNullOrEmpty($FolderName)) {
@@ -10278,7 +10280,7 @@ Elseif ($Tautulli) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -10345,7 +10347,7 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -10362,8 +10364,8 @@ Elseif ($Tautulli) {
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -InFile $PosterImage `
-                                                                            -ContentType 'image/jpeg' `
+                                                                            -Body $fileContent `
+                                                                            -ContentType 'application/octet-stream' `
                                                                             -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
@@ -10767,7 +10769,7 @@ Elseif ($Tautulli) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -10834,7 +10836,7 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -10851,8 +10853,8 @@ Elseif ($Tautulli) {
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -InFile $backgroundImage`
-                                                                            -ContentType 'image/jpeg' `
+                                                                            -Body $fileContent `
+                                                                            -ContentType 'application/octet-stream' `
                                                                             -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
@@ -11344,7 +11346,7 @@ Elseif ($Tautulli) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -11411,7 +11413,7 @@ Elseif ($Tautulli) {
                                     if (!$global:IsTruncated) {
                                         try {
                                             Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                            #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                            $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                             # Verify variables before uploading
                                             Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -11428,8 +11430,8 @@ Elseif ($Tautulli) {
                                             $Upload = Invoke-WebRequest -Uri $uri `
                                                                         -Method Post `
                                                                         -Headers $extraPlexHeaders `
-                                                                        -InFile $PosterImage`
-                                                                        -ContentType 'image/jpeg' `
+                                                                        -Body $fileContent `
+                                                                        -ContentType 'application/octet-stream' `
                                                                         -SkipHttpErrorCheck `
                                                                         -ErrorAction Stop
 
@@ -11844,7 +11846,7 @@ Elseif ($Tautulli) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -11916,7 +11918,7 @@ Elseif ($Tautulli) {
                                     if (!$global:IsTruncated) {
                                         try {
                                             Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                            #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                            $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                             # Verify variables before uploading
                                             Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -11933,8 +11935,8 @@ Elseif ($Tautulli) {
                                             $Upload = Invoke-WebRequest -Uri $uri `
                                                                         -Method Post `
                                                                         -Headers $extraPlexHeaders `
-                                                                        -InFile $backgroundImage`
-                                                                        -ContentType 'image/jpeg' `
+                                                                        -Body $fileContent `
+                                                                        -ContentType 'application/octet-stream' `
                                                                         -SkipHttpErrorCheck `
                                                                         -ErrorAction Stop
 
@@ -12439,7 +12441,7 @@ Elseif ($Tautulli) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                 $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                 if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                     $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -12610,7 +12612,7 @@ Elseif ($Tautulli) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -12627,8 +12629,8 @@ Elseif ($Tautulli) {
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -InFile $SeasonImage`
-                                                                            -ContentType 'image/jpeg' `
+                                                                            -Body $fileContent `
+                                                                            -ContentType 'application/octet-stream' `
                                                                             -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
@@ -13095,7 +13097,7 @@ Elseif ($Tautulli) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -13153,7 +13155,7 @@ Elseif ($Tautulli) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -13241,7 +13243,7 @@ Elseif ($Tautulli) {
                                                         if (!$global:IsTruncated) {
                                                             try {
                                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                 # Verify variables before uploading
                                                                 Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                 Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -13258,8 +13260,8 @@ Elseif ($Tautulli) {
                                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                                             -Method Post `
                                                                                             -Headers $extraPlexHeaders `
-                                                                                            -InFile $EpisodeImage`
-                                                                                            -ContentType 'image/jpeg' `
+                                                                                            -Body $fileContent `
+                                                                                            -ContentType 'application/octet-stream' `
                                                                                             -SkipHttpErrorCheck `
                                                                                             -ErrorAction Stop
 
@@ -13704,7 +13706,7 @@ Elseif ($Tautulli) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -13761,7 +13763,7 @@ Elseif ($Tautulli) {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -13848,7 +13850,7 @@ Elseif ($Tautulli) {
                                                         if (!$global:IsTruncated) {
                                                             try {
                                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                 # Verify variables before uploading
                                                                 Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                 Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -13865,8 +13867,8 @@ Elseif ($Tautulli) {
                                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                                             -Method Post `
                                                                                             -Headers $extraPlexHeaders `
-                                                                                            -InFile $EpisodeImage`
-                                                                                            -ContentType 'image/jpeg' `
+                                                                                            -Body $fileContent `
+                                                                                            -ContentType 'application/octet-stream' `
                                                                                             -SkipHttpErrorCheck `
                                                                                             -ErrorAction Stop
 
@@ -15114,7 +15116,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $fontImagemagick = $RTLfontImagemagick
                                                 }
@@ -15541,7 +15543,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
                                                 }
@@ -16050,7 +16052,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -16489,7 +16491,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -17022,7 +17024,7 @@ Elseif ($ArrTrigger) {
                                                         $SkippingText = 'true'
                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                     }
-                                                    if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                    if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                         $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                         if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                             $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -17546,7 +17548,7 @@ Elseif ($ArrTrigger) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                             $global:EPTitle = $global:EPTitle.ToUpper()
                                                                         }
@@ -17603,7 +17605,7 @@ Elseif ($ArrTrigger) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                             $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                         }
@@ -18037,7 +18039,7 @@ Elseif ($ArrTrigger) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -18095,7 +18097,7 @@ Elseif ($ArrTrigger) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -19043,7 +19045,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $fontImagemagick = $RTLfontImagemagick
                                                 }
@@ -19110,7 +19112,7 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -19127,8 +19129,8 @@ Elseif ($ArrTrigger) {
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -InFile $PosterImage`
-                                                                                -ContentType 'image/jpeg' `
+                                                                                -Body $fileContent `
+                                                                                -ContentType 'application/octet-stream' `
                                                                                 -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
@@ -19532,7 +19534,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
                                                 }
@@ -19599,7 +19601,7 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -19616,8 +19618,8 @@ Elseif ($ArrTrigger) {
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -InFile $backgroundImage`
-                                                                                -ContentType 'image/jpeg' `
+                                                                                -Body $fileContent `
+                                                                                -ContentType 'application/octet-stream' `
                                                                                 -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
@@ -20109,7 +20111,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -20176,7 +20178,7 @@ Elseif ($ArrTrigger) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -20193,8 +20195,8 @@ Elseif ($ArrTrigger) {
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -InFile $PosterImage`
-                                                                            -ContentType 'image/jpeg' `
+                                                                            -Body $fileContent `
+                                                                            -ContentType 'application/octet-stream' `
                                                                             -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
@@ -20609,7 +20611,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -20681,7 +20683,7 @@ Elseif ($ArrTrigger) {
                                         if (!$global:IsTruncated) {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -20698,8 +20700,8 @@ Elseif ($ArrTrigger) {
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -InFile $backgroundImage`
-                                                                            -ContentType 'image/jpeg' `
+                                                                            -Body $fileContent `
+                                                                            -ContentType 'application/octet-stream' `
                                                                             -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
@@ -21204,7 +21206,7 @@ Elseif ($ArrTrigger) {
                                                     $SkippingText = 'true'
                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                 }
-                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                     $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                     if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                         $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -21374,7 +21376,7 @@ Elseif ($ArrTrigger) {
                                             if (!$global:IsTruncated) {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                    $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -21391,8 +21393,8 @@ Elseif ($ArrTrigger) {
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -InFile $SeasonImage`
-                                                                                -ContentType 'image/jpeg' `
+                                                                                -Body $fileContent `
+                                                                                -ContentType 'application/octet-stream' `
                                                                                 -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
@@ -21859,7 +21861,7 @@ Elseif ($ArrTrigger) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                    if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                             $global:EPTitle = $global:EPTitle.ToUpper()
                                                                         }
@@ -21917,7 +21919,7 @@ Elseif ($ArrTrigger) {
                                                                         $SkippingText = 'true'
                                                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                     }
-                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                    if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                         if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                             $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                         }
@@ -22005,7 +22007,7 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:IsTruncated) {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                     # Verify variables before uploading
                                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -22022,8 +22024,8 @@ Elseif ($ArrTrigger) {
                                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                                 -Method Post `
                                                                                                 -Headers $extraPlexHeaders `
-                                                                                                -InFile $EpisodeImage`
-                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -Body $fileContent `
+                                                                                                -ContentType 'application/octet-stream' `
                                                                                                 -SkipHttpErrorCheck `
                                                                                                 -ErrorAction Stop
 
@@ -22468,7 +22470,7 @@ Elseif ($ArrTrigger) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -22525,7 +22527,7 @@ Elseif ($ArrTrigger) {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -22612,7 +22614,7 @@ Elseif ($ArrTrigger) {
                                                             if (!$global:IsTruncated) {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                     # Verify variables before uploading
                                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -22629,8 +22631,8 @@ Elseif ($ArrTrigger) {
                                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                                 -Method Post `
                                                                                                 -Headers $extraPlexHeaders `
-                                                                                                -InFile $EpisodeImage`
-                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -Body $fileContent `
+                                                                                                -ContentType 'application/octet-stream' `
                                                                                                 -SkipHttpErrorCheck `
                                                                                                 -ErrorAction Stop
 
@@ -24963,7 +24965,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -25390,7 +25392,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -25899,7 +25901,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -26338,7 +26340,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -26885,7 +26887,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $SkippingText = 'true'
                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                 }
-                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                     $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                     if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                         $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -27409,7 +27411,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -27466,7 +27468,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -27900,7 +27902,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -27958,7 +27960,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -29268,7 +29270,7 @@ else {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $fontImagemagick = $RTLfontImagemagick
                                             }
@@ -29336,7 +29338,7 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -29353,8 +29355,8 @@ else {
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -InFile $PosterImage`
-                                                                                -ContentType 'image/jpeg' `
+                                                                                -Body $fileContent `
+                                                                                -ContentType 'application/octet-stream' `
                                                                                 -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
@@ -29470,7 +29472,7 @@ else {
                                     GetPlexArtwork -Type "$Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        #$fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
+                                        $fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
                                         # Verify variables before uploading
                                         Write-Entry -Subtext "PosterImage: $PosterImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -29487,8 +29489,8 @@ else {
                                         $Upload = Invoke-WebRequest -Uri $uri `
                                                                     -Method Post `
                                                                     -Headers $extraPlexHeaders `
-                                                                    -InFile $PosterImageoriginal`
-                                                                    -ContentType 'image/jpeg' `
+                                                                    -Body $fileContent `
+                                                                    -ContentType 'application/octet-stream' `
                                                                     -SkipHttpErrorCheck `
                                                                     -ErrorAction Stop
 
@@ -29824,7 +29826,7 @@ else {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                        if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
                                             }
@@ -29892,7 +29894,7 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -29909,8 +29911,8 @@ else {
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -InFile $backgroundImage`
-                                                                                -ContentType 'image/jpeg' `
+                                                                                -Body $fileContent `
+                                                                                -ContentType 'application/octet-stream' `
                                                                                 -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
@@ -30026,7 +30028,7 @@ else {
                                     GetPlexArtwork -Type " $Titletext | Backgound Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
+                                        $fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
                                         # Verify variables before uploading
                                         Write-Entry -Subtext "BackgroundImage: $backgroundImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -30043,8 +30045,8 @@ else {
                                         $Upload = Invoke-WebRequest -Uri $uri `
                                                                     -Method Post `
                                                                     -Headers $extraPlexHeaders `
-                                                                    -InFile $backgroundImageoriginal`
-                                                                    -ContentType 'image/jpeg' `
+                                                                    -Body $fileContent `
+                                                                    -ContentType 'application/octet-stream' `
                                                                     -SkipHttpErrorCheck `
                                                                     -ErrorAction Stop
 
@@ -30470,7 +30472,7 @@ else {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $fontImagemagick = $RTLfontImagemagick
                                         }
@@ -30538,7 +30540,7 @@ else {
                                         if ($Upload2Plex -eq 'true') {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                #$fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
+                                                $fileContent = [System.IO.File]::ReadAllBytes($PosterImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "PosterImage: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -30555,8 +30557,8 @@ else {
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -InFile $PosterImage`
-                                                                            -ContentType 'image/jpeg' `
+                                                                            -Body $fileContent `
+                                                                            -ContentType 'application/octet-stream' `
                                                                             -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
@@ -30671,7 +30673,7 @@ else {
                                 GetPlexArtwork -Type "$Titletext Artwork." -ArtUrl $Arturl -TempImage $PosterImage
                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                    #$fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
+                                    $fileContent = [System.IO.File]::ReadAllBytes($PosterImageoriginal)
                                     # Verify variables before uploading
                                     Write-Entry -Subtext "PosterImage: $PosterImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -30688,8 +30690,8 @@ else {
                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                 -Method Post `
                                                                 -Headers $extraPlexHeaders `
-                                                                -InFile $PosterImageoriginal`
-                                                                -ContentType 'image/jpeg' `
+                                                                -Body $fileContent `
+                                                                -ContentType 'application/octet-stream' `
                                                                 -SkipHttpErrorCheck `
                                                                 -ErrorAction Stop
 
@@ -31040,7 +31042,7 @@ else {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                    if ($AddBackgroundText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                         if ($global:direction -eq "RTL") {
                                             $backgroundfontImagemagick = $RTLfontImagemagick
                                         }
@@ -31108,7 +31110,7 @@ else {
                                         if ($Upload2Plex -eq 'true') {
                                             try {
                                                 Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
+                                                $fileContent = [System.IO.File]::ReadAllBytes($backgroundImage)
                                                 # Verify variables before uploading
                                                 Write-Entry -Subtext "BackgroundImage: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -31125,8 +31127,8 @@ else {
                                                 $Upload = Invoke-WebRequest -Uri $uri `
                                                                             -Method Post `
                                                                             -Headers $extraPlexHeaders `
-                                                                            -InFile $backgroundImage`
-                                                                            -ContentType 'image/jpeg' `
+                                                                            -Body $fileContent `
+                                                                            -ContentType 'application/octet-stream' `
                                                                             -SkipHttpErrorCheck `
                                                                             -ErrorAction Stop
 
@@ -31240,7 +31242,7 @@ else {
                                 GetPlexArtwork -Type " $Titletext | Backgound Artwork." -ArtUrl $Arturl -TempImage $backgroundImage
                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                    #$fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
+                                    $fileContent = [System.IO.File]::ReadAllBytes($backgroundImageoriginal)
                                     # Verify variables before uploading
                                     Write-Entry -Subtext "BackgroundImage: $backgroundImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     Write-Entry -Subtext "RatingKey: $($entry.ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -31257,8 +31259,8 @@ else {
                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                 -Method Post `
                                                                 -Headers $extraPlexHeaders `
-                                                                -InFile $backgroundImageoriginal`
-                                                                -ContentType 'image/jpeg' `
+                                                                -Body $fileContent `
+                                                                -ContentType 'application/octet-stream' `
                                                                 -SkipHttpErrorCheck `
                                                                 -ErrorAction Stop
 
@@ -31708,7 +31710,7 @@ else {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                            if ($AddSeasonText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                 $global:seasonTitle = $global:seasonTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                                                 if ($ShowOnSeasonfontAllCaps -eq 'true') {
                                                     $global:ShowTitleOnSeason = $titletext.ToUpper() -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -31880,7 +31882,7 @@ else {
                                             if ($Upload2Plex -eq 'true') {
                                                 try {
                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                    #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
+                                                    $fileContent = [System.IO.File]::ReadAllBytes($SeasonImage)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "SeasonImage: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -31897,8 +31899,8 @@ else {
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -InFile $SeasonImage`
-                                                                                -ContentType 'image/jpeg' `
+                                                                                -Body $fileContent `
+                                                                                -ContentType 'application/octet-stream' `
                                                                                 -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
@@ -32012,7 +32014,7 @@ else {
                                     GetPlexArtwork -Type " $Titletext | $global:seasontmp Artwork."  -ArtUrl $Arturl -TempImage $SeasonImage
                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                        #$fileContent = [System.IO.File]::ReadAllBytes($SeasonImageoriginal)
+                                        $fileContent = [System.IO.File]::ReadAllBytes($SeasonImageoriginal)
                                         # Verify variables before uploading
                                         Write-Entry -Subtext "SeasonImage: $SeasonImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         Write-Entry -Subtext "RatingKey: $($global:SeasonRatingKey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -32029,8 +32031,8 @@ else {
                                         $Upload = Invoke-WebRequest -Uri $uri `
                                                                     -Method Post `
                                                                     -Headers $extraPlexHeaders `
-                                                                    -InFile $SeasonImageoriginal`
-                                                                    -ContentType 'image/jpeg' `
+                                                                    -Body $fileContent `
+                                                                    -ContentType 'application/octet-stream' `
                                                                     -SkipHttpErrorCheck `
                                                                     -ErrorAction Stop
 
@@ -32427,7 +32429,7 @@ else {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                         $global:EPTitle = $global:EPTitle.ToUpper()
                                                                     }
@@ -32484,7 +32486,7 @@ else {
                                                                     $SkippingText = 'true'
                                                                     Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                                 }
-                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                                if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                     if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                         $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                     }
@@ -32573,7 +32575,7 @@ else {
                                                             if ($Upload2Plex -eq 'true') {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                     # Verify variables before uploading
                                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -32590,8 +32592,8 @@ else {
                                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                                 -Method Post `
                                                                                                 -Headers $extraPlexHeaders `
-                                                                                                -InFile $EpisodeImage`
-                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -Body $fileContent `
+                                                                                                -ContentType 'application/octet-stream' `
                                                                                                 -SkipHttpErrorCheck `
                                                                                                 -ErrorAction Stop
 
@@ -32707,7 +32709,7 @@ else {
                                                 GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
                                                 if ($global:PlexartworkDownloaded -eq 'true') {
                                                     Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
+                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
                                                     # Verify variables before uploading
                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -32724,8 +32726,8 @@ else {
                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                 -Method Post `
                                                                                 -Headers $extraPlexHeaders `
-                                                                                -InFile $EpisodeImageoriginal`
-                                                                                -ContentType 'image/jpeg' `
+                                                                                -Body $fileContent `
+                                                                                -ContentType 'application/octet-stream' `
                                                                                 -SkipHttpErrorCheck `
                                                                                 -ErrorAction Stop
 
@@ -33097,7 +33099,7 @@ else {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPTitleText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPTitlefontAllCaps -eq 'true') {
                                                                     $global:EPTitle = $global:EPTitle.ToUpper()
                                                                 }
@@ -33154,7 +33156,7 @@ else {
                                                                 $SkippingText = 'true'
                                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
-                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -or $SkipAddTextAndOverlay -eq 'false')) {
+                                                            if ($AddTitleCardEPText -eq 'true' -and ($SkipAddText -eq 'false' -and $SkipAddTextAndOverlay -eq 'false')) {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
                                                                     $global:SeasonEPNumber = $global:SeasonEPNumber.ToUpper()
                                                                 }
@@ -33242,7 +33244,7 @@ else {
                                                             if ($Upload2Plex -eq 'true') {
                                                                 try {
                                                                     Write-Entry -Subtext "Uploading Artwork to Plex..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
-                                                                    #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
+                                                                    $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImage)
                                                                     # Verify variables before uploading
                                                                     Write-Entry -Subtext "EpisodeImage: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                                     Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -33259,8 +33261,8 @@ else {
                                                                     $Upload = Invoke-WebRequest -Uri $uri `
                                                                                                 -Method Post `
                                                                                                 -Headers $extraPlexHeaders `
-                                                                                                -InFile $EpisodeImage`
-                                                                                                -ContentType 'image/jpeg' `
+                                                                                                -Body $fileContent `
+                                                                                                -ContentType 'application/octet-stream' `
                                                                                                 -SkipHttpErrorCheck `
                                                                                                 -ErrorAction Stop
 
@@ -33376,7 +33378,7 @@ else {
                                                     GetPlexArtwork -Type " $Titletext | $global:FileNaming Artwork." -ArtUrl $Arturl -TempImage $EpisodeImage
                                                     if ($global:PlexartworkDownloaded -eq 'true') {
                                                         Write-Entry -Subtext "Uploading Existing Artwork for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                        #$fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
+                                                        $fileContent = [System.IO.File]::ReadAllBytes($EpisodeImageoriginal)
                                                         # Verify variables before uploading
                                                         Write-Entry -Subtext "EpisodeImage: $EpisodeImageoriginal" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                         Write-Entry -Subtext "RatingKey: $($global:episode_ratingkey)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -33393,8 +33395,8 @@ else {
                                                         $Upload = Invoke-WebRequest -Uri $uri `
                                                                                     -Method Post `
                                                                                     -Headers $extraPlexHeaders `
-                                                                                    -InFile $EpisodeImageoriginal`
-                                                                                    -ContentType 'image/jpeg' `
+                                                                                    -Body $fileContent `
+                                                                                    -ContentType 'application/octet-stream' `
                                                                                     -SkipHttpErrorCheck `
                                                                                     -ErrorAction Stop
 
