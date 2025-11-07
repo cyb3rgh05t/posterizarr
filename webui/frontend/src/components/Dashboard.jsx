@@ -53,9 +53,14 @@ const getLogFileForMode = (mode) => {
 };
 
 const getWebSocketURL = (logFile) => {
+  // Check if the page is loaded via HTTPS or HTTP
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
   const baseURL = isDev
     ? `ws://localhost:3000/ws/logs`
-    : `ws://${window.location.host}/ws/logs`;
+    : `${protocol}//${window.location.host}/ws/logs`; // Use the correct protocol
+
+  // Add log_file as query parameter
   return `${baseURL}?log_file=${encodeURIComponent(logFile)}`;
 };
 
