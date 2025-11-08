@@ -14,7 +14,6 @@ __pycache__
 coverage.*
 
 # mounted volumes
-config/
 4k.png
 config.json
 posteroverlay_0.7.png
@@ -31,4 +30,3 @@ scheduler.json
 /webui tests-infos
 /devUtils
 /Cache
-webui/backend/config_tooltips.py.backup
