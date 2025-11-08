@@ -5,7 +5,6 @@ import {
   RefreshCw,
   AlertCircle,
   ChevronDown,
-  ChevronRight,
   Settings,
   Database,
   Palette,
@@ -22,8 +21,6 @@ import {
   Upload,
   Image,
   Eye,
-  Expand,
-  Minimize,
   ExternalLink,
   Github,
 } from "lucide-react";
@@ -2414,7 +2411,6 @@ function ConfigEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null); // Error state for display
-  const [expandedGroups, setExpandedGroups] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [overlayFiles, setOverlayFiles] = useState([]);
   const [uploadingOverlay, setUploadingOverlay] = useState(false);
@@ -2422,8 +2418,10 @@ function ConfigEditor() {
   const [fontFiles, setFontFiles] = useState([]);
   const [uploadingFont, setUploadingFont] = useState(false);
   const [previewFont, setPreviewFont] = useState(null); // For font preview modal
-  const hasInitializedGroups = useRef(false);
   const initialAuthStatus = useRef(null); // Track initial auth status when config is loaded
+
+  // Sub-tabs state - track active group per main tab
+  const [activeSubTabs, setActiveSubTabs] = useState({});
 
   // Auto-save state
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
@@ -2503,22 +2501,34 @@ function ConfigEditor() {
 
   // Dropdown states - using object to handle multiple instances per field type
   const [openDropdowns, setOpenDropdowns] = useState({});
-  const [dropdownPositions, setDropdownPositions] = useState({}); // Track if dropdown opens up or down
   const dropdownRefs = useRef({});
 
-  const toggleDropdown = (key) => {
-    // Calculate position before toggling if dropdown is about to open
-    if (!openDropdowns[key]) {
-      const ref = dropdownRefs.current[key];
-      if (ref) {
-        const shouldOpenUp = calculateDropdownPosition({ current: ref });
-        setDropdownPositions((prev) => ({
-          ...prev,
-          [key]: shouldOpenUp,
-        }));
-      }
-    }
+  // Helper to calculate dropdown position (above or below button)
+  const getDropdownPosition = (buttonRef) => {
+    if (!buttonRef) return { top: 0, openUpward: false };
 
+    const rect = buttonRef.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const dropdownHeight = 248; // max-h-60 = 15rem = 240px + padding
+
+    // Open upward if not enough space below AND more space above
+    const openUpward = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+
+    if (openUpward) {
+      return {
+        bottom: window.innerHeight - rect.top + 8,
+        openUpward: true,
+      };
+    } else {
+      return {
+        top: rect.bottom + 8,
+        openUpward: false,
+      };
+    }
+  };
+
+  const toggleDropdown = (key) => {
     setOpenDropdowns((prev) => ({
       ...prev,
       [key]: !prev[key],
@@ -2533,7 +2543,6 @@ function ConfigEditor() {
   };
 
   const isDropdownOpen = (key) => openDropdowns[key] || false;
-  const isDropdownUp = (key) => dropdownPositions[key] || false;
 
   // Legacy single dropdown states for non-repeating fields
   const [favProviderDropdownOpen, setFavProviderDropdownOpen] = useState(false);
@@ -2541,10 +2550,6 @@ function ConfigEditor() {
   const [logLevelDropdownOpen, setLogLevelDropdownOpen] = useState(false);
   const [webuiLogLevelDropdownOpen, setWebuiLogLevelDropdownOpen] =
     useState(false);
-  const [favProviderDropdownUp, setFavProviderDropdownUp] = useState(false);
-  const [tmdbSortingDropdownUp, setTmdbSortingDropdownUp] = useState(false);
-  const [logLevelDropdownUp, setLogLevelDropdownUp] = useState(false);
-  const [webuiLogLevelDropdownUp, setWebuiLogLevelDropdownUp] = useState(false);
 
   const favProviderDropdownRef = useRef(null);
   const tmdbSortingDropdownRef = useRef(null);
@@ -2710,46 +2715,172 @@ function ConfigEditor() {
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [saving, config]);
 
-  useEffect(() => {
-    if (config && !hasInitializedGroups.current) {
-      const groups = getGroupsByTab(activeTab);
-      // Only auto-expand if there's exactly one section
-      if (groups.length === 1) {
-        setExpandedGroups({ [groups[0]]: true });
-      }
-      hasInitializedGroups.current = true;
-    }
-  }, [config, activeTab]);
-
-  useEffect(() => {
-    if (activeTab && config && hasInitializedGroups.current) {
-      const groups = getGroupsByTab(activeTab);
-      // Only auto-expand if there's exactly one section
-      if (groups.length === 1) {
-        setExpandedGroups((prev) => ({
-          ...prev,
-          [groups[0]]: true,
-        }));
-      }
-    }
-  }, [activeTab]);
-
   // Scroll to top when changing tabs
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [activeTab]);
 
-  // Auto-expand groups when searching
+  // Initialize sub-tab when main tab changes
   useEffect(() => {
-    if (searchQuery && activeTab) {
-      const filteredGroups = getFilteredGroupsByTab(activeTab);
-      const newExpandedState = {};
-      filteredGroups.forEach((groupName) => {
-        newExpandedState[groupName] = true;
-      });
-      setExpandedGroups(newExpandedState);
+    if (activeTab && config) {
+      const groups = getGroupsByTab(activeTab);
+      if (groups.length > 0 && !activeSubTabs[activeTab]) {
+        setActiveSubTabs((prev) => ({ ...prev, [activeTab]: groups[0] }));
+      }
     }
-  }, [searchQuery, activeTab]);
+  }, [activeTab, config]);
+
+  // Close WebUI Log Level dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        webuiLogLevelDropdownOpen &&
+        webuiLogLevelDropdownRef.current &&
+        !webuiLogLevelDropdownRef.current.contains(event.target)
+      ) {
+        setWebuiLogLevelDropdownOpen(false);
+      }
+    };
+
+    if (webuiLogLevelDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [webuiLogLevelDropdownOpen]);
+
+  // Close Log Level dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        logLevelDropdownOpen &&
+        logLevelDropdownRef.current &&
+        !logLevelDropdownRef.current.contains(event.target)
+      ) {
+        setLogLevelDropdownOpen(false);
+      }
+    };
+
+    if (logLevelDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [logLevelDropdownOpen]);
+
+  // Close FavProvider dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        favProviderDropdownOpen &&
+        favProviderDropdownRef.current &&
+        !favProviderDropdownRef.current.contains(event.target)
+      ) {
+        setFavProviderDropdownOpen(false);
+      }
+    };
+
+    if (favProviderDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [favProviderDropdownOpen]);
+
+  // Close TMDB Sorting dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        tmdbSortingDropdownOpen &&
+        tmdbSortingDropdownRef.current &&
+        !tmdbSortingDropdownRef.current.contains(event.target)
+      ) {
+        setTmdbSortingDropdownOpen(false);
+      }
+    };
+
+    if (tmdbSortingDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [tmdbSortingDropdownOpen]);
+
+  // Close generic dropdowns (overlay files, fonts, etc.) when clicking outside OR scrolling
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Get all currently open dropdowns
+      const openKeys = Object.keys(openDropdowns).filter(
+        (key) => openDropdowns[key]
+      );
+
+      if (openKeys.length === 0) return;
+
+      // Check if click is outside all dropdown refs
+      openKeys.forEach((key) => {
+        const ref = dropdownRefs.current[key];
+        if (ref && !ref.contains(event.target)) {
+          closeDropdown(key);
+        }
+      });
+    };
+
+    const handleScroll = (event) => {
+      // Check if scroll is happening inside a dropdown - if so, don't close
+      const scrollTarget = event.target;
+
+      // Check if scrolling inside any dropdown content (they all have overflow-y-auto class)
+      if (
+        scrollTarget.classList &&
+        scrollTarget.classList.contains("overflow-y-auto")
+      ) {
+        return; // Don't close if scrolling inside dropdown
+      }
+
+      // Check if scroll target is inside any dropdown ref
+      const isInsideDropdown = Object.values(dropdownRefs.current).some(
+        (ref) => ref && ref.contains(scrollTarget)
+      );
+
+      if (isInsideDropdown) {
+        return; // Don't close if scrolling inside dropdown
+      }
+
+      // Close all dropdowns on page scroll (not dropdown scroll)
+      const openKeys = Object.keys(openDropdowns).filter(
+        (key) => openDropdowns[key]
+      );
+      openKeys.forEach((key) => closeDropdown(key));
+
+      // Also close legacy dropdowns
+      if (favProviderDropdownOpen) setFavProviderDropdownOpen(false);
+      if (tmdbSortingDropdownOpen) setTmdbSortingDropdownOpen(false);
+      if (logLevelDropdownOpen) setLogLevelDropdownOpen(false);
+      if (webuiLogLevelDropdownOpen) setWebuiLogLevelDropdownOpen(false);
+    };
+
+    const hasOpenDropdowns =
+      Object.values(openDropdowns).some((isOpen) => isOpen) ||
+      favProviderDropdownOpen ||
+      tmdbSortingDropdownOpen ||
+      logLevelDropdownOpen ||
+      webuiLogLevelDropdownOpen;
+
+    if (hasOpenDropdowns) {
+      document.addEventListener("mousedown", handleClickOutside);
+      window.addEventListener("scroll", handleScroll, true); // true = capture phase to catch all scrolls
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        window.removeEventListener("scroll", handleScroll, true);
+      };
+    }
+  }, [
+    openDropdowns,
+    favProviderDropdownOpen,
+    tmdbSortingDropdownOpen,
+    logLevelDropdownOpen,
+    webuiLogLevelDropdownOpen,
+  ]);
 
   // Auto-save when config changes (with 5 second debounce)
   useEffect(() => {
@@ -2780,27 +2911,6 @@ function ConfigEditor() {
       }
     };
   }, [config, autoSaveEnabled]);
-
-  // Function to calculate dropdown position
-  const calculateDropdownPosition = (ref) => {
-    if (!ref || !ref.current) return false;
-
-    const rect = ref.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-
-    // Dropdown max height is 240px (max-h-60 = 15rem = 240px)
-    // Add buffer of 8px for margin
-    const dropdownHeight = 248;
-
-    // Only open upward if there's enough space above AND more space above than below
-    // This prevents cut-off at the top of the screen
-    if (spaceAbove > spaceBelow && spaceAbove >= dropdownHeight) {
-      return true;
-    }
-
-    return false;
-  };
 
   // Click-outside detection for dropdowns
   useEffect(() => {
@@ -3127,13 +3237,6 @@ function ConfigEditor() {
         setSaving(false);
       }
     }
-  };
-
-  const toggleGroup = (groupName) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [groupName]: !prev[groupName],
-    }));
   };
 
   // Validate min/max pairs in the config
@@ -3722,75 +3825,66 @@ function ConfigEditor() {
               </button>
 
               {isDropdownOpen(dropdownKey) && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => closeDropdown(dropdownKey)}
-                  />
-                  <div
-                    className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
-                    style={{
-                      left: dropdownRefs.current[
-                        dropdownKey
-                      ]?.getBoundingClientRect().left,
-                      width: dropdownRefs.current[dropdownKey]?.offsetWidth,
-                      ...(isDropdownUp(dropdownKey)
-                        ? {
-                            bottom:
-                              window.innerHeight -
-                              dropdownRefs.current[
-                                dropdownKey
-                              ]?.getBoundingClientRect().top +
-                              8,
-                          }
-                        : {
-                            top:
-                              dropdownRefs.current[
-                                dropdownKey
-                              ]?.getBoundingClientRect().bottom + 8,
-                          }),
-                    }}
-                  >
-                    <div className="p-2">
-                      <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
-                        Select Overlay File
-                      </div>
+                <div
+                  className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
+                  style={{
+                    left: dropdownRefs.current[
+                      dropdownKey
+                    ]?.getBoundingClientRect().left,
+                    width: dropdownRefs.current[dropdownKey]?.offsetWidth,
+                    ...(getDropdownPosition(dropdownRefs.current[dropdownKey])
+                      .openUpward
+                      ? {
+                          bottom: getDropdownPosition(
+                            dropdownRefs.current[dropdownKey]
+                          ).bottom,
+                        }
+                      : {
+                          top: getDropdownPosition(
+                            dropdownRefs.current[dropdownKey]
+                          ).top,
+                        }),
+                  }}
+                >
+                  <div className="p-2">
+                    <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                      Select Overlay File
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        closeDropdown(dropdownKey);
+                        updateValue(fieldKey, "");
+                      }}
+                      className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                        !stringValue
+                          ? "bg-theme-primary text-white"
+                          : "text-gray-300 hover:bg-theme-hover"
+                      }`}
+                    >
+                      -- Select Overlay File --
+                    </button>
+                    {overlayFiles.map((file) => (
                       <button
+                        key={file.name}
                         onClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
                           closeDropdown(dropdownKey);
-                          updateValue(fieldKey, "");
+                          updateValue(fieldKey, file.name);
                         }}
                         className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                          !stringValue
+                          stringValue === file.name
                             ? "bg-theme-primary text-white"
                             : "text-gray-300 hover:bg-theme-hover"
                         }`}
                       >
-                        -- Select Overlay File --
+                        {file.name}
                       </button>
-                      {overlayFiles.map((file) => (
-                        <button
-                          key={file.name}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            closeDropdown(dropdownKey);
-                            updateValue(fieldKey, file.name);
-                          }}
-                          className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                            stringValue === file.name
-                              ? "bg-theme-primary text-white"
-                              : "text-gray-300 hover:bg-theme-hover"
-                          }`}
-                        >
-                          {file.name}
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
 
@@ -3885,75 +3979,66 @@ function ConfigEditor() {
               </button>
 
               {isDropdownOpen(dropdownKey) && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => closeDropdown(dropdownKey)}
-                  />
-                  <div
-                    className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
-                    style={{
-                      left: dropdownRefs.current[
-                        dropdownKey
-                      ]?.getBoundingClientRect().left,
-                      width: dropdownRefs.current[dropdownKey]?.offsetWidth,
-                      ...(isDropdownUp(dropdownKey)
-                        ? {
-                            bottom:
-                              window.innerHeight -
-                              dropdownRefs.current[
-                                dropdownKey
-                              ]?.getBoundingClientRect().top +
-                              8,
-                          }
-                        : {
-                            top:
-                              dropdownRefs.current[
-                                dropdownKey
-                              ]?.getBoundingClientRect().bottom + 8,
-                          }),
-                    }}
-                  >
-                    <div className="p-2">
-                      <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
-                        Select Font File
-                      </div>
+                <div
+                  className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
+                  style={{
+                    left: dropdownRefs.current[
+                      dropdownKey
+                    ]?.getBoundingClientRect().left,
+                    width: dropdownRefs.current[dropdownKey]?.offsetWidth,
+                    ...(getDropdownPosition(dropdownRefs.current[dropdownKey])
+                      .openUpward
+                      ? {
+                          bottom: getDropdownPosition(
+                            dropdownRefs.current[dropdownKey]
+                          ).bottom,
+                        }
+                      : {
+                          top: getDropdownPosition(
+                            dropdownRefs.current[dropdownKey]
+                          ).top,
+                        }),
+                  }}
+                >
+                  <div className="p-2">
+                    <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                      Select Font File
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        closeDropdown(dropdownKey);
+                        updateValue(fieldKey, "");
+                      }}
+                      className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                        !stringValue
+                          ? "bg-theme-primary text-white"
+                          : "text-gray-300 hover:bg-theme-hover"
+                      }`}
+                    >
+                      -- Select Font File --
+                    </button>
+                    {fontFiles.map((file) => (
                       <button
+                        key={file}
                         onClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
                           closeDropdown(dropdownKey);
-                          updateValue(fieldKey, "");
+                          updateValue(fieldKey, file);
                         }}
                         className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                          !stringValue
+                          stringValue === file
                             ? "bg-theme-primary text-white"
                             : "text-gray-300 hover:bg-theme-hover"
                         }`}
                       >
-                        -- Select Font File --
+                        {file}
                       </button>
-                      {fontFiles.map((file) => (
-                        <button
-                          key={file}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            closeDropdown(dropdownKey);
-                            updateValue(fieldKey, file);
-                          }}
-                          className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                            stringValue === file
-                              ? "bg-theme-primary text-white"
-                              : "text-gray-300 hover:bg-theme-hover"
-                          }`}
-                        >
-                          {file}
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
 
@@ -4378,13 +4463,9 @@ function ConfigEditor() {
         <div className="space-y-2">
           <div className="relative" ref={favProviderDropdownRef}>
             <button
-              onClick={() => {
-                const shouldOpenUp = calculateDropdownPosition(
-                  favProviderDropdownRef
-                );
-                setFavProviderDropdownUp(shouldOpenUp);
-                setFavProviderDropdownOpen(!favProviderDropdownOpen);
-              }}
+              onClick={() =>
+                setFavProviderDropdownOpen(!favProviderDropdownOpen)
+              }
               className="w-full h-[42px] px-4 py-2.5 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary transition-all cursor-pointer shadow-sm flex items-center justify-between"
             >
               <span>{stringValue.toUpperCase()}</span>
@@ -4396,41 +4477,49 @@ function ConfigEditor() {
             </button>
 
             {favProviderDropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setFavProviderDropdownOpen(false)}
-                />
-                <div
-                  className={`absolute z-50 left-0 right-0 ${
-                    favProviderDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                  } rounded-lg bg-theme-card border border-theme shadow-lg overflow-hidden`}
-                >
-                  <div className="p-2">
-                    <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
-                      Select Provider
-                    </div>
-                    {providerOptions.map((option) => (
-                      <button
-                        key={option}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          setFavProviderDropdownOpen(false);
-                          updateValue(fieldKey, option);
-                        }}
-                        className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                          stringValue.toLowerCase() === option
-                            ? "bg-theme-primary text-white"
-                            : "text-gray-300 hover:bg-theme-hover"
-                        }`}
-                      >
-                        {option.toUpperCase()}
-                      </button>
-                    ))}
+              <div
+                className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg"
+                style={{
+                  left: favProviderDropdownRef.current?.getBoundingClientRect()
+                    .left,
+                  width: favProviderDropdownRef.current?.offsetWidth,
+                  ...(getDropdownPosition(favProviderDropdownRef.current)
+                    .openUpward
+                    ? {
+                        bottom: getDropdownPosition(
+                          favProviderDropdownRef.current
+                        ).bottom,
+                      }
+                    : {
+                        top: getDropdownPosition(favProviderDropdownRef.current)
+                          .top,
+                      }),
+                }}
+              >
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                    Select Provider
                   </div>
+                  {providerOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setFavProviderDropdownOpen(false);
+                        updateValue(fieldKey, option);
+                      }}
+                      className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                        stringValue.toLowerCase() === option
+                          ? "bg-theme-primary text-white"
+                          : "text-gray-300 hover:bg-theme-hover"
+                      }`}
+                    >
+                      {option.toUpperCase()}
+                    </button>
+                  ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
           <p className="text-xs text-theme-muted">
@@ -4452,13 +4541,9 @@ function ConfigEditor() {
         <div className="space-y-2">
           <div className="relative" ref={tmdbSortingDropdownRef}>
             <button
-              onClick={() => {
-                const shouldOpenUp = calculateDropdownPosition(
-                  tmdbSortingDropdownRef
-                );
-                setTmdbSortingDropdownUp(shouldOpenUp);
-                setTmdbSortingDropdownOpen(!tmdbSortingDropdownOpen);
-              }}
+              onClick={() =>
+                setTmdbSortingDropdownOpen(!tmdbSortingDropdownOpen)
+              }
               className="w-full h-[42px] px-4 py-2.5 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary transition-all cursor-pointer shadow-sm flex items-center justify-between"
             >
               <span>
@@ -4473,41 +4558,49 @@ function ConfigEditor() {
             </button>
 
             {tmdbSortingDropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setTmdbSortingDropdownOpen(false)}
-                />
-                <div
-                  className={`absolute z-50 left-0 right-0 ${
-                    tmdbSortingDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                  } rounded-lg bg-theme-card border border-theme shadow-lg overflow-hidden`}
-                >
-                  <div className="p-2">
-                    <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
-                      Select Sorting
-                    </div>
-                    {sortingOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          setTmdbSortingDropdownOpen(false);
-                          updateValue(fieldKey, option.value);
-                        }}
-                        className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                          stringValue === option.value
-                            ? "bg-theme-primary text-white"
-                            : "text-gray-300 hover:bg-theme-hover"
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+              <div
+                className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg"
+                style={{
+                  left: tmdbSortingDropdownRef.current?.getBoundingClientRect()
+                    .left,
+                  width: tmdbSortingDropdownRef.current?.offsetWidth,
+                  ...(getDropdownPosition(tmdbSortingDropdownRef.current)
+                    .openUpward
+                    ? {
+                        bottom: getDropdownPosition(
+                          tmdbSortingDropdownRef.current
+                        ).bottom,
+                      }
+                    : {
+                        top: getDropdownPosition(tmdbSortingDropdownRef.current)
+                          .top,
+                      }),
+                }}
+              >
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                    Select Sorting
                   </div>
+                  {sortingOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setTmdbSortingDropdownOpen(false);
+                        updateValue(fieldKey, option.value);
+                      }}
+                      className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                        stringValue === option.value
+                          ? "bg-theme-primary text-white"
+                          : "text-gray-300 hover:bg-theme-hover"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
           <p className="text-xs text-theme-muted">
@@ -5029,12 +5122,8 @@ function ConfigEditor() {
         <div className="space-y-2">
           <div className="relative" ref={logLevelDropdownRef}>
             <button
-              onClick={() => {
-                const shouldOpenUp =
-                  calculateDropdownPosition(logLevelDropdownRef);
-                setLogLevelDropdownUp(shouldOpenUp);
-                setLogLevelDropdownOpen(!logLevelDropdownOpen);
-              }}
+              ref={logLevelDropdownRef}
+              onClick={() => setLogLevelDropdownOpen(!logLevelDropdownOpen)}
               className="w-full h-[42px] px-4 py-2.5 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary transition-all cursor-pointer shadow-sm flex items-center justify-between"
             >
               <span>
@@ -5049,41 +5138,48 @@ function ConfigEditor() {
             </button>
 
             {logLevelDropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setLogLevelDropdownOpen(false)}
-                />
-                <div
-                  className={`absolute z-50 left-0 right-0 ${
-                    logLevelDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                  } rounded-lg bg-theme-card border border-theme shadow-lg overflow-hidden`}
-                >
-                  <div className="p-2">
-                    <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
-                      Select Log Level
-                    </div>
-                    {logLevelOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          setLogLevelDropdownOpen(false);
-                          updateValue(fieldKey, option.value);
-                        }}
-                        className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                          numValue === option.value
-                            ? "bg-theme-primary text-white"
-                            : "text-gray-300 hover:bg-theme-hover"
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+              <div
+                className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg overflow-hidden"
+                style={{
+                  left: logLevelDropdownRef.current?.getBoundingClientRect()
+                    .left,
+                  width: logLevelDropdownRef.current?.offsetWidth,
+                  ...(getDropdownPosition(logLevelDropdownRef.current)
+                    .openUpward
+                    ? {
+                        bottom: getDropdownPosition(logLevelDropdownRef.current)
+                          .bottom,
+                      }
+                    : {
+                        top: getDropdownPosition(logLevelDropdownRef.current)
+                          .top,
+                      }),
+                }}
+              >
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                    Select Log Level
                   </div>
+                  {logLevelOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setLogLevelDropdownOpen(false);
+                        updateValue(fieldKey, option.value);
+                      }}
+                      className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                        numValue === option.value
+                          ? "bg-theme-primary text-white"
+                          : "text-gray-300 hover:bg-theme-hover"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
           <p className="text-xs text-theme-muted">
@@ -5139,60 +5235,51 @@ function ConfigEditor() {
             </button>
 
             {isDropdownOpen(dropdownKey) && !disabled && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => closeDropdown(dropdownKey)}
-                />
-                <div
-                  className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
-                  style={{
-                    left: dropdownRefs.current[
-                      dropdownKey
-                    ]?.getBoundingClientRect().left,
-                    width: dropdownRefs.current[dropdownKey]?.offsetWidth,
-                    ...(isDropdownUp(dropdownKey)
-                      ? {
-                          bottom:
-                            window.innerHeight -
-                            dropdownRefs.current[
-                              dropdownKey
-                            ]?.getBoundingClientRect().top +
-                            8,
-                        }
-                      : {
-                          top:
-                            dropdownRefs.current[
-                              dropdownKey
-                            ]?.getBoundingClientRect().bottom + 8,
-                        }),
-                  }}
-                >
-                  <div className="p-2">
-                    <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
-                      Select Alignment
-                    </div>
-                    {gravityOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          closeDropdown(dropdownKey);
-                          updateValue(fieldKey, option.value);
-                        }}
-                        className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                          gravityValue === option.value
-                            ? "bg-theme-primary text-white"
-                            : "text-gray-300 hover:bg-theme-hover"
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+              <div
+                className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
+                style={{
+                  left: dropdownRefs.current[
+                    dropdownKey
+                  ]?.getBoundingClientRect().left,
+                  width: dropdownRefs.current[dropdownKey]?.offsetWidth,
+                  ...(getDropdownPosition(dropdownRefs.current[dropdownKey])
+                    .openUpward
+                    ? {
+                        bottom: getDropdownPosition(
+                          dropdownRefs.current[dropdownKey]
+                        ).bottom,
+                      }
+                    : {
+                        top: getDropdownPosition(
+                          dropdownRefs.current[dropdownKey]
+                        ).top,
+                      }),
+                }}
+              >
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                    Select Alignment
                   </div>
+                  {gravityOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        closeDropdown(dropdownKey);
+                        updateValue(fieldKey, option.value);
+                      }}
+                      className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                        gravityValue === option.value
+                          ? "bg-theme-primary text-white"
+                          : "text-gray-300 hover:bg-theme-hover"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
           <p className="text-xs text-theme-muted">
@@ -5432,80 +5519,72 @@ function ConfigEditor() {
               )}
 
               {isDropdownOpen(`color-${fieldKey}`) && !disabled && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => closeDropdown(`color-${fieldKey}`)}
-                  />
-                  <div
-                    className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
-                    style={{
-                      left: dropdownRefs.current[
-                        `color-${fieldKey}`
-                      ]?.getBoundingClientRect().left,
-                      width:
-                        dropdownRefs.current[`color-${fieldKey}`]?.offsetWidth,
-                      ...(isDropdownUp(`color-${fieldKey}`)
-                        ? {
-                            bottom:
-                              window.innerHeight -
-                              dropdownRefs.current[
-                                `color-${fieldKey}`
-                              ]?.getBoundingClientRect().top +
-                              8,
-                          }
-                        : {
-                            top:
-                              dropdownRefs.current[
-                                `color-${fieldKey}`
-                              ]?.getBoundingClientRect().bottom + 8,
-                          }),
-                    }}
-                  >
-                    <div className="p-2">
-                      <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
-                        Select Color
-                      </div>
+                <div
+                  className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
+                  style={{
+                    left: dropdownRefs.current[
+                      `color-${fieldKey}`
+                    ]?.getBoundingClientRect().left,
+                    width:
+                      dropdownRefs.current[`color-${fieldKey}`]?.offsetWidth,
+                    ...(getDropdownPosition(
+                      dropdownRefs.current[`color-${fieldKey}`]
+                    ).openUpward
+                      ? {
+                          bottom: getDropdownPosition(
+                            dropdownRefs.current[`color-${fieldKey}`]
+                          ).bottom,
+                        }
+                      : {
+                          top: getDropdownPosition(
+                            dropdownRefs.current[`color-${fieldKey}`]
+                          ).top,
+                        }),
+                  }}
+                >
+                  <div className="p-2">
+                    <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                      Select Color
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        closeDropdown(`color-${fieldKey}`);
+                        updateValue(fieldKey, "");
+                      }}
+                      className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                        !stringValue
+                          ? "bg-theme-primary text-white"
+                          : "text-gray-300 hover:bg-theme-hover"
+                      }`}
+                    >
+                      -- Select Color --
+                    </button>
+                    {colorNames.map((color) => (
                       <button
+                        key={color}
                         onClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
                           closeDropdown(`color-${fieldKey}`);
-                          updateValue(fieldKey, "");
+                          updateValue(fieldKey, color);
                         }}
-                        className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                          !stringValue
+                        className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left flex items-center gap-2 ${
+                          stringValue.toLowerCase() === color
                             ? "bg-theme-primary text-white"
                             : "text-gray-300 hover:bg-theme-hover"
                         }`}
                       >
-                        -- Select Color --
+                        <div
+                          className="w-4 h-4 rounded border border-gray-400"
+                          style={{ backgroundColor: color }}
+                        />
+                        {color.charAt(0).toUpperCase() + color.slice(1)}
                       </button>
-                      {colorNames.map((color) => (
-                        <button
-                          key={color}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            closeDropdown(`color-${fieldKey}`);
-                            updateValue(fieldKey, color);
-                          }}
-                          className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left flex items-center gap-2 ${
-                            stringValue.toLowerCase() === color
-                              ? "bg-theme-primary text-white"
-                              : "text-gray-300 hover:bg-theme-hover"
-                          }`}
-                        >
-                          <div
-                            className="w-4 h-4 rounded border border-gray-400"
-                            style={{ backgroundColor: color }}
-                          />
-                          {color.charAt(0).toUpperCase() + color.slice(1)}
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
           ) : (
@@ -5917,237 +5996,284 @@ function ConfigEditor() {
               </span>
             )}
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                const allGroups = getFilteredGroupsByTab(activeTab);
-                const newExpandedState = {};
-                allGroups.forEach((groupName) => {
-                  if (getFilteredFieldsForGroup(groupName).length > 0) {
-                    newExpandedState[groupName] = true;
-                  }
-                });
-                setExpandedGroups(newExpandedState);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
-            >
-              <Expand className="w-4 h-4 text-theme-primary" />
-              {t("configEditor.expandAll")}
-            </button>
-            <button
-              onClick={() => {
-                setExpandedGroups({});
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
-            >
-              <Minimize className="w-4 h-4 text-theme-primary" />
-              {t("configEditor.collapseAll")}
-            </button>
-          </div>
         </div>
       </div>
 
+      {/* Sub-Tabs for Groups (if multiple groups exist) */}
+      {(() => {
+        const groups = getFilteredGroupsByTab(activeTab).filter(
+          (groupName) => getFilteredFieldsForGroup(groupName).length > 0
+        );
+
+        // Get active sub-tab for current main tab, default to first group
+        const activeSubTab = activeSubTabs[activeTab] || groups[0];
+
+        // Show sub-tabs only if there are multiple groups
+        if (groups.length > 1) {
+          return (
+            <div className="bg-theme-card rounded-xl border border-theme overflow-hidden shadow-sm">
+              <div className="flex gap-1 overflow-x-auto p-2">
+                {groups.map((groupName) => {
+                  const GroupIcon = getGroupIconForDisplay(groupName);
+                  const isActive = activeSubTab === groupName;
+                  const settingsCount =
+                    getFilteredFieldsForGroup(groupName).length;
+
+                  return (
+                    <button
+                      key={groupName}
+                      onClick={() =>
+                        setActiveSubTabs((prev) => ({
+                          ...prev,
+                          [activeTab]: groupName,
+                        }))
+                      }
+                      className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-all whitespace-nowrap ${
+                        isActive
+                          ? "bg-theme-primary text-white shadow-md"
+                          : "bg-theme-bg text-theme-muted hover:text-theme-text hover:bg-theme-hover"
+                      }`}
+                    >
+                      <GroupIcon className="w-4 h-4" />
+                      <span className="font-medium">
+                        {formatGroupName(groupName)}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs ${
+                          isActive ? "bg-white/20" : "bg-theme-card"
+                        }`}
+                      >
+                        {settingsCount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       {/* Settings Groups */}
       <div className="space-y-4">
-        {getFilteredGroupsByTab(activeTab).map((groupName) => {
-          const GroupIcon = getGroupIconForDisplay(groupName);
-          const isExpanded = expandedGroups[groupName];
-          const fields = getFilteredFieldsForGroup(groupName);
-          const settingsCount = fields.length;
-          const readmeLink = getReadmeLink(groupName);
+        {(() => {
+          const groups = getFilteredGroupsByTab(activeTab).filter(
+            (groupName) => getFilteredFieldsForGroup(groupName).length > 0
+          );
 
-          // Don't show groups with no matching fields when searching
-          if (searchQuery && settingsCount === 0) return null;
+          // If multiple groups, show only active sub-tab
+          const groupsToRender =
+            groups.length > 1
+              ? [activeSubTabs[activeTab] || groups[0]]
+              : groups;
 
-          return (
-            <div
-              key={groupName}
-              className="bg-theme-card rounded-xl border border-theme overflow-hidden hover:border-theme-primary/50 transition-all shadow-sm"
-            >
-              {/* Group Header */}
-              <button
-                onClick={() => toggleGroup(groupName)}
-                className="w-full px-6 py-5 flex items-center justify-between hover:bg-theme-hover transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-lg bg-theme-primary/10 group-hover:bg-theme-primary/20 group-hover:scale-110 transition-all">
-                    <GroupIcon className="w-6 h-6 text-theme-primary" />
-                  </div>
-                  <div className="text-left">
-                    <h3 className="text-xl font-semibold text-theme-primary">
-                      {formatGroupName(groupName)}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <p className="text-sm text-theme-muted">
-                        {settingsCount} setting
-                        {settingsCount !== 1 ? "s" : ""}
-                        {searchQuery && " (filtered)"}
-                      </p>
-                      {readmeLink && (
-                        <a
-                          href={readmeLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg transition-all shadow-sm hover:scale-105"
-                          title="Open settings documentation in GitHub README"
-                        >
-                          <Github className="w-3.5 h-3.5 text-theme-primary" />
-                          <span>SETTINGS WIKI</span>
-                        </a>
-                      )}
+          return groupsToRender.map((groupName) => {
+            const GroupIcon = getGroupIconForDisplay(groupName);
+            const fields = getFilteredFieldsForGroup(groupName);
+            const settingsCount = fields.length;
+            const readmeLink = getReadmeLink(groupName);
+
+            // Don't show groups with no matching fields when searching
+            if (searchQuery && settingsCount === 0) return null;
+
+            // Special rendering for groups with dropdowns - no overflow-hidden to avoid z-index issues
+            const isWebUISettings = groupName === "WebUI Settings";
+            const isAPIKeysTokens =
+              groupName === "API Keys & Tokens" || groupName === "ApiPart";
+            const isLanguagePreferences =
+              groupName === "Language & Preferences";
+            const isOverlayFiles = groupName === "Overlay Files";
+            const isResolutionOverlays = groupName === "Resolution Overlays";
+            const isFonts = groupName === "Fonts";
+            const isOverlayPart = groupName === "OverlayPart";
+            const needsNoOverflow =
+              isWebUISettings ||
+              isAPIKeysTokens ||
+              isLanguagePreferences ||
+              isOverlayFiles ||
+              isResolutionOverlays ||
+              isFonts ||
+              isOverlayPart;
+
+            return (
+              <div key={groupName}>
+                {/* Separate Header Card */}
+                <div className="bg-theme-card rounded-xl border border-theme hover:border-theme-primary/50 transition-all shadow-sm mb-4">
+                  <div className="px-6 py-5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-lg bg-theme-primary/10">
+                        <GroupIcon className="w-6 h-6 text-theme-primary" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-xl font-semibold text-theme-primary">
+                          {formatGroupName(groupName)}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-sm text-theme-muted">
+                            {settingsCount} setting
+                            {settingsCount !== 1 ? "s" : ""}
+                            {searchQuery && " (filtered)"}
+                          </p>
+                          {readmeLink && (
+                            <a
+                              href={readmeLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg transition-all shadow-sm hover:scale-105"
+                              title="Open settings documentation in GitHub README"
+                            >
+                              <Github className="w-3.5 h-3.5 text-theme-primary" />
+                              <span>SETTINGS WIKI</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      isExpanded
-                        ? "bg-theme-card text-theme-primary border border-theme-primary/50 shadow-sm"
-                        : "bg-theme-card text-theme-muted border border-theme"
-                    }`}
-                  >
-                    {isExpanded ? "Open" : "Closed"}
-                  </span>
-                  {isExpanded ? (
-                    <ChevronDown className="w-6 h-6 text-theme-primary transition-transform" />
-                  ) : (
-                    <ChevronRight className="w-6 h-6 text-theme-muted transition-transform" />
-                  )}
-                </div>
-              </button>
 
-              {/* Group Content */}
-              {isExpanded && (
-                <div className="px-6 pb-6 border-t border-theme bg-theme-bg/30">
-                  <div className="pt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {fields.map((key, index) => {
-                      const value = usingFlatStructure
-                        ? config[key]
-                        : config[groupName]?.[key];
+                {/* Group Content - Different styling for WebUI Settings */}
+                <div
+                  className={
+                    needsNoOverflow
+                      ? "bg-theme-card rounded-xl border border-theme hover:border-theme-primary/50 transition-all shadow-sm"
+                      : "bg-theme-card rounded-xl border border-theme overflow-hidden hover:border-theme-primary/50 transition-all shadow-sm"
+                  }
+                >
+                  <div className="px-6 pb-6 bg-theme-bg/30 pt-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {fields.map((key, index) => {
+                        const value = usingFlatStructure
+                          ? config[key]
+                          : config[groupName]?.[key];
 
-                      const displayName = getDisplayName(key);
+                        const displayName = getDisplayName(key);
 
-                      // Create array to hold the field(s) to render
-                      const fieldsToRender = [];
+                        // Create array to hold the field(s) to render
+                        const fieldsToRender = [];
 
-                      // Special styling for toggles to span both columns
-                      const isFullWidthToggle =
-                        (key === "NewLineOnSpecificSymbols" &&
-                          groupName === "Text Formatting") ||
-                        (key === "UsePosterResolutionOverlays" &&
-                          groupName === "Resolution Overlays") ||
-                        (key === "UseBackgroundResolutionOverlays" &&
-                          groupName === "Resolution Overlays") ||
-                        (key === "UseTCResolutionOverlays" &&
-                          groupName === "Resolution Overlays");
+                        // Special styling for toggles to span both columns
+                        const isFullWidthToggle =
+                          (key === "NewLineOnSpecificSymbols" &&
+                            groupName === "Text Formatting") ||
+                          (key === "UsePosterResolutionOverlays" &&
+                            groupName === "Resolution Overlays") ||
+                          (key === "UseBackgroundResolutionOverlays" &&
+                            groupName === "Resolution Overlays") ||
+                          (key === "UseTCResolutionOverlays" &&
+                            groupName === "Resolution Overlays");
 
-                      // Special styling for Library Exclusion Selectors to span both columns
-                      const isFullWidthLibrarySelector =
-                        key === "PlexLibstoExclude" ||
-                        key === "JellyfinLibstoExclude" ||
-                        key === "EmbyLibstoExclude";
+                        // Special styling for Library Exclusion Selectors to span both columns
+                        const isFullWidthLibrarySelector =
+                          key === "PlexLibstoExclude" ||
+                          key === "JellyfinLibstoExclude" ||
+                          key === "EmbyLibstoExclude";
 
-                      // Main field
-                      fieldsToRender.push(
-                        <div
-                          key={key}
-                          className={`space-y-3 ${
-                            isFullWidthToggle || isFullWidthLibrarySelector
-                              ? "lg:col-span-2"
-                              : ""
-                          }`}
-                        >
-                          <label className="block">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold text-theme-primary">
-                                  {displayName}
-                                </span>
-                                {CONFIG_TOOLTIPS[key] && (
-                                  <Tooltip text={CONFIG_TOOLTIPS[key]}>
-                                    <HelpCircle className="w-4 h-4 text-theme-muted hover:text-theme-primary cursor-help transition-colors" />
-                                  </Tooltip>
-                                )}
-                              </div>
-                              {key !== displayName && (
-                                <span className="text-xs text-theme-muted font-mono bg-theme-bg px-2 py-1 rounded">
-                                  {getCleanSettingKey(key)}
-                                </span>
-                              )}
-                            </div>
-                            {renderInput(groupName, key, value)}
-                          </label>
-                        </div>
-                      );
-
-                      // Insert WebUI Log Level dropdown after basicAuthPassword in WebUI Settings
-                      if (
-                        key === "basicAuthPassword" &&
-                        groupName === "WebUI Settings"
-                      ) {
+                        // Main field
                         fieldsToRender.push(
-                          <div key="webuiLogLevel-ui" className="space-y-3">
+                          <div
+                            key={key}
+                            className={`space-y-3 ${
+                              isFullWidthToggle || isFullWidthLibrarySelector
+                                ? "lg:col-span-2"
+                                : ""
+                            }`}
+                          >
                             <label className="block">
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-semibold text-theme-primary">
-                                    WebUI Backend Log Level
+                                    {displayName}
                                   </span>
-                                  {CONFIG_TOOLTIPS["webuiLogLevel"] && (
-                                    <Tooltip
-                                      text={CONFIG_TOOLTIPS["webuiLogLevel"]}
-                                    >
+                                  {CONFIG_TOOLTIPS[key] && (
+                                    <Tooltip text={CONFIG_TOOLTIPS[key]}>
                                       <HelpCircle className="w-4 h-4 text-theme-muted hover:text-theme-primary cursor-help transition-colors" />
                                     </Tooltip>
                                   )}
                                 </div>
-                              </div>
-
-                              {/* WebUI Log Level Dropdown */}
-                              <div
-                                className="relative"
-                                ref={webuiLogLevelDropdownRef}
-                              >
-                                <button
-                                  onClick={() => {
-                                    const shouldOpenUp =
-                                      calculateDropdownPosition(
-                                        webuiLogLevelDropdownRef
-                                      );
-                                    setWebuiLogLevelDropdownUp(shouldOpenUp);
-                                    setWebuiLogLevelDropdownOpen(
-                                      !webuiLogLevelDropdownOpen
-                                    );
-                                  }}
-                                  className="w-full h-[42px] px-4 py-2.5 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary transition-all cursor-pointer shadow-sm flex items-center justify-between"
-                                >
-                                  <span className="text-theme-text">
-                                    {webuiLogLevel}
+                                {key !== displayName && (
+                                  <span className="text-xs text-theme-muted font-mono bg-theme-bg px-2 py-1 rounded">
+                                    {getCleanSettingKey(key)}
                                   </span>
-                                  <ChevronDown
-                                    className={`w-5 h-5 text-theme-muted transition-transform ${
-                                      webuiLogLevelDropdownOpen
-                                        ? "rotate-180"
-                                        : ""
-                                    }`}
-                                  />
-                                </button>
+                                )}
+                              </div>
+                              {renderInput(groupName, key, value)}
+                            </label>
+                          </div>
+                        );
 
-                                {webuiLogLevelDropdownOpen && (
-                                  <>
-                                    <div
-                                      className="fixed inset-0 z-40"
-                                      onClick={() =>
-                                        setWebuiLogLevelDropdownOpen(false)
-                                      }
+                        // Insert WebUI Log Level dropdown after basicAuthPassword in WebUI Settings
+                        if (
+                          key === "basicAuthPassword" &&
+                          groupName === "WebUI Settings"
+                        ) {
+                          fieldsToRender.push(
+                            <div key="webuiLogLevel-ui" className="space-y-3">
+                              <label className="block">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-theme-primary">
+                                      WebUI Backend Log Level
+                                    </span>
+                                    {CONFIG_TOOLTIPS["webuiLogLevel"] && (
+                                      <Tooltip
+                                        text={CONFIG_TOOLTIPS["webuiLogLevel"]}
+                                      >
+                                        <HelpCircle className="w-4 h-4 text-theme-muted hover:text-theme-primary cursor-help transition-colors" />
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* WebUI Log Level Dropdown */}
+                                <div
+                                  className="relative"
+                                  ref={webuiLogLevelDropdownRef}
+                                >
+                                  <button
+                                    onClick={() =>
+                                      setWebuiLogLevelDropdownOpen(
+                                        !webuiLogLevelDropdownOpen
+                                      )
+                                    }
+                                    className="w-full h-[42px] px-4 py-2.5 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary transition-all cursor-pointer shadow-sm flex items-center justify-between"
+                                  >
+                                    <span className="text-theme-text">
+                                      {webuiLogLevel}
+                                    </span>
+                                    <ChevronDown
+                                      className={`w-5 h-5 text-theme-muted transition-transform ${
+                                        webuiLogLevelDropdownOpen
+                                          ? "rotate-180"
+                                          : ""
+                                      }`}
                                     />
+                                  </button>
+
+                                  {webuiLogLevelDropdownOpen && (
                                     <div
-                                      className={`absolute z-50 left-0 right-0 ${
-                                        webuiLogLevelDropdownUp
-                                          ? "bottom-full mb-2"
-                                          : "top-full mt-2"
-                                      } rounded-lg bg-theme-card border border-theme shadow-lg overflow-hidden`}
+                                      className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg"
+                                      style={{
+                                        left: webuiLogLevelDropdownRef.current?.getBoundingClientRect()
+                                          .left,
+                                        width:
+                                          webuiLogLevelDropdownRef.current
+                                            ?.offsetWidth,
+                                        ...(getDropdownPosition(
+                                          webuiLogLevelDropdownRef.current
+                                        ).openUpward
+                                          ? {
+                                              bottom: getDropdownPosition(
+                                                webuiLogLevelDropdownRef.current
+                                              ).bottom,
+                                            }
+                                          : {
+                                              top: getDropdownPosition(
+                                                webuiLogLevelDropdownRef.current
+                                              ).top,
+                                            }),
+                                      }}
                                     >
                                       <div className="p-2">
                                         <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
@@ -6181,154 +6307,154 @@ function ConfigEditor() {
                                         ))}
                                       </div>
                                     </div>
-                                  </>
-                                )}
-                              </div>
-                            </label>
-                          </div>
-                        );
-                      }
+                                  )}
+                                </div>
+                              </label>
+                            </div>
+                          );
+                        }
 
-                      // Insert UseJellySync after UseJellyfin
-                      if (
-                        key === "UseJellyfin" &&
-                        (groupName === "JellyfinPart" ||
-                          groupName === "Jellyfin Settings")
-                      ) {
-                        // Check if UseJellyfin is enabled - if yes, disable the Sync toggle
-                        const jellyfinEnabled = usingFlatStructure
-                          ? config["UseJellyfin"] === "true" ||
-                            config["UseJellyfin"] === true
-                          : config["JellyfinPart"]?.UseJellyfin === "true" ||
-                            config["JellyfinPart"]?.UseJellyfin === true;
+                        // Insert UseJellySync after UseJellyfin
+                        if (
+                          key === "UseJellyfin" &&
+                          (groupName === "JellyfinPart" ||
+                            groupName === "Jellyfin Settings")
+                        ) {
+                          // Check if UseJellyfin is enabled - if yes, disable the Sync toggle
+                          const jellyfinEnabled = usingFlatStructure
+                            ? config["UseJellyfin"] === "true" ||
+                              config["UseJellyfin"] === true
+                            : config["JellyfinPart"]?.UseJellyfin === "true" ||
+                              config["JellyfinPart"]?.UseJellyfin === true;
 
-                        fieldsToRender.push(
-                          <div key="UseJellySync-ui" className="space-y-3">
-                            <label className="block">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-semibold text-theme-primary">
+                          fieldsToRender.push(
+                            <div key="UseJellySync-ui" className="space-y-3">
+                              <label className="block">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-theme-primary">
+                                      Use JellySync
+                                    </span>
+                                    {CONFIG_TOOLTIPS["UseJellySync"] && (
+                                      <Tooltip
+                                        text={CONFIG_TOOLTIPS["UseJellySync"]}
+                                      >
+                                        <HelpCircle className="w-4 h-4 text-theme-muted hover:text-theme-primary cursor-help transition-colors" />
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-theme-muted font-mono bg-theme-bg px-2 py-1 rounded">
+                                    UI Only
+                                  </span>
+                                </div>
+                                <div
+                                  className={`flex items-center justify-between h-[42px] px-4 bg-theme-bg rounded-lg border border-theme transition-all ${
+                                    jellyfinEnabled
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : "hover:border-theme-primary/30"
+                                  }`}
+                                >
+                                  <div className="text-sm font-medium text-theme-text">
                                     Use JellySync
-                                  </span>
-                                  {CONFIG_TOOLTIPS["UseJellySync"] && (
-                                    <Tooltip
-                                      text={CONFIG_TOOLTIPS["UseJellySync"]}
-                                    >
-                                      <HelpCircle className="w-4 h-4 text-theme-muted hover:text-theme-primary cursor-help transition-colors" />
-                                    </Tooltip>
-                                  )}
+                                    {jellyfinEnabled && (
+                                      <span className="text-xs text-theme-muted ml-2">
+                                        (Disabled when Jellyfin is active)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={useJellySync}
+                                      onChange={(e) =>
+                                        setUseJellySync(e.target.checked)
+                                      }
+                                      disabled={jellyfinEnabled}
+                                      className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-2 peer-focus:ring-theme-primary peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-primary peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+                                  </label>
                                 </div>
-                                <span className="text-xs text-theme-muted font-mono bg-theme-bg px-2 py-1 rounded">
-                                  UI Only
-                                </span>
-                              </div>
-                              <div
-                                className={`flex items-center justify-between h-[42px] px-4 bg-theme-bg rounded-lg border border-theme transition-all ${
-                                  jellyfinEnabled
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : "hover:border-theme-primary/30"
-                                }`}
-                              >
-                                <div className="text-sm font-medium text-theme-text">
-                                  Use JellySync
-                                  {jellyfinEnabled && (
-                                    <span className="text-xs text-theme-muted ml-2">
-                                      (Disabled when Jellyfin is active)
+                              </label>
+                            </div>
+                          );
+                        }
+
+                        // Insert UseEmbySync after UseEmby
+                        if (
+                          key === "UseEmby" &&
+                          (groupName === "EmbyPart" ||
+                            groupName === "Emby Settings")
+                        ) {
+                          // Check if UseEmby is enabled - if yes, disable the Sync toggle
+                          const embyEnabled = usingFlatStructure
+                            ? config["UseEmby"] === "true" ||
+                              config["UseEmby"] === true
+                            : config["EmbyPart"]?.UseEmby === "true" ||
+                              config["EmbyPart"]?.UseEmby === true;
+
+                          fieldsToRender.push(
+                            <div key="UseEmbySync-ui" className="space-y-3">
+                              <label className="block">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-theme-primary">
+                                      Use EmbySync
                                     </span>
-                                  )}
+                                    {CONFIG_TOOLTIPS["UseEmbySync"] && (
+                                      <Tooltip
+                                        text={CONFIG_TOOLTIPS["UseEmbySync"]}
+                                      >
+                                        <HelpCircle className="w-4 h-4 text-theme-muted hover:text-theme-primary cursor-help transition-colors" />
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-theme-muted font-mono bg-theme-bg px-2 py-1 rounded">
+                                    UI Only
+                                  </span>
                                 </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={useJellySync}
-                                    onChange={(e) =>
-                                      setUseJellySync(e.target.checked)
-                                    }
-                                    disabled={jellyfinEnabled}
-                                    className="sr-only peer"
-                                  />
-                                  <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-2 peer-focus:ring-theme-primary peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-primary peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
-                                </label>
-                              </div>
-                            </label>
-                          </div>
-                        );
-                      }
-
-                      // Insert UseEmbySync after UseEmby
-                      if (
-                        key === "UseEmby" &&
-                        (groupName === "EmbyPart" ||
-                          groupName === "Emby Settings")
-                      ) {
-                        // Check if UseEmby is enabled - if yes, disable the Sync toggle
-                        const embyEnabled = usingFlatStructure
-                          ? config["UseEmby"] === "true" ||
-                            config["UseEmby"] === true
-                          : config["EmbyPart"]?.UseEmby === "true" ||
-                            config["EmbyPart"]?.UseEmby === true;
-
-                        fieldsToRender.push(
-                          <div key="UseEmbySync-ui" className="space-y-3">
-                            <label className="block">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-semibold text-theme-primary">
+                                <div
+                                  className={`flex items-center justify-between h-[42px] px-4 bg-theme-bg rounded-lg border border-theme transition-all ${
+                                    embyEnabled
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : "hover:border-theme-primary/30"
+                                  }`}
+                                >
+                                  <div className="text-sm font-medium text-theme-text">
                                     Use EmbySync
-                                  </span>
-                                  {CONFIG_TOOLTIPS["UseEmbySync"] && (
-                                    <Tooltip
-                                      text={CONFIG_TOOLTIPS["UseEmbySync"]}
-                                    >
-                                      <HelpCircle className="w-4 h-4 text-theme-muted hover:text-theme-primary cursor-help transition-colors" />
-                                    </Tooltip>
-                                  )}
+                                    {embyEnabled && (
+                                      <span className="text-xs text-theme-muted ml-2">
+                                        (Disabled when Emby is active)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={useEmbySync}
+                                      onChange={(e) =>
+                                        setUseEmbySync(e.target.checked)
+                                      }
+                                      disabled={embyEnabled}
+                                      className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-2 peer-focus:ring-theme-primary peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-primary peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+                                  </label>
                                 </div>
-                                <span className="text-xs text-theme-muted font-mono bg-theme-bg px-2 py-1 rounded">
-                                  UI Only
-                                </span>
-                              </div>
-                              <div
-                                className={`flex items-center justify-between h-[42px] px-4 bg-theme-bg rounded-lg border border-theme transition-all ${
-                                  embyEnabled
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : "hover:border-theme-primary/30"
-                                }`}
-                              >
-                                <div className="text-sm font-medium text-theme-text">
-                                  Use EmbySync
-                                  {embyEnabled && (
-                                    <span className="text-xs text-theme-muted ml-2">
-                                      (Disabled when Emby is active)
-                                    </span>
-                                  )}
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={useEmbySync}
-                                    onChange={(e) =>
-                                      setUseEmbySync(e.target.checked)
-                                    }
-                                    disabled={embyEnabled}
-                                    className="sr-only peer"
-                                  />
-                                  <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-2 peer-focus:ring-theme-primary peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-primary peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
-                                </label>
-                              </div>
-                            </label>
-                          </div>
-                        );
-                      }
+                              </label>
+                            </div>
+                          );
+                        }
 
-                      return fieldsToRender;
-                    })}
+                        return fieldsToRender;
+                      })}
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            );
+          });
+        })()}
 
         {/* No Results Message */}
         {searchQuery && getFilteredGroupsByTab(activeTab).length === 0 && (

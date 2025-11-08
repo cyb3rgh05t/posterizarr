@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronDown, GripVertical, Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -41,6 +41,32 @@ const LanguageOrderSelector = ({ value = [], onChange, label, helpText }) => {
   const [selectedLanguages, setSelectedLanguages] = useState([]);
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Helper to calculate dropdown position (above or below button)
+  const getDropdownPosition = (buttonRef) => {
+    if (!buttonRef) return { top: 0, openUpward: false };
+
+    const rect = buttonRef.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const dropdownHeight = 264; // max-h-64 = 16rem = 256px + padding
+
+    // Open upward if not enough space below AND more space above
+    const openUpward = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+
+    if (openUpward) {
+      return {
+        bottom: window.innerHeight - rect.top + 8,
+        openUpward: true,
+      };
+    } else {
+      return {
+        top: rect.bottom + 8,
+        openUpward: false,
+      };
+    }
+  };
 
   // Initialize from value prop
   useEffect(() => {
@@ -48,6 +74,25 @@ const LanguageOrderSelector = ({ value = [], onChange, label, helpText }) => {
       setSelectedLanguages(value);
     }
   }, [value]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        dropdownOpen &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target)
+      ) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [dropdownOpen]);
 
   // Get available languages (not yet selected)
   const availableLanguages = COMMON_LANGUAGES.filter(
@@ -234,7 +279,7 @@ const LanguageOrderSelector = ({ value = [], onChange, label, helpText }) => {
 
       {/* Add Language Dropdown */}
       {availableLanguages.length > 0 && (
-        <div className="relative">
+        <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-theme-bg hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
@@ -254,37 +299,37 @@ const LanguageOrderSelector = ({ value = [], onChange, label, helpText }) => {
 
           {/* Dropdown Menu */}
           {dropdownOpen && (
-            <>
-              {/* Backdrop */}
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setDropdownOpen(false)}
-              />
-
-              {/* Dropdown Content */}
-              <div className="absolute z-20 w-full mt-2 rounded-lg bg-theme-card border border-theme shadow-lg max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-theme-primary scrollbar-track-theme-bg">
-                <div className="p-2">
-                  <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
-                    {t("languageOrderSelector.selectLanguage")}
-                  </div>
-                  {availableLanguages.map((lang) => (
-                    <button
-                      key={lang.code}
-                      onClick={() => addLanguage(lang.code)}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-theme-hover text-left"
-                    >
-                      <span className="font-mono text-sm text-theme-primary font-semibold w-8">
-                        {lang.code}
-                      </span>
-                      <span className="text-sm text-theme-muted">•</span>
-                      <span className="text-sm text-gray-300 hover:text-white">
-                        {lang.name}
-                      </span>
-                    </button>
-                  ))}
+            <div
+              className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-theme-primary scrollbar-track-theme-bg"
+              style={{
+                left: dropdownRef.current?.getBoundingClientRect().left,
+                width: dropdownRef.current?.offsetWidth,
+                ...(getDropdownPosition(dropdownRef.current).openUpward
+                  ? { bottom: getDropdownPosition(dropdownRef.current).bottom }
+                  : { top: getDropdownPosition(dropdownRef.current).top }),
+              }}
+            >
+              <div className="p-2">
+                <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                  {t("languageOrderSelector.selectLanguage")}
                 </div>
+                {availableLanguages.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => addLanguage(lang.code)}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-theme-hover text-left"
+                  >
+                    <span className="font-mono text-sm text-theme-primary font-semibold w-8">
+                      {lang.code}
+                    </span>
+                    <span className="text-sm text-theme-muted">•</span>
+                    <span className="text-sm text-gray-300 hover:text-white">
+                      {lang.name}
+                    </span>
+                  </button>
+                ))}
               </div>
-            </>
+            </div>
           )}
         </div>
       )}
