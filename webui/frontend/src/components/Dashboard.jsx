@@ -54,7 +54,7 @@ const getLogFileForMode = (mode) => {
 
 const getWebSocketURL = (logFile) => {
   // Check if the page is loaded via HTTPS or HTTP
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 
   const baseURL = isDev
     ? `ws://localhost:3000/ws/logs`
@@ -87,6 +87,7 @@ function Dashboard() {
   );
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(!cachedStatus);
   const [version, setVersion] = useState(
     cachedVersion || { local: null, remote: null }
   );
@@ -215,6 +216,7 @@ function Dashboard() {
         hasInitiallyLoaded.current = true;
         finishLoading("dashboard");
       }
+      setInitialLoading(false);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       // Even on error, mark as loaded to show the page
@@ -222,6 +224,7 @@ function Dashboard() {
         hasInitiallyLoaded.current = true;
         finishLoading("dashboard");
       }
+      setInitialLoading(false);
     } finally {
       if (!silent) {
         setTimeout(() => {
@@ -809,7 +812,9 @@ function Dashboard() {
                   <div className="space-y-1">
                     {status.current_mode && (
                       <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30 mb-1">
-                        {t("dashboard.mode")}: {status.current_mode}
+                        {t("dashboard.mode")}:{" "}
+                        {status.current_mode.charAt(0).toUpperCase() +
+                          status.current_mode.slice(1)}
                       </div>
                     )}
                     {status.pid && (
@@ -822,7 +827,9 @@ function Dashboard() {
                       <p className="text-xs text-theme-muted">
                         Started:{" "}
                         <span className="font-mono">
-                          {new Date(status.start_time).toLocaleString("sv-SE").replace("T", " ")}
+                          {new Date(status.start_time)
+                            .toLocaleString("sv-SE")
+                            .replace("T", " ")}
                         </span>
                       </p>
                     )}
@@ -881,7 +888,9 @@ function Dashboard() {
                         {schedulerStatus.next_run && (
                           <p className="text-xs text-blue-400">
                             {t("dashboard.nextRun")}:{" "}
-                            {new Date(schedulerStatus.next_run).toLocaleString("sv-SE").replace("T", " ")}
+                            {new Date(schedulerStatus.next_run)
+                              .toLocaleString("sv-SE")
+                              .replace("T", " ")}
                           </p>
                         )}
                       </>
@@ -917,84 +926,80 @@ function Dashboard() {
                 <p className="text-theme-muted text-sm mb-1 font-medium">
                   {t("dashboard.scriptFile")} & {t("dashboard.configFile")}
                 </p>
-                <div className="space-y-3">
-                  {/* Script Status */}
-                  <div className="flex items-center gap-2">
-                    {status.script_exists ? (
-                      <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                    )}
-                    <span
-                      className={`text-lg font-bold ${
-                        status.script_exists ? "text-green-400" : "text-red-400"
-                      }`}
-                    >
-                      {t("dashboard.scriptFile")}:{" "}
-                      {status.script_exists
-                        ? t("dashboard.found")
-                        : t("dashboard.missing")}
-                    </span>
+                {initialLoading ? (
+                  <div className="flex items-center gap-2 py-4">
+                    <RefreshCw className="w-5 h-5 text-theme-primary animate-spin" />
+                    <span className="text-theme-muted">Loading...</span>
                   </div>
-                  {status.script_exists &&
-                    (version.local || version.remote) && (
-                      <div className="flex items-center gap-2 flex-wrap ml-7">
-                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-card border border-theme-primary text-theme-primary shadow-sm">
-                          v{version.local || version.remote}
-                        </span>
-                        {version.is_update_available && (
-                          <a
-                            href="https://github.com/fscorrupt/Posterizarr/releases/latest"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center"
-                          >
-                            <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/20 border border-green-500/50 text-green-400 shadow-sm animate-pulse hover:scale-105 transition-transform">
-                              v{version.remote} available
-                            </span>
-                          </a>
-                        )}
+                ) : (
+                  <div className="space-y-3">
+                    {/* Script Status */}
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-lg font-bold ${
+                          status.script_exists
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {status.script_exists
+                          ? t("dashboard.scriptFile")
+                          : `${t("dashboard.scriptFile")}: ${t(
+                              "dashboard.missing"
+                            )}`}
+                      </span>
+                    </div>
+                    {status.script_exists &&
+                      (version.local || version.remote) && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-card border border-theme-primary text-theme-primary shadow-sm">
+                            v{version.local || version.remote}
+                          </span>
+                          {version.is_update_available && (
+                            <a
+                              href="https://github.com/fscorrupt/Posterizarr/releases/latest"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center"
+                            >
+                              <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/20 border border-green-500/50 text-green-400 shadow-sm animate-pulse hover:scale-105 transition-transform">
+                                v{version.remote} available
+                              </span>
+                            </a>
+                          )}
+                        </div>
+                      )}
+
+                    {/* Config Status */}
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-lg font-bold ${
+                          status.config_exists
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {status.config_exists
+                          ? t("dashboard.configFile")
+                          : `${t("dashboard.configFile")}: ${t(
+                              "dashboard.missing"
+                            )}`}
+                      </span>
+                    </div>
+                    {status.config_exists && (
+                      <div>
+                        <Link
+                          to="/config"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+                        >
+                          <Settings className="w-4 h-4 text-theme-primary" />
+                          <span className="text-theme-text">
+                            {t("dashboard.configureNow")}
+                          </span>
+                        </Link>
                       </div>
                     )}
-
-                  {/* Config Status */}
-                  <div className="flex items-center gap-2">
-                    {status.config_exists ? (
-                      <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                    )}
-                    <span
-                      className={`text-lg font-bold ${
-                        status.config_exists ? "text-green-400" : "text-red-400"
-                      }`}
-                    >
-                      {t("dashboard.configFile")}:{" "}
-                      {status.config_exists
-                        ? t("dashboard.found")
-                        : t("dashboard.missing")}
-                    </span>
                   </div>
-                  {status.config_exists && (
-                    <div className="ml-7">
-                      <Link
-                        to="/config"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
-                      >
-                        <Settings className="w-4 h-4 text-theme-primary" />
-                        <span className="text-theme-text">
-                          {t("dashboard.configureNow")}
-                        </span>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="p-3 rounded-lg bg-theme-primary/10">
-                {status.script_exists && status.config_exists ? (
-                  <CheckCircle className="w-12 h-12 text-green-400" />
-                ) : (
-                  <AlertCircle className="w-12 h-12 text-red-400" />
                 )}
               </div>
             </div>
@@ -1335,8 +1340,8 @@ function Dashboard() {
         )}
       </div>
 
-      {/* Already Running Warning */}
-      {status.already_running_detected && (
+      {/* Already Running Warning - only show after initial load */}
+      {!initialLoading && status.already_running_detected && (
         <div className="bg-yellow-900/30 border-l-4 border-yellow-500 rounded-lg p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <AlertTriangle className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-1" />

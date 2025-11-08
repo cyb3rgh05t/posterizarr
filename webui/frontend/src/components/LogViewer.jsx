@@ -25,7 +25,7 @@ const isDev = import.meta.env.DEV;
 
 const getWebSocketURL = (logFile) => {
   // Check if the page is loaded via HTTPS or HTTP
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 
   const baseURL = isDev
     ? `ws://localhost:3000/ws/logs`
@@ -667,7 +667,9 @@ function LogViewer() {
                 <p className="text-sm text-orange-300/80">
                   {status.current_mode && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-200 mr-2">
-                      {t("logViewer.mode")}: {status.current_mode}
+                      {t("logViewer.mode")}:{" "}
+                      {status.current_mode.charAt(0).toUpperCase() +
+                        status.current_mode.slice(1)}
                     </span>
                   )}
                   {t("logViewer.stopBeforeRunning")}

@@ -5051,15 +5051,12 @@ async def get_status():
         # Get last 25 log lines from the active log file
         last_logs = get_last_log_lines(25, log_file=active_log)
 
-        # Check for "already running" warning
-        already_running = False
-        for line in last_logs[-5:]:  # Check last 5 lines
-            if "Another Posterizarr instance already running" in line:
-                already_running = True
-                break
-
         # Check if running file exists
         running_file_exists = RUNNING_FILE.exists()
+
+        # Only show "already running" warning if running file exists but script is not detected as running
+        # This indicates a stale lock file that should be cleaned up
+        already_running = running_file_exists and not is_running
 
         # Determine PID to show
         display_pid = None

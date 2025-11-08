@@ -572,7 +572,9 @@ function RuntimeHistory() {
                     {t("runtimeStats.lastRun")}:
                   </span>
                   <span className="text-sm text-theme-text font-mono">
-                    {new Date(summary.latest_run.start_time).toLocaleString("sv-SE").replace("T", " ")}
+                    {new Date(summary.latest_run.start_time)
+                      .toLocaleString("sv-SE")
+                      .replace("T", " ")}
                   </span>
                 </div>
               )}
@@ -1030,12 +1032,15 @@ function RuntimeHistory() {
                 fetchSummary();
               }}
               disabled={refreshing}
-              className="flex items-center gap-2 px-4 py-2 text-theme-muted hover:text-theme-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:bg-theme-hover rounded-lg"
+              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
               title={t("runtimeHistory.refreshHistory")}
             >
               <RefreshCw
-                className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
+                className={`w-5 h-5 text-theme-primary ${
+                  refreshing ? "animate-spin" : ""
+                }`}
               />
+              <span className="text-sm font-medium">{t("common.refresh")}</span>
             </button>
           </div>
         </div>
@@ -1098,7 +1103,9 @@ function RuntimeHistory() {
                     title={t("runtimeHistory.clickForDetails")}
                   >
                     <td className="py-3 px-4 text-theme-text text-sm">
-                      {new Date(entry.start_time).toLocaleString("sv-SE").replace("T", " ")}
+                      {new Date(entry.start_time)
+                        .toLocaleString("sv-SE")
+                        .replace("T", " ")}
                     </td>
                     <td className="py-3 px-4">
                       <span
@@ -1192,7 +1199,9 @@ function RuntimeHistory() {
                     {t("runtimeHistory.detailTitle")}
                   </h2>
                   <p className="text-sm text-theme-muted">
-                    {new Date(selectedEntry.start_time).toLocaleString("sv-SE").replace("T", " ")}
+                    {new Date(selectedEntry.start_time)
+                      .toLocaleString("sv-SE")
+                      .replace("T", " ")}
                   </p>
                 </div>
               </div>
@@ -1238,7 +1247,9 @@ function RuntimeHistory() {
                         {t("runtimeStats.startTime")}
                       </p>
                       <p className="text-sm font-medium text-theme-text">
-                        {new Date(selectedEntry.start_time).toLocaleString("sv-SE").replace("T", " ")}
+                        {new Date(selectedEntry.start_time)
+                          .toLocaleString("sv-SE")
+                          .replace("T", " ")}
                       </p>
                     </div>
                   )}
@@ -1248,7 +1259,9 @@ function RuntimeHistory() {
                         {t("runtimeStats.endTime")}
                       </p>
                       <p className="text-sm font-medium text-theme-text">
-                        {new Date(selectedEntry.end_time).toLocaleString("sv-SE").replace("T", " ")}
+                        {new Date(selectedEntry.end_time)
+                          .toLocaleString("sv-SE")
+                          .replace("T", " ")}
                       </p>
                     </div>
                   )}
