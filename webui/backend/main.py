@@ -427,7 +427,7 @@ except ImportError as e:
 # Import database module
 try:
     logger.debug("Attempting to import database module")
-    from database import init_database, ImageChoicesDB
+    from database import init_database, ImageChoicesDB  # type: ignore[attr-defined]
 
     DATABASE_AVAILABLE = True
     logger.info("Database module loaded successfully")
@@ -628,7 +628,7 @@ def import_imagechoices_to_db():
         logger.error(f"Error importing CSV to database: {e}")
 
 
-def parse_version(version_str: str) -> tuple:
+def parse_version(version_str: str) -> Optional[tuple]:
     """
     Parse a semantic version string into a tuple of integers for comparison.
     Handles versions like "1.9.97", "2.0.0", "1.10.5", etc.
@@ -869,7 +869,7 @@ def process_image_path(image_path: Path):
         return None
 
 
-def determine_media_type(filename: str, library_folder: str = None) -> str:
+def determine_media_type(filename: str, library_folder: Optional[str] = None) -> str:
     """
     Determine media type from filename and library folder
 
@@ -921,11 +921,20 @@ def determine_media_type(filename: str, library_folder: str = None) -> str:
         # If library_type is None (not in DB), try to guess from folder name
         if library_type is None and library_folder:
             folder_lower = library_folder.lower()
-            if any(keyword in folder_lower for keyword in ["show", "series", "tv", "serien", "anime"]):
-                logger.debug(f"[MediaType] {filename} in {library_folder} -> Show Background (guessing from folder name)")
+            if any(
+                keyword in folder_lower
+                for keyword in ["show", "series", "tv", "serien", "anime"]
+            ):
+                logger.debug(
+                    f"[MediaType] {filename} in {library_folder} -> Show Background (guessing from folder name)"
+                )
                 return "Show Background"
-            if any(keyword in folder_lower for keyword in ["movie", "film", "kino", "4k"]):
-                logger.debug(f"[MediaType] {filename} in {library_folder} -> Movie Background (guessing from folder name)")
+            if any(
+                keyword in folder_lower for keyword in ["movie", "film", "kino", "4k"]
+            ):
+                logger.debug(
+                    f"[MediaType] {filename} in {library_folder} -> Movie Background (guessing from folder name)"
+                )
                 return "Movie Background"
 
         # Default to generic Background if library type unknown
@@ -951,17 +960,27 @@ def determine_media_type(filename: str, library_folder: str = None) -> str:
         if library_type is None and library_folder:
             folder_lower = library_folder.lower()
             # Common TV show library names
-            if any(keyword in folder_lower for keyword in ["show", "series", "tv", "serien", "anime"]):
-                logger.debug(f"[MediaType] {filename} in {library_folder} -> Show (guessing from folder name)")
+            if any(
+                keyword in folder_lower
+                for keyword in ["show", "series", "tv", "serien", "anime"]
+            ):
+                logger.debug(
+                    f"[MediaType] {filename} in {library_folder} -> Show (guessing from folder name)"
+                )
                 return "Show"
             # Common movie library names
-            if any(keyword in folder_lower for keyword in ["movie", "film", "kino", "4k"]):
-                logger.debug(f"[MediaType] {filename} in {library_folder} -> Movie (guessing from folder name)")
+            if any(
+                keyword in folder_lower for keyword in ["movie", "film", "kino", "4k"]
+            ):
+                logger.debug(
+                    f"[MediaType] {filename} in {library_folder} -> Movie (guessing from folder name)"
+                )
                 return "Movie"
 
     # Default to Movie for poster.jpg files
     logger.debug(f"[MediaType] {filename} in {library_folder} -> Movie (default)")
     return "Movie"
+
 
 def get_library_type_from_db(library_folder: str) -> Optional[str]:
     """
@@ -1011,6 +1030,8 @@ def get_library_type_from_db(library_folder: str) -> Optional[str]:
             )
 
     return None
+
+
 def scan_and_cache_assets():
     """
     Scans the assets directory and populates/refreshes the cache atomically.
@@ -1036,13 +1057,13 @@ def scan_and_cache_assets():
         "titlecards": [],
         "folders": [],
         "manual_gallery": {"libraries": [], "total_assets": 0},
-        "last_scanned": 0, # Will be set at the end
+        "last_scanned": 0,  # Will be set at the end
     }
 
     if not ASSETS_DIR.exists() or not ASSETS_DIR.is_dir():
         logger.warning("Assets directory not found. Clearing cache.")
         # If the path is gone, clear the global cache and stop.
-        asset_cache = new_cache # Set to empty
+        asset_cache = new_cache  # Set to empty
         asset_cache["last_scanned"] = time.time()
         cache_scan_in_progress = False
         return
@@ -1160,24 +1181,40 @@ def scan_and_cache_assets():
                             if "@eaDir" in img_file.parts:
                                 continue
                             if img_file.is_file() and img_file.suffix.lower() in [
-                                ".jpg", ".jpeg", ".png", ".webp"
+                                ".jpg",
+                                ".jpeg",
+                                ".png",
+                                ".webp",
                             ]:
-                                if img_file.suffix == ".backup" or ".backup" in img_file.name:
+                                if (
+                                    img_file.suffix == ".backup"
+                                    or ".backup" in img_file.name
+                                ):
                                     continue
 
                                 filename_lower = img_file.name.lower()
-                                if "poster.jpg" in filename_lower or "poster.png" in filename_lower:
+                                if (
+                                    "poster.jpg" in filename_lower
+                                    or "poster.png" in filename_lower
+                                ):
                                     asset_type = "poster"
-                                elif "background.jpg" in filename_lower or "background.png" in filename_lower:
+                                elif (
+                                    "background.jpg" in filename_lower
+                                    or "background.png" in filename_lower
+                                ):
                                     asset_type = "background"
                                 elif filename_lower.startswith("season"):
                                     asset_type = "season"
-                                elif re.match(r"^s\d+e\d+\.", filename_lower, re.IGNORECASE):
+                                elif re.match(
+                                    r"^s\d+e\d+\.", filename_lower, re.IGNORECASE
+                                ):
                                     asset_type = "titlecard"
                                 else:
                                     asset_type = "other"
 
-                                relative_path = f"{library_name}/{folder_name}/{img_file.name}"
+                                relative_path = (
+                                    f"{library_name}/{folder_name}/{img_file.name}"
+                                )
                                 encoded_relative_path = quote(relative_path, safe="/")
 
                                 assets.append(
@@ -1215,7 +1252,7 @@ def scan_and_cache_assets():
         # 5. Add manual gallery to 'new_cache'
         new_cache["manual_gallery"] = {
             "libraries": manual_libraries,
-            "total_assets": manual_total_assets
+            "total_assets": manual_total_assets,
         }
         logger.info(
             f"Manual assets scan complete: {len(manual_libraries)} libraries, {manual_total_assets} total assets"
@@ -1241,6 +1278,7 @@ def scan_and_cache_assets():
             f"{len(new_cache['folders'])} folders."
         )
 
+
 def background_cache_refresh(skip_initial_scan: bool = False):
     """Background thread that refreshes the cache periodically"""
     global cache_refresh_running
@@ -1264,10 +1302,14 @@ def background_cache_refresh(skip_initial_scan: bool = False):
         try:
             # Wait until the next refresh
             # Sleep in 1-second intervals to allow for fast shutdown
-            logger.debug(f"Cache refresh thread sleeping for {CACHE_REFRESH_INTERVAL} seconds...")
+            logger.debug(
+                f"Cache refresh thread sleeping for {CACHE_REFRESH_INTERVAL} seconds..."
+            )
             for _ in range(CACHE_REFRESH_INTERVAL):
                 if not cache_refresh_running:
-                    logger.info("Cache refresh thread received stop signal during sleep.")
+                    logger.info(
+                        "Cache refresh thread received stop signal during sleep."
+                    )
                     break
                 time.sleep(1)
 
@@ -1280,7 +1322,8 @@ def background_cache_refresh(skip_initial_scan: bool = False):
             # Continue running even if there's an error
             time.sleep(60)  # Wait a bit before retrying
 
-def start_cache_refresh_background(skip_initial_scan: bool = False): # <-- MODIFIED
+
+def start_cache_refresh_background(skip_initial_scan: bool = False):  # <-- MODIFIED
     """Start the background cache refresh thread"""
     global cache_refresh_task, cache_refresh_running
 
@@ -1291,9 +1334,9 @@ def start_cache_refresh_background(skip_initial_scan: bool = False): # <-- MODIF
     cache_refresh_running = True
     cache_refresh_task = threading.Thread(
         target=background_cache_refresh,
-        args=(skip_initial_scan,), # <-- MODIFIED
+        args=(skip_initial_scan,),  # <-- MODIFIED
         daemon=True,
-        name="CacheRefresh"
+        name="CacheRefresh",
     )
     cache_refresh_task.start()
     logger.info("Background cache refresh thread started")
@@ -1325,7 +1368,7 @@ def find_poster_in_assets(
     asset_type: str = "Poster",
     title: str = "",
     download_source: str = "",
-) -> str:
+) -> Optional[str]:
     """
     Search recursively in ASSETS_DIR for a folder matching rootfolder and return image URL
 
@@ -1454,7 +1497,7 @@ def find_poster_with_metadata(
     asset_type: str = "Poster",
     title: str = "",
     download_source: str = "",
-) -> dict:
+) -> Optional[dict]:
     """
     Same as find_poster_in_assets but returns metadata including file timestamps
 
@@ -1742,6 +1785,7 @@ async def get_script_version():
         "is_update_available": is_update_available,  # Boolean for update availability
     }
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown"""
@@ -1751,7 +1795,9 @@ async def lifespan(app: FastAPI):
 
     # This blocks the app from starting until the first scan is done,
     # ensuring the UI is populated on first load.
-    logger.info("Running initial asset cache scan... (UI will be available after this is complete)")
+    logger.info(
+        "Running initial asset cache scan... (UI will be available after this is complete)"
+    )
     try:
         # We wrap the blocking function in asyncio.to_thread to be a good async citizen
         await asyncio.to_thread(scan_and_cache_assets)
@@ -1811,15 +1857,16 @@ async def lifespan(app: FastAPI):
                         "Found existing ImageChoices.csv - importing to new database..."
                     )
                     try:
-                        stats = db.import_from_csv(csv_path)
-                        if stats["added"] > 0:
-                            logger.info(
-                                f"Initialized database with {stats['added']} records from existing CSV"
-                            )
-                        else:
-                            logger.info(
-                                "No records imported from CSV (all empty or invalid)"
-                            )
+                        if db:
+                            stats = db.import_from_csv(csv_path)
+                            if stats["added"] > 0:
+                                logger.info(
+                                    f"Initialized database with {stats['added']} records from existing CSV"
+                                )
+                            else:
+                                logger.info(
+                                    "No records imported from CSV (all empty or invalid)"
+                                )
                     except Exception as csv_error:
                         logger.warning(f"Could not import existing CSV: {csv_error}")
                 else:
@@ -1827,10 +1874,11 @@ async def lifespan(app: FastAPI):
 
             # Check if database has any records
             try:
-                record_count = len(db.get_all_choices())
-                logger.info(
-                    f"Database ready: {IMAGECHOICES_DB_PATH} ({record_count} records)"
-                )
+                if db:
+                    record_count = len(db.get_all_choices())
+                    logger.info(
+                        f"Database ready: {IMAGECHOICES_DB_PATH} ({record_count} records)"
+                    )
             except Exception:
                 logger.info(f"Database ready: {IMAGECHOICES_DB_PATH}")
 
@@ -2215,8 +2263,13 @@ async def update_config(data: ConfigUpdate):
 
             # Check if the database has libraries for this server type
             try:
-                db_result = server_libraries_db.get_media_server_libraries(server_type)
-                has_db_libraries = len(db_result.get("libraries", [])) > 0
+                if server_libraries_db:
+                    db_result = server_libraries_db.get_media_server_libraries(
+                        server_type
+                    )
+                    has_db_libraries = len(db_result.get("libraries", [])) > 0
+                else:
+                    has_db_libraries = False
 
                 # If database is empty but config.json has exclusions, preserve them
                 if not has_db_libraries and current_flat.get(exclusion_key):
@@ -2362,11 +2415,12 @@ async def get_config_db_status():
         return {
             "success": True,
             "available": True,
-            **status_data, # Unpack the safe data
+            **status_data,  # Unpack the safe data
         }
     except Exception as e:
         logger.error(f"Error getting config database status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/config-db/section/{section}")
 async def get_config_db_section(section: str):
@@ -2537,6 +2591,12 @@ async def upload_overlay_file(file: UploadFile = File(...)):
 
         # Validate file type - images and fonts
         logger.debug("Validating file type...")
+
+        # Check if filename exists
+        if not file.filename:
+            logger.error("No filename provided")
+            raise HTTPException(status_code=400, detail="No filename provided")
+
         allowed_extensions = {
             ".png",
             ".jpg",
@@ -2769,6 +2829,11 @@ async def upload_font_file(file: UploadFile = File(...)):
             )
 
         # Validate file type
+        # Check if filename exists
+        if not file.filename:
+            logger.error("No filename provided")
+            raise HTTPException(status_code=400, detail="No filename provided")
+
         allowed_extensions = {".ttf", ".otf", ".woff", ".woff2"}
         file_ext = Path(file.filename).suffix.lower()
 
@@ -3736,6 +3801,7 @@ async def validate_uptimekuma(request: UptimeKumaValidationRequest):
 # LIBRARY FETCHING ENDPOINTS
 # ============================================================================
 
+
 @app.get("/api/libraries/{server_type}/cached")
 async def get_cached_libraries(server_type: str):
     # ... (This function remains unchanged) ...
@@ -3745,6 +3811,9 @@ async def get_cached_libraries(server_type: str):
         return {"success": False, "error": "Invalid server type"}
 
     try:
+        if not server_libraries_db:
+            return {"success": False, "error": "Database not initialized"}
+
         result = server_libraries_db.get_media_server_libraries(server_type)
         logger.info(
             f"Found {len(result['libraries'])} cached libraries for {server_type} ({len(result['excluded'])} excluded)"
@@ -3758,8 +3827,10 @@ async def get_cached_libraries(server_type: str):
         logger.error(f"Error fetching cached libraries: {e}")
         return {"success": False, "error": str(e), "libraries": [], "excluded": []}
 
+
 class LibraryExclusionUpdate(BaseModel):
     excluded_libraries: list[str]
+
 
 @app.post("/api/libraries/{server_type}/exclusions")
 async def update_library_exclusions(server_type: str, request: LibraryExclusionUpdate):
@@ -3770,6 +3841,9 @@ async def update_library_exclusions(server_type: str, request: LibraryExclusionU
         return {"success": False, "error": "Invalid server type"}
 
     try:
+        if not server_libraries_db:
+            return {"success": False, "error": "Database not initialized"}
+
         server_libraries_db.update_library_exclusions(
             server_type, request.excluded_libraries
         )
@@ -3778,6 +3852,7 @@ async def update_library_exclusions(server_type: str, request: LibraryExclusionU
     except Exception as e:
         logger.error(f"Error updating library exclusions: {e}")
         return {"success": False, "error": str(e)}
+
 
 @app.post("/api/libraries/plex")
 async def get_plex_libraries(request: PlexValidationRequest):
@@ -3804,17 +3879,16 @@ async def get_plex_libraries(request: PlexValidationRequest):
                     # FIXED: Add ALL libraries to the main list
                     libraries.append(lib_info)
 
-                logger.info(
-                    f"Found {len(libraries)} Plex libraries (all types)"
-                )
+                logger.info(f"Found {len(libraries)} Plex libraries (all types)")
 
                 # Save libraries to database
                 try:
-                    # FIXED: Pass an empty list for exclusions
-                    server_libraries_db.save_media_server_libraries(
-                        "plex", libraries, []
-                    )
-                    logger.info("Saved Plex libraries to database")
+                    if server_libraries_db:
+                        # FIXED: Pass an empty list for exclusions
+                        server_libraries_db.save_media_server_libraries(
+                            "plex", libraries, []
+                        )
+                        logger.info("Saved Plex libraries to database")
                 except Exception as db_error:
                     logger.error(
                         f"Failed to save Plex libraries to database: {str(db_error)}"
@@ -3835,6 +3909,7 @@ async def get_plex_libraries(request: PlexValidationRequest):
     except Exception as e:
         logger.error(f"[ERROR] Error fetching Plex libraries: {str(e)}")
         return {"success": False, "error": str(e)}
+
 
 @app.post("/api/libraries/jellyfin")
 async def get_jellyfin_libraries(request: JellyfinValidationRequest):
@@ -3865,17 +3940,16 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
                     # FIXED: Add ALL libraries to the main list
                     libraries.append(lib_info)
 
-                logger.info(
-                    f"Found {len(libraries)} Jellyfin libraries (all types)"
-                )
+                logger.info(f"Found {len(libraries)} Jellyfin libraries (all types)")
 
                 # Save libraries to database
                 try:
-                    # FIXED: Pass an empty list for exclusions
-                    server_libraries_db.save_media_server_libraries(
-                        "jellyfin", libraries, []
-                    )
-                    logger.info("Saved Jellyfin libraries to database")
+                    if server_libraries_db:
+                        # FIXED: Pass an empty list for exclusions
+                        server_libraries_db.save_media_server_libraries(
+                            "jellyfin", libraries, []
+                        )
+                        logger.info("Saved Jellyfin libraries to database")
                 except Exception as db_error:
                     logger.error(
                         f"Failed to save Jellyfin libraries to database: {str(db_error)}"
@@ -3898,6 +3972,7 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
     except Exception as e:
         logger.error(f"[ERROR] Error fetching Jellyfin libraries: {str(e)}")
         return {"success": False, "error": str(e)}
+
 
 @app.post("/api/libraries/emby")
 async def get_emby_libraries(request: EmbyValidationRequest):
@@ -3927,17 +4002,16 @@ async def get_emby_libraries(request: EmbyValidationRequest):
                     # FIXED: Add ALL libraries to the main list
                     libraries.append(lib_info)
 
-                logger.info(
-                    f"Found {len(libraries)} Emby libraries (all types)"
-                )
+                logger.info(f"Found {len(libraries)} Emby libraries (all types)")
 
                 # Save libraries to database
                 try:
-                    # FIXED: Pass an empty list for exclusions
-                    server_libraries_db.save_media_server_libraries(
-                        "emby", libraries, []
-                    )
-                    logger.info("Saved Emby libraries and exclusions to database")
+                    if server_libraries_db:
+                        # FIXED: Pass an empty list for exclusions
+                        server_libraries_db.save_media_server_libraries(
+                            "emby", libraries, []
+                        )
+                        logger.info("Saved Emby libraries and exclusions to database")
                 except Exception as db_error:
                     logger.error(
                         f"Failed to save Emby libraries to database: {str(db_error)}"
@@ -3958,6 +4032,8 @@ async def get_emby_libraries(request: EmbyValidationRequest):
     except Exception as e:
         logger.error(f"[ERROR] Error fetching Emby libraries: {str(e)}")
         return {"success": False, "error": str(e)}
+
+
 # Request model for fetching library items
 class LibraryItemsRequest(BaseModel):
     url: str
@@ -4772,10 +4848,10 @@ async def get_upload_diagnostics():
             import grp
 
             diagnostics["user"] = {
-                "uid": os.getuid(),
-                "gid": os.getgid(),
-                "username": pwd.getpwuid(os.getuid()).pw_name,
-                "groupname": grp.getgrgid(os.getgid()).gr_name,
+                "uid": os.getuid(),  # type: ignore[attr-defined]
+                "gid": os.getgid(),  # type: ignore[attr-defined]
+                "username": pwd.getpwuid(os.getuid()).pw_name,  # type: ignore[attr-defined]
+                "groupname": grp.getgrgid(os.getgid()).gr_name,  # type: ignore[attr-defined]
             }
         except Exception as e:
             diagnostics["user"] = {"error": str(e)}
@@ -4820,7 +4896,9 @@ async def get_status():
                 logger.info("Triggering cache refresh after script completion...")
                 try:
                     threading.Thread(target=scan_and_cache_assets, daemon=True).start()
-                    logger.info("Cache refresh started in background after script completion")
+                    logger.info(
+                        "Cache refresh started in background after script completion"
+                    )
                 except Exception as e:
                     logger.error(f"Error refreshing cache after script completion: {e}")
 
@@ -4883,9 +4961,13 @@ async def get_status():
                     scheduler_is_running = False
 
                     # Auto-trigger cache refresh after scheduler finishes
-                    logger.info("Triggering cache refresh after scheduler completion...")
+                    logger.info(
+                        "Triggering cache refresh after scheduler completion..."
+                    )
                     try:
-                        threading.Thread(target=scan_and_cache_assets, daemon=True).start()
+                        threading.Thread(
+                            target=scan_and_cache_assets, daemon=True
+                        ).start()
                         logger.info(
                             "Cache refresh started in background after scheduler completion"
                         )
@@ -4899,7 +4981,9 @@ async def get_status():
                         # import_imagechoices_to_db()
                         pass
                     except Exception as e:
-                        logger.error(f"Error importing ImageChoices.csv to database: {e}")
+                        logger.error(
+                            f"Error importing ImageChoices.csv to database: {e}"
+                        )
 
                     # Save runtime statistics to database for scheduler runs
                     if RUNTIME_DB_AVAILABLE:
@@ -4918,7 +5002,9 @@ async def get_status():
                                     "Runtime statistics will be imported by logs_watcher for scheduled run"
                                 )
                         except Exception as e:
-                            logger.error(f"Error saving scheduler runtime to database: {e}")
+                            logger.error(
+                                f"Error saving scheduler runtime to database: {e}"
+                            )
 
         # Combined running status
         is_running = manual_is_running or scheduler_is_running
@@ -4977,7 +5063,7 @@ async def get_status():
 
         # Determine PID to show
         display_pid = None
-        if manual_is_running:
+        if manual_is_running and current_process:
             display_pid = current_process.pid
         elif scheduler_is_running:
             display_pid = scheduler_pid
@@ -4994,7 +5080,9 @@ async def get_status():
                 scheduler_pid
                 if scheduler_is_running and scheduler_pid
                 else (
-                    current_process.pid if manual_is_running and current_process else None
+                    current_process.pid
+                    if manual_is_running and current_process
+                    else None
                 )
             ),
             "current_mode": effective_mode,
@@ -5168,8 +5256,10 @@ async def get_runtime_history(
                 "history": [],
             }
 
-        history = runtime_db.get_runtime_history(limit=limit, offset=offset, mode=mode)
-        total = runtime_db.get_runtime_history_total_count(mode=mode)
+        history = runtime_db.get_runtime_history(
+            limit=limit, offset=offset, mode=mode or ""
+        )
+        total = runtime_db.get_runtime_history_total_count(mode=mode or "")
 
         return {
             "success": True,
@@ -5359,6 +5449,7 @@ async def get_migration_status():
     except Exception as e:
         logger.error(f"Error getting migration status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/runtime-history/migrate-format")
 async def migrate_runtime_format():
@@ -6266,7 +6357,7 @@ async def run_manual_mode(request: ManualModeRequest):
         ):
             raise HTTPException(status_code=400, detail="Title text is required")
 
-        if  not request.folderName or not request.folderName.strip():
+        if not request.folderName or not request.folderName.strip():
             raise HTTPException(status_code=400, detail="Folder name is required")
 
         if not request.libraryName or not request.libraryName.strip():
@@ -6277,14 +6368,16 @@ async def run_manual_mode(request: ManualModeRequest):
             not request.seasonPosterName or not request.seasonPosterName.strip()
         ):
             raise HTTPException(
-                status_code=400, detail="Season poster name is required for season posters"
+                status_code=400,
+                detail="Season poster name is required for season posters",
             )
 
         # Validate title card
         if request.posterType == "titlecard":
             if not request.epTitleName or not request.epTitleName.strip():
                 raise HTTPException(
-                    status_code=400, detail="Episode title name is required for title cards"
+                    status_code=400,
+                    detail="Episode title name is required for title cards",
                 )
             if not request.episodeNumber or not request.episodeNumber.strip():
                 raise HTTPException(
@@ -6490,6 +6583,12 @@ async def run_manual_mode_upload(
             logger.error(f"Manual upload validation failed: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
 
+        # Check if filename exists
+        if not file.filename:
+            error_msg = "No filename provided"
+            logger.error(f"Manual upload validation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
         # Validate file type
         allowed_extensions = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"]
         file_extension = Path(file.filename).suffix.lower()
@@ -6508,7 +6607,9 @@ async def run_manual_mode_upload(
 
         if not folderName.strip():
             error_msg = "Folder name is required"
-            logger.error(f"Manual upload validation failed: {error_msg} (posterType: {posterType})")
+            logger.error(
+                f"Manual upload validation failed: {error_msg} (posterType: {posterType})"
+            )
             raise HTTPException(status_code=400, detail=error_msg)
 
         if not libraryName.strip():
@@ -6544,7 +6645,9 @@ async def run_manual_mode_upload(
                 test_file.touch()
                 test_file.unlink()
             except PermissionError as e:
-                logger.error(f"No write permission for uploads directory: {UPLOADS_DIR}")
+                logger.error(
+                    f"No write permission for uploads directory: {UPLOADS_DIR}"
+                )
                 raise HTTPException(
                     status_code=500,
                     detail=f"No write permission for uploads directory. This may be a Docker/NAS permission issue. Please check folder permissions.",
@@ -6575,7 +6678,9 @@ async def run_manual_mode_upload(
             try:
                 content = await file.read()
                 if len(content) == 0:
-                    raise HTTPException(status_code=400, detail="Uploaded file is empty")
+                    raise HTTPException(
+                        status_code=400, detail="Uploaded file is empty"
+                    )
 
                 # Validate image aspect ratio
                 try:
@@ -6585,7 +6690,9 @@ async def run_manual_mode_upload(
                     # Open image from bytes
                     img = Image.open(io.BytesIO(content))
                     width, height = img.size
-                    logger.info(f"Manual upload image dimensions: {width}x{height} pixels")
+                    logger.info(
+                        f"Manual upload image dimensions: {width}x{height} pixels"
+                    )
 
                     # Define target ratios and tolerance
                     POSTER_RATIO = 2 / 3  # 0.666...
@@ -6664,7 +6771,9 @@ async def run_manual_mode_upload(
                     detail=f"File system error: {str(e)}. This may be a Docker volume mount issue.",
                 )
 
-            logger.info(f"File saved successfully: {upload_path} ({len(content)} bytes)")
+            logger.info(
+                f"File saved successfully: {upload_path} ({len(content)} bytes)"
+            )
 
             # Determine PowerShell command
             import platform
@@ -6779,9 +6888,10 @@ async def run_manual_mode_upload(
             # Schedule cleanup after process completes (in background)
             async def cleanup_upload():
                 """Cleanup uploaded file after process completes"""
+                global current_process
                 try:
                     # Wait for process to complete
-                    while current_process.poll() is None:
+                    while current_process and current_process.poll() is None:
                         await asyncio.sleep(1)
 
                     # Wait a bit more to ensure file operations are complete
@@ -6992,7 +7102,7 @@ async def stop_script():
             stopped_processes = []
 
             # Stop manual process if running
-            if manual_running:
+            if manual_running and current_process:
                 try:
                     current_process.terminate()
                     current_process.wait(timeout=5)
@@ -7001,14 +7111,15 @@ async def stop_script():
                     current_start_time = None
                     stopped_processes.append("manual")
                 except subprocess.TimeoutExpired:
-                    current_process.kill()
+                    if current_process:
+                        current_process.kill()
                     current_process = None
                     current_mode = None
                     current_start_time = None
                     stopped_processes.append("manual (force killed after timeout)")
 
             # Stop scheduler process if running
-            if scheduler_running:
+            if scheduler_running and scheduler and scheduler.current_process:
                 try:
                     scheduler.current_process.terminate()
                     scheduler.current_process.wait(timeout=5)
@@ -7016,7 +7127,8 @@ async def stop_script():
                     scheduler.is_running = False
                     stopped_processes.append("scheduled")
                 except subprocess.TimeoutExpired:
-                    scheduler.current_process.kill()
+                    if scheduler.current_process:
+                        scheduler.current_process.kill()
                     scheduler.current_process = None
                     scheduler.is_running = False
                     stopped_processes.append("scheduled (force killed after timeout)")
@@ -7056,7 +7168,7 @@ async def force_kill_script():
             killed_processes = []
 
             # Kill manual process if running
-            if manual_running:
+            if manual_running and current_process:
                 try:
                     current_process.kill()
                     current_process.wait(timeout=2)
@@ -7073,7 +7185,7 @@ async def force_kill_script():
                     killed_processes.append("manual (cleared)")
 
             # Kill scheduler process if running
-            if scheduler_running:
+            if scheduler_running and scheduler and scheduler.current_process:
                 try:
                     scheduler.current_process.kill()
                     scheduler.current_process.wait(timeout=2)
@@ -7299,9 +7411,10 @@ async def websocket_logs(
     logger.info(f"WebSocket connection established for log: {log_file}")
 
     # Determine which log file to monitor - check both directories
-    log_path = LOGS_DIR / log_file
+    log_filename = log_file or "Scriptlog.log"
+    log_path = LOGS_DIR / log_filename
     if not log_path.exists():
-        log_path = UI_LOGS_DIR / log_file
+        log_path = UI_LOGS_DIR / log_filename
 
     # Track if user explicitly requested a specific log file
     user_requested_log = log_file != "Scriptlog.log"  # User manually selected a log
@@ -7496,12 +7609,14 @@ async def delete_poster(path: str):
 class BulkDeleteRequest(BaseModel):
     paths: List[str]
 
+
 class BulkResolveRequest(BaseModel):
     status: str
     category: str
     searchQuery: str
     type: str
     library: str
+
 
 def _get_categorized_assets(config: dict) -> dict:
     """
@@ -7518,14 +7633,9 @@ def _get_categorized_assets(config: dict) -> dict:
     logger.debug("Creating fast asset lookup map from cache for overview...")
     cache = get_fresh_assets()
     all_cached_assets = (
-        cache["posters"]
-        + cache["backgrounds"]
-        + cache["seasons"]
-        + cache["titlecards"]
+        cache["posters"] + cache["backgrounds"] + cache["seasons"] + cache["titlecards"]
     )
-    asset_map = {
-        img["path"].replace("\\", "/"): img for img in all_cached_assets
-    }
+    asset_map = {img["path"].replace("\\", "/"): img for img in all_cached_assets}
     logger.debug(f"Asset map created with {len(asset_map)} items for overview")
 
     # Get primary language and provider from config
@@ -7554,10 +7664,10 @@ def _get_categorized_assets(config: dict) -> dict:
         "truncated_text": [],
         "assets_with_issues": [],
         "resolved": [],
-        "all": [], # New category to hold all assets
+        "all": [],  # New category to hold all assets
     }
 
-    all_assets_map = {} # Use a map to store all unique assets once
+    all_assets_map = {}  # Use a map to store all unique assets once
 
     # Categorize each record
     for record in records:
@@ -7565,14 +7675,14 @@ def _get_categorized_assets(config: dict) -> dict:
 
         # Add to 'all' map
         if record_dict["id"] not in all_assets_map:
-             all_assets_map[record_dict["id"]] = record_dict
+            all_assets_map[record_dict["id"]] = record_dict
 
         rootfolder = record_dict.get("Rootfolder", "")
         asset_type_from_db = record_dict.get("Type", "Poster")
         title = record_dict.get("Title", "")
         library = record_dict.get("LibraryName", "")
 
-        asset_filename = "poster.jpg" # Default
+        asset_filename = "poster.jpg"  # Default
         asset_type_lower = (asset_type_from_db or "").lower()
 
         if "background" in asset_type_lower:
@@ -7583,14 +7693,14 @@ def _get_categorized_assets(config: dict) -> dict:
                 season_num = season_match.group(1).zfill(2)
                 asset_filename = f"Season{season_num}.jpg"
             else:
-                asset_filename = "Season_unknown.jpg" # Will not match
+                asset_filename = "Season_unknown.jpg"  # Will not match
         elif "titlecard" in asset_type_lower or "episode" in asset_type_lower:
             episode_match = re.search(r"(S\d+E\d+)", title, re.IGNORECASE)
             if episode_match:
                 episode_code = episode_match.group(1).upper()
                 asset_filename = f"{episode_code}.jpg"
             else:
-                asset_filename = "Episode_unknown.jpg" # Will not match
+                asset_filename = "Episode_unknown.jpg"  # Will not match
 
         relative_path_key = f"{library}/{rootfolder}/{asset_filename}"
         poster_data = asset_map.get(relative_path_key)
@@ -7668,14 +7778,12 @@ def _get_categorized_assets(config: dict) -> dict:
                     "fanart": ["fanart"],
                     "plex": ["plex"],
                 }
-                patterns = provider_patterns.get(
-                    primary_provider, [primary_provider]
-                )
+                patterns = provider_patterns.get(primary_provider, [primary_provider])
                 is_download_from_primary = any(
-                    pattern in download_source.lower() for pattern in patterns
+                    pattern in (download_source or "").lower() for pattern in patterns
                 )
                 is_fav_link_from_primary = any(
-                    pattern in provider_link.lower() for pattern in patterns
+                    pattern in (provider_link or "").lower() for pattern in patterns
                 )
                 if not is_download_from_primary or not is_fav_link_from_primary:
                     categories["non_primary_provider"].append(record_dict)
@@ -7725,16 +7833,17 @@ def _get_categorized_assets(config: dict) -> dict:
                 "count": len(categories["resolved"]),
                 "assets": categories["resolved"],
             },
-            "all": { # Return all assets as well
+            "all": {  # Return all assets as well
                 "count": len(categories["all"]),
                 "assets": categories["all"],
-            }
+            },
         },
         "config": {
             "primary_language": primary_language,
             "primary_provider": primary_provider,
         },
     }
+
 
 @app.post("/api/gallery/bulk-delete")
 async def bulk_delete_posters(request: BulkDeleteRequest):
@@ -8128,7 +8237,9 @@ async def get_manual_assets_gallery():
     try:
         # Use the main asset cache, which is refreshed in the background
         cache = get_fresh_assets()
-        manual_gallery_data = cache.get("manual_gallery", {"libraries": [], "total_assets": 0})
+        manual_gallery_data = cache.get(
+            "manual_gallery", {"libraries": [], "total_assets": 0}
+        )
 
         # Log this at a DEBUG level to avoid spam
         logger.debug(
@@ -8139,8 +8250,10 @@ async def get_manual_assets_gallery():
     except Exception as e:
         logger.error(f"Error getting manual assets gallery from cache: {e}")
         import traceback
+
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.delete("/api/manual-assets/{path:path}")
 async def delete_manual_asset(path: str):
@@ -8234,7 +8347,7 @@ async def bulk_delete_manual_assets(request: BulkDeleteRequest):
 
 
 @app.get("/api/assets-folders")
-async def get_assets_folders():
+async def get_assets_folders_cached():
     """Get list of folders in assets directory with image counts per type - uses cache"""
     try:
         cache = get_fresh_assets()
@@ -8274,6 +8387,7 @@ async def get_assets_folder_images_filtered(image_type: str, folder_path: str):
         logger.error(f"Error getting folder images from cache: {e}")
         return {"images": []}
 
+
 # ============================================================================
 # FOLDER VIEW (RECURSIVE)
 # ============================================================================
@@ -8298,37 +8412,45 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
 
             # Security check: Ensure the path is within ASSETS_DIR
             if not str(full_path).startswith(str(ASSETS_DIR.resolve())):
-                raise HTTPException(status_code=403, detail="Access denied: Invalid path")
+                raise HTTPException(
+                    status_code=403, detail="Access denied: Invalid path"
+                )
 
             if not full_path.exists() or not full_path.is_dir():
                 raise HTTPException(status_code=404, detail="Path not found")
 
             current_dir = full_path
-            relative_path_str = str(full_path.relative_to(ASSETS_DIR)).replace("\\", "/")
+            relative_path_str = str(full_path.relative_to(ASSETS_DIR)).replace(
+                "\\", "/"
+            )
 
         logger.info(f"Browsing folder view: {current_dir}")
 
         items = []
         # Determine library folder (first part of path) for media type detection
-        library_folder = relative_path_str.split('/')[0] if relative_path_str else None
+        library_folder = relative_path_str.split("/")[0] if relative_path_str else None
 
         for item in current_dir.iterdir():
-            if item.name == "@eaDir": # Skip Synology index folders
+            if item.name == "@eaDir":  # Skip Synology index folders
                 continue
 
             if item.is_dir():
                 # This is a folder
                 try:
                     # Count items inside this subfolder
-                    item_count = sum(1 for sub_item in item.iterdir() if sub_item.name != "@eaDir")
+                    item_count = sum(
+                        1 for sub_item in item.iterdir() if sub_item.name != "@eaDir"
+                    )
 
                     folder_path = item.relative_to(ASSETS_DIR)
-                    items.append({
-                        "type": "folder",
-                        "name": item.name,
-                        "path": str(folder_path).replace("\\", "/"),
-                        "item_count": item_count,
-                    })
+                    items.append(
+                        {
+                            "type": "folder",
+                            "name": item.name,
+                            "path": str(folder_path).replace("\\", "/"),
+                            "item_count": item_count,
+                        }
+                    )
                 except Exception as e:
                     logger.warning(f"Could not scan subfolder {item.name}: {e}")
 
@@ -8345,7 +8467,7 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
                     asset_type_str = determine_media_type(item.name, library_folder)
 
                     # Map to simple types for frontend (poster, background, season, titlecard)
-                    asset_type_simple = "poster" # default
+                    asset_type_simple = "poster"  # default
                     if "background" in asset_type_str.lower():
                         asset_type_simple = "background"
                     elif "season" in asset_type_str.lower():
@@ -8353,15 +8475,17 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
                     elif "episode" in asset_type_str.lower():
                         asset_type_simple = "titlecard"
 
-                    items.append({
-                        "type": "asset",
-                        "name": item.name,
-                        "path": url_path,
-                        "url": f"/poster_assets/{encoded_url_path}",
-                        "size": item.stat().st_size,
-                        "asset_type": asset_type_simple, # e.g., 'poster', 'background'
-                        "full_type": asset_type_str, # e.g., 'Movie', 'Show Background'
-                    })
+                    items.append(
+                        {
+                            "type": "asset",
+                            "name": item.name,
+                            "path": url_path,
+                            "url": f"/poster_assets/{encoded_url_path}",
+                            "size": item.stat().st_size,
+                            "asset_type": asset_type_simple,  # e.g., 'poster', 'background'
+                            "full_type": asset_type_str,  # e.g., 'Movie', 'Show Background'
+                        }
+                    )
 
         # Sort: folders first, then assets
         items.sort(key=lambda x: (x["type"] != "folder", x["name"]))
@@ -8379,6 +8503,7 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
         logger.exception("Full traceback:")
         return {"success": False, "error": str(e), "items": []}
 
+
 @app.get("/api/recent-assets")
 async def get_recent_assets():
     """
@@ -8389,12 +8514,17 @@ async def get_recent_assets():
     try:
         # CSV import is handled by logs_watcher, no import needed here
         try:
-            pass # Keep block for safety
+            pass  # Keep block for safety
         except Exception as e:
-            logger.warning(f"Could not import CSV to database: {e}") # This should not run
+            logger.warning(
+                f"Could not import CSV to database: {e}"
+            )  # This should not run
 
         # Get all assets from database (already sorted by id DESC - newest first)
-        db_records = db.get_all_choices()
+        if db:
+            db_records = db.get_all_choices()
+        else:
+            db_records = []
 
         logger.info(f"Found {len(db_records)} total assets in database")
 
@@ -8421,9 +8551,7 @@ async def get_recent_assets():
 
         # Create a map: { "Library/Folder/poster.jpg": { ... asset data ... } }
         # Use normalized paths for lookup
-        asset_map = {
-            img["path"].replace("\\", "/"): img for img in all_cached_assets
-        }
+        asset_map = {img["path"].replace("\\", "/"): img for img in all_cached_assets}
         logger.debug(f"Asset map created with {len(asset_map)} items")
 
         # Convert database records to asset format and find poster files
@@ -8442,7 +8570,7 @@ async def get_recent_assets():
             rootfolder = asset_dict.get("Rootfolder", "")
             asset_type_from_db = asset_dict.get("Type", "Poster")
             title = asset_dict.get("Title", "")
-            download_source = asset_dict.get("DownloadSource", "") # Corrected key
+            download_source = asset_dict.get("DownloadSource", "")  # Corrected key
             library = asset_dict.get("LibraryName", "")
 
             manual_field = asset_dict.get("Manual", "N/A")
@@ -8468,7 +8596,7 @@ async def get_recent_assets():
                 # This is the new, fast part.
 
                 # Determine asset filename (poster.jpg, background.jpg, Season01.jpg, S01E01.jpg)
-                asset_filename = "poster.jpg" # Default
+                asset_filename = "poster.jpg"  # Default
                 asset_type_lower = (asset_type_from_db or "").lower()
 
                 if "background" in asset_type_lower:
@@ -8479,14 +8607,14 @@ async def get_recent_assets():
                         season_num = season_match.group(1).zfill(2)
                         asset_filename = f"Season{season_num}.jpg"
                     else:
-                        asset_filename = "Season_unknown.jpg" # Will not match
+                        asset_filename = "Season_unknown.jpg"  # Will not match
                 elif "titlecard" in asset_type_lower or "episode" in asset_type_lower:
                     episode_match = re.search(r"(S\d+E\d+)", title, re.IGNORECASE)
                     if episode_match:
                         episode_code = episode_match.group(1).upper()
                         asset_filename = f"{episode_code}.jpg"
                     else:
-                        asset_filename = "Episode_unknown.jpg" # Will not match
+                        asset_filename = "Episode_unknown.jpg"  # Will not match
 
                 # Construct the relative path we expect to find in the cache
                 # Use forward slashes for normalized lookup
@@ -8520,7 +8648,9 @@ async def get_recent_assets():
                     }
                     recent_assets.append(asset)
                 else:
-                    logger.debug(f"[SKIP] Skipping asset (poster not found in cache): {title} at {relative_path_key}")
+                    logger.debug(
+                        f"[SKIP] Skipping asset (poster not found in cache): {title} at {relative_path_key}"
+                    )
 
         logger.info(
             f"Returning {len(recent_assets)} most recent assets with existing images from database"
@@ -8539,10 +8669,9 @@ async def get_recent_assets():
         logger.error(traceback.format_exc())
         return {"success": False, "error": str(e), "assets": [], "total_count": 0}
 
+
 @app.get("/api/asset-type-lookup")
-async def get_asset_type_lookup(
-    library_name: str = Query(...)
-):
+async def get_asset_type_lookup(library_name: str = Query(...)):
     """
     Look up the media type (movie/show) for a given library folder name.
     This is used by the frontend galleries to determine media type.
@@ -8955,7 +9084,7 @@ async def add_schedule(data: ScheduleCreate):
                 detail=f"Invalid time format '{data.time}'. Must be HH:MM (00:00-23:59)",
             )
 
-        success = scheduler.add_schedule(data.time, data.description)
+        success = scheduler.add_schedule(data.time, data.description or "")
         if success:
             return {"success": True, "message": f"Schedule added: {data.time}"}
         else:
@@ -9489,9 +9618,9 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                 params = {"query": title}
 
                 if year and media_type == "movie":
-                    params["year"] = year
+                    params["year"] = str(year)
                 elif year and media_type == "tv":
-                    params["first_air_date_year"] = year
+                    params["first_air_date_year"] = str(year)
 
                 logger.info(f" TMDB API Request: {url}")
                 logger.info(f"   Params: {params}")
@@ -9558,7 +9687,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                             }
 
                             if year:
-                                params["year"] = year
+                                params["year"] = str(year)
 
                             logger.info(f" TVDB API Request: {search_url}")
                             logger.info(f"   Params: {params}")
@@ -9588,7 +9717,9 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                         f"   No results found in TVDB response"
                                     )
                         else:
-                            logger.error(f" TVDB: Login failed with code: {login_response.status_code}")
+                            logger.error(
+                                f" TVDB: Login failed with code: {login_response.status_code}"
+                            )
             except Exception as e:
                 logger.error(f"Error searching TVDB by title: {e}")
             return None
@@ -10131,7 +10262,9 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                 f" TVDB: Series endpoint returned {artwork_response.status_code}"
                                             )
                         else:
-                            logger.error(f" TVDB: Login failed with code: {login_response.status_code}")
+                            logger.error(
+                                f" TVDB: Login failed with code: {login_response.status_code}"
+                            )
 
                 logger.info(
                     f" TVDB: Collected {len(all_results)} unique images from {len(tvdb_ids_to_use)} ID(s)"
@@ -10356,9 +10489,14 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
             logger.error(f"Fanart fetch failed: {fanart_results}")
             fanart_results = []
 
-        results["tmdb"] = tmdb_results
-        results["tvdb"] = tvdb_results
-        results["fanart"] = fanart_results
+        # Ensure all results are lists (type narrowing for Pylance)
+        tmdb_list = tmdb_results if isinstance(tmdb_results, list) else []
+        tvdb_list = tvdb_results if isinstance(tvdb_results, list) else []
+        fanart_list = fanart_results if isinstance(fanart_results, list) else []
+
+        results["tmdb"] = tmdb_list
+        results["tvdb"] = tvdb_list
+        results["fanart"] = fanart_list
 
         # Apply language filtering based on asset type
         logger.info(
@@ -10422,6 +10560,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
     except Exception as e:
         logger.error(f"Error fetching asset replacements: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/assets/upload-replacement")
 async def upload_asset_replacement(
@@ -11310,7 +11449,7 @@ async def replace_asset_from_url(
                         titletext=(
                             final_title_text
                             if poster_type != "titlecard"
-                            else ep_title_name
+                            else (ep_title_name or "")
                         ),
                         folderName=final_folder_name,
                         libraryName=final_library_name,
@@ -11509,9 +11648,7 @@ async def get_assets_overview():
         )
 
         # Create a map: { "Library/Folder/poster.jpg": { ... asset data ... } }
-        asset_map = {
-            img["path"].replace("\\", "/"): img for img in all_cached_assets
-        }
+        asset_map = {img["path"].replace("\\", "/"): img for img in all_cached_assets}
         logger.debug(f"Asset map created with {len(asset_map)} items for overview")
 
         # Get primary language and provider from config
@@ -11555,7 +11692,7 @@ async def get_assets_overview():
             title = record_dict.get("Title", "")
             library = record_dict.get("LibraryName", "")
 
-            asset_filename = "poster.jpg" # Default
+            asset_filename = "poster.jpg"  # Default
             asset_type_lower = (asset_type_from_db or "").lower()
 
             if "background" in asset_type_lower:
@@ -11566,14 +11703,14 @@ async def get_assets_overview():
                     season_num = season_match.group(1).zfill(2)
                     asset_filename = f"Season{season_num}.jpg"
                 else:
-                    asset_filename = "Season_unknown.jpg" # Will not match
+                    asset_filename = "Season_unknown.jpg"  # Will not match
             elif "titlecard" in asset_type_lower or "episode" in asset_type_lower:
                 episode_match = re.search(r"(S\d+E\d+)", title, re.IGNORECASE)
                 if episode_match:
                     episode_code = episode_match.group(1).upper()
                     asset_filename = f"{episode_code}.jpg"
                 else:
-                    asset_filename = "Episode_unknown.jpg" # Will not match
+                    asset_filename = "Episode_unknown.jpg"  # Will not match
 
             relative_path_key = f"{library}/{rootfolder}/{asset_filename}"
             poster_data = asset_map.get(relative_path_key)
@@ -11659,26 +11796,24 @@ async def get_assets_overview():
                         "plex": ["plex"],
                     }
 
-                    patterns = provider_patterns.get(
-                        primary_provider, [primary_provider]
+                patterns = provider_patterns.get(
+                    primary_provider or "", [primary_provider or ""]
+                )  # Check if DownloadSource contains the primary provider
+                is_download_from_primary = any(
+                    pattern in (download_source or "").lower() for pattern in patterns
+                )
+
+                # Check if FavProviderLink contains the primary provider
+                is_fav_link_from_primary = any(
+                    pattern in (provider_link or "").lower() for pattern in patterns
+                )
+
+                # Show as non-primary if EITHER DownloadSource OR FavProviderLink is not from primary provider
+                if not is_download_from_primary or not is_fav_link_from_primary:
+                    non_primary_provider.append(record_dict)
+                    has_issue = (
+                        True  # Truncated Text: TextTruncated == "True" or "true"
                     )
-
-                    # Check if DownloadSource contains the primary provider
-                    is_download_from_primary = any(
-                        pattern in download_source.lower() for pattern in patterns
-                    )
-
-                    # Check if FavProviderLink contains the primary provider
-                    is_fav_link_from_primary = any(
-                        pattern in provider_link.lower() for pattern in patterns
-                    )
-
-                    # Show as non-primary if EITHER DownloadSource OR FavProviderLink is not from primary provider
-                    if not is_download_from_primary or not is_fav_link_from_primary:
-                        non_primary_provider.append(record_dict)
-                        has_issue = True
-
-            # Truncated Text: TextTruncated == "True" or "true"
             truncated_value = str(record_dict.get("TextTruncated", "")).lower()
             if truncated_value == "true":
                 truncated_text.append(record_dict)
@@ -11727,6 +11862,7 @@ async def get_assets_overview():
     except Exception as e:
         logger.error(f"Error fetching assets overview: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/imagechoices")
 async def get_all_imagechoices():
@@ -12024,6 +12160,7 @@ async def spa_fallback(request: Request, exc: HTTPException):
 
     # If index.html doesn't exist, return the original 404
     raise exc
+
 
 if __name__ == "__main__":
     import uvicorn
