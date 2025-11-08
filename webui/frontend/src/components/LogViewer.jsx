@@ -791,10 +791,12 @@ function LogViewer() {
             <button
               onClick={() => fetchAvailableLogs(true)}
               disabled={isRefreshing}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-bg hover:bg-theme-hover border border-theme disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-all hover:scale-[1.02] shadow-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-all shadow-sm"
             >
               <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                className={`w-4 h-4 text-theme-primary ${
+                  isRefreshing ? "animate-spin" : ""
+                }`}
               />
               {t("logViewer.refresh")}
             </button>
@@ -803,7 +805,7 @@ function LogViewer() {
             <button
               onClick={() => fetchFullLogFile(selectedLog)}
               disabled={!selectedLog || isLoadingFullLog}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-bg hover:bg-theme-hover border border-theme disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-all hover:scale-[1.02] shadow-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-all shadow-sm"
             >
               {isLoadingFullLog ? (
                 <Loader2 className="w-4 h-4 animate-spin text-theme-primary" />
