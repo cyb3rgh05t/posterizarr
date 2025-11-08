@@ -629,6 +629,32 @@ function ConfigEditor() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Helper function to normalize gravity values to lowercase
+  const normalizeGravityValues = (configObj) => {
+    if (!configObj || typeof configObj !== "object") return configObj;
+
+    const normalized = Array.isArray(configObj)
+      ? [...configObj]
+      : { ...configObj };
+
+    for (const key in normalized) {
+      if (typeof normalized[key] === "object" && normalized[key] !== null) {
+        // Recursively normalize nested objects
+        normalized[key] = normalizeGravityValues(normalized[key]);
+      } else if (
+        key.toLowerCase().includes("gravity") ||
+        key.toLowerCase().endsWith("textgravity")
+      ) {
+        // Normalize gravity values to lowercase
+        if (typeof normalized[key] === "string") {
+          normalized[key] = normalized[key].toLowerCase();
+        }
+      }
+    }
+
+    return normalized;
+  };
+
   const fetchConfig = async () => {
     setLoading(true);
     setError(null); // Clear any previous errors
@@ -637,26 +663,29 @@ function ConfigEditor() {
       const data = await response.json();
 
       if (data.success) {
-        setConfig(data.config);
+        // Normalize gravity values to lowercase in the loaded config
+        const normalizedConfig = normalizeGravityValues(data.config);
+
+        setConfig(normalizedConfig);
         setUiGroups(data.ui_groups || null);
         setDisplayNames(data.display_names || {});
         setUsingFlatStructure(data.using_flat_structure || false);
 
         // Store config for change detection
-        lastSavedConfigRef.current = JSON.stringify(data.config);
+        lastSavedConfigRef.current = JSON.stringify(normalizedConfig);
         setHasUnsavedChanges(false);
 
         // Store initial auth status when config is first loaded
         if (initialAuthStatus.current === null) {
           const authEnabled = data.using_flat_structure
-            ? data.config?.basicAuthEnabled
-            : data.config?.WebUI?.basicAuthEnabled;
+            ? normalizedConfig?.basicAuthEnabled
+            : normalizedConfig?.WebUI?.basicAuthEnabled;
           initialAuthStatus.current = Boolean(authEnabled);
           console.log("Initial auth status saved:", initialAuthStatus.current);
         }
 
         // Validate min/max pairs on initial load
-        validateMinMaxPairs(data.config);
+        validateMinMaxPairs(normalizedConfig);
 
         console.log(
           "Config structure:",
@@ -997,12 +1026,20 @@ function ConfigEditor() {
   };
 
   const updateValue = (key, value) => {
+    // Convert gravity values to lowercase
+    const keyLower = key.toLowerCase();
+    let processedValue = value;
+
+    if (keyLower.includes("gravity") || keyLower.endsWith("textgravity")) {
+      processedValue = typeof value === "string" ? value.toLowerCase() : value;
+    }
+
     let updatedConfig;
 
     if (usingFlatStructure) {
       updatedConfig = {
         ...config,
-        [key]: value,
+        [key]: processedValue,
       };
       setConfig(updatedConfig);
     } else {
@@ -1012,7 +1049,7 @@ function ConfigEditor() {
           ...config,
           [section]: {
             ...config[section],
-            [field]: value,
+            [field]: processedValue,
           },
         };
         setConfig(updatedConfig);
@@ -2868,18 +2905,47 @@ function ConfigEditor() {
 
     // ============ TEXT GRAVITY (Alignment) ============
     if (keyLower.includes("gravity") || keyLower.endsWith("textgravity")) {
-      const gravityValue = String(stringValue || "South");
+      // Normalize the value: convert to lowercase for comparison, capitalize for display
+      const rawValue = String(stringValue || "south");
+      const normalizedValue = rawValue.toLowerCase();
+      const displayValue =
+        normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1);
+
       const disabled = isFieldDisabled(key, groupName);
       const gravityOptions = [
-        { value: "NorthWest", label: "NorthWest (Top Left)" },
-        { value: "North", label: "North (Top Center)" },
-        { value: "NorthEast", label: "NorthEast (Top Right)" },
-        { value: "West", label: "West (Middle Left)" },
-        { value: "Center", label: "Center (Middle Center)" },
-        { value: "East", label: "East (Middle Right)" },
-        { value: "SouthWest", label: "SouthWest (Bottom Left)" },
-        { value: "South", label: "South (Bottom Center)" },
-        { value: "SouthEast", label: "SouthEast (Bottom Right)" },
+        {
+          value: "northwest",
+          displayValue: "NorthWest",
+          label: "NorthWest (Top Left)",
+        },
+        { value: "north", displayValue: "North", label: "North (Top Center)" },
+        {
+          value: "northeast",
+          displayValue: "NorthEast",
+          label: "NorthEast (Top Right)",
+        },
+        { value: "west", displayValue: "West", label: "West (Middle Left)" },
+        {
+          value: "center",
+          displayValue: "Center",
+          label: "Center (Middle Center)",
+        },
+        { value: "east", displayValue: "East", label: "East (Middle Right)" },
+        {
+          value: "southwest",
+          displayValue: "SouthWest",
+          label: "SouthWest (Bottom Left)",
+        },
+        {
+          value: "south",
+          displayValue: "South",
+          label: "South (Bottom Center)",
+        },
+        {
+          value: "southeast",
+          displayValue: "SouthEast",
+          label: "SouthEast (Bottom Right)",
+        },
       ];
 
       const dropdownKey = `gravity-${fieldKey}`;
@@ -2900,8 +2966,8 @@ function ConfigEditor() {
               }`}
             >
               <span>
-                {gravityOptions.find((opt) => opt.value === gravityValue)
-                  ?.label || gravityValue}
+                {gravityOptions.find((opt) => opt.value === normalizedValue)
+                  ?.label || displayValue}
               </span>
               <ChevronDown
                 className={`w-5 h-5 text-theme-muted transition-transform ${
@@ -2946,7 +3012,7 @@ function ConfigEditor() {
                         updateValue(fieldKey, option.value);
                       }}
                       className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                        gravityValue === option.value
+                        normalizedValue === option.value
                           ? "bg-theme-primary text-white"
                           : "text-gray-300 hover:bg-theme-hover"
                       }`}
