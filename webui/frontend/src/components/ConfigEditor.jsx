@@ -4046,10 +4046,20 @@ function ConfigEditor() {
           <textarea
             defaultValue={value.join(", ")}
             onBlur={(e) => {
-              const arrayValue = e.target.value
-                .split(",")
-                .map((item) => item.trim())
-                .filter((item) => item !== "");
+              const items = e.target.value.split(",");
+              let arrayValue;
+
+              if (key === "NewLineSymbols" || key === "SymbolsToKeepOnNewLine") {
+                // Don't trim spaces for these specific symbol fields
+                arrayValue = items
+                  .map((item) => item) // No .trim()
+                  .filter((item) => item !== "");
+              } else {
+                // Trim spaces for all OTHER array fields (like libraries)
+                arrayValue = items
+                  .map((item) => item.trim()) // Keep .trim()
+                  .filter((item) => item !== "");
+              }
               updateValue(fieldKey, arrayValue);
             }}
             onInput={(e) => autoResize(e.target)}
@@ -4066,9 +4076,12 @@ function ConfigEditor() {
               {value.map((item, idx) => (
                 <span
                   key={idx}
-                  className="px-3 py-1 bg-theme-primary/20 text-theme-primary rounded-full text-sm border border-theme-primary/30"
+                  className="px-3 py-1 bg-theme-primary/20 text-theme-primary rounded-full text-sm border border-theme-primary/30 font-mono"
                 >
-                  {item}
+                  {/* Conditionally add quotes for clarity */}
+                  {key === "NewLineSymbols" || key === "SymbolsToKeepOnNewLine"
+                    ? `"${item}"`
+                    : item}
                 </span>
               ))}
             </div>
