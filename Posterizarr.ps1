@@ -3620,11 +3620,14 @@ function Push-ObjectToDiscord {
         $response = $_.Exception.Response
         if ($response) {
             $statusCode = $response.StatusCode
-            $stream = $response.GetResponseStream()
-            $reader = New-Object System.IO.StreamReader($stream)
-            $discordErrorBody = $reader.ReadToEnd() # This is the JSON error from Discord
-
-            $errorMessage = "Unable to send to Discord. Status: $statusCode. Reason: $discordErrorBody"
+            if ($statusCode -eq 'NotFound'){
+                $errorMessage = "Unable to send to Discord. Status: $statusCode. Reason: Wrong Webhook Url"
+            }Else {
+                $stream = $response.GetResponseStream()
+                $reader = New-Object System.IO.StreamReader($stream)
+                $discordErrorBody = $reader.ReadToEnd() # This is the JSON error from Discord
+                $errorMessage = "Unable to send to Discord. Status: $statusCode. Reason: $discordErrorBody"
+            }
         }
         else {
             # This was a general network error (e.g., DNS failure)
@@ -27963,10 +27966,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
-                                                            }
-                                                            if (($SkipAddText -eq 'true' -or $SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                $SkippingText = 'true'
-                                                                Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                                             }
                                                             if ($AddTitleCardEPText -eq 'true' -and $SkippingText -eq 'false') {
                                                                 if ($TitleCardEPfontAllCaps -eq 'true') {
