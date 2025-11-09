@@ -79,14 +79,14 @@
     "UptimeKumaUrl": "https://uptime-kuma.domain.com/api/push/qXpb7Mf1vW"
   },
   "PrerequisitePart": {
-    "AssetPath": "P:\\assets",
+    "AssetPath": "/assets",
     "SkipAddText": "false",
     "SkipAddTextAndOverlay": "false",
     "FollowSymlink": "false",
     "ForceRunningDeletion": "false",
     "AutoUpdatePosterizarr": "false",
-    "BackupPath": "P:\\assetsbackup",
-    "ManualAssetPath": "P:\\manualassets",
+    "BackupPath": "/assetsbackup",
+    "ManualAssetPath": "/manualassets",
     "PlexUpload": "false",
     "show_skipped": "false",
     "magickinstalllocation": "C:\\PosterTemp\\ImageMagickPortable",
