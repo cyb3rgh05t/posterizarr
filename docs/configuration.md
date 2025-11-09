@@ -241,10 +241,6 @@
 
     - `UseBackgroundAsTitleCard`: Set to `true` if you prefer show background as TitleCard, default is `false` where it uses episode image as TitleCard.
     - `BackgroundFallback`: Set to `false` if you want to skip Background fallback for TitleCard images if no TitleCard was found.
-    - `AddBlurEffect`: Set to `true` if you want to add a blur effect to the TitleCard (spoiler prevention).
-    - `textBlurProfile`: Defines the strength of the background blur (spoiler prevention). The second number is the "sigma," so a higher value creates a much stronger and more intense blur (default is 0x40).
-    - `glassColor`: Sets the color and transparency of the tinted rectangle behind the text. (default is a very dark gray 25,25,25 that is semi-transparent 0.4 or 40% opaque).
-    - `colorize`: Controls the color saturation of the background image. 100 would be full color, 0 would be grayscale (black and white), and 50 is 50% desaturated (default is 50).
     - `AddOverlay`: Set to `true` to add the defined TitleCard overlay file to the TitleCard image.
     - `AddBorder`: Set to `true` to add a border to the TitleCard image.
     - `borderwidth`: Border width.

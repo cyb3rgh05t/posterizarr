@@ -382,11 +382,6 @@ const getConfigTooltips = (language) => {
       TitleCardAddBorder: "Set to true to add a border to the TitleCard image",
       TitleCardBordercolor: "Color of border on title cards",
       TitleCardBorderwidth: "Border width in pixels for title cards",
-      TitleCardtextBlurProfile: "Defines the strength of the background blur (spoiler prevention).",
-      TitleCardAddBlurEffect:
-        "Set to true if you want to add a blur effect to the TitleCard (spoiler prevention)",
-      TitleCardglassColor: "Sets the color and transparency of the tinted rectangle behind the text.",
-      TitleCardcolorize: "Controls the color saturation of the background image.",
       TitleCardBackgroundFallback:
         "Set to false if you want to skip Background fallback for TitleCard images if no TitleCard was found",
 
@@ -825,10 +820,6 @@ const getConfigTooltips = (language) => {
       TitleCardBorderwidth: "Rahmenbreite in Pixeln für Titelkarten",
       TitleCardBackgroundFallback:
         "Auf false setzen, wenn Sie Hintergrund-Fallback für Titelkartenbilder überspringen möchten, wenn keine Titelkarte gefunden wurde",
-      TitleCardAddBlurEffect: "Auf true setzen, wenn Sie der TitleCard einen Weichzeichnereffekt hinzufügen möchten (Spoiler-Prävention)",
-      TitleCardtextBlurProfile: "Legt die Stärke des Hintergrund-Weichzeichners fest (Spoiler-Prävention).",
-      TitleCardglassColor: "Legt Farbe und Transparenz des getönten Rechtecks hinter dem Text fest.",
-      TitleCardcolorize: "Steuert die Farbsättigung des Hintergrundbilds.",
 
       // TitleCardTitleTextPart
       TitleCardTitleFontAllCaps:
@@ -1287,10 +1278,6 @@ const getConfigTooltips = (language) => {
         "Largeur de bordure en pixels pour les cartes de titre",
       TitleCardBackgroundFallback:
         "Définir sur false si vous souhaitez ignorer le repli d'arrière-plan pour les images de carte de titre si aucune carte de titre n'a été trouvée",
-      TitleCardAddBlurEffect: "Définir sur true si vous souhaitez ajouter un effet de flou à la TitleCard (prévention des spoilers)",
-      TitleCardtextBlurProfile: "Définit la force du flou d'arrière-plan (prévention des spoilers).",
-      TitleCardglassColor: "Définit la couleur et la transparence du rectangle teinté derrière le texte.",
-      TitleCardcolorize: "Contrôle la saturation des couleurs de l'image d'arrière-plan.",
 
       // TitleCardTitleTextPart
       TitleCardTitleFontAllCaps:
@@ -1750,10 +1737,6 @@ const getConfigTooltips = (language) => {
       TitleCardBorderwidth: "Larghezza del bordo in pixel per le title card",
       TitleCardBackgroundFallback:
         "Impostare su false se vuoi saltare il ripiego sullo sfondo per le immagini delle title card se non è stata trovata alcuna title card",
-      TitleCardAddBlurEffect: "Imposta su true se vuoi aggiungere un effetto sfocatura alla TitleCard (prevenzione spoiler)",
-      TitleCardtextBlurProfile: "Definisce l'intensità della sfocatura dello sfondo (prevenzione spoiler).",
-      TitleCardglassColor: "Imposta il colore e la trasparenza del rettangolo colorato dietro al testo.",
-      TitleCardcolorize: "Controlla la saturazione del colore dell'immagine di sfondo.",
 
       // TitleCardTitleTextPart
       TitleCardTitleFontAllCaps:
@@ -2206,10 +2189,6 @@ const getConfigTooltips = (language) => {
       TitleCardBorderwidth: "Largura da borda em pixels para cartões de título",
       TitleCardBackgroundFallback:
         "Defina como false se quiser pular o retorno ao fundo para imagens de cartão de título se nenhum cartão de título foi encontrado",
-      TitleCardAddBlurEffect: "Defina como true se quiser adicionar um efeito de desfoque ao TitleCard (prevenção de spoiler)",
-      TitleCardtextBlurProfile: "Define a intensidade do desfoque de fundo (prevenção de spoiler).",
-      TitleCardglassColor: "Define a cor e a transparência do retângulo fumê atrás do texto.",
-      TitleCardcolorize: "Controla a saturação de cor da imagem de fundo.",
 
       // TitleCardTitleTextPart
       TitleCardTitleFontAllCaps:
@@ -3557,19 +3536,6 @@ function ConfigEditor() {
       "Title Card Overlay",
     ];
 
-    // Title Card Blur fields
-    if (
-      (groupName === "Title Card Overlay" || groupName === "TitleCardOverlayPart") &&
-      (key === "TitleCardtextBlurProfile" ||
-        key === "TitleCardglassColor" ||
-        key === "TitleCardcolorize")
-    ) {
-      console.log(`🌀 Title Card Blur field detected: ${key}`);
-      const addBlur = getGroupValue(groupName, "TitleCardAddBlurEffect");
-      console.log(`   TitleCardAddBlurEffect = ${addBlur}, returning ${!addBlur}`);
-      if (!addBlur) return true; // Disable if AddBlurEffect is false
-    }
-
     // Groups where AddText affects text-related fields
     const textGroups = [
       "Collection Poster",
@@ -4177,7 +4143,6 @@ function ConfigEditor() {
       "TitleCardAddOverlay",
       "TitleCardAddBorder",
       "TitleCardBackgroundFallback",
-      "TitleCardAddBlurEffect",
       "TitleCardTitleFontAllCaps",
       "TitleCardTitleAddEPTitleText",
       "TitleCardTitleAddTextStroke",
@@ -4428,89 +4393,6 @@ function ConfigEditor() {
           <p className="text-xs text-theme-muted">
             Select your preferred metadata provider (recommended: TMDB)
           </p>
-        </div>
-      );
-    }
-
-    // TitleCardtextBlurProfile
-    if (key === "TitleCardtextBlurProfile") {
-      const disabled = isFieldDisabled(key, groupName);
-
-      // Parse the string "0xSIGMA" to get just the SIGMA value
-      let displayValue = "";
-      if (stringValue && stringValue.includes("x")) {
-        displayValue = stringValue.split("x")[1] || "";
-      } else if (stringValue) {
-        // Handle case where it might just be a number
-        displayValue = stringValue;
-      }
-
-      const numValue = displayValue === "" ? "" : Number(displayValue);
-      const isInvalid =
-        displayValue !== "" &&
-        (numValue < 0 || isNaN(numValue) || !Number.isInteger(numValue));
-
-      return (
-        <div className="space-y-2">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted text-sm font-mono pointer-events-none">
-              0x
-            </span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={displayValue}
-              onChange={(e) => {
-                const val = e.target.value.trim();
-                if (val === "") {
-                  updateValue(fieldKey, "");
-                } else {
-                  const numVal = Number(val);
-                  if (
-                    !isNaN(numVal) &&
-                    numVal >= 0 &&
-                    Number.isInteger(numVal)
-                  ) {
-                    // Save with "0x" prefix
-                    updateValue(fieldKey, "0x" + val);
-                  }
-                }
-              }}
-              onBlur={(e) => {
-                // Enforce "0x" prefix on blur
-                let val = e.target.value.trim();
-                if (val !== "") {
-                  const numVal = Number(val);
-                  if (
-                    !isNaN(numVal) &&
-                    numVal >= 0 &&
-                    Number.isInteger(numVal)
-                  ) {
-                    updateValue(fieldKey, "0x" + String(numVal));
-                  } else {
-                    updateValue(fieldKey, "0x40"); // Default fallback
-                  }
-                } else {
-                  updateValue(fieldKey, "0x40"); // Default fallback
-                }
-              }}
-              disabled={disabled}
-              className={`w-full h-[42px] px-4 py-2.5 pl-9 bg-theme-bg border ${
-                isInvalid ? "border-red-500" : "border-theme"
-              } rounded-lg text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary transition-all`}
-              placeholder="40"
-            />
-          </div>
-          <p className="text-xs text-theme-muted">
-            Enter the **Sigma** value for the blur. (e.g., 40). This will be
-            saved as "0x40".
-          </p>
-          {isInvalid && (
-            <p className="text-xs text-red-400">
-              Value must be a non-negative integer.
-            </p>
-          )}
         </div>
       );
     }
@@ -5642,21 +5524,10 @@ function ConfigEditor() {
       keyLower.includes("borderwidth") ||
       keyLower.includes("strokewidth") ||
       keyLower.includes("spacing") ||
-      keyLower === "maxlogs" ||
-      keyLower === "titlecardcolorize"
+      keyLower === "maxlogs"
     ) {
       const disabled = isFieldDisabled(key, groupName);
       const hasError = validationErrors[key];
-
-      let minVal = 0;
-      let maxVal; // undefined = no max
-      let placeholder = "Enter number";
-
-      if (keyLower === "titlecardcolorize") {
-        minVal = 0;
-        maxVal = 100;
-        placeholder = "0-100";
-      }
 
       return (
         <div className="space-y-2">
@@ -5996,19 +5867,6 @@ function ConfigEditor() {
           const settingsCount = fields.length;
           const readmeLink = getReadmeLink(groupName);
 
-          // Check if TitleCardAddBlurEffect is enabled for this group
-          let addBlurEffectEnabled = false;
-          const isTitleCardOverlayGroup =
-            groupName === "Title Card Overlay" ||
-            groupName === "TitleCardOverlayPart";
-
-          if (isTitleCardOverlayGroup) {
-            const blurValue = usingFlatStructure
-              ? config["TitleCardAddBlurEffect"]
-              : config[groupName]?.["TitleCardAddBlurEffect"];
-            addBlurEffectEnabled = blurValue === "true" || blurValue === true;
-          }
-
           // Don't show groups with no matching fields when searching
           if (searchQuery && settingsCount === 0) return null;
 
@@ -6075,7 +5933,6 @@ function ConfigEditor() {
                 <div className="px-6 pb-6 border-t border-theme bg-theme-bg/30">
                   <div className="pt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {fields.map((key, index) => {
-                      
                       const value = usingFlatStructure
                         ? config[key]
                         : config[groupName]?.[key];

@@ -164,10 +164,6 @@ CONFIG_TOOLTIPS = {
     "TitleCardBordercolor": "Color of border on title cards",
     "TitleCardBorderwidth": "Border width in pixels for title cards",
     "TitleCardBackgroundFallback": "Set to false if you want to skip Background fallback for TitleCard images if no TitleCard was found",
-    "TitleCardAddBlurEffect": "Set to true if you want to add a blur effect to the TitleCard (spoiler prevention).",
-    "TitleCardtextBlurProfile": "Defines the strength of the background blur (spoiler prevention).",
-    "TitleCardglassColor": "Sets the color and transparency of the tinted rectangle behind the text.",
-    "TitleCardcolorize": "Controls the color saturation of the background image.",
     # TitleCardTitleTextPart
     "TitleCardTitleFontAllCaps": "Set to true for all caps episode title text on title cards, else false",
     "TitleCardTitleAddEPTitleText": "Set to true to add episode title text to the TitleCard image",
