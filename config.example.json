@@ -252,6 +252,10 @@
   "TitleCardOverlayPart": {
     "UseBackgroundAsTitleCard": "false",
     "BackgroundFallback": "true",
+    "AddBlurEffect": "false",
+    "textBlurProfile": "0x40",
+    "glassColor": "rgba(25,25,25,0.4)",
+    "colorize": "50",
     "AddOverlay": "true",
     "AddBorder": "true",
     "bordercolor": "black",

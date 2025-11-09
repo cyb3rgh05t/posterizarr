@@ -7133,6 +7133,10 @@ $Backgroundboxsize = $BackgroundMaxWidth + 'x' + $BackgroundMaxHeight
 # Title Card Overlay Part
 $AddTitleCardOverlay = $config.TitleCardOverlayPart.AddOverlay.tolower()
 $UseBackgroundAsTitleCard = $config.TitleCardOverlayPart.UseBackgroundAsTitleCard.tolower()
+$AddBlurEffect = $config.TitleCardOverlayPart.AddBlurEffect.tolower()
+$textBlurProfile = $config.TitleCardOverlayPart.textBlurProfile
+$glassColor = $config.TitleCardOverlayPart.glassColor
+$colorize = $config.TitleCardOverlayPart.colorize
 $AddTitleCardBorder = $config.TitleCardOverlayPart.AddBorder.tolower()
 $TitleCardborderwidth = $config.TitleCardOverlayPart.borderwidth
 $TitleCardbordercolor = $config.TitleCardOverlayPart.bordercolor
@@ -8471,6 +8475,14 @@ if ($Manual) {
         $logEntry = "`"$magick`" $Resizeargument"
         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
         InvokeMagickCommand -Command $magick -Arguments $Resizeargument
+    }
+    if ($TitleCard -and $AddBlurEffect -eq 'true'){
+        $Arguments = "`"$PosterImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$PosterImage`""
+        Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+        $logEntry = "`"$magick`" $Arguments"
+        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+        InvokeMagickCommand -Command $magick -Arguments $Arguments
     }
     if (!$global:ImageMagickError -eq 'true') {
         # Move file back to original naming with Brackets.
@@ -13189,6 +13201,14 @@ Elseif ($Tautulli) {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
+                                                                if ($AddBlurEffect -eq 'true'){
+                                                                    $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                    Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                    $logEntry = "`"$magick`" $Arguments"
+                                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -13796,6 +13816,14 @@ Elseif ($Tautulli) {
                                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
+                                                            }
+                                                            if ($AddBlurEffect -eq 'true'){
+                                                                $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                $logEntry = "`"$magick`" $Arguments"
+                                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                             }
                                                         }
                                                     }
@@ -17639,6 +17667,14 @@ Elseif ($ArrTrigger) {
                                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                         }
                                                                     }
+                                                                    if ($AddBlurEffect -eq 'true'){
+                                                                        $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                        Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                        $logEntry = "`"$magick`" $Arguments"
+                                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -18130,6 +18166,14 @@ Elseif ($ArrTrigger) {
                                                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
+                                                                }
+                                                                if ($AddBlurEffect -eq 'true'){
+                                                                    $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                    Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                    $logEntry = "`"$magick`" $Arguments"
+                                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
                                                             }
                                                         }
@@ -21953,6 +21997,14 @@ Elseif ($ArrTrigger) {
                                                                             InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                         }
                                                                     }
+                                                                    if ($AddBlurEffect -eq 'true'){
+                                                                        $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                        Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                        $logEntry = "`"$magick`" $Arguments"
+                                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -22560,6 +22612,14 @@ Elseif ($ArrTrigger) {
                                                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
+                                                                }
+                                                                if ($AddBlurEffect -eq 'true'){
+                                                                    $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                    Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                    $logEntry = "`"$magick`" $Arguments"
+                                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
                                                             }
                                                         }
@@ -27502,6 +27562,14 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
+                                                                if ($AddBlurEffect -eq 'true'){
+                                                                    $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                    Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                    $logEntry = "`"$magick`" $Arguments"
+                                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -27989,6 +28057,14 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
+                                                            }
+                                                            if ($AddBlurEffect -eq 'true'){
+                                                                $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                $logEntry = "`"$magick`" $Arguments"
+                                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                             }
                                                         }
                                                     }
@@ -32516,6 +32592,14 @@ else {
                                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                     }
                                                                 }
+                                                                if ($AddBlurEffect -eq 'true'){
+                                                                    $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                    Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                    $logEntry = "`"$magick`" $Arguments"
+                                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -33185,6 +33269,14 @@ else {
                                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                                 }
+                                                            }
+                                                            if ($AddBlurEffect -eq 'true'){
+                                                                $Arguments = "`"$EpisodeImage`" -blur `"$textBlurProfile`" -fill `"$glassColor`" -colorize `"$colorize`" `"$EpisodeImage`""
+                                                                Write-Entry -Subtext "Add Blur effect" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                                $logEntry = "`"$magick`" $Arguments"
+                                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
                                                             }
                                                         }
                                                     }
