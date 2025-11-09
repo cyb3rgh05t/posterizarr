@@ -1,3 +1,5 @@
+name: Discord Release Webhook
+
 on:
   release:
     types: [created, edited]

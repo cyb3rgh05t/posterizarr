@@ -24,6 +24,7 @@ import {
   Eye,
   Expand,
   Minimize,
+  ExternalLink,
   Github,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -34,32 +35,47 @@ import { useToast } from "../context/ToastContext";
 
 const API_URL = "/api";
 
-// Mapping from groups to README sections
+// Mapping von Gruppen zu README-Abschnitten
 const README_LINKS = {
-  "WebUI Settings": "https://fscorrupt.github.io/Posterizarr/configuration/#webui",
-  "API Keys & Tokens": "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+  "WebUI Settings":
+    "https://fscorrupt.github.io/Posterizarr/configuration/#webui",
+  "API Keys & Tokens":
+    "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
   ApiPart: "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
-  "Language & Preferences": "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
-  "Image Filters": "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
-  "Plex Settings": "https://fscorrupt.github.io/Posterizarr/configuration/#plexpart",
+  "Language & Preferences":
+    "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+  "Image Filters":
+    "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+  "Plex Settings":
+    "https://fscorrupt.github.io/Posterizarr/configuration/#plexpart",
   PlexPart: "https://fscorrupt.github.io/Posterizarr/configuration/#plexpart",
-  "Jellyfin Settings": "https://fscorrupt.github.io/Posterizarr/configuration/#jellyfinpart",
-  JellyfinPart: "https://fscorrupt.github.io/Posterizarr/configuration/#jellyfinpart",
-  "Emby Settings": "https://fscorrupt.github.io/Posterizarr/configuration/#embypart",
+  "Jellyfin Settings":
+    "https://fscorrupt.github.io/Posterizarr/configuration/#jellyfinpart",
+  JellyfinPart:
+    "https://fscorrupt.github.io/Posterizarr/configuration/#jellyfinpart",
+  "Emby Settings":
+    "https://fscorrupt.github.io/Posterizarr/configuration/#embypart",
   EmbyPart: "https://fscorrupt.github.io/Posterizarr/configuration/#embypart",
-  Notifications: "https://fscorrupt.github.io/Posterizarr/configuration/#notification",
-  Notification: "https://fscorrupt.github.io/Posterizarr/configuration/#notification",
+  Notifications:
+    "https://fscorrupt.github.io/Posterizarr/configuration/#notification",
+  Notification:
+    "https://fscorrupt.github.io/Posterizarr/configuration/#notification",
   "General Settings":
     "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
-  PrerequisitePart: "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
-  "Overlay Files": "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+  PrerequisitePart:
+    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+  "Overlay Files":
+    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
   "Resolution Overlays":
     "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
-  Fonts: "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+  Fonts:
+    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
   "Text Formatting":
     "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
-  "Image Processing": "https://fscorrupt.github.io/Posterizarr/configuration/#overlaypart",
-  OverlayPart: "https://fscorrupt.github.io/Posterizarr/configuration/#overlaypart",
+  "Image Processing":
+    "https://fscorrupt.github.io/Posterizarr/configuration/#overlaypart",
+  OverlayPart:
+    "https://fscorrupt.github.io/Posterizarr/configuration/#overlaypart",
   "Poster Settings":
     "https://fscorrupt.github.io/Posterizarr/configuration/#posteroverlaypart",
   PosterOverlayPart:
@@ -69,9 +85,9 @@ const README_LINKS = {
   SeasonPosterOverlayPart:
     "https://fscorrupt.github.io/Posterizarr/configuration/#seasonposteroverlaypart",
   "Show Title on Season":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#showtitleonseasonposterpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#showtilteonseasonposterpart",
   ShowTitleOnSeasonPosterPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#showtitleonseasonposterpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#showtilteonseasonposterpart",
   "Background Settings":
     "https://fscorrupt.github.io/Posterizarr/configuration/#backgroundoverlaypart",
   BackgroundOverlayPart:
@@ -2347,37 +2363,42 @@ const getConfigTooltips = (language) => {
 
 // Helper function to remove redundant prefixes from setting keys for display
 const getCleanSettingKey = (key) => {
-    // FIX: Exclude the main feature toggles from prefix removal
-    const keysToExclude = ["Posters", "SeasonPosters", "BackgroundPosters", "TitleCards"];
+  // FIX: Exclude the main feature toggles from prefix removal
+  const keysToExclude = [
+    "Posters",
+    "SeasonPosters",
+    "BackgroundPosters",
+    "TitleCards",
+  ];
 
-    if (keysToExclude.includes(key)) {
-        return key;
-    }
-
-    const prefixes = [
-        "CollectionTitle",
-        "CollectionPoster",
-        "SeasonPoster",
-        "TitleCardTitle",
-        "TitleCardEP",
-        "TitleCard",
-        "ShowTitle",
-        "Background",
-        "Poster",
-    ];
-
-    for (const prefix of prefixes) {
-        if (key.startsWith(prefix)) {
-            const remainder = key.slice(prefix.length);
-            // Only remove prefix if there's something left after it
-            // The original logic is fine for fields *within* groups (e.g., PosterAddBorder -> AddBorder)
-            if (remainder) {
-                return remainder;
-            }
-        }
-    }
-
+  if (keysToExclude.includes(key)) {
     return key;
+  }
+
+  const prefixes = [
+    "CollectionTitle",
+    "CollectionPoster",
+    "SeasonPoster",
+    "TitleCardTitle",
+    "TitleCardEP",
+    "TitleCard",
+    "ShowTitle",
+    "Background",
+    "Poster",
+  ];
+
+  for (const prefix of prefixes) {
+    if (key.startsWith(prefix)) {
+      const remainder = key.slice(prefix.length);
+      // Only remove prefix if there's something left after it
+      // The original logic is fine for fields *within* groups (e.g., PosterAddBorder -> AddBorder)
+      if (remainder) {
+        return remainder;
+      }
+    }
+  }
+
+  return key;
 };
 
 function ConfigEditor() {
@@ -2821,6 +2842,32 @@ function ConfigEditor() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Helper function to normalize gravity values to lowercase
+  const normalizeGravityValues = (configObj) => {
+    if (!configObj || typeof configObj !== "object") return configObj;
+
+    const normalized = Array.isArray(configObj)
+      ? [...configObj]
+      : { ...configObj };
+
+    for (const key in normalized) {
+      if (typeof normalized[key] === "object" && normalized[key] !== null) {
+        // Recursively normalize nested objects
+        normalized[key] = normalizeGravityValues(normalized[key]);
+      } else if (
+        key.toLowerCase().includes("gravity") ||
+        key.toLowerCase().endsWith("textgravity")
+      ) {
+        // Normalize gravity values to lowercase
+        if (typeof normalized[key] === "string") {
+          normalized[key] = normalized[key].toLowerCase();
+        }
+      }
+    }
+
+    return normalized;
+  };
+
   const fetchConfig = async () => {
     setLoading(true);
     setError(null); // Clear any previous errors
@@ -2829,26 +2876,29 @@ function ConfigEditor() {
       const data = await response.json();
 
       if (data.success) {
-        setConfig(data.config);
+        // Normalize gravity values to lowercase in the loaded config
+        const normalizedConfig = normalizeGravityValues(data.config);
+
+        setConfig(normalizedConfig);
         setUiGroups(data.ui_groups || null);
         setDisplayNames(data.display_names || {});
         setUsingFlatStructure(data.using_flat_structure || false);
 
         // Store config for change detection
-        lastSavedConfigRef.current = JSON.stringify(data.config);
+        lastSavedConfigRef.current = JSON.stringify(normalizedConfig);
         setHasUnsavedChanges(false);
 
         // Store initial auth status when config is first loaded
         if (initialAuthStatus.current === null) {
           const authEnabled = data.using_flat_structure
-            ? data.config?.basicAuthEnabled
-            : data.config?.WebUI?.basicAuthEnabled;
+            ? normalizedConfig?.basicAuthEnabled
+            : normalizedConfig?.WebUI?.basicAuthEnabled;
           initialAuthStatus.current = Boolean(authEnabled);
           console.log("Initial auth status saved:", initialAuthStatus.current);
         }
 
         // Validate min/max pairs on initial load
-        validateMinMaxPairs(data.config);
+        validateMinMaxPairs(normalizedConfig);
 
         console.log(
           "Config structure:",
@@ -3196,12 +3246,20 @@ function ConfigEditor() {
   };
 
   const updateValue = (key, value) => {
+    // Convert gravity values to lowercase
+    const keyLower = key.toLowerCase();
+    let processedValue = value;
+
+    if (keyLower.includes("gravity") || keyLower.endsWith("textgravity")) {
+      processedValue = typeof value === "string" ? value.toLowerCase() : value;
+    }
+
     let updatedConfig;
 
     if (usingFlatStructure) {
       updatedConfig = {
         ...config,
-        [key]: value,
+        [key]: processedValue,
       };
       setConfig(updatedConfig);
     } else {
@@ -3211,7 +3269,7 @@ function ConfigEditor() {
           ...config,
           [section]: {
             ...config[section],
-            [field]: value,
+            [field]: processedValue,
           },
         };
         setConfig(updatedConfig);
@@ -3663,6 +3721,7 @@ function ConfigEditor() {
   };
 
   const renderInput = (groupName, key, value) => {
+    const Icon = getInputIcon(key, value);
     const fieldKey = usingFlatStructure ? key : `${groupName}.${key}`;
     const displayName = getDisplayName(key);
 
@@ -4174,10 +4233,10 @@ function ConfigEditor() {
       lowercaseStringBooleanFields.includes(key) ||
       capitalizedStringBooleanFields.includes(key)
     ) {
-
       // Determine which type to use
       const isBoolean = booleanFields.includes(key);
       const isCapitalizedString = capitalizedStringBooleanFields.includes(key);
+      const isLowercaseString = lowercaseStringBooleanFields.includes(key);
 
       // Determine current state (enabled/disabled)
       const isEnabled =
@@ -5018,18 +5077,47 @@ function ConfigEditor() {
 
     // ============ TEXT GRAVITY (Alignment) ============
     if (keyLower.includes("gravity") || keyLower.endsWith("textgravity")) {
-      const gravityValue = String(stringValue || "South");
+      // Normalize the value: convert to lowercase for comparison, capitalize for display
+      const rawValue = String(stringValue || "south");
+      const normalizedValue = rawValue.toLowerCase();
+      const displayValue =
+        normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1);
+
       const disabled = isFieldDisabled(key, groupName);
       const gravityOptions = [
-        { value: "NorthWest", label: "NorthWest (Top Left)" },
-        { value: "North", label: "North (Top Center)" },
-        { value: "NorthEast", label: "NorthEast (Top Right)" },
-        { value: "West", label: "West (Middle Left)" },
-        { value: "Center", label: "Center (Middle Center)" },
-        { value: "East", label: "East (Middle Right)" },
-        { value: "SouthWest", label: "SouthWest (Bottom Left)" },
-        { value: "South", label: "South (Bottom Center)" },
-        { value: "SouthEast", label: "SouthEast (Bottom Right)" },
+        {
+          value: "northwest",
+          displayValue: "NorthWest",
+          label: "NorthWest (Top Left)",
+        },
+        { value: "north", displayValue: "North", label: "North (Top Center)" },
+        {
+          value: "northeast",
+          displayValue: "NorthEast",
+          label: "NorthEast (Top Right)",
+        },
+        { value: "west", displayValue: "West", label: "West (Middle Left)" },
+        {
+          value: "center",
+          displayValue: "Center",
+          label: "Center (Middle Center)",
+        },
+        { value: "east", displayValue: "East", label: "East (Middle Right)" },
+        {
+          value: "southwest",
+          displayValue: "SouthWest",
+          label: "SouthWest (Bottom Left)",
+        },
+        {
+          value: "south",
+          displayValue: "South",
+          label: "South (Bottom Center)",
+        },
+        {
+          value: "southeast",
+          displayValue: "SouthEast",
+          label: "SouthEast (Bottom Right)",
+        },
       ];
 
       const dropdownKey = `gravity-${fieldKey}`;
@@ -5050,8 +5138,8 @@ function ConfigEditor() {
               }`}
             >
               <span>
-                {gravityOptions.find((opt) => opt.value === gravityValue)
-                  ?.label || gravityValue}
+                {gravityOptions.find((opt) => opt.value === normalizedValue)
+                  ?.label || displayValue}
               </span>
               <ChevronDown
                 className={`w-5 h-5 text-theme-muted transition-transform ${
@@ -5095,7 +5183,7 @@ function ConfigEditor() {
                       updateValue(fieldKey, option.value);
                     }}
                     className={`w-full px-4 py-2 text-sm transition-all text-left ${
-                      gravityValue === option.value
+                      normalizedValue === option.value
                         ? "bg-theme-primary text-white"
                         : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
                     }`}
@@ -5658,6 +5746,8 @@ function ConfigEditor() {
       </div>
     );
   }
+
+  const TabIcon = tabs[activeTab]?.icon || Settings;
 
   return (
     <div className="space-y-6">
