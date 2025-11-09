@@ -201,7 +201,7 @@
     - `lineSpacing`: Adjust the height between lines of text (Default is `0`)
     - `TextGravity`: Specifies the text alignment within the textbox (Default is `south`)
 
-    #### ShowTilteOnSeasonPosterPart
+    #### ShowTitleOnSeasonPosterPart
 
     - `fontAllCaps`: Set to `true` for all caps text, else `false`.
     - `AddShowTitletoSeason`: if set to `true` it will add show title to season poster (Default Value is: `false`)

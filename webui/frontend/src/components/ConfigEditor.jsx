@@ -24,19 +24,17 @@ import {
   Eye,
   Expand,
   Minimize,
-  ExternalLink,
   Github,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ValidateButton from "./ValidateButton";
-import Notification from "./Notification";
 import LanguageOrderSelector from "./LanguageOrderSelector";
 import LibraryExclusionSelector from "./LibraryExclusionSelector";
 import { useToast } from "../context/ToastContext";
 
 const API_URL = "/api";
 
-// Mapping von Gruppen zu README-Abschnitten
+// Mapping from groups to README sections
 const README_LINKS = {
   "WebUI Settings": "https://fscorrupt.github.io/Posterizarr/configuration/#webui",
   "API Keys & Tokens": "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
@@ -71,9 +69,9 @@ const README_LINKS = {
   SeasonPosterOverlayPart:
     "https://fscorrupt.github.io/Posterizarr/configuration/#seasonposteroverlaypart",
   "Show Title on Season":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#showtilteonseasonposterpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#showtitleonseasonposterpart",
   ShowTitleOnSeasonPosterPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#showtilteonseasonposterpart",
+    "https://fscorrupt.github.io/Posterizarr/configuration/#showtitleonseasonposterpart",
   "Background Settings":
     "https://fscorrupt.github.io/Posterizarr/configuration/#backgroundoverlaypart",
   BackgroundOverlayPart:
@@ -3665,7 +3663,6 @@ function ConfigEditor() {
   };
 
   const renderInput = (groupName, key, value) => {
-    const Icon = getInputIcon(key, value);
     const fieldKey = usingFlatStructure ? key : `${groupName}.${key}`;
     const displayName = getDisplayName(key);
 
@@ -4181,7 +4178,6 @@ function ConfigEditor() {
       // Determine which type to use
       const isBoolean = booleanFields.includes(key);
       const isCapitalizedString = capitalizedStringBooleanFields.includes(key);
-      const isLowercaseString = lowercaseStringBooleanFields.includes(key);
 
       // Determine current state (enabled/disabled)
       const isEnabled =
@@ -5662,8 +5658,6 @@ function ConfigEditor() {
       </div>
     );
   }
-
-  const TabIcon = tabs[activeTab]?.icon || Settings;
 
   return (
     <div className="space-y-6">
