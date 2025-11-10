@@ -403,7 +403,7 @@
     "runtimeHistory": "Cronologia esecuzioni",
     "plexExport": "Esportazione Plex",
     "mediaServerExport": "Cronologia esportazioni server multimediale",
-    "assets": "Asset",
+    "assets": "Gestione asset",
     "config": "Configurazione",
     "galleries": "Gallerie",
     "scheduler": "Pianificatore",
@@ -411,7 +411,7 @@
     "about": "Informazioni",
     "howItWorks": "Come funziona",
     "autoTriggers": "Trigger automatici",
-    "assetOverview": "Panoramica asset",
+    "assetOverview": "Centro azioni",
     "assetReplacer": "Sostitutore asset",
     "assetsManager": "Gestore overlay",
     "manualAssets": "Asset manuali",
@@ -1353,7 +1353,7 @@
     "confirmFetchButton": "Recupera sostituzioni"
   },
   "assetOverview": {
-    "title": "Panoramica asset",
+    "title": "Centro azioni",
     "description": "Panoramica di tutti gli asset con categorizzazione dettagliata",
     "loading": "Caricamento panoramica asset...",
     "fetchError": "Recupero panoramica asset non riuscito",

@@ -403,7 +403,7 @@
     "runtimeHistory": "Historique d'exécution",
     "plexExport": "Export Plex",
     "mediaServerExport": "Historique d'exportation du serveur multimédia",
-    "assets": "Ressources",
+    "assets": "Gestion des assets",
     "config": "Configuration",
     "galleries": "Galeries",
     "scheduler": "Planificateur",
@@ -411,7 +411,7 @@
     "about": "À propos",
     "howItWorks": "Fonctionnement",
     "autoTriggers": "Déclencheurs automatiques",
-    "assetOverview": "Aperçu des ressources",
+    "assetOverview": "Centre d'actions",
     "assetReplacer": "Remplacement de ressource",
     "assetsManager": "Gestionnaire de superposition",
     "manualAssets": "Ressources manuelles",
@@ -1353,7 +1353,7 @@
     "confirmFetchButton": "Récupérer les remplacements"
   },
   "assetOverview": {
-    "title": "Aperçu des ressources",
+    "title": "Centre d'actions",
     "description": "Aperçu de toutes les ressources avec une catégorisation détaillée",
     "loading": "Chargement de l'aperçu des ressources...",
     "fetchError": "Échec de la récupération de l'aperçu des ressources",

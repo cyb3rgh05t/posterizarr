@@ -403,7 +403,7 @@
     "runtimeHistory": "Runtime History",
     "plexExport": "Plex Export",
     "mediaServerExport": "Media Server Export",
-    "assets": "Assets",
+    "assets": "Asset Management",
     "config": "Configuration",
     "galleries": "Galleries",
     "scheduler": "Scheduler",
@@ -411,7 +411,7 @@
     "about": "About",
     "howItWorks": "How It Works",
     "autoTriggers": "Auto Triggers",
-    "assetOverview": "Asset Overview",
+    "assetOverview": "Action Center",
     "assetReplacer": "Asset Replacer",
     "assetsManager": "Overlay Manager",
     "manualAssets": "Manual Assets",
@@ -1361,7 +1361,7 @@
     "confirmFetchButton": "Fetch Replacements"
   },
   "assetOverview": {
-    "title": "Asset Overview",
+    "title": "Action Center",
     "description": "Overview of all assets with detailed categorization",
     "loading": "Loading asset overview...",
     "fetchError": "Failed to fetch asset overview",
