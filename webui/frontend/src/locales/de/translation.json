@@ -403,7 +403,7 @@
     "runtimeHistory": "Laufzeitverlauf",
     "plexExport": "Plex Export",
     "mediaServerExport": "Medienserver-Exportverlauf",
-    "assets": "Assets",
+    "assets": "Asset Verwaltung",
     "config": "Konfiguration",
     "galleries": "Galerien",
     "scheduler": "Zeitplaner",
@@ -411,7 +411,7 @@
     "about": "Über",
     "howItWorks": "Wie es funktioniert",
     "autoTriggers": "Auto Trigger",
-    "assetOverview": "Asset-Übersicht",
+    "assetOverview": "Aktionszentrum",
     "assetReplacer": "Asset-Ersetzer",
     "assetsManager": "Overlay-Manager",
     "manualAssets": "Manuelle Assets",
@@ -1406,7 +1406,7 @@
     "confirmFetchButton": "Ersetzungen abrufen"
   },
   "assetOverview": {
-    "title": "Asset-Übersicht",
+    "title": "Aktionszentrum",
     "description": "Übersicht aller Assets mit detaillierter Kategorisierung",
     "loading": "Lade Asset-Übersicht...",
     "fetchError": "Fehler beim Abrufen der Asset-Übersicht",

@@ -31,6 +31,7 @@ import {
   FolderKanban,
   GripVertical,
   MoreVertical,
+  TestTube,
 } from "lucide-react";
 import VersionBadge from "./VersionBadge";
 import { useSidebar } from "../context/SidebarContext";
@@ -183,7 +184,7 @@ const Sidebar = () => {
       icon: Image,
       hasSubItems: true,
       subItems:
-        // In Folder View: Only show "Assets Folders" tab, in Grid View: show all tabs
+        // In Folder View:
         viewMode === "folder"
           ? [
               {
@@ -191,8 +192,35 @@ const Sidebar = () => {
                 label: t("assets.assetsFolders"),
                 icon: FolderKanban,
               },
+              {
+                path: "/manual-assets",
+                label: "Manual Assets",
+                icon: FileImage,
+                badge: manualAssetsCount,
+                badgeColor: "green",
+              },
+              {
+                path: "/asset-overview",
+                label: t("nav.assetOverview"),
+                icon: AlertTriangle,
+                badge: missingAssetsCount,
+                badgeColor: "red",
+              },
+              {
+                path: "/assets-manager", // This is your Overlay Assets
+                label: t("nav.assetsManager", "Assets Manager"),
+                icon: Layers,
+              },
+              // --- START MODIFICATION 1 ---
+              {
+                path: "/test-gallery",
+                label: t("nav.testGallery", "Test Gallery"),
+                icon: TestTube,
+              },
+              // --- END MODIFICATION 1 ---
             ]
           : [
+              // In Grid View:
               {
                 path: "/gallery/posters",
                 label: t("assets.posters"),
@@ -213,29 +241,33 @@ const Sidebar = () => {
                 label: t("assets.titleCards"),
                 icon: Tv,
               },
+              {
+                path: "/manual-assets",
+                label: "Manual Assets",
+                icon: FileImage,
+                badge: manualAssetsCount,
+                badgeColor: "green",
+              },
+              {
+                path: "/asset-overview",
+                label: t("nav.assetOverview"),
+                icon: AlertTriangle,
+                badge: missingAssetsCount,
+                badgeColor: "red",
+              },
+              {
+                path: "/assets-manager", // This is your Overlay Assets
+                label: t("nav.assetsManager", "Assets Manager"),
+                icon: Layers,
+              },
+              // --- START MODIFICATION 2 ---
+              {
+                path: "/test-gallery",
+                label: t("nav.testGallery", "Test Gallery"),
+                icon: TestTube,
+              },
+              // --- END MODIFICATION 2 ---
             ],
-    },
-    {
-      id: "manualAssets",
-      path: "/manual-assets",
-      label: "Manual Assets",
-      icon: FileImage,
-      badge: manualAssetsCount,
-      badgeColor: "green",
-    },
-    {
-      id: "assetOverview",
-      path: "/asset-overview",
-      label: t("nav.assetOverview"),
-      icon: AlertTriangle,
-      badge: missingAssetsCount,
-      badgeColor: "red",
-    },
-    {
-      id: "assetsManager",
-      path: "/assets-manager",
-      label: t("nav.assetsManager"),
-      icon: FolderKanban,
     },
     {
       id: "autoTriggers",
@@ -295,7 +327,16 @@ const Sidebar = () => {
         const savedIds = new Set(savedOrder);
         const defaultIds = defaultNavItems.map((item) => item.id);
         const missingIds = defaultIds.filter((id) => !savedIds.has(id));
-        return [...savedOrder, ...missingIds];
+
+        // Filter out all the old top-level links that are now in the dropdown
+        const validSavedOrder = savedOrder.filter(
+          (id) =>
+            // "assetsManager" is not a top-level item, but it's not in the defaultNavItems
+            // so we don't need to filter it. We just filter the ones we moved.
+            id !== "manualAssets" &&
+            id !== "assetOverview"
+        );
+        return [...validSavedOrder, ...missingIds];
       } catch (e) {
         return defaultNavItems.map((item) => item.id);
       }
@@ -341,7 +382,16 @@ const Sidebar = () => {
     setDraggedItem(null);
   };
 
-  const isInAssetsSection = location.pathname.startsWith("/gallery");
+  // --- START MODIFICATION 3 ---
+  // Update section logic to highlight the "Assets" parent for all child routes
+  const isInAssetsSection =
+    location.pathname.startsWith("/gallery") ||
+    location.pathname.startsWith("/manual-assets") ||
+    location.pathname.startsWith("/asset-overview") ||
+    location.pathname.startsWith("/assets-manager") || // This is for Overlay Assets
+    location.pathname.startsWith("/test-gallery");    // This is for Test Gallery
+  // --- END MODIFICATION 3 ---
+
   const isInConfigSection = location.pathname.startsWith("/config");
   const isInMediaServerSection = location.pathname.startsWith(
     "/media-server-export"
@@ -457,14 +507,28 @@ const Sidebar = () => {
                             <Link
                               key={subItem.path}
                               to={subItem.path}
-                              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                              className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                                 isSubActive
                                   ? "bg-theme-primary text-white shadow-lg"
                                   : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"
                               }`}
                             >
-                              <SubIcon className="w-4 h-4 flex-shrink-0" />
-                              <span className="ml-3">{subItem.label}</span>
+                              <div className="flex items-center">
+                                <SubIcon className="w-4 h-4 flex-shrink-0" />
+                                <span className="ml-3">{subItem.label}</span>
+                              </div>
+                              {subItem.badge !== undefined &&
+                                subItem.badge > 0 && (
+                                  <span
+                                    className={`${
+                                      subItem.badgeColor === "green"
+                                        ? "bg-green-500"
+                                        : "bg-red-500"
+                                    } text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center`}
+                                  >
+                                    {subItem.badge}
+                                  </span>
+                                )}
                             </Link>
                           );
                         })}
@@ -706,14 +770,30 @@ const Sidebar = () => {
                                   key={subItem.path}
                                   to={subItem.path}
                                   onClick={() => setIsMobileMenuOpen(false)}
-                                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                                     isSubActive
                                       ? "bg-theme-primary text-white shadow-lg"
                                       : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"
                                   }`}
                                 >
-                                  <SubIcon className="w-4 h-4" />
-                                  <span className="ml-3">{subItem.label}</span>
+                                  <div className="flex items-center">
+                                    <SubIcon className="w-4 h-4" />
+                                    <span className="ml-3">
+                                      {subItem.label}
+                                    </span>
+                                  </div>
+                                  {subItem.badge !== undefined &&
+                                    subItem.badge > 0 && (
+                                      <span
+                                        className={`${
+                                          subItem.badgeColor === "green"
+                                            ? "bg-green-500"
+                                            : "bg-red-500"
+                                        } text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center`}
+                                      >
+                                        {subItem.badge}
+                                      </span>
+                                    )}
                                 </Link>
                               );
                             })}
