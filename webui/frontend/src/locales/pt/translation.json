@@ -403,7 +403,7 @@
     "runtimeHistory": "Histórico de execução",
     "plexExport": "Exportação Plex",
     "mediaServerExport": "Histórico de exportação do servidor de mídia",
-    "assets": "Ativos",
+    "assets": "Gestão de Ativos",
     "config": "Configuração",
     "galleries": "Galerias",
     "scheduler": "Agendador",
@@ -411,7 +411,7 @@
     "about": "Sobre",
     "howItWorks": "Como funciona",
     "autoTriggers": "Gatilhos automáticos",
-    "assetOverview": "Visão geral dos ativos",
+    "assetOverview": "Central de Ações",
     "assetReplacer": "Substituidor de ativos",
     "assetsManager": "Gerenciador de sobreposição",
     "manualAssets": "Ativos manuais",
@@ -1351,7 +1351,7 @@
     "confirmFetchButton": "Buscar substituições"
   },
   "assetOverview": {
-    "title": "Visão geral dos ativos",
+    "title": "Central de Ações",
     "description": "Visão geral de todos os ativos com categorização detalhada",
     "loading": "Carregando visão geral dos ativos...",
     "fetchError": "Falha ao buscar visão geral dos ativos",
