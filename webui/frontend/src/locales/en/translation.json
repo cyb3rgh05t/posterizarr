@@ -1422,6 +1422,7 @@
     "confirmMarkAll": "Confirm & Mark All ({{count}})"
   },
   "common": {
+    "view": "View",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
