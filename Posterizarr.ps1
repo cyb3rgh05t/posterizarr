@@ -7750,7 +7750,8 @@ if ($Manual) {
         if ([string]::IsNullOrEmpty($FolderName)) {
             $FolderName = Read-Host "Enter Media Foldername (how plex sees it)"
         }
-        if ([string]::IsNullOrEmpty($Titletext)) {
+        # Only prompt if the parameter was NOT passed at all
+        if (-not $PSBoundParameters.ContainsKey('Titletext')) {
             $Titletext = Read-Host "Enter Movie/Show/Background Title"
         }
     }
@@ -8212,7 +8213,7 @@ if ($Manual) {
             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
             InvokeMagickCommand -Command $magick -Arguments $Arguments
 
-            if ($AddText -eq 'true' -or $AddSeasonText -eq 'true' -or $AddTitleCardEPTitleText -eq 'true' -or $AddTitleCardEPText -eq 'true' -or $AddCollectionText -eq 'true' -or $AddBackgroundText -eq 'true') {
+            if (($AddText -eq 'true' -or $AddSeasonText -eq 'true' -or $AddTitleCardEPTitleText -eq 'true' -or $AddTitleCardEPText -eq 'true' -or $AddCollectionText -eq 'true' -or $AddBackgroundText -eq 'true') -and -not [string]::IsNullOrWhiteSpace($joinedTitle)) {
                 $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                 if ($AddShowTitletoSeason -eq 'true' -and $SeasonPoster) {
                     $ShowjoinedTitle = $ShowjoinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''

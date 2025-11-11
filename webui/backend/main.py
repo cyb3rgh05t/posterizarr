@@ -6266,12 +6266,6 @@ async def run_manual_mode(request: ManualModeRequest):
         if not request.picturePath or not request.picturePath.strip():
             raise HTTPException(status_code=400, detail="Picture path is required")
 
-        # Title text is NOT required for titlecards (they use epTitleName instead)
-        if request.posterType != "titlecard" and (
-            not request.titletext or not request.titletext.strip()
-        ):
-            raise HTTPException(status_code=400, detail="Title text is required")
-
         if  not request.folderName or not request.folderName.strip():
             raise HTTPException(status_code=400, detail="Folder name is required")
 
@@ -6505,13 +6499,6 @@ async def run_manual_mode_upload(
             raise HTTPException(status_code=400, detail=error_msg)
 
         # Validate required fields
-        if posterType != "titlecard" and not titletext.strip():
-            error_msg = "Title text is required"
-            logger.error(
-                f"Manual upload validation failed: {error_msg} (posterType: {posterType})"
-            )
-            raise HTTPException(status_code=400, detail=error_msg)
-
         if not folderName.strip():
             error_msg = "Folder name is required"
             logger.error(f"Manual upload validation failed: {error_msg} (posterType: {posterType})")
