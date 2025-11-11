@@ -223,11 +223,12 @@ class ImageChoicesDB:
 
     def import_from_csv(self, csv_path: Path) -> dict:
         """
-        Import data from ImageChoices.csv, skipping duplicates
-        Uses batch processing for performance
+        Import data from ImageChoices.csv, inserting new records
+        and updating existing ones based on the unique key.
+        (Title, Rootfolder, Type, LibraryName)
         """
         if not csv_path.exists():
-            return {"added": 0, "skipped": 0, "errors": 0, "error_details": []}
+            return {"added": 0, "updated": 0, "skipped": 0, "errors": 0, "error_details": []}
 
         with self.lock:
             conn = None
@@ -235,7 +236,7 @@ class ImageChoicesDB:
                 conn = self._get_connection()
                 cursor = conn.cursor()
 
-                records_to_insert = []
+                records_to_upsert = []
                 errors = 0
                 error_details = []
 
@@ -250,7 +251,7 @@ class ImageChoicesDB:
                             if not clean_row.get("Title") and not clean_row.get("Rootfolder"):
                                 continue
 
-                            records_to_insert.append((
+                            records_to_upsert.append((
                                 clean_row.get("Title", ""),
                                 clean_row.get("Type", ""),
                                 clean_row.get("Rootfolder", ""),
@@ -267,40 +268,82 @@ class ImageChoicesDB:
                             errors += 1
                             error_details.append(f"Row {i+1}: {str(e_row)}")
 
-                if records_to_insert:
-                    cursor.executemany(
-                        """
-                        INSERT OR IGNORE INTO imagechoices (
+                if records_to_upsert:
+                    # Store total rows before
+                    cursor.execute("SELECT COUNT(*) FROM imagechoices")
+                    rows_before = cursor.fetchone()[0]
+
+                    # Store total changes before
+                    cursor.execute("SELECT total_changes()")
+                    changes_before = cursor.fetchone()[0]
+
+                    # NEW UPSERT SQL
+                    # This attempts to INSERT. If a conflict on the unique key occurs,
+                    # it will UPDATE the existing row instead.
+                    sql_upsert = """
+                        INSERT INTO imagechoices (
                             Title, Type, Rootfolder, LibraryName, Language,
                             Fallback, TextTruncated, DownloadSource, FavProviderLink, Manual
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        records_to_insert
-                    )
+                        ON CONFLICT(Title, Rootfolder, Type, LibraryName) DO UPDATE SET
+                            Language = excluded.Language,
+                            Fallback = excluded.Fallback,
+                            TextTruncated = excluded.TextTruncated,
+                            DownloadSource = excluded.DownloadSource,
+                            FavProviderLink = excluded.FavProviderLink,
+                            Manual = excluded.Manual,
+                            updated_at = (datetime('now', 'localtime'))
+                        WHERE
+                            imagechoices.Language IS NOT excluded.Language OR
+                            imagechoices.Fallback IS NOT excluded.Fallback OR
+                            imagechoices.TextTruncated IS NOT excluded.TextTruncated OR
+                            imagechoices.DownloadSource IS NOT excluded.DownloadSource OR
+                            imagechoices.FavProviderLink IS NOT excluded.FavProviderLink OR
+                            imagechoices.Manual IS NOT excluded.Manual
+                    """
+
+                    cursor.executemany(sql_upsert, records_to_upsert)
                     conn.commit()
 
-                    added_count = cursor.rowcount
-                    skipped_count = len(records_to_insert) - added_count
+                    # Get total changes after
+                    cursor.execute("SELECT total_changes()")
+                    changes_after = cursor.fetchone()[0]
+
+                    # Get total rows after
+                    cursor.execute("SELECT COUNT(*) FROM imagechoices")
+                    rows_after = cursor.fetchone()[0]
 
                     conn.close()
+
+                    # Calculate stats
+                    total_changes = changes_after - changes_before
+                    added_count = rows_after - rows_before
+
+                    # An INSERT counts as 1 change, an UPDATE counts as 1 change.
+                    updated_count = total_changes - added_count
+
+                    # Skipped rows are those that were processed but caused no change (due to the WHERE clause)
+                    skipped_count = len(records_to_upsert) - total_changes
+
                     return {
                         "added": added_count,
+                        "updated": updated_count,
                         "skipped": skipped_count,
                         "errors": errors,
                         "error_details": error_details,
                     }
 
                 conn.close()
-                return {"added": 0, "skipped": 0, "errors": errors, "error_details": error_details}
+                return {"added": 0, "updated": 0, "skipped": 0, "errors": errors, "error_details": error_details}
 
             except Exception as e:
                 logger.error(f"Error importing CSV: {e}")
                 if conn:
                     conn.rollback()
                     conn.close()
-                return {"added": 0, "skipped": 0, "errors": errors + 1, "error_details": [str(e)]}
+                return {"added": 0, "updated": 0, "skipped": 0, "errors": errors + 1, "error_details": [str(e)]}
 
-    # --- NEW: Bulk update function ---
+    # Bulk update function
     def bulk_update_manual_status(self, record_ids: List[int], manual_status: str) -> int:
         """
         Update the 'Manual' status for a list of record IDs in a single transaction.
@@ -349,7 +392,7 @@ class ImageChoicesDB:
                     conn.rollback()
                     conn.close()
                 raise
-    # --- END: New function ---
+    # END: New function
 
 def init_database(db_path: Path) -> ImageChoicesDB:
     """Initialize the database"""
