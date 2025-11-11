@@ -1467,6 +1467,7 @@
     "confirmMarkAll": "Bestätigen & Alle ({{count}}) markieren"
   },
   "common": {
+    "view": "Ansehen",
     "save": "Speichern",
     "cancel": "Abbrechen",
     "delete": "Löschen",
