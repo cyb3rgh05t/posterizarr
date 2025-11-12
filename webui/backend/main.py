@@ -595,7 +595,7 @@ def check_directory_permissions(
 def import_imagechoices_to_db():
     """
     Import ImageChoices.csv from Logs directory to database
-    Only imports new records that don't already exist
+    Inserts new records and updates existing ones
     """
     if not DATABASE_AVAILABLE or db is None:
         logger.debug("Database not available, skipping CSV import")
@@ -607,22 +607,28 @@ def import_imagechoices_to_db():
         return
 
     try:
-        logger.info(" Importing ImageChoices.csv to database...")
+        logger.info(" Importing/Updating ImageChoices.csv to database...")
         stats = db.import_from_csv(csv_path)
 
-        if stats["added"] > 0:
+        added = stats.get('added', 0)
+        updated = stats.get('updated', 0)
+        skipped = stats.get('skipped', 0)
+        errors = stats.get('errors', 0)
+
+        if added > 0 or updated > 0:
             logger.info(
-                f"CSV import successful: {stats['added']} new record(s) added, "
-                f"{stats['skipped']} skipped (already exist), "
-                f"{stats['errors']} error(s)"
+                f"CSV import successful: {added} new record(s) added, "
+                f"{updated} record(s) updated, "
+                f"{skipped} skipped (no change), "
+                f"{errors} error(s)"
             )
         else:
             logger.debug(
-                f"CSV import: No new records to add ({stats['skipped']} already exist)"
+                f"CSV import: No new or updated records ({skipped} skipped, {errors} errors)"
             )
 
-        if stats["errors"] > 0:
-            logger.warning(f"Import errors: {stats['error_details']}")
+        if errors > 0:
+            logger.warning(f"Import errors: {stats.get('error_details', [])}")
 
     except Exception as e:
         logger.error(f"Error importing CSV to database: {e}")
@@ -6260,12 +6266,6 @@ async def run_manual_mode(request: ManualModeRequest):
         if not request.picturePath or not request.picturePath.strip():
             raise HTTPException(status_code=400, detail="Picture path is required")
 
-        # Title text is NOT required for titlecards (they use epTitleName instead)
-        if request.posterType != "titlecard" and (
-            not request.titletext or not request.titletext.strip()
-        ):
-            raise HTTPException(status_code=400, detail="Title text is required")
-
         if  not request.folderName or not request.folderName.strip():
             raise HTTPException(status_code=400, detail="Folder name is required")
 
@@ -6499,13 +6499,6 @@ async def run_manual_mode_upload(
             raise HTTPException(status_code=400, detail=error_msg)
 
         # Validate required fields
-        if posterType != "titlecard" and not titletext.strip():
-            error_msg = "Title text is required"
-            logger.error(
-                f"Manual upload validation failed: {error_msg} (posterType: {posterType})"
-            )
-            raise HTTPException(status_code=400, detail=error_msg)
-
         if not folderName.strip():
             error_msg = "Folder name is required"
             logger.error(f"Manual upload validation failed: {error_msg} (posterType: {posterType})")
@@ -11948,10 +11941,11 @@ async def import_imagechoices_csv():
         return {
             "message": "CSV import completed",
             "stats": {
-                "added": stats["added"],
-                "skipped": stats["skipped"],
-                "errors": stats["errors"],
-                "error_details": stats["error_details"] if stats["errors"] > 0 else [],
+                "added": stats.get("added", 0),
+                "updated": stats.get("updated", 0),
+                "skipped": stats.get("skipped", 0),
+                "errors": stats.get("errors", 0),
+                "error_details": stats.get("error_details", []) if stats.get("errors", 0) > 0 else [],
             },
         }
     except Exception as e:

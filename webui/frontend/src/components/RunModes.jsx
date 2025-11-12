@@ -755,12 +755,6 @@ function RunModes() {
       return;
     }
 
-    // Title text is only required for non-titlecard types
-    if (manualForm.posterType !== "titlecard" && !manualForm.titletext.trim()) {
-      showError(t("runModes.validation.titleRequired"));
-      return;
-    }
-
     // Folder name is required for all types
     if (!manualForm.folderName.trim()) {
       showError(t("runModes.validation.folderRequired"));
@@ -2313,8 +2307,7 @@ function RunModes() {
           {manualForm.posterType !== "titlecard" && (
             <div>
               <label className="block text-sm font-medium text-theme-text mb-2">
-                {t("runModes.manual.titleText")}{" "}
-                <span className="text-red-400">*</span>
+                {t("runModes.manual.titleText")}
               </label>
               <input
                 type="text"
