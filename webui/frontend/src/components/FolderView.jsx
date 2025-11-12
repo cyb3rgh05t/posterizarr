@@ -19,6 +19,7 @@ import CompactImageSizeSlider from "./CompactImageSizeSlider";
 import ConfirmDialog from "./ConfirmDialog";
 import ImagePreviewModal from "./ImagePreviewModal";
 import ScrollToButtons from "./ScrollToButtons";
+import AssetReplacer from "./AssetReplacer";
 
 const API_URL = "/api";
 
@@ -41,6 +42,10 @@ function FolderView() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState(new Set());
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // Asset replacer state
+  const [replacerOpen, setReplacerOpen] = useState(false);
+  const [assetToReplace, setAssetToReplace] = useState(null);
 
   // Image size state
   const [imageSize, setImageSize] = useState(() => {
@@ -313,7 +318,7 @@ function FolderView() {
                 ) : (
                   <CheckSquare className="w-4 h-4" />
                 )}
-                <span>{selectMode ? t("common.cancel") : t("common.select")}</span>
+                <span>{selectMode ? t("folderView.cancel") : t("folderView.select")}</span>
               </button>
             )}
             <button
@@ -554,8 +559,9 @@ function FolderView() {
           selectedImage={selectedImage}
           onClose={() => setSelectedImage(null)}
           onDelete={deleteAsset}
-          onReplace={() => {
-            /* Replace functionality can be added here */
+          onReplace={(image) => {
+            setAssetToReplace(image);
+            setReplacerOpen(true);
           }}
           isDeleting={false} // Add state for this if needed
           cacheBuster={cacheBuster}
@@ -563,6 +569,32 @@ function FolderView() {
           formatTimestamp={() => new Date().toLocaleString("sv-SE")}
           getMediaType={(p, n) => selectedImage.full_type}
           getTypeColor={(t) => getAssetTypeBadgeColor(selectedImage.asset_type)}
+        />
+      )}
+      {/* Asset Replacer Modal */}
+      {replacerOpen && assetToReplace && (
+        <AssetReplacer
+          asset={assetToReplace}
+          onClose={() => {
+            setReplacerOpen(false);
+            setAssetToReplace(null);
+          }}
+          onSuccess={() => {
+            // Force cache refresh by updating timestamp
+            setCacheBuster(Date.now());
+
+            // Close modals
+            setReplacerOpen(false);
+            setAssetToReplace(null);
+            setSelectedImage(null); // Close the preview modal
+
+            showSuccess(t("gallery.assetReplaced") || "Asset replaced successfully.");
+
+            // Refresh the images after successful replacement
+            setTimeout(() => {
+              fetchData(currentPath, false); // Refresh the folder view
+            }, 500);
+          }}
         />
       )}
     </div>
