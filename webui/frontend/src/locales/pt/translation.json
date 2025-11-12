@@ -1416,6 +1416,7 @@
     "confirmMarkAll": "Confirmar e Marcar Tudo ({{count}})"
   },
   "common": {
+    "view": "Visualizar",
     "save": "Salvar",
     "cancel": "Cancelar",
     "delete": "Excluir",
