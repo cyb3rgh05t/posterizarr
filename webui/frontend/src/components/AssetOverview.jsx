@@ -20,6 +20,7 @@ import {
   ChevronRight, // Added for pagination
   CheckCheck, // Added for Mark All button
   X, // <-- ADDED for new confirm modal
+  Trash2, // <-- ADDED: For Delete button
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../context/ToastContext";
@@ -84,7 +85,7 @@ const getProviderBadge = (url) => {
 };
 
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// ++ NEW PAGINATION COMPONENT (Copied from ManualAssets.jsx)
+// ++ PAGINATION COMPONENT
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
   const { t } = useTranslation();
@@ -191,8 +192,6 @@ const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
   );
 };
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// ++ END OF PAGINATION COMPONENT
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 // Asset Row Component - Memoized to prevent unnecessary re-renders
 const AssetRow = React.memo(
@@ -203,17 +202,25 @@ const AssetRow = React.memo(
     onNoEditsNeeded,
     onUnresolve,
     onReplace,
+    onDelete, // <-- Delete prop
     isSelected,
     onToggleSelection,
     showCheckbox,
   }) => {
     const { t } = useTranslation();
     const [logoError, setLogoError] = useState(false);
+    const [favLogoError, setFavLogoError] = useState(false);
 
     // Memoize badge computation based on DownloadSource
-    const badge = useMemo(
+    const downloadBadge = useMemo(
       () => getProviderBadge(asset.DownloadSource),
       [asset.DownloadSource]
+    );
+
+    // Memoize badge for FavProviderLink
+    const favProviderBadge = useMemo(
+      () => getProviderBadge(asset.FavProviderLink),
+      [asset.FavProviderLink]
     );
 
     // Check if asset is resolved (Manual = "Yes" or "true" for legacy)
@@ -252,11 +259,13 @@ const AssetRow = React.memo(
                 )}
               </h3>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-sm text-theme-muted">
+                {/* Type */}
                 <span className="font-medium">{t("assetOverview.type")}:</span>
                 <span className="bg-theme-card px-2 py-0.5 rounded">
                   {asset.Type || "Unknown"}
                 </span>
                 <span className="hidden sm:inline">•</span>
+                {/* Language */}
                 <span className="font-medium">
                   {t("assetOverview.language")}:
                 </span>
@@ -268,6 +277,7 @@ const AssetRow = React.memo(
                     : "Unknown"}
                 </span>
                 <span className="hidden sm:inline">•</span>
+                {/* Source */}
                 <span className="font-medium">
                   {t("assetOverview.source")}:
                 </span>
@@ -281,31 +291,68 @@ const AssetRow = React.memo(
                     className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
                     title={asset.DownloadSource}
                   >
-                    {badge.logo && !logoError ? (
+                    {downloadBadge.logo && !logoError ? (
                       <img
-                        src={badge.logo}
-                        alt={badge.name}
+                        src={downloadBadge.logo}
+                        alt={downloadBadge.name}
                         className="h-[35px] object-contain"
                         onError={() => setLogoError(true)}
                       />
                     ) : (
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${badge.color}`}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${downloadBadge.color}`}
                       >
-                        {badge.name}
+                        {downloadBadge.name}
                       </span>
                     )}
                     <ExternalLink className="w-3 h-3 opacity-60" />
                   </a>
                 ) : (
                   <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${badge.color}`}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${downloadBadge.color}`}
                   >
-                    {badge.name}
+                    {downloadBadge.name}
                   </span>
                 )}
-
-                {/* Added timestamp */}
+                {/* Fav Provider */}
+                <>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="font-medium">
+                    {t("assetOverview.favProvider")}:
+                  </span>
+                  {favProviderBadge.name === "Missing" ? (
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${favProviderBadge.color}`}
+                    >
+                      {favProviderBadge.name}
+                    </span>
+                  ) : (
+                    <a
+                      href={asset.FavProviderLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
+                      title={asset.FavProviderLink}
+                    >
+                      {favProviderBadge.logo && !favLogoError ? (
+                        <img
+                          src={favProviderBadge.logo}
+                          alt={favProviderBadge.name}
+                          className="h-[35px] object-contain"
+                          onError={() => setFavLogoError(true)}
+                        />
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${favProviderBadge.color}`}
+                        >
+                          {favProviderBadge.name}
+                        </span>
+                      )}
+                      <ExternalLink className="w-3 h-3 opacity-60" />
+                    </a>
+                  )}
+                </>
+                {/* Timestamp */}
                 {asset.created_at && (
                   <>
                     <span className="hidden sm:inline">•</span>
@@ -323,7 +370,6 @@ const AssetRow = React.memo(
                   </>
                 )}
               </div>
-
               {/* Tags */}
               <div className="flex flex-wrap gap-2 mt-3">
                 {tags.map((tag, index) => (
@@ -341,17 +387,27 @@ const AssetRow = React.memo(
           {/* Action Buttons */}
           <div className="flex items-start gap-2">
             {isResolved ? (
-              // Show "Unresolve" button for resolved assets
-              <button
-                onClick={() => onUnresolve(asset)}
-                className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text transition-all whitespace-nowrap shadow-sm"
-                title={t("assetOverview.unresolveTooltip")}
-              >
-                <Edit className="w-4 h-4 text-theme-primary" />
-                {t("assetOverview.unresolve")}
-              </button>
+              // --- Resolved Asset Actions ---
+              <>
+                <button
+                  onClick={() => onUnresolve(asset)}
+                  className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text transition-all whitespace-nowrap shadow-sm"
+                  title={t("assetOverview.unresolveTooltip")}
+                >
+                  <Edit className="w-4 h-4 text-theme-primary" />
+                  {t("assetOverview.unresolve")}
+                </button>
+                {/* <-- UPDATED: Delete button for resolved assets --> */}
+                <button
+                  onClick={() => onDelete(asset)}
+                  className="flex items-center justify-center p-2 bg-red-900/50 hover:bg-red-900/80 border border-red-500/30 hover:border-red-500/50 rounded-lg text-red-400 transition-all whitespace-nowrap shadow-sm"
+                  title={t("assetOverview.deleteAssetTooltip")}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
             ) : (
-              // Show "No Edits Needed" and "Replace" buttons for unresolved assets
+              // --- Unresolved Asset Actions ---
               <>
                 <button
                   onClick={() => onNoEditsNeeded(asset)}
@@ -368,6 +424,14 @@ const AssetRow = React.memo(
                 >
                   <Replace className="w-4 h-4 text-theme-primary" />
                   {t("assetOverview.replace")}
+                </button>
+                {/* <-- UPDATED: Delete button for unresolved assets --> */}
+                <button
+                  onClick={() => onDelete(asset)}
+                  className="flex items-center justify-center p-2 bg-red-900/50 hover:bg-red-900/80 border border-red-500/30 hover:border-red-500/50 rounded-lg text-red-400 transition-all whitespace-nowrap shadow-sm"
+                  title={t("assetOverview.deleteAssetTooltip")}
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </>
             )}
@@ -390,44 +454,55 @@ const AssetOverview = () => {
   const [selectedType, setSelectedType] = useState("All Types");
   const [selectedLibrary, setSelectedLibrary] = useState("All Libraries");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
-  const [selectedStatus, setSelectedStatus] = useState("Unresolved"); // New filter for resolved/unresolved
+  const [selectedStatus, setSelectedStatus] = useState("Unresolved");
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showReplacer, setShowReplacer] = useState(false);
 
   // PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(() => {
-    const saved = localStorage.getItem("asset-overview-items-per-page"); // Use unique key
+    const saved = localStorage.getItem("asset-overview-items-per-page");
     return saved ? parseInt(saved) : 25;
   });
-  // END PAGINATION STATE
 
   // Selection state for bulk actions
   const [selectedAssetIds, setSelectedAssetIds] = useState(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false); // <-- NEW: For confirm modal
+
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ++ Generic Confirmation Modal State
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  const [confirmModalState, setConfirmModalState] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "",
+    confirmColor: "primary", // "primary" or "danger"
+    onConfirm: () => {},
+  });
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // Dropdown states
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [libraryDropdownOpen, setLibraryDropdownOpen] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
-  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false); // New dropdown state
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [itemsPerPageDropdownOpen, setItemsPerPageDropdownOpen] =
-    useState(false); // New
+    useState(false);
 
-  // Dropdown position states (true = opens upward, false = opens downward)
+  // Dropdown position states
   const [typeDropdownUp, setTypeDropdownUp] = useState(false);
   const [libraryDropdownUp, setLibraryDropdownUp] = useState(false);
   const [categoryDropdownUp, setCategoryDropdownUp] = useState(false);
-  const [statusDropdownUp, setStatusDropdownUp] = useState(false); // New dropdown position
-  const [itemsPerPageDropdownUp, setItemsPerPageDropdownUp] = useState(false); // New
+  const [statusDropdownUp, setStatusDropdownUp] = useState(false);
+  const [itemsPerPageDropdownUp, setItemsPerPageDropdownUp] = useState(false);
 
   // Refs for click outside detection
   const typeDropdownRef = useRef(null);
   const libraryDropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null);
-  const statusDropdownRef = useRef(null); // New ref
-  const itemsPerPageDropdownRef = useRef(null); // New
+  const statusDropdownRef = useRef(null);
+  const itemsPerPageDropdownRef = useRef(null);
 
   // Fetch data from API
   const fetchData = async () => {
@@ -447,45 +522,38 @@ const AssetOverview = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [t]); // Added t dependency
 
   // Clear selection and reset page when filters change
   useEffect(() => {
     setSelectedAssetIds(new Set());
-    setCurrentPage(1); // Reset to page 1
+    setCurrentPage(1);
   }, [
     searchQuery,
     selectedType,
     selectedLibrary,
     selectedCategory,
     selectedStatus,
-    itemsPerPage, // Reset page when itemsPerPage changes
+    itemsPerPage,
   ]);
 
   // Helper function to parse clean show name from Rootfolder
   const parseShowName = (rootfolder) => {
     if (!rootfolder) return null;
-
-    // Remove TMDB/TVDB/IMDB IDs from the folder name
-    // Pattern matches: [tvdb-123456], [tmdb-123456], [imdb-tt123456], etc.
     const cleanName = rootfolder
       .replace(/\s*\[tvdb-[^\]]+\]/gi, "")
       .replace(/\s*\[tmdb-[^\]]+\]/gi, "")
       .replace(/\s*\[imdb-[^\]]+\]/gi, "")
       .trim();
-
     return cleanName;
   };
 
   // Function to calculate dropdown position
   const calculateDropdownPosition = (ref) => {
     if (!ref.current) return false;
-
     const rect = ref.current.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
-
-    // If more space above than below, open upward
     return spaceAbove > spaceBelow;
   };
 
@@ -516,7 +584,6 @@ const AssetOverview = () => {
       ) {
         setStatusDropdownOpen(false);
       }
-      // New: Click outside for itemsPerPage dropdown
       if (
         itemsPerPageDropdownRef.current &&
         !itemsPerPageDropdownRef.current.contains(event.target)
@@ -533,22 +600,15 @@ const AssetOverview = () => {
 
   // Handle opening the replacer
   const handleReplace = async (asset) => {
-    // Instead of constructing the path manually (which doesn't work for Seasons/TitleCards),
-    // we ask the backend to find the actual asset file in the filesystem
     try {
       const response = await fetch(`/api/imagechoices/${asset.id}/find-asset`);
-
       if (!response.ok) {
         console.error("Failed to find asset file:", await response.text());
-        // Fallback to manual construction for backwards compatibility
         constructAssetManually(asset);
         return;
       }
-
       const data = await response.json();
-
       if (data.success && data.asset) {
-        // Use the actual asset path from filesystem
         const assetTypeRaw = (asset.Type || "").toLowerCase();
         let mediaType = "movie";
         if (
@@ -561,7 +621,6 @@ const AssetOverview = () => {
         ) {
           mediaType = "tv";
         }
-
         const assetForReplacer = {
           id: asset.id,
           title: asset.Title,
@@ -573,20 +632,6 @@ const AssetOverview = () => {
           _dbData: asset,
           _originalType: asset.Type,
         };
-
-        console.log("Found actual asset file from filesystem:", {
-          dbRecord: {
-            Title: asset.Title,
-            Type: asset.Type,
-            Rootfolder: asset.Rootfolder,
-          },
-          foundAsset: {
-            path: data.asset.path,
-            name: data.asset.name,
-            type: mediaType,
-          },
-        });
-
         setSelectedAsset(assetForReplacer);
         setShowReplacer(true);
       } else {
@@ -599,78 +644,48 @@ const AssetOverview = () => {
     }
   };
 
-  // Fallback: Manual path construction (for backwards compatibility)
+  // Fallback: Manual path construction
   const constructAssetManually = (asset) => {
     console.warn("Using manual path construction as fallback");
-
     let fullPath;
-
     if (asset.Rootfolder) {
-      // Rootfolder contains: "Man-Thing (2005) {tmdb-18882}"
-      // Determine filename based on asset type (same as actual file structure)
       const assetType = (asset.Type || "").toLowerCase();
       const title = asset.Title || "";
-      let filename = "poster.jpg"; // Default
-
+      let filename = "poster.jpg";
       if (assetType.includes("background")) {
         filename = "background.jpg";
       } else if (assetType.includes("season")) {
-        // Extract season number from Title (e.g., "Show Name | Season04" or "Show Name | Season05")
-        // NOT from Type field which only contains "Season"
         const seasonMatch = title.match(/season\s*(\d+)/i);
         if (seasonMatch) {
           const seasonNum = seasonMatch[1].padStart(2, "0");
           filename = `Season${seasonNum}.jpg`;
-          console.log(`Season filename from title '${title}': ${filename}`);
         } else {
-          filename = "Season01.jpg"; // Fallback to Season01 if no number found
-          console.warn(
-            `Could not extract season number from title '${title}', using Season01.jpg as fallback`
-          );
+          filename = "Season01.jpg";
         }
       } else if (
         assetType.includes("titlecard") ||
         assetType.includes("episode")
       ) {
-        // Extract episode code from Title (e.g., "S04E01 | Episode Title")
         const episodeMatch = title.match(/(S\d+E\d+)/i);
         if (episodeMatch) {
           const episodeCode = episodeMatch[1].toUpperCase();
           filename = `${episodeCode}.jpg`;
-          console.log(`Episode filename from title '${title}': ${filename}`);
         } else {
-          filename = "S01E01.jpg"; // Fallback
-          console.warn(
-            `Could not extract episode code from title '${title}', using S01E01.jpg as fallback`
-          );
+          filename = "S01E01.jpg";
         }
       }
-
-      // Construct path like Gallery does: "LibraryName/Rootfolder/filename"
       fullPath = `${asset.LibraryName}/${asset.Rootfolder}/${filename}`;
     } else if (asset.Title) {
-      // Fallback without Rootfolder
       const assetType = (asset.Type || "").toLowerCase();
       const filename = assetType.includes("background")
         ? "background.jpg"
         : "poster.jpg";
       fullPath = `${asset.LibraryName || "4K"}/${asset.Title}/${filename}`;
     } else {
-      // Last fallback
       fullPath = `${asset.LibraryName || "4K"}/unknown.jpg`;
     }
-
-    // Determine the correct type for AssetReplacer
-    // AssetReplacer's extractMetadata expects:
-    // - asset.type to determine media_type ("movie" vs "tv")
-    // - asset.type or path to determine asset_type ("poster", "background", etc.)
     const assetTypeRaw = (asset.Type || "").toLowerCase();
-
-    // Determine if it's a movie or TV show
-    // DB Type examples:
-    // - Movies: "Movie", "Movie Background"
-    // - TV: "Show", "Show Background", "Season", "Season Poster", "TitleCard", "Episode"
-    let mediaType = "movie"; // Default
+    let mediaType = "movie";
     if (
       assetTypeRaw.includes("show") ||
       assetTypeRaw.includes("series") ||
@@ -681,74 +696,36 @@ const AssetOverview = () => {
     ) {
       mediaType = "tv";
     }
-
     const assetForReplacer = {
       id: asset.id,
       title: asset.Title,
-      name: fullPath.split("/").pop(), // Just the filename
-      path: fullPath, // Relative path from assets folder (like Gallery)
-      type: mediaType, // "movie" or "tv" - used by extractMetadata() to set media_type
+      name: fullPath.split("/").pop(),
+      path: fullPath,
+      type: mediaType,
       library: asset.LibraryName || "",
-      url: `/poster_assets/${fullPath}`, // Same URL format as Gallery
-      // Pass through original DB data for debugging
+      url: `/poster_assets/${fullPath}`,
       _dbData: asset,
-      _originalType: asset.Type, // Keep original for reference
+      _originalType: asset.Type,
     };
-
-    console.log("Converting asset for replacer (Gallery-compatible format):", {
-      original: {
-        Title: asset.Title,
-        Type: asset.Type,
-        Rootfolder: asset.Rootfolder,
-        LibraryName: asset.LibraryName,
-      },
-      converted: {
-        path: assetForReplacer.path,
-        name: assetForReplacer.name,
-        url: assetForReplacer.url,
-        type: assetForReplacer.type,
-      },
-    });
-
     setSelectedAsset(assetForReplacer);
     setShowReplacer(true);
   };
 
   // Handle successful replacement
   const handleReplaceSuccess = async () => {
-    console.log("handleReplaceSuccess called for asset ID:", selectedAsset?.id);
-
-    // Delete the DB entry after successful replacement
     try {
-      console.log(
-        "Sending DELETE request to /api/imagechoices/" + selectedAsset.id
-      );
       const response = await fetch(`/api/imagechoices/${selectedAsset.id}`, {
         method: "DELETE",
       });
-
-      console.log("DELETE response status:", response.status);
-
       if (response.ok) {
-        console.log("DB entry deleted successfully after replacement");
-
-        // Refresh the data to update the UI
-        console.log("Refreshing asset data...");
         await fetchData();
-        console.log("Asset data refreshed");
-
-        // Trigger event to update sidebar badge count
-        console.log("Dispatching assetReplaced event");
         window.dispatchEvent(new Event("assetReplaced"));
       } else {
-        const errorText = await response.text();
-        console.error("Failed to delete DB entry:", response.status, errorText);
+        console.error("Failed to delete DB entry:", response.status, await response.text());
       }
     } catch (error) {
       console.error("Error deleting DB entry:", error);
     }
-
-    console.log("Closing replacer modal");
     setShowReplacer(false);
     setSelectedAsset(null);
   };
@@ -761,15 +738,7 @@ const AssetOverview = () => {
 
   // Handle marking asset as "No Edits Needed"
   const handleNoEditsNeeded = async (asset) => {
-    console.log(`[AssetOverview] Marking asset as "No Edits Needed":`, {
-      id: asset.id,
-      title: asset.Title,
-      type: asset.Type,
-      library: asset.LibraryName,
-    });
-
     try {
-      // Build the complete record with all required fields
       const updateRecord = {
         Title: asset.Title,
         Type: asset.Type || null,
@@ -780,80 +749,30 @@ const AssetOverview = () => {
         TextTruncated: asset.TextTruncated || null,
         DownloadSource: asset.DownloadSource || null,
         FavProviderLink: asset.FavProviderLink || null,
-        Manual: "Yes", // Mark as manually reviewed (Yes instead of true)
+        Manual: "Yes",
       };
-
-      console.log(
-        `[AssetOverview] Sending PUT request to /api/imagechoices/${asset.id}`,
-        {
-          method: "PUT",
-          payload: updateRecord,
-        }
-      );
-
       const response = await fetch(`/api/imagechoices/${asset.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateRecord),
       });
-
-      const responseData = await response.json();
-      console.log(`[AssetOverview] PUT response:`, {
-        ok: response.ok,
-        status: response.status,
-        data: responseData,
-      });
-
       if (response.ok) {
-        console.log(
-          `[AssetOverview] ✅ Asset ${asset.id} marked as Manual=true (No Edits Needed)`
-        );
         showSuccess(
           t("assetOverview.markedAsReviewed", { title: asset.Title })
         );
-
-        // Refresh the data to update the UI
         await fetchData();
-
-        // Trigger event to update sidebar badge count
         window.dispatchEvent(new Event("assetReplaced"));
       } else {
-        console.error(
-          `[AssetOverview] ❌ Failed to update asset Manual field:`,
-          {
-            status: response.status,
-            statusText: response.statusText,
-            error: responseData,
-          }
-        );
         showError(t("assetOverview.updateFailed", { title: asset.Title }));
       }
     } catch (error) {
-      console.error(`[AssetOverview] ❌ Error updating asset:`, {
-        error: error.message,
-        stack: error.stack,
-        asset: {
-          id: asset.id,
-          title: asset.Title,
-        },
-      });
       showError(t("assetOverview.updateError", { error: error.message }));
     }
   };
 
-  // Handle marking asset as "Unresolve" (undo resolution)
+  // Handle marking asset as "Unresolve"
   const handleUnresolve = async (asset) => {
-    console.log(`[AssetOverview] Unresolving asset:`, {
-      id: asset.id,
-      title: asset.Title,
-      type: asset.Type,
-      library: asset.LibraryName,
-    });
-
     try {
-      // Build the complete record with Manual set to "false"
       const updateRecord = {
         Title: asset.Title,
         Type: asset.Type || null,
@@ -864,71 +783,78 @@ const AssetOverview = () => {
         TextTruncated: asset.TextTruncated || null,
         DownloadSource: asset.DownloadSource || null,
         FavProviderLink: asset.FavProviderLink || null,
-        Manual: "No", // Mark as explicitly unresolved (No instead of false)
+        Manual: "No",
       };
-
-      console.log(
-        `[AssetOverview] Sending PUT request to /api/imagechoices/${asset.id}`,
-        {
-          method: "PUT",
-          payload: updateRecord,
-        }
-      );
-
       const response = await fetch(`/api/imagechoices/${asset.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateRecord),
       });
-
-      const responseData = await response.json();
-      console.log(`[AssetOverview] PUT response:`, {
-        ok: response.ok,
-        status: response.status,
-        data: responseData,
-      });
-
       if (response.ok) {
-        console.log(
-          `[AssetOverview] ✅ Asset ${asset.id} marked as Manual=false (Unresolved)`
-        );
         showSuccess(
           t("assetOverview.markedAsUnresolved", { title: asset.Title })
         );
-
-        // Refresh the data to update the UI
         await fetchData();
-
-        // Trigger event to update sidebar badge count
         window.dispatchEvent(new Event("assetReplaced"));
       } else {
-        console.error(`[AssetOverview] ❌ Failed to unresolve asset:`, {
-          status: response.status,
-          statusText: response.statusText,
-          error: responseData,
-        });
         showError(t("assetOverview.unresolveFailed", { title: asset.Title }));
       }
     } catch (error) {
-      console.error(`[AssetOverview] ❌ Error unresolving asset:`, {
-        error: error.message,
-        stack: error.stack,
-        asset: {
-          id: asset.id,
-          title: asset.Title,
-        },
-      });
       showError(t("assetOverview.unresolveError", { error: error.message }));
     }
   };
+
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ++ UPDATED: Single Asset Delete
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  const handleDeleteAsset = (asset) => {
+    setConfirmModalState({
+      isOpen: true,
+      title: t("assetOverview.deleteAssetTitle"),
+      message: t("assetOverview.deleteAssetConfirm", { title: asset.Title }),
+      confirmText: t("assetOverview.delete"),
+      confirmColor: "danger",
+      onConfirm: () => runDeleteAsset(asset.id),
+    });
+  };
+
+  const runDeleteAsset = async (assetId) => {
+    setIsBulkProcessing(true); // Use same processing flag
+    try {
+      const response = await fetch(`/api/assets/delete-asset/${assetId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        showSuccess(t("assetOverview.deleteSuccess"));
+        await fetchData();
+        window.dispatchEvent(new Event("assetReplaced")); // Update sidebar
+      } else {
+        const errorData = await response.json();
+        showError(
+          t("assetOverview.deleteFailed", {
+            error: errorData.detail || "Unknown error",
+          })
+        );
+      }
+    } catch (error) {
+      showError(
+        t("assetOverview.deleteError", {
+          error: error.message,
+        })
+      );
+    } finally {
+      setIsBulkProcessing(false);
+      setConfirmModalState({ isOpen: false }); // Close modal
+    }
+  };
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // Items per page handler
   const handleItemsPerPageChange = (value) => {
     setItemsPerPage(value);
     localStorage.setItem("asset-overview-items-per-page", value.toString());
-    setCurrentPage(1); // Reset to first page
+    setCurrentPage(1);
   };
 
   // Handle toggling selection of a single asset
@@ -944,40 +870,29 @@ const AssetOverview = () => {
     });
   };
 
-  // Handle selecting/deselecting all filtered assets
+  // Handle selecting/deselecting all displayed assets
   const handleSelectAll = () => {
-    // This now refers to displayedAssets, which is calculated below
     if (
       selectedAssetIds.size === displayedAssets.length &&
       displayedAssets.length > 0
     ) {
-      // Deselect all
       setSelectedAssetIds(new Set());
     } else {
-      // Select all *displayed* assets
       setSelectedAssetIds(new Set(displayedAssets.map((asset) => asset.id)));
     }
   };
 
-  // Handle bulk mark as resolved
+  // Handle bulk mark as resolved (for selected items)
   const handleBulkMarkAsResolved = async () => {
     if (selectedAssetIds.size === 0) return;
-
     setIsBulkProcessing(true);
-    // Note: We use allAssets here to find the assets by ID, not just displayedAssets
     const selectedAssets = allAssets.filter((asset) =>
       selectedAssetIds.has(asset.id)
-    );
-
-    console.log(
-      `[AssetOverview] Bulk marking ${selectedAssets.length} assets as resolved`
     );
 
     try {
       let successCount = 0;
       let failCount = 0;
-
-      // Process each selected asset
       for (const asset of selectedAssets) {
         try {
           const updateRecord = {
@@ -992,40 +907,24 @@ const AssetOverview = () => {
             FavProviderLink: asset.FavProviderLink || null,
             Manual: "Yes",
           };
-
           const response = await fetch(`/api/imagechoices/${asset.id}`, {
             method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(updateRecord),
           });
-
           if (response.ok) {
             successCount++;
           } else {
             failCount++;
-            console.error(
-              `Failed to update asset ${asset.id}:`,
-              await response.text()
-            );
           }
         } catch (error) {
           failCount++;
-          console.error(`Error updating asset ${asset.id}:`, error);
         }
       }
-
-      // Clear selection after processing
       setSelectedAssetIds(new Set());
-
-      // Refresh data
       await fetchData();
-
-      // Trigger event to update sidebar badge count
       window.dispatchEvent(new Event("assetReplaced"));
 
-      // Show result message
       if (successCount > 0 && failCount === 0) {
         showSuccess(
           t("assetOverview.bulkMarkSuccess", { count: successCount })
@@ -1041,60 +940,124 @@ const AssetOverview = () => {
         showError(t("assetOverview.bulkMarkFailed"));
       }
     } catch (error) {
-      console.error("[AssetOverview] Error in bulk mark as resolved:", error);
       showError(t("assetOverview.bulkMarkError", { error: error.message }));
     } finally {
       setIsBulkProcessing(false);
     }
   };
 
-  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  // ++ REFACTORED: Bulk mark ALL FILTERED (split for modal)
-  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ++ UPDATED: Bulk Delete (for selected items)
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  const handleBulkDelete = () => {
+    if (selectedAssetIds.size === 0) return;
 
-  // STEP 1: This is called by the "Mark All ({{count}}) Resolved" button
-  const handleBulkMarkAllFilteredAsResolved = () => {
-    const assetsToProcess = filteredAssets; // Get the currently filtered list
+    setConfirmModalState({
+      isOpen: true,
+      title: t("assetOverview.bulkDeleteTitle"),
+      message: t("assetOverview.bulkDeleteConfirm", {
+        count: selectedAssetIds.size,
+      }),
+      confirmText: t("assetOverview.deleteCount", {
+        count: selectedAssetIds.size,
+      }),
+      confirmColor: "danger",
+      onConfirm: runBulkDelete,
+    });
+  };
 
-    if (assetsToProcess.length === 0) {
+  const runBulkDelete = async () => {
+    setIsBulkProcessing(true);
+    setConfirmModalState({ isOpen: false }); // Close modal
+
+    try {
+      const response = await fetch("/api/assets/bulk-delete-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ record_ids: Array.from(selectedAssetIds) }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        if (result.failed_count > 0) {
+          showError(
+            t("assetOverview.bulkDeletePartial", {
+              success: result.deleted_count,
+              failed: result.failed_count,
+            })
+          );
+        } else {
+          showSuccess(
+            t("assetOverview.bulkDeleteSuccess", {
+              count: result.deleted_count,
+            })
+          );
+        }
+      } else {
+        showError(
+          t("assetOverview.bulkDeleteFailed", {
+            error: result.detail || "Server error",
+          })
+        );
+      }
+    } catch (error) {
       showError(
-        t("assetOverview.noAssetsToMark", "No filtered assets to mark as resolved.")
+        t("assetOverview.bulkDeleteError", {
+          error: error.message,
+        })
       );
+    } finally {
+      setSelectedAssetIds(new Set());
+      await fetchData();
+      window.dispatchEvent(new Event("assetReplaced")); // Update sidebar
+      setIsBulkProcessing(false);
+    }
+  };
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ++ REFACTORED: Bulk Mark All Filtered (to use new modal)
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  const handleBulkMarkAllFilteredAsResolved = () => {
+    const assetsToProcess = filteredAssets;
+    if (assetsToProcess.length === 0) {
+      showError(t("assetOverview.noAssetsToMark"));
       return;
     }
 
-    // If assets exist, open the confirmation modal
-    setIsConfirmModalOpen(true);
+    setConfirmModalState({
+      isOpen: true,
+      title: t("assetOverview.bulkMarkAllFilteredTitle"),
+      message: t("assetOverview.bulkMarkAllFilteredConfirm", {
+        count: assetsToProcess.length,
+      }),
+      confirmText: t("assetOverview.confirmMarkAll", {
+        count: assetsToProcess.length,
+      }),
+      confirmColor: "primary",
+      onConfirm: runBulkMarkAllFilteredResolved,
+    });
   };
 
-  // STEP 2: This is called by the "Confirm" button INSIDE the modal
   const runBulkMarkAllFilteredResolved = async () => {
-    setIsConfirmModalOpen(false); // Close the modal
-
-    const assetsToProcess = filteredAssets; // Get the list again
-
+    setConfirmModalState({ isOpen: false });
+    const assetsToProcess = filteredAssets;
     setIsBulkProcessing(true);
-    console.log(
-      `[AssetOverview] Bulk marking all ${assetsToProcess.length} filtered assets as resolved`
-    );
 
     try {
       let successCount = 0;
       let failCount = 0;
 
-      // Process each filtered asset
       for (const asset of assetsToProcess) {
-        // Check if it's already resolved (e.g., if filter is "All")
         const isResolved =
           asset.Manual === "Yes" ||
           asset.Manual === "true" ||
           asset.Manual === true;
-
         if (isResolved) {
-          successCount++; // Count it as a "success"
+          successCount++;
           continue;
         }
-
         try {
           const updateRecord = {
             Title: asset.Title,
@@ -1106,42 +1069,27 @@ const AssetOverview = () => {
             TextTruncated: asset.TextTruncated || null,
             DownloadSource: asset.DownloadSource || null,
             FavProviderLink: asset.FavProviderLink || null,
-            Manual: "Yes", // Mark as resolved
+            Manual: "Yes",
           };
-
           const response = await fetch(`/api/imagechoices/${asset.id}`, {
             method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(updateRecord),
           });
-
           if (response.ok) {
             successCount++;
           } else {
             failCount++;
-            console.error(
-              `Failed to update asset ${asset.id}:`,
-              await response.text()
-            );
           }
         } catch (error) {
           failCount++;
-          console.error(`Error updating asset ${asset.id}:`, error);
         }
       }
 
-      // Clear selection just in case
       setSelectedAssetIds(new Set());
-
-      // Refresh data
       await fetchData();
-
-      // Trigger event to update sidebar badge count
       window.dispatchEvent(new Event("assetReplaced"));
 
-      // Show result message
       if (successCount > 0 && failCount === 0) {
         showSuccess(
           t("assetOverview.bulkMarkSuccess", { count: successCount })
@@ -1157,22 +1105,17 @@ const AssetOverview = () => {
         showError(t("assetOverview.bulkMarkFailed"));
       }
     } catch (error) {
-      console.error("[AssetOverview] Error in bulk mark all filtered:", error);
       showError(t("assetOverview.bulkMarkError", { error: error.message }));
     } finally {
       setIsBulkProcessing(false);
     }
   };
-  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  // ++ END OF REFACTORED FUNCTIONS
-  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // Get all assets from all categories
   const allAssets = useMemo(() => {
     if (!data) return [];
     const assets = new Map();
-
-    // Collect all unique assets
     Object.values(data.categories).forEach((category) => {
       category.assets.forEach((asset) => {
         if (!assets.has(asset.id)) {
@@ -1180,17 +1123,13 @@ const AssetOverview = () => {
         }
       });
     });
-
     return Array.from(assets.values());
   }, [data]);
 
-  // Get unique types and libraries for filters (based on selectedStatus)
+  // Get unique types and libraries for filters
   const types = useMemo(() => {
     let assetsToFilter = allAssets;
-
-    // Filter based on status first
     if (selectedStatus === "Resolved") {
-      // Show assets marked as "Yes" or "true" (legacy)
       assetsToFilter = assetsToFilter.filter(
         (asset) =>
           asset.Manual === "Yes" ||
@@ -1198,7 +1137,6 @@ const AssetOverview = () => {
           asset.Manual === true
       );
     } else if (selectedStatus === "Unresolved") {
-      // Show everything except resolved ("Yes" or "true")
       assetsToFilter = assetsToFilter.filter(
         (asset) =>
           !asset.Manual ||
@@ -1207,8 +1145,6 @@ const AssetOverview = () => {
             asset.Manual !== true)
       );
     }
-    // "All" status shows everything
-
     const uniqueTypes = new Set(
       assetsToFilter.map((a) => a.Type).filter(Boolean)
     );
@@ -1217,10 +1153,7 @@ const AssetOverview = () => {
 
   const libraries = useMemo(() => {
     let assetsToFilter = allAssets;
-
-    // Filter based on status first
     if (selectedStatus === "Resolved") {
-      // Show assets marked as "Yes" or "true" (legacy)
       assetsToFilter = assetsToFilter.filter(
         (asset) =>
           asset.Manual === "Yes" ||
@@ -1228,7 +1161,6 @@ const AssetOverview = () => {
           asset.Manual === true
       );
     } else if (selectedStatus === "Unresolved") {
-      // Show everything except resolved ("Yes" or "true")
       assetsToFilter = assetsToFilter.filter(
         (asset) =>
           !asset.Manual ||
@@ -1237,18 +1169,15 @@ const AssetOverview = () => {
             asset.Manual !== true)
       );
     }
-    // "All" status shows everything
-
     const uniqueLibs = new Set(
       assetsToFilter.map((a) => a.LibraryName).filter(Boolean)
     );
     return ["All Libraries", ...Array.from(uniqueLibs).sort()];
   }, [allAssets, selectedStatus]);
 
-  // Category cards configuration (must be before filteredAssets to avoid circular dependency)
+  // Category cards configuration
   const categoryCards = useMemo(() => {
     if (!data) return [];
-
     return [
       {
         key: "assets_with_issues",
@@ -1316,24 +1245,17 @@ const AssetOverview = () => {
   // Filter assets based on selected category and filters
   const filteredAssets = useMemo(() => {
     if (!data) return [];
-
     let assets = [];
-
-    // Select assets based on category
     if (selectedCategory === "All Categories") {
       assets = allAssets;
     } else {
-      // Find the category card with matching label to get the correct key
       const categoryCard = categoryCards.find(
         (card) => card.label === selectedCategory
       );
       const categoryKey = categoryCard?.key;
       assets = categoryKey ? data.categories[categoryKey]?.assets || [] : [];
     }
-
-    // Filter based on selected status
     if (selectedStatus === "Resolved") {
-      // Show only resolved assets (Manual === "Yes" or "true" for legacy)
       assets = assets.filter(
         (asset) =>
           asset.Manual === "Yes" ||
@@ -1341,7 +1263,6 @@ const AssetOverview = () => {
           asset.Manual === true
       );
     } else if (selectedStatus === "Unresolved") {
-      // Show only unresolved assets (not "Yes" or "true")
       assets = assets.filter(
         (asset) =>
           !asset.Manual ||
@@ -1350,9 +1271,6 @@ const AssetOverview = () => {
             asset.Manual !== true)
       );
     }
-    // If selectedStatus === "All", don't filter by Manual status
-
-    // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       assets = assets.filter(
@@ -1361,17 +1279,12 @@ const AssetOverview = () => {
           asset.Rootfolder?.toLowerCase().includes(query)
       );
     }
-
-    // Apply type filter
     if (selectedType !== "All Types") {
       assets = assets.filter((asset) => asset.Type === selectedType);
     }
-
-    // Apply library filter
     if (selectedLibrary !== "All Libraries") {
       assets = assets.filter((asset) => asset.LibraryName === selectedLibrary);
     }
-
     return assets;
   }, [
     data,
@@ -1390,45 +1303,30 @@ const AssetOverview = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  // END: Pagination Logic
 
   // Get tags for an asset
   const getAssetTags = (asset) => {
     const tags = [];
-
-    // 1. MISSING ASSET CHECK
-    // Missing Asset Badge -> if DownloadSource is empty
     const downloadSource = asset.DownloadSource;
     const providerLink = asset.FavProviderLink;
-
     const isDownloadMissing =
       downloadSource === "false" || downloadSource === false || !downloadSource;
-
     const isProviderLinkMissing =
       providerLink === "false" || providerLink === false || !providerLink;
-
-    // Missing Asset Badge (red) - only if DownloadSource is empty
     if (isDownloadMissing) {
       tags.push({
         label: t("assetOverview.missingAsset"),
         color: "bg-red-500/20 text-red-400 border-red-500/30",
       });
     }
-
-    // Missing Asset at Favorite Provider Badge (orange) - only if FavProviderLink is empty
     if (isProviderLinkMissing) {
       tags.push({
         label: t("assetOverview.missingAssetAtFavProvider"),
         color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
       });
     }
-
-    // 2. NON-PRIMARY PROVIDER CHECK
-    // Check if DownloadSource OR FavProviderLink don't match the primary provider
-    // Only check if we have both DownloadSource AND FavProviderLink
     if (!isDownloadMissing && !isProviderLinkMissing) {
       const primaryProvider = data?.config?.primary_provider || "";
-
       if (primaryProvider) {
         const providerPatterns = {
           tmdb: ["tmdb", "themoviedb"],
@@ -1436,20 +1334,13 @@ const AssetOverview = () => {
           fanart: ["fanart"],
           plex: ["plex"],
         };
-
         const patterns = providerPatterns[primaryProvider] || [primaryProvider];
-
-        // Check if DownloadSource contains the primary provider
         const isDownloadFromPrimaryProvider = patterns.some((pattern) =>
           downloadSource.toLowerCase().includes(pattern)
         );
-
-        // Check if FavProviderLink contains the primary provider
         const isFavLinkFromPrimaryProvider = patterns.some((pattern) =>
           providerLink.toLowerCase().includes(pattern)
         );
-
-        // Show badge if EITHER DownloadSource OR FavProviderLink is not from primary provider
         if (!isDownloadFromPrimaryProvider || !isFavLinkFromPrimaryProvider) {
           tags.push({
             label: t("assetOverview.notPrimaryProvider"),
@@ -1458,10 +1349,6 @@ const AssetOverview = () => {
         }
       }
     }
-
-    // 3. NON-PRIMARY LANGUAGE CHECK
-    // Check for "Unknown" language first (add badge for non-primary language)
-    // This includes when Language is "unknown", "false", false, or missing
     if (
       !asset.Language ||
       asset.Language === "false" ||
@@ -1472,9 +1359,7 @@ const AssetOverview = () => {
         label: t("assetOverview.notPrimaryLanguage"),
         color: "bg-sky-500/20 text-sky-400 border-sky-500/30",
       });
-    }
-    // Language is a valid language code/string
-    else if (data?.config?.primary_language) {
+    } else if (data?.config?.primary_language) {
       const langNormalized =
         asset.Language.toLowerCase() === "textless"
           ? "xx"
@@ -1483,7 +1368,6 @@ const AssetOverview = () => {
         data.config.primary_language.toLowerCase() === "textless"
           ? "xx"
           : data.config.primary_language.toLowerCase();
-
       if (langNormalized !== primaryNormalized) {
         tags.push({
           label: t("assetOverview.notPrimaryLanguage"),
@@ -1491,7 +1375,6 @@ const AssetOverview = () => {
         });
       }
     } else if (!data?.config?.primary_language) {
-      // No primary language set, anything that's not Textless/xx is non-primary
       if (!["textless", "xx"].includes(asset.Language.toLowerCase())) {
         tags.push({
           label: t("assetOverview.notPrimaryLanguage"),
@@ -1499,8 +1382,6 @@ const AssetOverview = () => {
         });
       }
     }
-
-    // 4. TRUNCATED TEXT CHECK
     if (
       asset.TextTruncated &&
       (asset.TextTruncated.toLowerCase() === "true" ||
@@ -1511,10 +1392,10 @@ const AssetOverview = () => {
         color: "bg-purple-500/20 text-purple-400 border-purple-500/30",
       });
     }
-
     return tags;
   };
 
+  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1526,6 +1407,7 @@ const AssetOverview = () => {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
@@ -1542,6 +1424,7 @@ const AssetOverview = () => {
     );
   }
 
+  // Main Render
   return (
     <div className="space-y-6">
       {/* Category Cards */}
@@ -1549,7 +1432,6 @@ const AssetOverview = () => {
         {categoryCards.map((card) => {
           const Icon = card.icon;
           const isSelected = selectedCategory === card.label;
-
           return (
             <button
               key={card.key}
@@ -1583,7 +1465,6 @@ const AssetOverview = () => {
 
       {/* Filters */}
       <div className="bg-theme-card border border-theme rounded-lg p-4">
-        {/* First Row: 4 Filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {/* Status Filter */}
           <div className="relative" ref={statusDropdownRef}>
@@ -1609,7 +1490,6 @@ const AssetOverview = () => {
                 }`}
               />
             </button>
-
             {statusDropdownOpen && (
               <div
                 className={`absolute z-50 w-full ${
@@ -1639,7 +1519,6 @@ const AssetOverview = () => {
               </div>
             )}
           </div>
-
           {/* Type Filter */}
           <div className="relative" ref={typeDropdownRef}>
             <button
@@ -1661,7 +1540,6 @@ const AssetOverview = () => {
                 }`}
               />
             </button>
-
             {typeDropdownOpen && (
               <div
                 className={`absolute z-50 w-full ${
@@ -1687,7 +1565,6 @@ const AssetOverview = () => {
               </div>
             )}
           </div>
-
           {/* Library Filter */}
           <div className="relative" ref={libraryDropdownRef}>
             <button
@@ -1710,7 +1587,6 @@ const AssetOverview = () => {
                 }`}
               />
             </button>
-
             {libraryDropdownOpen && (
               <div
                 className={`absolute z-50 w-full ${
@@ -1738,7 +1614,6 @@ const AssetOverview = () => {
               </div>
             )}
           </div>
-
           {/* Category Filter */}
           <div className="relative" ref={categoryDropdownRef}>
             <button
@@ -1761,7 +1636,6 @@ const AssetOverview = () => {
                 }`}
               />
             </button>
-
             {categoryDropdownOpen && (
               <div
                 className={`absolute z-50 w-full ${
@@ -1801,8 +1675,7 @@ const AssetOverview = () => {
             )}
           </div>
         </div>
-
-        {/* Second Row: Search Bar */}
+        {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
           <input
@@ -1817,7 +1690,7 @@ const AssetOverview = () => {
 
       {/* Assets Grid */}
       <div className="bg-theme-card border border-theme rounded-lg p-6">
-        {/* Bulk Action Toolbar - Shows when items are selected */}
+        {/* Bulk Action Toolbar */}
         {selectedAssetIds.size > 0 && (
           <div className="mb-4 p-4 bg-theme-primary/10 border border-theme-primary rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -1828,23 +1701,31 @@ const AssetOverview = () => {
                 })}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleBulkMarkAsResolved}
                 disabled={isBulkProcessing}
                 className="flex items-center gap-2 px-4 py-2 bg-theme-primary hover:bg-theme-primary/80 disabled:bg-theme-primary/50 rounded-lg text-white font-medium transition-all shadow-sm disabled:cursor-not-allowed"
               >
                 {isBulkProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {t("assetOverview.processing")}
-                  </>
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <>
-                    <CheckIcon className="w-4 h-4" />
-                    {t("assetOverview.markSelectedAsResolved")}
-                  </>
+                  <CheckIcon className="w-4 h-4" />
                 )}
+                {t("assetOverview.markSelectedAsResolved")}
+              </button>
+              {/* <-- UPDATED: Bulk Delete Button --> */}
+              <button
+                onClick={handleBulkDelete}
+                disabled={isBulkProcessing}
+                className="flex items-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-800 disabled:bg-red-700/50 rounded-lg text-white font-medium transition-all shadow-sm disabled:cursor-not-allowed"
+              >
+                {isBulkProcessing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                {t("assetOverview.deleteSelected")}
               </button>
               <button
                 onClick={() => setSelectedAssetIds(new Set())}
@@ -1857,6 +1738,7 @@ const AssetOverview = () => {
           </div>
         )}
 
+        {/* Grid Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-theme-text">
             {selectedCategory === "All Categories"
@@ -1892,16 +1774,13 @@ const AssetOverview = () => {
               </button>
             )}
 
-            {/* Mark All Filtered as Resolved */}
-            {filteredAssets.length > 0 && (
+            {/* Mark All Filtered as Resolved (Refactored) */}
+            {filteredAssets.length > 0 && selectedStatus !== "Resolved" && (
               <button
                 onClick={handleBulkMarkAllFilteredAsResolved}
                 disabled={isBulkProcessing}
                 className="flex items-center gap-2 px-4 py-2 bg-theme-primary/80 hover:bg-theme-primary disabled:bg-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm text-white"
-                title={t(
-                  "assetOverview.markAllFilteredTooltip",
-                  "Mark all filtered assets as resolved"
-                )}
+                title={t("assetOverview.markAllFilteredTooltip")}
               >
                 {isBulkProcessing ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1909,15 +1788,12 @@ const AssetOverview = () => {
                   <CheckCheck className="w-4 h-4 text-white" />
                 )}
                 <span className="text-white">
-                  {t(
-                    "assetOverview.markAllFiltered",
-                    `Mark All (${filteredAssets.length}) Resolved`,
-                    { count: filteredAssets.length }
-                  )}
+                  {t("assetOverview.markAllFiltered", {
+                    count: filteredAssets.length,
+                  })}
                 </span>
               </button>
             )}
-            {/* END NEW BUTTON */}
 
             <button
               onClick={fetchData}
@@ -1929,6 +1805,7 @@ const AssetOverview = () => {
           </div>
         </div>
 
+        {/* Asset List */}
         {filteredAssets.length === 0 ? (
           <div className="text-center py-12">
             <FileQuestion className="w-16 h-16 text-theme-muted mx-auto mb-4" />
@@ -1940,8 +1817,6 @@ const AssetOverview = () => {
           <div className="space-y-4">
             {displayedAssets.map((asset) => {
               const tags = getAssetTags(asset);
-
-              // Parse show name for episodes and titlecards only (not seasons)
               const assetType = (asset.Type || "").toLowerCase();
               const isEpisodeType =
                 assetType.includes("episode") ||
@@ -1959,6 +1834,7 @@ const AssetOverview = () => {
                   onNoEditsNeeded={handleNoEditsNeeded}
                   onReplace={handleReplace}
                   onUnresolve={handleUnresolve}
+                  onDelete={handleDeleteAsset}
                   isSelected={selectedAssetIds.has(asset.id)}
                   onToggleSelection={handleToggleSelection}
                   showCheckbox={selectedAssetIds.size > 0 || isBulkProcessing}
@@ -2032,37 +1908,46 @@ const AssetOverview = () => {
         )}
       </div>
 
-      {/* NEW CONFIRMATION MODAL */}
-      {isConfirmModalOpen && (
+      {/*
+        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        ++ UPDATED: Generic Confirmation Modal
+        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      */}
+      {confirmModalState.isOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80"
-          onClick={() => !isBulkProcessing && setIsConfirmModalOpen(false)}
+          onClick={() => !isBulkProcessing && setConfirmModalState({ isOpen: false })}
         >
           <div
             className="relative w-full max-w-lg p-6 bg-theme-card border border-theme rounded-lg shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full bg-red-500/10 border border-red-500/20">
-                <AlertTriangle className="w-6 h-6 text-red-400" />
+              <div
+                className={`flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full ${
+                  confirmModalState.confirmColor === "danger"
+                    ? "bg-red-500/10 border border-red-500/20"
+                    : "bg-theme-primary/10 border border-theme-primary/20"
+                }`}
+              >
+                <AlertTriangle
+                  className={`w-6 h-6 ${
+                    confirmModalState.confirmColor === "danger"
+                      ? "text-red-400"
+                      : "text-theme-primary"
+                  }`}
+                />
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-semibold text-theme-text">
-                  {t(
-                    "assetOverview.bulkMarkAllFilteredTitle",
-                    "Mark All As Resolved?"
-                  )}
+                  {confirmModalState.title}
                 </h3>
                 <p className="mt-2 text-theme-muted whitespace-pre-wrap">
-                  {t(
-                    "assetOverview.bulkMarkAllFilteredConfirm",
-                    `Are you sure you want to mark all ${filteredAssets.length} filtered assets as resolved?\n\nThis will remove them from the 'Unresolved' view. This action cannot be undone easily.`,
-                    { count: filteredAssets.length }
-                  )}
+                  {confirmModalState.message}
                 </p>
               </div>
               <button
-                onClick={() => !isBulkProcessing && setIsConfirmModalOpen(false)}
+                onClick={() => !isBulkProcessing && setConfirmModalState({ isOpen: false })}
                 className="absolute top-4 right-4 text-theme-muted hover:text-theme-text transition-colors"
                 disabled={isBulkProcessing}
               >
@@ -2072,30 +1957,34 @@ const AssetOverview = () => {
 
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => setIsConfirmModalOpen(false)}
+                onClick={() => setConfirmModalState({ isOpen: false })}
                 disabled={isBulkProcessing}
                 className="px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text text-sm font-medium hover:bg-theme-hover hover:border-theme-primary/50 transition-all shadow-sm disabled:opacity-50"
               >
-                {t("common.cancel", "Cancel")}
+                {t("assetOverview.cancel")}
               </button>
               <button
-                onClick={runBulkMarkAllFilteredResolved}
+                onClick={confirmModalState.onConfirm}
                 disabled={isBulkProcessing}
-                className="flex items-center gap-2 px-4 py-2 bg-theme-primary hover:bg-theme-primary/80 disabled:bg-theme-primary/50 rounded-lg text-white text-sm font-medium transition-all shadow-sm disabled:cursor-not-allowed"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium transition-all shadow-sm disabled:cursor-not-allowed ${
+                  confirmModalState.confirmColor === "danger"
+                    ? "bg-red-700 hover:bg-red-800 disabled:bg-red-700/50"
+                    : "bg-theme-primary hover:bg-theme-primary/80 disabled:bg-theme-primary/50"
+                }`}
               >
                 {isBulkProcessing ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {t("assetOverview.processing", "Processing...")}
+                    {t("assetOverview.processing")}
                   </>
                 ) : (
                   <>
-                    <CheckCheck className="w-4 h-4" />
-                    {t(
-                      "assetOverview.confirmMarkAll",
-                      "Confirm & Mark All ({{count}})",
-                      { count: filteredAssets.length }
+                    {confirmModalState.confirmColor === "danger" ? (
+                      <Trash2 className="w-4 h-4" />
+                    ) : (
+                      <CheckCheck className="w-4 h-4" />
                     )}
+                    {confirmModalState.confirmText}
                   </>
                 )}
               </button>
@@ -2103,7 +1992,11 @@ const AssetOverview = () => {
           </div>
         </div>
       )}
-      {/* END NEW CONFIRMATION MODAL */}
+      {/*
+        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        ++ END: Generic Confirmation Modal
+        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      */}
 
       {/* Asset Replacer Modal */}
       {showReplacer && selectedAsset && (
