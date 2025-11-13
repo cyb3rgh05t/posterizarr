@@ -8420,14 +8420,10 @@ async def get_recent_assets():
         logger.debug(f"Asset map created with {len(asset_map)} items")
 
         # Convert database records to asset format and find poster files
-        recent_assets = []
-        max_assets = 100  # Limit to 100 most recent assets
+        all_assets_with_mtime = []
 
         # Process records until we have 100 valid assets (not just first 100 records)
         for record in db_records:
-            # Stop once we have enough valid assets
-            if len(recent_assets) >= max_assets:
-                break
 
             # Convert database record (sqlite3.Row) to dict
             asset_dict = dict(record)
@@ -8511,9 +8507,20 @@ async def get_recent_assets():
                         "created": poster_data["created"],
                         "modified": poster_data["modified"],
                     }
-                    recent_assets.append(asset)
+                    all_assets_with_mtime.append(asset)
                 else:
                     logger.debug(f"[SKIP] Skipping asset (poster not found in cache): {title} at {relative_path_key}")
+
+        # Add sorting and limiting *after* the loop
+        logger.info(f"Sorting {len(all_assets_with_mtime)} assets by modification time...")
+
+        # Sort the list by the 'modified' timestamp (newest first)
+        # Use a default value of 0 for any assets that somehow lack a modified time
+        all_assets_with_mtime.sort(key=lambda x: x.get("modified", 0), reverse=True)
+
+        # Now, take the top 100
+        max_assets = 100
+        recent_assets = all_assets_with_mtime[:max_assets]
 
         logger.info(
             f"Returning {len(recent_assets)} most recent assets with existing images from database"
