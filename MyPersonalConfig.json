@@ -90,6 +90,7 @@
     "DiscordUserName": "Posterizarr"
   },
   "PrerequisitePart": {
+    "FileTestOnTrigger": "true",
     "AssetPath": "/assets",
     "magickinstalllocation": "C:\\PosterTemp\\ImageMagickPortable",
     "maxLogs": "5",
