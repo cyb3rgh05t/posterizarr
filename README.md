@@ -5,8 +5,6 @@
     <img src="/docs/images/logo_banner.png" alt="Logo" width="550" height="550">
   </a>
 
-  <h3 align="center">Posterizarr</h3>
-
   <p align="center">
     Automate the creation of beautiful, textless posters for your Plex, Jellyfin, or Emby library.
     <br />
