@@ -14,14 +14,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import json
 import subprocess
 import asyncio
 import os
 import httpx
 from pathlib import Path
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict
 import logging
 import re
 import time
@@ -9153,6 +9153,8 @@ class AssetUploadRequest(BaseModel):
     asset_path: str
     image_data: str  # Base64 encoded image
 
+class BulkDeleteAssetsRequest(BaseModel):
+    record_ids: List[int] = Field(..., min_items=1)
 
 @app.post("/api/assets/fetch-replacements")
 async def fetch_asset_replacements(request: AssetReplaceRequest):
@@ -11456,6 +11458,167 @@ async def trigger_manual_run_internal(request: ManualModeRequest):
 
     logger.info(f"Manual Run process started (PID: {current_process.pid})")
 
+async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
+    """
+    Internal helper to find an asset file by its DB record ID,
+    delete the file, and then delete the DB record.
+
+    Returns:
+        A dict with status and asset info.
+    """
+    if not DATABASE_AVAILABLE or db is None:
+        logger.warning(f"[DeleteAsset] Database not available (ID: {record_id})")
+        return {"success": False, "error": "Database not available"}
+
+    # --- Step 1: Get the record from DB ---
+    record = db.get_choice_by_id(record_id)
+    if not record:
+        logger.warning(f"[DeleteAsset] Record not found in DB (ID: {record_id})")
+        return {"success": False, "error": "Record not found in database"}
+
+    record_dict = dict(record)
+    rootfolder = record_dict.get("Rootfolder")
+    library = record_dict.get("LibraryName")
+    asset_type = (record_dict.get("Type") or "").lower()
+    title = record_dict.get("Title") or ""
+
+    if not rootfolder or not library:
+        logger.warning(f"[DeleteAsset] Record missing Rootfolder/LibraryName (ID: {record_id})")
+        # Record exists but is invalid, delete it from DB
+        try:
+            db.delete_choice(record_id)
+            logger.info(f"[DeleteAsset] Deleted invalid DB record (ID: {record_id})")
+        except Exception as e_db:
+            logger.error(f"[DeleteAsset] Failed to delete invalid DB record (ID: {record_id}): {e_db}")
+        return {"success": True, "file_deleted": False, "db_deleted": True, "asset_info": title}
+
+    asset_info = f"{library}/{rootfolder} ({title})"
+
+    # --- Step 2: Determine filename ---
+    asset_filename = None
+    if "background" in asset_type:
+        asset_filename = "background.jpg"
+    elif "season" in asset_type:
+        season_match = re.search(r"season\s*(\d+)", title, re.IGNORECASE)
+        if season_match:
+            season_num = season_match.group(1).zfill(2)
+            asset_filename = f"Season{season_num}.jpg"
+    elif "titlecard" in asset_type or "episode" in asset_type:
+        episode_match = re.search(r"(S\d+E\d+)", title, re.IGNORECASE)
+        if episode_match:
+            episode_code = episode_match.group(1).upper()
+            asset_filename = f"{episode_code}.jpg"
+    else: # Default to poster
+        asset_filename = "poster.jpg"
+
+    if not asset_filename:
+        logger.warning(f"[DeleteAsset] Could not determine filename for {asset_info}")
+        # We can still delete the DB record
+        try:
+            db.delete_choice(record_id)
+            logger.info(f"[DeleteAsset] Deleted DB record (file not found) (ID: {record_id})")
+        except Exception as e_db:
+            logger.error(f"[DeleteAsset] Failed to delete DB record (ID: {record_id}): {e_db}")
+        return {"success": True, "file_deleted": False, "db_deleted": True, "asset_info": asset_info}
+
+    # --- Step 3: Construct file path ---
+    file_path = ASSETS_DIR / library / rootfolder / asset_filename
+    file_deleted = False
+
+    # --- Step 4: Delete the file ---
+    try:
+        if file_path.exists() and file_path.is_file():
+            file_path.unlink()
+            file_deleted = True
+            logger.info(f"[DeleteAsset] Successfully deleted asset file: {file_path}")
+        else:
+            logger.warning(f"[DeleteAsset] Asset file not found, skipping delete: {file_path}")
+    except Exception as e_file:
+        logger.error(f"[DeleteAsset] Error deleting asset file {file_path}: {e_file}")
+        # Do NOT proceed to delete DB record if file delete failed
+        return {"success": False, "error": f"Failed to delete file: {e_file}", "asset_info": asset_info}
+
+    # --- Step 5: Delete the DB record ---
+    try:
+        db.delete_choice(record_id)
+        logger.info(f"[DeleteAsset] Successfully deleted DB record (ID: {record_id})")
+        return {"success": True, "file_deleted": file_deleted, "db_deleted": True, "asset_info": asset_info}
+    except Exception as e_db:
+        logger.error(f"[DeleteAsset] File deleted, but failed to delete DB record (ID: {record_id}): {e_db}")
+        return {"success": False, "error": f"File deleted, but DB delete failed: {e_db}", "asset_info": asset_info}
+
+@app.delete("/api/assets/delete-asset/{record_id}")
+async def delete_asset_and_record(record_id: int):
+    """
+    Deletes a single asset: the file from /assets AND the
+    corresponding record from the imagechoices database.
+    """
+    logger.info("=" * 60)
+    logger.info(f"SINGLE ASSET DELETE REQUEST: ID {record_id}")
+    try:
+        result = await _find_and_delete_asset(record_id)
+
+        if result["success"]:
+            # Trigger cache refresh in background
+            threading.Thread(target=scan_and_cache_assets, daemon=True).start()
+            logger.info(f"Delete successful for {result['asset_info']}, triggering cache refresh.")
+            logger.info("=" * 60)
+            return {
+                "success": True,
+                "message": f"Asset '{result['asset_info']}' deleted.",
+                "file_deleted": result["file_deleted"],
+                "db_deleted": result["db_deleted"],
+            }
+        else:
+            logger.error(f"Delete failed for ID {record_id}: {result['error']}")
+            logger.info("=" * 60)
+            raise HTTPException(status_code=500, detail=result.get("error", "Failed to delete asset"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error deleting asset ID {record_id}: {e}", exc_info=True)
+        logger.info("=" * 60)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/assets/bulk-delete-assets")
+async def bulk_delete_assets_and_records(request: BulkDeleteAssetsRequest):
+    """
+    Deletes multiple assets: files from /assets AND the
+    corresponding records from the imagechoices database.
+    """
+    logger.info("=" * 60)
+    logger.info(f"BULK ASSET DELETE REQUEST: {len(request.record_ids)} items")
+
+    deleted_count = 0
+    failed_items = []
+
+    for record_id in request.record_ids:
+        try:
+            result = await _find_and_delete_asset(record_id)
+            if result["success"]:
+                deleted_count += 1
+            else:
+                failed_items.append({"id": record_id, "error": result.get("error", "Unknown error")})
+                logger.warning(f"Bulk delete failed for ID {record_id}: {result.get('error')}")
+        except Exception as e:
+            failed_items.append({"id": record_id, "error": str(e)})
+            logger.error(f"Unexpected error in bulk delete for ID {record_id}: {e}", exc_info=True)
+
+    # Trigger cache refresh in background *after* all deletes are done
+    if deleted_count > 0:
+        threading.Thread(target=scan_and_cache_assets, daemon=True).start()
+        logger.info(f"Bulk delete complete, triggering cache refresh.")
+
+    logger.info(f"Bulk delete summary: {deleted_count} deleted, {len(failed_items)} failed.")
+    logger.info("=" * 60)
+
+    return {
+        "success": True,
+        "deleted_count": deleted_count,
+        "failed_count": len(failed_items),
+        "failed_items": failed_items,
+        "message": f"Deleted {deleted_count} assets. {len(failed_items)} failed."
+    }
 
 # ============================================
 # API ENDPOINTS: IMAGE CHOICES DATABASE
