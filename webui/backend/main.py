@@ -8449,10 +8449,6 @@ async def get_recent_assets():
                 )
 
             if rootfolder:
-                is_fallback = asset_dict.get("Fallback", "").lower() == "true"
-                if is_fallback:
-                    continue
-
                 # Find the asset file path in our fast cache map
                 # This is the new, fast part.
 
