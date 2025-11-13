@@ -79,6 +79,7 @@
     "UptimeKumaUrl": "https://uptime-kuma.domain.com/api/push/qXpb7Mf1vW"
   },
   "PrerequisitePart": {
+    "FileTestOnTrigger": "true",
     "AssetPath": "/assets",
     "SkipAddText": "false",
     "SkipAddTextAndOverlay": "false",

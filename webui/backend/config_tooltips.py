@@ -54,6 +54,7 @@ CONFIG_TOOLTIPS = {
     "UptimeKumaUrl": "Uptime-Kuma Webhook URL",
     # PrerequisitePart
     "AssetPath": "Path to store generated posters. On Docker, this should be /assets",
+    "FileTestOnTrigger": "On trigger run, checks whether the file is present locally. If set to $false, the test will be skipped and all images will be overwritten.",
     "BackupPath": "Path to store/download Plex posters when using the backup mode",
     "ManualAssetPath": "If assets are placed in this directory with the exact naming convention, they will be preferred (must follow same naming convention as /assets)",
     "SkipAddText": "If set to true, Posterizarr will skip adding text to the poster if it is flagged as a 'Poster with text' by the provider",

@@ -300,6 +300,7 @@ CONFIG_GROUPS = {
     "DiscordUserName": "Notification",
     # PrerequisitePart
     "AssetPath": "PrerequisitePart",
+    "FileTestOnTrigger": "PrerequisitePart",
     "show_skipped": "PrerequisitePart",
     "magickinstalllocation": "PrerequisitePart",
     "maxLogs": "PrerequisitePart",
@@ -530,6 +531,7 @@ UI_GROUPS = {
         "AutoUpdatePosterizarr",
         "ForceRunningDeletion",
         "DisableHashValidation",
+        "FileTestOnTrigger",
     ],
     "API Keys & Tokens": [
         "tvdbapi",
@@ -975,6 +977,7 @@ DISPLAY_NAMES = {
     "DiscordUserName": "Discord Username",
     # General Settings
     "AssetPath": "Asset Path",
+    "FileTestOnTrigger": "Test File on Trigger",
     "show_skipped": "Show Skipped Items",
     "magickinstalllocation": "ImageMagick Location",
     "maxLogs": "Maximum Log Files",

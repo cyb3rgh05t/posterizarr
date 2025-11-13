@@ -154,6 +154,7 @@
     - `DisableHashValidation` : Set to `true` to skip hash validation (Default value is: false).
         - _Note: This may produce bloat, as every item will be re-uploaded to the media servers._
     - `DisableOnlineAssetFetch` : Set to `true` to skip all online lookups and use only locally available assets. (Default value is: false).
+    - `FileTestOnTrigger` : On trigger run, checks whether the file is present locally. If set to $false, the test will be skipped and all images will be overwritten.
 
     #### OverlayPart
 
