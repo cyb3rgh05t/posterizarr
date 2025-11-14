@@ -1,5 +1,5 @@
 1. Open `config.example.json` located in the script directory.
-2. Update the following variables with your API keys and preferences [my personal config](https://github.com/fscorrupt/Posterizarr/blob/main/MyPersonalConfig.json):
+2. Update the following variables with your API keys and preferences [my personal config](https://github.com/fscorrupt/posterizarr/blob/main/MyPersonalConfig.json):
 
     #### WebUI
 
@@ -119,11 +119,11 @@
     - `4KDoViTC`: Specific overlay for 4K Dolby Vision TitleCards. (3840x2160)
     - `4KHDR10TC`: Specific overlay for 4K HDR10 TitleCards. (3840x2160)
     - `4KDoViHDR10TC`: Specific overlay for 4K DoVi & HDR10 TitleCards. (3840x2160)
-    - `UsePosterResolutionOverlays`: Set to `true` to apply specific overlay with resolution for 4k/1080p posters [4K Example](https://github.com/fscorrupt/Posterizarr/blob/main/docs/images/poster-4k.png)/[1080p Example](https://github.com/fscorrupt/Posterizarr/blob/main/docs/images/poster-1080p.png).
+    - `UsePosterResolutionOverlays`: Set to `true` to apply specific overlay with resolution for 4k/1080p posters [4K Example](https://github.com/fscorrupt/posterizarr/blob/main/docs/images/poster-4k.png)/[1080p Example](https://github.com/fscorrupt/posterizarr/blob/main/docs/images/poster-1080p.png).
         - if you only want 4k just add your default overlay file also for `Poster1080p`.
-    - `UseBackgroundResolutionOverlays`: Set to `true` to apply specific overlay with resolution for 4k/1080p posters [4K Example](https://github.com/fscorrupt/Posterizarr/blob/main/docs/images/background-4k.png)/[1080p Example](https://github.com/fscorrupt/Posterizarr/blob/main/docs/images/background-1080p.png).
+    - `UseBackgroundResolutionOverlays`: Set to `true` to apply specific overlay with resolution for 4k/1080p posters [4K Example](https://github.com/fscorrupt/posterizarr/blob/main/docs/images/background-4k.png)/[1080p Example](https://github.com/fscorrupt/posterizarr/blob/main/docs/images/background-1080p.png).
         - if you only want 4k just add your default overlay file also for `Background1080p`.
-    - `UseTCResolutionOverlays`: Set to `true` to apply specific overlay with resolution for 4k/1080p posters [4K Example](https://github.com/fscorrupt/Posterizarr/blob/main/docs/images/background-4k.png)/[1080p Example](https://github.com/fscorrupt/Posterizarr/blob/main/docs/images/background-1080p.png).
+    - `UseTCResolutionOverlays`: Set to `true` to apply specific overlay with resolution for 4k/1080p posters [4K Example](https://github.com/fscorrupt/posterizarr/blob/main/docs/images/background-4k.png)/[1080p Example](https://github.com/fscorrupt/posterizarr/blob/main/docs/images/background-1080p.png).
         - if you only want 4k - add your default (without an resolution) overlay file for `TC1080p`.
     - `LibraryFolders`: Set to `false` for asset structure in one flat folder or `true` to split into library media folders like [Kometa](https://kometa.wiki/en/latest/kometa/guides/assets/#image-asset-directory-guide) needs it.
     - `Posters`: Set to `true` to create movie/show posters.

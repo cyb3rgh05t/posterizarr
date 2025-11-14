@@ -52,7 +52,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.8"
+$CurrentScriptVersion = "2.1.9"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -356,7 +356,7 @@ function Test-PathPermissions {
         Write-Entry -Message "Drive '$($driveLetter):' not found. The path '$PathToTest' appears to use a Windows-style default." -Path "$global:ScriptRoot\Logs\Scriptlog.log" -Color Yellow -log Warning
         Write-Entry -Subtext "Please update this path to a valid mount (e.g., /assetsbackup)." -Path "$global:ScriptRoot\Logs\Scriptlog.log" -Color Cyan -log Info
         Write-Entry -Message "Refer to the official docker-compose.yml template for correct volume mappings:" -Path "$global:ScriptRoot\Logs\Scriptlog.log" -Color Cyan -log Info
-        Write-Entry -Subtext "https://raw.githubusercontent.com/fscorrupt/Posterizarr/refs/heads/main/docker-compose.yml" -Path "$global:ScriptRoot\Logs\Scriptlog.log" -Color Cyan -log Info
+        Write-Entry -Subtext "https://raw.githubusercontent.com/fscorrupt/posterizarr/refs/heads/main/docker-compose.yml" -Path "$global:ScriptRoot\Logs\Scriptlog.log" -Color Cyan -log Info
         return
     }
 
@@ -888,13 +888,13 @@ function SendMessage {
         # Build the final payload object
         $payloadObject = [PSCustomObject]@{
             username   = $global:DiscordUserName
-            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/docs/images/webhook.png"
+            avatar_url = "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/docs/images/webhook.png"
             content    = ""
             embeds     = @(
                 [PSCustomObject]@{
                     author      = @{
                         name = "Posterizarr @Github"
-                        url  = "https://github.com/fscorrupt/Posterizarr"
+                        url  = "https://github.com/fscorrupt/posterizarr"
                     }
                     description = "Recently Added`n`n"
                     timestamp   = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
@@ -2150,7 +2150,6 @@ function GetTMDBTitleCard {
             Write-Entry -Subtext "Could not query TMDB url, error message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
             $global:TMDBAssetChangeUrl = "https://www.themoviedb.org/tv/$($global:tmdbid)/season/$global:season_number/episode/$global:episodenumber/images/backdrops"
-
         }
         if ($response) {
             if ($response.stills) {
@@ -3714,7 +3713,7 @@ function CheckJson {
                         Write-Entry -Message "Missing Main Attribute in your Config file: $partKey." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                         Write-Entry -Subtext "I will copy all settings from 'PosterOverlayPart'..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                         Write-Entry -Subtext "Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                        Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/Posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                        Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                         # Convert the updated configuration object back to JSON and save it, then reload it
                         $configJson = $config | ConvertTo-Json -Depth 10
                         $configJson | Set-Content -Path $jsonFilePath -Force
@@ -3723,7 +3722,7 @@ function CheckJson {
                     Else {
                         Write-Entry -Message "Missing Main Attribute in your Config file: $partKey." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                         Write-Entry -Subtext "Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                        Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/Posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                        Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                         $config | Add-Member -MemberType NoteProperty -Name $partKey -Value $defaultConfig.$partKey
                         $AttributeChanged = $True
                     }
@@ -3757,7 +3756,7 @@ function CheckJson {
                         if (-not $config.$partKey.PSObject.Properties.Name.tolower().Contains($propertyKey.tolower())) {
                             Write-Entry -Message "Missing Sub-Attribute in your Config file: $partKey.$propertyKey" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                             Write-Entry -Subtext "Adding it for you... In GH Readme, look for $partKey.$propertyKey - if you want to see what changed..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                            Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/Posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                            Write-Entry -Subtext "GH Readme -> https://fscorrupt.github.io/posterizarr/configuration" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                             # Add the property using the expected casing
                             $config.$partKey | Add-Member -MemberType NoteProperty -Name $propertyKey -Value $defaultConfig.$partKey.$propertyKey -Force
                             $AttributeChanged = $True
@@ -3920,7 +3919,7 @@ function Get-Platform {
 }
 function Get-LatestScriptVersion {
     try {
-        return Invoke-RestMethod -Uri "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/Release.txt" -Method Get -ErrorAction Stop
+        return Invoke-RestMethod -Uri "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/Release.txt" -Method Get -ErrorAction Stop
     }
     catch {
         Write-Entry -Subtext "Could not query latest script version, Error: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -3961,7 +3960,7 @@ function CheckConfigFile {
 
     if (!(Test-Path (Join-Path $ScriptRoot 'config.json'))) {
         Write-Entry -Message "Config File missing, downloading it for you..." -Path "$ScriptRoot\Logs\Scriptlog.log" -Color White -log Info
-        Invoke-WebRequest -Uri "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/config.example.json" -OutFile "$ScriptRoot\config.json"
+        Invoke-WebRequest -Uri "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/config.example.json" -OutFile "$ScriptRoot\config.json"
         Write-Entry -Subtext "Config File downloaded here: '$ScriptRoot\config.json'" -Path "$ScriptRoot\Logs\Scriptlog.log" -Color White -log Info
         Write-Entry -Subtext "Please configure the config file according to GitHub, Exit script now..." -Path "$ScriptRoot\Logs\Scriptlog.log" -Color Yellow -log Warning
         # Clear Running File
@@ -6531,20 +6530,20 @@ function Send-SummaryNotification {
         # Build final payload
         $payloadObject = [PSCustomObject]@{
             username   = $global:DiscordUserName
-            avatar_url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/docs/images/webhook.png"
+            avatar_url = "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/docs/images/webhook.png"
             content    = ""
             embeds     = @(
                 [PSCustomObject]@{
                     author    = @{
                         name = "Posterizarr @Github"
-                        url  = "https://github.com/fscorrupt/Posterizarr"
+                        url  = "https://github.com/fscorrupt/posterizarr"
                     }
                     description = $desc
                     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
                     color     = $(if ($ErrorCount -ge '1') { 16711680 } Elseif ($Testing) { 8388736 } Elseif ($FallbackCount -gt '1' -or $PosterUnknownCount -ge '1' -or $TruncatedCount -gt '1') { 15120384 } Else { 5763719 })
                     fields    = $fieldList
                     thumbnail = @{
-                        url = "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/docs/images/webhook.png"
+                        url = "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/docs/images/webhook.png"
                     }
                     footer    = @{
                         text = "$Platform  | vCurr: $CurrentScriptVersion | vNext: $LatestScriptVersion | IM vCurr: $global:CurrentImagemagickversion | IM vNext: $global:LatestImagemagickversion"
@@ -6638,7 +6637,7 @@ foreach ($path in $LogsPath, $TempPath, $TestPath, $WatcherPath) {
 # Check if Config file is present
 CheckConfigFile -ScriptRoot $global:ScriptRoot
 # Test Json if something is missing
-CheckJson -jsonExampleUrl "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/config.example.json" -jsonFilePath $(Join-Path $global:ScriptRoot 'config.json')
+CheckJson -jsonExampleUrl "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/config.example.json" -jsonFilePath $(Join-Path $global:ScriptRoot 'config.json')
 # Check if Script is Latest
 if ($CurrentScriptVersion -eq $LatestScriptVersion) {
     Write-Entry -Message "You are Running Version - v$CurrentScriptVersion" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
@@ -6658,7 +6657,7 @@ if ($Platform -ne 'Docker' -and $config.PrerequisitePart.AutoUpdatePosterizarr.t
     Write-Entry -Subtext "Backup current Script to: $CurrentScriptPath.bak" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
     Copy-Item -Path $CurrentScriptPath -Destination "$CurrentScriptPath.bak" -Force
     try {
-        Invoke-WebRequest -Uri "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/Posterizarr.ps1" -OutFile $CurrentScriptPath -ErrorAction Stop
+        Invoke-WebRequest -Uri "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/Posterizarr.ps1" -OutFile $CurrentScriptPath -ErrorAction Stop
         Write-Entry -Subtext "Posterizarr script updated to v$LatestScriptVersion, please restart script..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
     }
     catch {
@@ -7397,22 +7396,22 @@ if ($Testing) {
 
 # Test and download files if they don't exist
 if ($config.PrerequisitePart.overlayfile -eq 'overlay.png' -or $config.PrerequisitePart.seasonoverlayfile -eq 'overlay.png') {
-    Test-And-Download -url "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/Overlayfiles/overlay.png" -destination (Join-Path $global:OverlayPath 'overlay.png')
+    Test-And-Download -url "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/Overlayfiles/overlay.png" -destination (Join-Path $global:OverlayPath 'overlay.png')
 }
 if ($config.PrerequisitePart.overlayfile -eq 'overlay-innerglow.png' -or $config.PrerequisitePart.seasonoverlayfile -eq 'overlay-innerglow.png') {
-    Test-And-Download -url "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/Overlayfiles/overlay-innerglow.png" -destination (Join-Path $global:OverlayPath 'overlay-innerglow.png')
+    Test-And-Download -url "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/Overlayfiles/overlay-innerglow.png" -destination (Join-Path $global:OverlayPath 'overlay-innerglow.png')
 }
 if ($config.PrerequisitePart.backgroundoverlayfile -eq 'backgroundoverlay.png' -or $config.PrerequisitePart.titlecardoverlayfile -eq 'backgroundoverlay.png') {
-    Test-And-Download -url "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/Overlayfiles/backgroundoverlay.png" -destination (Join-Path $global:OverlayPath 'backgroundoverlay.png')
+    Test-And-Download -url "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/Overlayfiles/backgroundoverlay.png" -destination (Join-Path $global:OverlayPath 'backgroundoverlay.png')
 }
 if ($config.PrerequisitePart.backgroundoverlayfile -eq 'backgroundoverlay-innerglow.png' -or $config.PrerequisitePart.titlecardoverlayfile -eq 'backgroundoverlay-innerglow.png') {
-    Test-And-Download -url "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/Overlayfiles/backgroundoverlay-innerglow.png" -destination (Join-Path $global:OverlayPath 'backgroundoverlay-innerglow.png')
+    Test-And-Download -url "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/Overlayfiles/backgroundoverlay-innerglow.png" -destination (Join-Path $global:OverlayPath 'backgroundoverlay-innerglow.png')
 }
 if ($config.PrerequisitePart.font -eq 'Rocky.ttf' -or $config.PrerequisitePart.backgroundfont -eq 'Rocky.ttf' -or $config.PrerequisitePart.titlecardfont -eq 'Rocky.ttf' -or $config.PrerequisitePart.RTLFont -eq 'Rocky.ttf') {
-    Test-And-Download -url "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/Overlayfiles/Rocky.ttf" -destination (Join-Path $global:OverlayPath 'Rocky.ttf')
+    Test-And-Download -url "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/Overlayfiles/Rocky.ttf" -destination (Join-Path $global:OverlayPath 'Rocky.ttf')
 }
 if ($config.PrerequisitePart.font -eq 'Colus-Regular.ttf' -or $config.PrerequisitePart.backgroundfont -eq 'Colus-Regular.ttf' -or $config.PrerequisitePart.titlecardfont -eq 'Colus-Regular.ttf' -or $config.PrerequisitePart.RTLFont -eq 'Colus-Regular.ttf') {
-    Test-And-Download -url "https://github.com/fscorrupt/Posterizarr/raw/$($Branch)/Overlayfiles/Colus-Regular.ttf" -destination (Join-Path $global:OverlayPath 'Colus-Regular.ttf')
+    Test-And-Download -url "https://github.com/fscorrupt/posterizarr/raw/$($Branch)/Overlayfiles/Colus-Regular.ttf" -destination (Join-Path $global:OverlayPath 'Colus-Regular.ttf')
 }
 
 # Write log message
@@ -12958,8 +12957,11 @@ Elseif ($Tautulli) {
                                                 if ($global:FavProvider -eq 'TMDB') {
                                                     if ($episode.tmdbid) {
                                                         $global:posterurl = GetTMDBTitleCard
-                                                        if ($global:Fallback -eq "TVDB") {
+                                                        if (!$global:posterurl -or $global:Fallback -eq "TVDB") {
                                                             $global:posterurl = GetTVDBTitleCard
+                                                            if ($global:posterurl){
+                                                                $global:IsFallback = $true
+                                                            }
                                                         }
                                                         if (!$global:posterurl) {
                                                             $global:IsFallback = $true
@@ -13024,8 +13026,11 @@ Elseif ($Tautulli) {
                                                 Else {
                                                     if ($episode.tvdbid) {
                                                         $global:posterurl = GetTVDBTitleCard
-                                                        if ($global:Fallback -eq "TMDB") {
+                                                        if (!$global:posterurl -or $global:Fallback -eq "TMDB") {
                                                             $global:posterurl = GetTMDBTitleCard
+                                                            if ($global:posterurl){
+                                                                $global:IsFallback = $true
+                                                            }
                                                         }
                                                         if (!$global:posterurl) {
                                                             $global:IsFallback = $true
@@ -17314,8 +17319,11 @@ Elseif ($ArrTrigger) {
                                                     if ($global:FavProvider -eq 'TMDB') {
                                                         if ($episode.tmdbid) {
                                                             $global:posterurl = GetTMDBTitleCard
-                                                            if ($global:Fallback -eq "TVDB") {
+                                                            if (!$global:posterurl -or $global:Fallback -eq "TVDB") {
                                                                 $global:posterurl = GetTVDBTitleCard
+                                                                if ($global:posterurl){
+                                                                    $global:IsFallback = $true
+                                                                }
                                                             }
                                                             if (!$global:posterurl) {
                                                                 $global:IsFallback = $true
@@ -17368,8 +17376,11 @@ Elseif ($ArrTrigger) {
                                                     Else {
                                                         if ($episode.tvdbid) {
                                                             $global:posterurl = GetTVDBTitleCard
-                                                            if ($global:Fallback -eq "TMDB") {
+                                                            if (!$global:posterurl -or $global:Fallback -eq "TMDB") {
                                                                 $global:posterurl = GetTMDBTitleCard
+                                                                if ($global:posterurl){
+                                                                    $global:IsFallback = $true
+                                                                }
                                                             }
                                                             if (!$global:posterurl) {
                                                                 $global:IsFallback = $true
@@ -21706,8 +21717,11 @@ Elseif ($ArrTrigger) {
                                                     if ($global:FavProvider -eq 'TMDB') {
                                                         if ($episode.tmdbid) {
                                                             $global:posterurl = GetTMDBTitleCard
-                                                            if ($global:Fallback -eq "TVDB") {
+                                                            if (!$global:posterurl -or $global:Fallback -eq "TVDB") {
                                                                 $global:posterurl = GetTVDBTitleCard
+                                                                if ($global:posterurl){
+                                                                    $global:IsFallback = $true
+                                                                }
                                                             }
                                                             if (!$global:posterurl) {
                                                                 $global:IsFallback = $true
@@ -21772,8 +21786,11 @@ Elseif ($ArrTrigger) {
                                                     Else {
                                                         if ($episode.tvdbid) {
                                                             $global:posterurl = GetTVDBTitleCard
-                                                            if ($global:Fallback -eq "TMDB") {
+                                                            if (!$global:posterurl -or $global:Fallback -eq "TMDB") {
                                                                 $global:posterurl = GetTMDBTitleCard
+                                                                if ($global:posterurl){
+                                                                    $global:IsFallback = $true
+                                                                }
                                                             }
                                                             if (!$global:posterurl) {
                                                                 $global:IsFallback = $true
@@ -27161,8 +27178,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 if ($global:FavProvider -eq 'TMDB') {
                                                     if ($episode.tmdbid) {
                                                         $global:posterurl = GetTMDBTitleCard
-                                                        if ($global:Fallback -eq "TVDB") {
+                                                        if (!$global:posterurl -or $global:Fallback -eq "TVDB") {
                                                             $global:posterurl = GetTVDBTitleCard
+                                                            if ($global:posterurl){
+                                                                $global:IsFallback = $true
+                                                            }
                                                         }
                                                         if (!$global:posterurl) {
                                                             $global:IsFallback = $true
@@ -27215,8 +27235,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 Else {
                                                     if ($episode.tvdbid) {
                                                         $global:posterurl = GetTVDBTitleCard
-                                                        if ($global:Fallback -eq "TMDB") {
+                                                        if (!$global:posterurl -or $global:Fallback -eq "TMDB") {
                                                             $global:posterurl = GetTMDBTitleCard
+                                                            if ($global:posterurl){
+                                                                $global:IsFallback = $true
+                                                            }
                                                         }
                                                         if (!$global:posterurl) {
                                                             $global:IsFallback = $true
@@ -32319,8 +32342,12 @@ else {
                                                 if ($global:FavProvider -eq 'TMDB') {
                                                     if ($episode.tmdbid) {
                                                         $global:posterurl = GetTMDBTitleCard
-                                                        if ($global:Fallback -eq "TVDB") {
+                                                        if (!$global:posterurl) {
+                                                            $global:IsFallback = $true
                                                             $global:posterurl = GetTVDBTitleCard
+                                                            if ($global:posterurl){
+                                                                $global:IsFallback = $true
+                                                            }
                                                         }
                                                         if (!$global:posterurl) {
                                                             $global:IsFallback = $true
@@ -32385,8 +32412,11 @@ else {
                                                 Else {
                                                     if ($episode.tvdbid) {
                                                         $global:posterurl = GetTVDBTitleCard
-                                                        if ($global:Fallback -eq "TMDB") {
+                                                        if (!$global:posterurl -or $global:Fallback -eq "TMDB") {
                                                             $global:posterurl = GetTMDBTitleCard
+                                                            if ($global:FavProvider -ne 'TMDB' -and $global:posterurl) {
+                                                                $global:IsFallback = $true
+                                                            }
                                                         }
                                                         if (!$global:posterurl) {
                                                             $global:IsFallback = $true
@@ -32423,6 +32453,9 @@ else {
                                                     else {
                                                         Write-Entry -Subtext "Can't search on TVDB, missing ID..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
                                                         $global:posterurl = GetTMDBTitleCard
+                                                        if ($global:FavProvider -ne 'TMDB' -and $global:posterurl) {
+                                                            $global:IsFallback = $true
+                                                        }
                                                         if (!$global:posterurl) {
                                                             $global:IsFallback = $true
                                                             if ($ArtUrl) {

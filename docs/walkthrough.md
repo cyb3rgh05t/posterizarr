@@ -17,7 +17,7 @@
     - **Plex Token:** [Optain Plex Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
 
 ### Docker/ARM
-- For Docker please start here: [Docker](platformandtools.md#docker)
+- For Docker please start here: [Docker](#docker)
 
 - For Linux/ARM please start here: [ARM](#arm-prerequisites)
 
@@ -103,7 +103,7 @@
         - [Git for Linux](https://git-scm.com/download/linux)
     - Clone the Repo:
         ```bash
-        git clone https://github.com/fscorrupt/Posterizarr.git
+        git clone https://github.com/fscorrupt/posterizarr.git
         ```
     - After that you can switch into the cloned Repo/Folder
         ```bash
@@ -194,7 +194,7 @@
     Have a look at the [Assets Tip](namingconvention.md)
 
 ## Docker
-1. Adjust the [docker-compose.yml](https://github.com/fscorrupt/Posterizarr/raw/main/docker-compose.yml) to fit your environment.
+1. Adjust the [docker-compose.yml](https://github.com/fscorrupt/posterizarr/raw/main/docker-compose.yml) to fit your environment.
     - Required environment variables and descriptions can be found [here](platformandtools.md#docker)
 
         Docker-Compose example on Linux:
@@ -257,7 +257,7 @@
     - Linux:
         ```bash
         cd /opt/appdata
-        mkdir Posterizarr
+        mkdir Posterizarr # chown the dir with correct puid/pgid
         cd Posterizarr
         docker compose up -d
         ```

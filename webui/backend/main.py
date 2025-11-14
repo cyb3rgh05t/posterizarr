@@ -21,7 +21,7 @@ import asyncio
 import os
 import httpx
 from pathlib import Path
-from typing import Optional, List, Literal, Dict
+from typing import Optional, List, Literal, Dict, Any
 import logging
 import re
 import time
@@ -1752,7 +1752,7 @@ async def get_script_version():
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                "https://raw.githubusercontent.com/fscorrupt/Posterizarr/refs/heads/main/Release.txt",
+                "https://raw.githubusercontent.com/fscorrupt/posterizarr/refs/heads/main/Release.txt",
                 timeout=10.0,
             )
             response.raise_for_status()
@@ -8635,7 +8635,9 @@ async def get_recent_assets():
                     )
 
         # Add sorting and limiting *after* the loop
-        logger.info(f"Sorting {len(all_assets_with_mtime)} assets by modification time...")
+        logger.info(
+            f"Sorting {len(all_assets_with_mtime)} assets by modification time..."
+        )
 
         # Sort the list by the 'modified' timestamp (newest first)
         # Use a default value of 0 for any assets that somehow lack a modified time
@@ -8709,7 +8711,7 @@ async def get_version_ui():
     """
     return await fetch_version(
         local_filename="ReleaseUI.txt",
-        github_url="https://raw.githubusercontent.com/fscorrupt/Posterizarr/refs/heads/main/ReleaseUI.txt",
+        github_url="https://raw.githubusercontent.com/fscorrupt/posterizarr/refs/heads/main/ReleaseUI.txt",
         version_type="UI",
     )
 
@@ -8722,7 +8724,7 @@ async def get_github_releases():
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                "https://api.github.com/repos/fscorrupt/Posterizarr/releases",
+                "https://api.github.com/repos/fscorrupt/posterizarr/releases",
                 headers={"Accept": "application/vnd.github.v3+json"},
                 timeout=10.0,
             )
@@ -9282,8 +9284,10 @@ class AssetUploadRequest(BaseModel):
     asset_path: str
     image_data: str  # Base64 encoded image
 
+
 class BulkDeleteAssetsRequest(BaseModel):
-    record_ids: List[int] = Field(..., min_items=1)
+    record_ids: List[int] = Field(default=..., min_length=1)
+
 
 @app.post("/api/assets/fetch-replacements")
 async def fetch_asset_replacements(request: AssetReplaceRequest):
@@ -11597,7 +11601,8 @@ async def trigger_manual_run_internal(request: ManualModeRequest):
 
     logger.info(f"Manual Run process started (PID: {current_process.pid})")
 
-async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
+
+async def _find_and_delete_asset(record_id: int) -> dict[str, Any]:
     """
     Internal helper to find an asset file by its DB record ID,
     delete the file, and then delete the DB record.
@@ -11622,14 +11627,23 @@ async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
     title = record_dict.get("Title") or ""
 
     if not rootfolder or not library:
-        logger.warning(f"[DeleteAsset] Record missing Rootfolder/LibraryName (ID: {record_id})")
+        logger.warning(
+            f"[DeleteAsset] Record missing Rootfolder/LibraryName (ID: {record_id})"
+        )
         # Record exists but is invalid, delete it from DB
         try:
             db.delete_choice(record_id)
             logger.info(f"[DeleteAsset] Deleted invalid DB record (ID: {record_id})")
         except Exception as e_db:
-            logger.error(f"[DeleteAsset] Failed to delete invalid DB record (ID: {record_id}): {e_db}")
-        return {"success": True, "file_deleted": False, "db_deleted": True, "asset_info": title}
+            logger.error(
+                f"[DeleteAsset] Failed to delete invalid DB record (ID: {record_id}): {e_db}"
+            )
+        return {
+            "success": True,
+            "file_deleted": False,
+            "db_deleted": True,
+            "asset_info": title,
+        }
 
     asset_info = f"{library}/{rootfolder} ({title})"
 
@@ -11647,7 +11661,7 @@ async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
         if episode_match:
             episode_code = episode_match.group(1).upper()
             asset_filename = f"{episode_code}.jpg"
-    else: # Default to poster
+    else:  # Default to poster
         asset_filename = "poster.jpg"
 
     if not asset_filename:
@@ -11655,10 +11669,19 @@ async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
         # We can still delete the DB record
         try:
             db.delete_choice(record_id)
-            logger.info(f"[DeleteAsset] Deleted DB record (file not found) (ID: {record_id})")
+            logger.info(
+                f"[DeleteAsset] Deleted DB record (file not found) (ID: {record_id})"
+            )
         except Exception as e_db:
-            logger.error(f"[DeleteAsset] Failed to delete DB record (ID: {record_id}): {e_db}")
-        return {"success": True, "file_deleted": False, "db_deleted": True, "asset_info": asset_info}
+            logger.error(
+                f"[DeleteAsset] Failed to delete DB record (ID: {record_id}): {e_db}"
+            )
+        return {
+            "success": True,
+            "file_deleted": False,
+            "db_deleted": True,
+            "asset_info": asset_info,
+        }
 
     # --- Step 3: Construct file path ---
     file_path = ASSETS_DIR / library / rootfolder / asset_filename
@@ -11671,20 +11694,38 @@ async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
             file_deleted = True
             logger.info(f"[DeleteAsset] Successfully deleted asset file: {file_path}")
         else:
-            logger.warning(f"[DeleteAsset] Asset file not found, skipping delete: {file_path}")
+            logger.warning(
+                f"[DeleteAsset] Asset file not found, skipping delete: {file_path}"
+            )
     except Exception as e_file:
         logger.error(f"[DeleteAsset] Error deleting asset file {file_path}: {e_file}")
         # Do NOT proceed to delete DB record if file delete failed
-        return {"success": False, "error": f"Failed to delete file: {e_file}", "asset_info": asset_info}
+        return {
+            "success": False,
+            "error": f"Failed to delete file: {e_file}",
+            "asset_info": asset_info,
+        }
 
     # --- Step 5: Delete the DB record ---
     try:
         db.delete_choice(record_id)
         logger.info(f"[DeleteAsset] Successfully deleted DB record (ID: {record_id})")
-        return {"success": True, "file_deleted": file_deleted, "db_deleted": True, "asset_info": asset_info}
+        return {
+            "success": True,
+            "file_deleted": file_deleted,
+            "db_deleted": True,
+            "asset_info": asset_info,
+        }
     except Exception as e_db:
-        logger.error(f"[DeleteAsset] File deleted, but failed to delete DB record (ID: {record_id}): {e_db}")
-        return {"success": False, "error": f"File deleted, but DB delete failed: {e_db}", "asset_info": asset_info}
+        logger.error(
+            f"[DeleteAsset] File deleted, but failed to delete DB record (ID: {record_id}): {e_db}"
+        )
+        return {
+            "success": False,
+            "error": f"File deleted, but DB delete failed: {e_db}",
+            "asset_info": asset_info,
+        }
+
 
 @app.delete("/api/assets/delete-asset/{record_id}")
 async def delete_asset_and_record(record_id: int):
@@ -11700,7 +11741,9 @@ async def delete_asset_and_record(record_id: int):
         if result["success"]:
             # Trigger cache refresh in background
             threading.Thread(target=scan_and_cache_assets, daemon=True).start()
-            logger.info(f"Delete successful for {result['asset_info']}, triggering cache refresh.")
+            logger.info(
+                f"Delete successful for {result['asset_info']}, triggering cache refresh."
+            )
             logger.info("=" * 60)
             return {
                 "success": True,
@@ -11711,13 +11754,18 @@ async def delete_asset_and_record(record_id: int):
         else:
             logger.error(f"Delete failed for ID {record_id}: {result['error']}")
             logger.info("=" * 60)
-            raise HTTPException(status_code=500, detail=result.get("error", "Failed to delete asset"))
+            raise HTTPException(
+                status_code=500, detail=result.get("error", "Failed to delete asset")
+            )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error deleting asset ID {record_id}: {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error deleting asset ID {record_id}: {e}", exc_info=True
+        )
         logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/assets/bulk-delete-assets")
 async def bulk_delete_assets_and_records(request: BulkDeleteAssetsRequest):
@@ -11737,18 +11785,27 @@ async def bulk_delete_assets_and_records(request: BulkDeleteAssetsRequest):
             if result["success"]:
                 deleted_count += 1
             else:
-                failed_items.append({"id": record_id, "error": result.get("error", "Unknown error")})
-                logger.warning(f"Bulk delete failed for ID {record_id}: {result.get('error')}")
+                failed_items.append(
+                    {"id": record_id, "error": result.get("error", "Unknown error")}
+                )
+                logger.warning(
+                    f"Bulk delete failed for ID {record_id}: {result.get('error')}"
+                )
         except Exception as e:
             failed_items.append({"id": record_id, "error": str(e)})
-            logger.error(f"Unexpected error in bulk delete for ID {record_id}: {e}", exc_info=True)
+            logger.error(
+                f"Unexpected error in bulk delete for ID {record_id}: {e}",
+                exc_info=True,
+            )
 
     # Trigger cache refresh in background *after* all deletes are done
     if deleted_count > 0:
         threading.Thread(target=scan_and_cache_assets, daemon=True).start()
         logger.info(f"Bulk delete complete, triggering cache refresh.")
 
-    logger.info(f"Bulk delete summary: {deleted_count} deleted, {len(failed_items)} failed.")
+    logger.info(
+        f"Bulk delete summary: {deleted_count} deleted, {len(failed_items)} failed."
+    )
     logger.info("=" * 60)
 
     return {
@@ -11756,8 +11813,9 @@ async def bulk_delete_assets_and_records(request: BulkDeleteAssetsRequest):
         "deleted_count": deleted_count,
         "failed_count": len(failed_items),
         "failed_items": failed_items,
-        "message": f"Deleted {deleted_count} assets. {len(failed_items)} failed."
+        "message": f"Deleted {deleted_count} assets. {len(failed_items)} failed.",
     }
+
 
 # ============================================
 # API ENDPOINTS: IMAGE CHOICES DATABASE

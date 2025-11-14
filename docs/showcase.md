@@ -29,7 +29,7 @@
 ![posterizarr-overview-new](images/posterizarr-overview.jpg)
 
 !!! tip
-    - It was made using this Posterizarr [config](https://github.com/fscorrupt/Posterizarr/blob/main/MyPersonalConfig.json).
+    - It was made using this Posterizarr [config](https://github.com/fscorrupt/posterizarr/blob/main/MyPersonalConfig.json).
 
 ### 🖼️Assets after Kometa run
 #### Font - Colus-Regular.ttf
