@@ -944,7 +944,7 @@ function Dashboard() {
                         </span>
                         {version.is_update_available && (
                           <a
-                            href="https://github.com/fscorrupt/Posterizarr/releases/latest"
+                            href="https://github.com/fscorrupt/posterizarr/releases/latest"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center"

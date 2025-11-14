@@ -218,7 +218,7 @@ function ScriptSchedule {
 }
 function GetLatestScriptVersion {
     try {
-        return Invoke-RestMethod -Uri "https://github.com/fscorrupt/Posterizarr/raw/main/Release.txt" -Method Get -ErrorAction Stop
+        return Invoke-RestMethod -Uri "https://github.com/fscorrupt/posterizarr/raw/main/Release.txt" -Method Get -ErrorAction Stop
     }
     catch {
         Write-Host "Could not query latest script version, Error: $($_.Exception.Message)"
@@ -443,7 +443,7 @@ DapperDrivers & Onedr0p
  |_|   \___/|___/\__\___|_|  |_/___\__,_|_|  |_|
  ======================================================
  To support the projects visit:
- https://github.com/fscorrupt/Posterizarr
+ https://github.com/fscorrupt/posterizarr
 ----------------------------------------------------
 "@
 

@@ -305,14 +305,14 @@ function HowItWorks() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="group relative bg-theme-hover border border-theme rounded-lg overflow-hidden hover:border-theme-primary/50 transition-all">
                 <img
-                  src="https://raw.githubusercontent.com/fscorrupt/Posterizarr/main/images/posterizarr-overview.jpg"
+                  src="https://raw.githubusercontent.com/fscorrupt/posterizarr/main/images/posterizarr-overview.jpg"
                   alt="Posterizarr Overview - Original"
                   className="w-full h-auto object-contain group-hover:scale-[1.02] transition-transform duration-300"
                 />
               </div>
               <div className="group relative bg-theme-hover border border-theme rounded-lg overflow-hidden hover:border-theme-primary/50 transition-all">
                 <img
-                  src="https://raw.githubusercontent.com/fscorrupt/Posterizarr/main/images/posterizarr-overview-new.jpg"
+                  src="https://raw.githubusercontent.com/fscorrupt/posterizarr/main/images/posterizarr-overview-new.jpg"
                   alt="Posterizarr Overview - Updated"
                   className="w-full h-auto object-contain group-hover:scale-[1.02] transition-transform duration-300"
                 />
@@ -331,14 +331,14 @@ function HowItWorks() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="group relative bg-theme-hover border border-theme rounded-lg overflow-hidden hover:border-theme-primary/50 transition-all">
                 <img
-                  src="https://raw.githubusercontent.com/fscorrupt/Posterizarr/main/images/kometa-overview.png"
+                  src="https://raw.githubusercontent.com/fscorrupt/posterizarr/main/images/kometa-overview.png"
                   alt="Kometa Overview - Original"
                   className="w-full h-auto object-contain group-hover:scale-[1.02] transition-transform duration-300"
                 />
               </div>
               <div className="group relative bg-theme-hover border border-theme rounded-lg overflow-hidden hover:border-theme-primary/50 transition-all">
                 <img
-                  src="https://raw.githubusercontent.com/fscorrupt/Posterizarr/main/images/kometa-overview-new.jpg"
+                  src="https://raw.githubusercontent.com/fscorrupt/posterizarr/main/images/kometa-overview-new.jpg"
                   alt="Kometa Overview - Updated"
                   className="w-full h-auto object-contain group-hover:scale-[1.02] transition-transform duration-300"
                 />
@@ -361,7 +361,7 @@ function HowItWorks() {
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <a
-            href="https://fscorrupt.github.io/Posterizarr/walkthrough"
+            href="https://fscorrupt.github.io/posterizarr/walkthrough"
             target="_blank"
             rel="noopener noreferrer"
             className="px-5 py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
@@ -370,7 +370,7 @@ function HowItWorks() {
             <ArrowRight className="w-4 h-4" />
           </a>
           <a
-            href="https://github.com/fscorrupt/Posterizarr#readme"
+            href="https://github.com/fscorrupt/posterizarr#readme"
             target="_blank"
             rel="noopener noreferrer"
             className="px-5 py-2.5 bg-theme-hover hover:bg-theme-primary/20 text-theme-text rounded-lg font-medium transition-colors duration-200 flex items-center gap-2 border border-theme"

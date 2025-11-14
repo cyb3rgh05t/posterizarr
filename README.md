@@ -1,7 +1,7 @@
 <a name="readme-top"></a>
 <br />
 <div align="center">
-  <a href="https://github.com/fscorrupt/Posterizarr">
+  <a href="https://github.com/fscorrupt/posterizarr">
     <img src="/docs/images/logo_banner.png" alt="Logo" width="550" height="550">
   </a>
 
@@ -11,12 +11,12 @@
     Automate the creation of beautiful, textless posters for your Plex, Jellyfin, or Emby library.
     <br />
     <br />
-    <strong><a href="https://fscorrupt.github.io/Posterizarr/">View Full Documentation »</a></strong>
+    <strong><a href="https://fscorrupt.github.io/posterizarr/">View Full Documentation »</a></strong>
     <br />
     <br />
-    <a href="https://github.com/fscorrupt/Posterizarr/issues">Report Bug</a>
+    <a href="https://github.com/fscorrupt/posterizarr/issues">Report Bug</a>
     ·
-    <a href="https://github.com/fscorrupt/Posterizarr/issues">Request Feature</a>
+    <a href="https://github.com/fscorrupt/posterizarr/issues">Request Feature</a>
     ·
     <a href="https://discord.gg/fYyJQSGt54">Join our Discord</a>
   </p>
@@ -37,7 +37,7 @@ Posterizarr is a PowerShell script with a full Web UI that automates generating 
 * **Smart Integration:** Trigger runs from Tautulli, Sonarr, and Radarr.
 
 <p align="center">
-  <a href="https://fscorrupt.github.io/Posterizarr/installation">
+  <a href="https://fscorrupt.github.io/posterizarr/installation">
     <img alt="Web UI Preview" width="100%" src="/docs/images/PosterizarrUI.png">
   </a>
 </p>
@@ -46,16 +46,16 @@ Posterizarr is a PowerShell script with a full Web UI that automates generating 
 
 All installation instructions, configuration guides, and advanced tutorials have been moved to our dedicated documentation site.
 
-## **[Click Here to Read the Full Documentation](https://fscorrupt.github.io/Posterizarr/installation)**
+## **[Click Here to Read the Full Documentation](https://fscorrupt.github.io/posterizarr/installation)**
 
 ## Supported Platforms 💻
 
-[![Docker](https://img.shields.io/static/v1?style=for-the-badge&logo=docker&logoColor=FFFFFF&message=docker&color=1E63EE&label=)](https://fscorrupt.github.io/Posterizarr/installation)
-[![Unraid](https://img.shields.io/static/v1?style=for-the-badge&logo=unraid&logoColor=FFFFFF&message=unraid&color=E8402A&label=)](https://fscorrupt.github.io/Posterizarr/installation)
-[![Linux](https://img.shields.io/static/v1?style=for-the-badge&logo=linux&logoColor=FFFFFF&message=Linux&color=0D597F&label=)](https://fscorrupt.github.io/Posterizarr/installation)
-[![Windows](https://img.shields.io/static/v1?style=for-the-badge&logo=windows&logoColor=FFFFFF&message=windows&color=097CD7&label=)](https://fscorrupt.github.io/Posterizarr/installation)
-[![MacOS](https://img.shields.io/static/v1?style=for-the-badge&logo=apple&logoColor=FFFFFF&message=macOS&color=515151&label=)](https://fscorrupt.github.io/Posterizarr/installation)
-[![ARM](https://img.shields.io/static/v1?style=for-the-badge&logo=arm&logoColor=FFFFFF&message=ARM&color=815151&label=)](https://fscorrupt.github.io/Posterizarr/installation)
+[![Docker](https://img.shields.io/static/v1?style=for-the-badge&logo=docker&logoColor=FFFFFF&message=docker&color=1E63EE&label=)](https://fscorrupt.github.io/posterizarr/installation)
+[![Unraid](https://img.shields.io/static/v1?style=for-the-badge&logo=unraid&logoColor=FFFFFF&message=unraid&color=E8402A&label=)](https://fscorrupt.github.io/posterizarr/installation)
+[![Linux](https://img.shields.io/static/v1?style=for-the-badge&logo=linux&logoColor=FFFFFF&message=Linux&color=0D597F&label=)](https://fscorrupt.github.io/posterizarr/installation)
+[![Windows](https://img.shields.io/static/v1?style=for-the-badge&logo=windows&logoColor=FFFFFF&message=windows&color=097CD7&label=)](https://fscorrupt.github.io/posterizarr/installation)
+[![MacOS](https://img.shields.io/static/v1?style=for-the-badge&logo=apple&logoColor=FFFFFF&message=macOS&color=515151&label=)](https://fscorrupt.github.io/posterizarr/installation)
+[![ARM](https://img.shields.io/static/v1?style=for-the-badge&logo=arm&logoColor=FFFFFF&message=ARM&color=815151&label=)](https://fscorrupt.github.io/posterizarr/installation)
 
 ## Enjoy
 
