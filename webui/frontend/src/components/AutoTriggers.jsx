@@ -166,7 +166,7 @@ function TautulliContent() {
 
   const handleDownloadScript = () => {
     const url =
-      "https://github.com/fscorrupt/Posterizarr/blob/main/modules/trigger.py";
+      "https://github.com/fscorrupt/posterizarr/blob/main/modules/trigger.py";
     window.open(url, "_blank");
   };
 
@@ -438,7 +438,7 @@ function TautulliContent() {
             {t("autoTriggers.resources.tautulliWiki")}
           </a>
           <a
-            href="https://github.com/fscorrupt/Posterizarr/blob/main/modules/trigger.py"
+            href="https://github.com/fscorrupt/posterizarr/blob/main/modules/trigger.py"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-theme-primary hover:underline text-xs sm:text-sm break-all"
@@ -466,7 +466,7 @@ function SonarrContent() {
 
   const handleDownloadScript = () => {
     const url =
-      "https://github.com/fscorrupt/Posterizarr/blob/main/modules/ArrTrigger.sh";
+      "https://github.com/fscorrupt/posterizarr/blob/main/modules/ArrTrigger.sh";
     window.open(url, "_blank");
   };
 
@@ -667,7 +667,7 @@ function SonarrContent() {
             {t("autoTriggers.resources.sonarrWiki")}
           </a>
           <a
-            href="https://github.com/fscorrupt/Posterizarr/blob/main/modules/ArrTrigger.sh"
+            href="https://github.com/fscorrupt/posterizarr/blob/main/modules/ArrTrigger.sh"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-theme-primary hover:underline text-xs sm:text-sm break-all"
@@ -695,7 +695,7 @@ function RadarrContent() {
 
   const handleDownloadScript = () => {
     const url =
-      "https://github.com/fscorrupt/Posterizarr/blob/main/modules/ArrTrigger.sh";
+      "https://github.com/fscorrupt/posterizarr/blob/main/modules/ArrTrigger.sh";
     window.open(url, "_blank");
   };
 
@@ -902,7 +902,7 @@ function RadarrContent() {
             {t("autoTriggers.resources.radarrWiki")}
           </a>
           <a
-            href="https://github.com/fscorrupt/Posterizarr/blob/main/modules/ArrTrigger.sh"
+            href="https://github.com/fscorrupt/posterizarr/blob/main/modules/ArrTrigger.sh"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-theme-primary hover:underline text-xs sm:text-sm break-all"

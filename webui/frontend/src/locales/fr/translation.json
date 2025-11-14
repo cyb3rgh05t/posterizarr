@@ -1730,7 +1730,7 @@
             "title": "Télécharger le script de déclenchement",
             "description": "Téléchargez trigger.py depuis GitHub et placez-le dans votre répertoire de scripts Tautulli.",
             "substeps": [
-              "Téléchargez depuis : https://github.com/fscorrupt/Posterizarr/blob/main/modules/trigger.py",
+              "Téléchargez depuis : https://github.com/fscorrupt/posterizarr/blob/main/modules/trigger.py",
               "Placez dans le répertoire de scripts Tautulli (voir Wiki Tautulli pour l'emplacement)",
               "Définir les permissions d'exécution : chmod +x trigger.py"
             ]
@@ -1848,7 +1848,7 @@
           "title": "Télécharger le script de déclenchement",
           "description": "Téléchargez ArrTrigger.sh depuis GitHub et placez-le dans votre répertoire de scripts Sonarr.",
           "substeps": [
-            "Téléchargez depuis : https://github.com/fscorrupt/Posterizarr/blob/main/modules/ArrTrigger.sh",
+            "Téléchargez depuis : https://github.com/fscorrupt/posterizarr/blob/main/modules/ArrTrigger.sh",
             "Exemple : Créez le répertoire /opt/appdata/sonarr/scripts/",
             "Placez ArrTrigger.sh dans ce répertoire",
             "Définir les permissions d'exécution : chmod +x ArrTrigger.sh"
@@ -1920,7 +1920,7 @@
           "title": "Télécharger le script de déclenchement",
           "description": "Téléchargez ArrTrigger.sh depuis GitHub et placez-le dans votre répertoire de scripts Radarr.",
           "substeps": [
-            "Téléchargez depuis : https://github.com/fscorrupt/Posterizarr/blob/main/modules/ArrTrigger.sh",
+            "Téléchargez depuis : https://github.com/fscorrupt/posterizarr/blob/main/modules/ArrTrigger.sh",
             "Exemple : Créez le répertoire /opt/appdata/radarr/scripts/",
             "Placez ArrTrigger.sh dans ce répertoire",
             "Définir les permissions d'exécution : chmod +x ArrTrigger.sh"

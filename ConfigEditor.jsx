@@ -38,80 +38,80 @@ const API_URL = "/api";
 // Mapping von Gruppen zu README-Abschnitten
 const README_LINKS = {
   "WebUI Settings":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#webui",
+    "https://fscorrupt.github.io/posterizarr/configuration/#webui",
   "API Keys & Tokens":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
-  ApiPart: "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#apipart",
+  ApiPart: "https://fscorrupt.github.io/posterizarr/configuration/#apipart",
   "Language & Preferences":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#apipart",
   "Image Filters":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#apipart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#apipart",
   "Plex Settings":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#plexpart",
-  PlexPart: "https://fscorrupt.github.io/Posterizarr/configuration/#plexpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#plexpart",
+  PlexPart: "https://fscorrupt.github.io/posterizarr/configuration/#plexpart",
   "Jellyfin Settings":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#jellyfinpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#jellyfinpart",
   JellyfinPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#jellyfinpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#jellyfinpart",
   "Emby Settings":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#embypart",
-  EmbyPart: "https://fscorrupt.github.io/Posterizarr/configuration/#embypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#embypart",
+  EmbyPart: "https://fscorrupt.github.io/posterizarr/configuration/#embypart",
   Notifications:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#notification",
+    "https://fscorrupt.github.io/posterizarr/configuration/#notification",
   Notification:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#notification",
+    "https://fscorrupt.github.io/posterizarr/configuration/#notification",
   "General Settings":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#prerequisitepart",
   PrerequisitePart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#prerequisitepart",
   "Overlay Files":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#prerequisitepart",
   "Resolution Overlays":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#prerequisitepart",
   Fonts:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#prerequisitepart",
   "Text Formatting":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#prerequisitepart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#prerequisitepart",
   "Image Processing":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#overlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#overlaypart",
   OverlayPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#overlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#overlaypart",
   "Poster Settings":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#posteroverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#posteroverlaypart",
   PosterOverlayPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#posteroverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#posteroverlaypart",
   "Season Poster Settings":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#seasonposteroverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#seasonposteroverlaypart",
   SeasonPosterOverlayPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#seasonposteroverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#seasonposteroverlaypart",
   "Show Title on Season":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#showtilteonseasonposterpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#showtilteonseasonposterpart",
   ShowTitleOnSeasonPosterPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#showtilteonseasonposterpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#showtilteonseasonposterpart",
   "Background Settings":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#backgroundoverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#backgroundoverlaypart",
   BackgroundOverlayPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#backgroundoverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#backgroundoverlaypart",
   "Title Card Overlay":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardoverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#titlecardoverlaypart",
   TitleCardOverlayPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardoverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#titlecardoverlaypart",
   "Title Card Title Text":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardtitletextpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#titlecardtitletextpart",
   TitleCardTitleTextPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardtitletextpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#titlecardtitletextpart",
   "Title Card Episode Text":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardepisodetextpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#titlecardepisodetextpart",
   TitleCardEPTextPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#titlecardepisodetextpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#titlecardepisodetextpart",
   "Collection Poster":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#collectionposteroverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#collectionposteroverlaypart",
   CollectionPosterOverlayPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#collectionposteroverlaypart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#collectionposteroverlaypart",
   "Collection Title":
-    "https://fscorrupt.github.io/Posterizarr/configuration/#collectiontitleposterpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#collectiontitleposterpart",
   CollectionTitlePosterPart:
-    "https://fscorrupt.github.io/Posterizarr/configuration/#collectiontitleposterpart",
+    "https://fscorrupt.github.io/posterizarr/configuration/#collectiontitleposterpart",
 };
 
 // Comprehensive tooltip descriptions for all config variables

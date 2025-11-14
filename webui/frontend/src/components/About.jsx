@@ -14,7 +14,7 @@ import ReleasesSection from "./ReleasesSection";
 import AssetsStats from "./AssetsStats";
 
 const API_URL = "/api";
-const REPO_URL = "https://github.com/fscorrupt/Posterizarr/releases/latest";
+const REPO_URL = "https://github.com/fscorrupt/posterizarr/releases/latest";
 
 function About() {
   const { t } = useTranslation();
@@ -106,7 +106,7 @@ function About() {
         <p className="text-orange-300 text-sm">
           {t("about.betaWarning")}{" "}
           <a
-            href="https://github.com/fscorrupt/Posterizarr/issues"
+            href="https://github.com/fscorrupt/posterizarr/issues"
             target="_blank"
             rel="noopener noreferrer"
             className="text-orange-400 hover:text-orange-300 underline font-medium inline-flex items-center gap-1"
@@ -202,7 +202,7 @@ function About() {
 
         <div className="space-y-3">
           <a
-            href="https://github.com/fscorrupt/Posterizarr/issues"
+            href="https://github.com/fscorrupt/posterizarr/issues"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between p-3 bg-theme-hover hover:bg-theme-primary/20 border border-theme rounded-lg transition-all group"

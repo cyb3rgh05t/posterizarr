@@ -1,6 +1,6 @@
 ## Docker
 
-- [Docker-Compose Example File](https://github.com/fscorrupt/Posterizarr/blob/main/docker-compose.yml)
+- [Docker-Compose Example File](https://github.com/fscorrupt/posterizarr/blob/main/docker-compose.yml)
 
   - Change `RUN_TIME` in yaml to your needs **- You need to use 24H Time Format**
     - The Script gets executed on the Times you specified
