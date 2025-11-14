@@ -1,7 +1,7 @@
 site_name: Posterizarr
-site_url: https://fscorrupt.github.io/Posterizarr/
-repo_url: https://github.com/fscorrupt/Posterizarr
-repo_name: fscorrupt/Posterizarr
+site_url: https://fscorrupt.github.io/posterizarr/
+repo_url: https://github.com/fscorrupt/posterizarr
+repo_name: fscorrupt/posterizarr
 edit_uri: edit/main/docs/
 
 theme:
@@ -35,7 +35,6 @@ theme:
         name: Switch to light mode
 
 # Page navigation
-# Page navigation
 nav:
   - 'Home': 'index.md'
   - 'Getting Started':
@@ -50,6 +49,7 @@ nav:
     - 'Search Order': 'searchorder.md'
     - 'Naming Convention': 'namingconvention.md'
     - 'Platform & Tools': 'platformandtools.md'
+    - 'API Endpoints': 'endpoints.md'
   - 'Reference':
     - 'Showcase': 'showcase.md'
 
@@ -63,3 +63,15 @@ markdown_extensions:
   - admonition
   - pymdownx.details
   - pymdownx.superfences
+
+# Extra features (Adapted from example)
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/fscorrupt
+      name: GitHub Profile
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/fYyJQSGt54
+      name: Discord Server
+
+copyright: Copyright &copy; 2025 fscorrupt

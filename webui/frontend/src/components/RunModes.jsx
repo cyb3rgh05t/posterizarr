@@ -1263,7 +1263,7 @@ function RunModes() {
             {/* Documentation Link */}
             <div className="pt-4 border-t-2 border-theme">
               <a
-                href="https://fscorrupt.github.io/Posterizarr/modes/#sync-modessync-modes"
+                href="https://fscorrupt.github.io/posterizarr/modes/#sync-modessync-modes"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center px-6 py-3 bg-theme-bg hover:bg-theme-hover border border-theme rounded-lg font-medium transition-all text-theme-text shadow-lg"
@@ -1400,7 +1400,7 @@ function RunModes() {
             {/* Documentation Link */}
             <div className="pt-4 border-t-2 border-theme">
               <a
-                href="https://fscorrupt.github.io/Posterizarr/modes/#sync-modessync-modes"
+                href="https://fscorrupt.github.io/posterizarr/modes/#sync-modessync-modes"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center px-6 py-3 bg-theme-bg hover:bg-theme-hover border border-theme rounded-lg font-medium transition-all text-theme-text shadow-lg"
@@ -1511,7 +1511,7 @@ function RunModes() {
             {/* Documentation Link */}
             <div className="pt-4 border-t-2 border-theme">
               <a
-                href="https://fscorrupt.github.io/Posterizarr/modes/#backup-mode"
+                href="https://fscorrupt.github.io/posterizarr/modes/#backup-mode"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center px-6 py-3 bg-theme-bg hover:bg-theme-hover border border-theme rounded-lg font-medium transition-all text-theme-text shadow-lg"
@@ -2536,7 +2536,7 @@ function RunModes() {
               {/* Documentation Link */}
               <div className="mt-4 pt-4 border-t border-blue-500/30">
                 <a
-                  href="https://fscorrupt.github.io/Posterizarr/modes/#manual-mode-semi-automated"
+                  href="https://fscorrupt.github.io/posterizarr/modes/#manual-mode-semi-automated"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 rounded-lg font-medium transition-all text-blue-100 hover:text-white"

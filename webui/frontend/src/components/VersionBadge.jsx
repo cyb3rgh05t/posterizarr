@@ -3,7 +3,7 @@ import { AlertCircle, Info, CheckCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const API_URL = "/api";
-const REPO_URL = "https://github.com/fscorrupt/Posterizarr/releases/latest";
+const REPO_URL = "https://github.com/fscorrupt/posterizarr/releases/latest";
 
 let cachedVersionData = { version: null, isOutOfDate: false };
 

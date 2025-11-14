@@ -272,7 +272,7 @@ To use it we need to configure a script in Tautulli, please follow these instruc
      - "/opt/appdata/posterizarr:/posterizarr:rw"
    ```
    ⚠️ Note: This mount path is case-sensitive and must match exactly /posterizarr.
-1. Download the [trigger.py](https://github.com/fscorrupt/Posterizarr/blob/main/modules/trigger.py) from the GH and place it in the Tautulli Script dir -    [Tautulli-Wiki](https://github.com/Tautulli/Tautulli/wiki/Custom-Scripts)
+1. Download the [trigger.py](https://github.com/fscorrupt/posterizarr/blob/main/modules/trigger.py) from the GH and place it in the Tautulli Script dir -    [Tautulli-Wiki](https://github.com/Tautulli/Tautulli/wiki/Custom-Scripts)
    - You may have to set `chmod +x` to the file.
 1. Open Tautulli and go to Settings -    `NOTIFICATION AGENTS`
 1. Click on `Add a new notification agent` and select `Script`
@@ -354,7 +354,7 @@ To use it we need to configure a script in Sonarr/Radarr, please follow these in
      - "/opt/appdata/posterizarr:/posterizarr:rw"
    ```
    ⚠️ Note: This mount path is case-sensitive and must match exactly `/posterizarr`.
-2. Download [ArrTrigger.sh](https://github.com/fscorrupt/Posterizarr/blob/main/modules/ArrTrigger.sh) from GitHub and place it in your Sonarr/Radarr script directory.
+2. Download [ArrTrigger.sh](https://github.com/fscorrupt/posterizarr/blob/main/modules/ArrTrigger.sh) from GitHub and place it in your Sonarr/Radarr script directory.
    - For example, create a `scripts` folder in `/opt/appdata/sonarr`, resulting in the path:
      `/opt/appdata/sonarr/scripts/ArrTrigger.sh`
    - Make sure to set executable permissions: `chmod +x ArrTrigger.sh`

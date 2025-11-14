@@ -1709,7 +1709,7 @@ async def get_script_version():
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                "https://raw.githubusercontent.com/fscorrupt/Posterizarr/refs/heads/main/Release.txt",
+                "https://raw.githubusercontent.com/fscorrupt/posterizarr/refs/heads/main/Release.txt",
                 timeout=10.0,
             )
             response.raise_for_status()
@@ -8583,7 +8583,7 @@ async def get_version_ui():
     """
     return await fetch_version(
         local_filename="ReleaseUI.txt",
-        github_url="https://raw.githubusercontent.com/fscorrupt/Posterizarr/refs/heads/main/ReleaseUI.txt",
+        github_url="https://raw.githubusercontent.com/fscorrupt/posterizarr/refs/heads/main/ReleaseUI.txt",
         version_type="UI",
     )
 
@@ -8596,7 +8596,7 @@ async def get_github_releases():
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                "https://api.github.com/repos/fscorrupt/Posterizarr/releases",
+                "https://api.github.com/repos/fscorrupt/posterizarr/releases",
                 headers={"Accept": "application/vnd.github.v3+json"},
                 timeout=10.0,
             )
