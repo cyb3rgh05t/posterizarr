@@ -697,28 +697,39 @@ const SchedulerSettings = () => {
             </button>
 
             {timezoneDropdownOpen && !isUpdating && (
-              <div
-                className={`absolute z-50 left-0 right-0 ${
-                  timezoneDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                } bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-80 overflow-y-auto`}
-              >
-                {timezones.map((tz) => (
-                  <button
-                    key={tz}
-                    onClick={() => {
-                      updateTimezone(tz);
-                      setTimezoneDropdownOpen(false);
-                    }}
-                    className={`w-full px-4 py-2 text-sm transition-all text-left ${
-                      timezone === tz
-                        ? "bg-theme-primary text-white"
-                        : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                    }`}
-                  >
-                    {tz}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setTimezoneDropdownOpen(false)}
+                />
+                <div
+                  className={`absolute z-50 left-0 right-0 ${
+                    timezoneDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
+                  } rounded-lg bg-theme-card border border-theme shadow-lg max-h-80 overflow-y-auto`}
+                >
+                  <div className="p-2">
+                    <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                      {t("schedulerSettings.timezone")}
+                    </div>
+                    {timezones.map((tz) => (
+                      <button
+                        key={tz}
+                        onClick={() => {
+                          updateTimezone(tz);
+                          setTimezoneDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                          timezone === tz
+                            ? "bg-theme-primary text-white"
+                            : "text-gray-300 hover:bg-theme-hover"
+                        }`}
+                      >
+                        {tz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -816,55 +827,78 @@ const SchedulerSettings = () => {
             </button>
 
             {timePickerOpen && !isUpdating && (
-              <div
-                className={`absolute z-50 left-0 right-0 ${
-                  timePickerUp ? "bottom-full mb-2" : "top-full mt-2"
-                } bg-theme-card border border-theme-primary rounded-lg shadow-xl`}
-              >
-                <div className="flex divide-x divide-theme">
-                  {/* Hours Column */}
-                  <div className="flex-1 max-h-64 overflow-y-auto">
-                    <div className="sticky top-0 bg-theme-card border-b border-theme px-3 py-2 text-xs font-semibold text-theme-primary">
-                      {t("schedulerSettings.hour") || "Hour"}
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setTimePickerOpen(false)}
+                />
+                <div
+                  className={`absolute z-50 left-0 right-0 ${
+                    timePickerUp ? "bottom-full mb-2" : "top-full mt-2"
+                  } rounded-lg bg-theme-card border border-theme shadow-lg overflow-hidden`}
+                >
+                  <div className="px-3 py-2 bg-theme-bg border-b border-theme">
+                    <div className="text-xs font-semibold text-theme-muted uppercase tracking-wider text-center">
+                      {t("schedulerSettings.selectTime")}
                     </div>
-                    {hours.map((hour) => (
-                      <button
-                        key={hour}
-                        type="button"
-                        onClick={() => handleTimeSelect(hour, selectedMinute)}
-                        className={`w-full px-4 py-2 text-sm transition-all text-center ${
-                          selectedHour === hour
-                            ? "bg-theme-primary text-white"
-                            : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                        }`}
-                      >
-                        {hour}
-                      </button>
-                    ))}
                   </div>
-
-                  {/* Minutes Column */}
-                  <div className="flex-1 max-h-64 overflow-y-auto">
-                    <div className="sticky top-0 bg-theme-card border-b border-theme px-3 py-2 text-xs font-semibold text-theme-primary">
-                      {t("schedulerSettings.minute") || "Minute"}
+                  <div className="flex divide-x divide-theme">
+                    {/* Hours Column */}
+                    <div className="flex-1">
+                      <div className="sticky top-0 bg-theme-card border-b border-theme px-3 py-2 text-xs font-semibold text-theme-primary uppercase tracking-wider text-center">
+                        {t("schedulerSettings.hour")}
+                      </div>
+                      <div className="p-2 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-theme-primary scrollbar-track-theme-bg">
+                        <div className="space-y-1">
+                          {hours.map((hour) => (
+                            <button
+                              key={hour}
+                              type="button"
+                              onClick={() =>
+                                handleTimeSelect(hour, selectedMinute)
+                              }
+                              className={`w-full px-3 py-2 rounded-md text-sm font-medium transition-all text-center ${
+                                selectedHour === hour
+                                  ? "bg-theme-primary text-white shadow-sm"
+                                  : "text-gray-300 hover:bg-theme-hover hover:text-white"
+                              }`}
+                            >
+                              {hour}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    {minutes.map((minute) => (
-                      <button
-                        key={minute}
-                        type="button"
-                        onClick={() => handleTimeSelect(selectedHour, minute)}
-                        className={`w-full px-4 py-2 text-sm transition-all text-center ${
-                          selectedMinute === minute
-                            ? "bg-theme-primary text-white"
-                            : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                        }`}
-                      >
-                        {minute}
-                      </button>
-                    ))}
+
+                    {/* Minutes Column */}
+                    <div className="flex-1">
+                      <div className="sticky top-0 bg-theme-card border-b border-theme px-3 py-2 text-xs font-semibold text-theme-primary uppercase tracking-wider text-center">
+                        {t("schedulerSettings.minute")}
+                      </div>
+                      <div className="p-2 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-theme-primary scrollbar-track-theme-bg">
+                        <div className="space-y-1">
+                          {minutes.map((minute) => (
+                            <button
+                              key={minute}
+                              type="button"
+                              onClick={() =>
+                                handleTimeSelect(selectedHour, minute)
+                              }
+                              className={`w-full px-3 py-2 rounded-md text-sm font-medium transition-all text-center ${
+                                selectedMinute === minute
+                                  ? "bg-theme-primary text-white shadow-sm"
+                                  : "text-gray-300 hover:bg-theme-hover hover:text-white"
+                              }`}
+                            >
+                              {minute}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
 

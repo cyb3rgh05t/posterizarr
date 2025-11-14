@@ -490,19 +490,37 @@ const AssetOverview = () => {
   const [itemsPerPageDropdownOpen, setItemsPerPageDropdownOpen] =
     useState(false);
 
-  // Dropdown position states
-  const [typeDropdownUp, setTypeDropdownUp] = useState(false);
-  const [libraryDropdownUp, setLibraryDropdownUp] = useState(false);
-  const [categoryDropdownUp, setCategoryDropdownUp] = useState(false);
-  const [statusDropdownUp, setStatusDropdownUp] = useState(false);
-  const [itemsPerPageDropdownUp, setItemsPerPageDropdownUp] = useState(false);
-
   // Refs for click outside detection
   const typeDropdownRef = useRef(null);
   const libraryDropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null);
   const statusDropdownRef = useRef(null);
   const itemsPerPageDropdownRef = useRef(null);
+
+  // Helper to calculate dropdown position (above or below button)
+  const getDropdownPosition = (buttonRef) => {
+    if (!buttonRef) return { top: 0, openUpward: false };
+
+    const rect = buttonRef.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const dropdownHeight = 248; // max-h-60 = 15rem = 240px + padding
+
+    // Open upward if not enough space below AND more space above
+    const openUpward = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+
+    if (openUpward) {
+      return {
+        bottom: window.innerHeight - rect.top + 8,
+        openUpward: true,
+      };
+    } else {
+      return {
+        top: rect.bottom + 8,
+        openUpward: false,
+      };
+    }
+  };
 
   // Fetch data from API
   const fetchData = async () => {
@@ -548,15 +566,6 @@ const AssetOverview = () => {
     return cleanName;
   };
 
-  // Function to calculate dropdown position
-  const calculateDropdownPosition = (ref) => {
-    if (!ref.current) return false;
-    const rect = ref.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    return spaceAbove > spaceBelow;
-  };
-
   // Click outside detection for dropdowns
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -592,11 +601,48 @@ const AssetOverview = () => {
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+    const handleScroll = (event) => {
+      // Check if scroll is happening inside a dropdown - if so, don't close
+      const scrollTarget = event.target;
+
+      // Check if scrolling inside any dropdown content (they all have overflow-y-auto class)
+      if (
+        scrollTarget.classList &&
+        scrollTarget.classList.contains("overflow-y-auto")
+      ) {
+        return; // Don't close if scrolling inside dropdown
+      }
+
+      // Close all dropdowns on page scroll (not dropdown scroll)
+      setTypeDropdownOpen(false);
+      setLibraryDropdownOpen(false);
+      setCategoryDropdownOpen(false);
+      setStatusDropdownOpen(false);
+      setItemsPerPageDropdownOpen(false);
     };
-  }, []);
+
+    const hasOpenDropdowns =
+      typeDropdownOpen ||
+      libraryDropdownOpen ||
+      categoryDropdownOpen ||
+      statusDropdownOpen ||
+      itemsPerPageDropdownOpen;
+
+    if (hasOpenDropdowns) {
+      document.addEventListener("mousedown", handleClickOutside);
+      window.addEventListener("scroll", handleScroll, true);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        window.removeEventListener("scroll", handleScroll, true);
+      };
+    }
+  }, [
+    typeDropdownOpen,
+    libraryDropdownOpen,
+    categoryDropdownOpen,
+    statusDropdownOpen,
+    itemsPerPageDropdownOpen,
+  ]);
 
   // Handle opening the replacer
   const handleReplace = async (asset) => {
@@ -721,7 +767,11 @@ const AssetOverview = () => {
         await fetchData();
         window.dispatchEvent(new Event("assetReplaced"));
       } else {
-        console.error("Failed to delete DB entry:", response.status, await response.text());
+        console.error(
+          "Failed to delete DB entry:",
+          response.status,
+          await response.text()
+        );
       }
     } catch (error) {
       console.error("Error deleting DB entry:", error);
@@ -1469,12 +1519,7 @@ const AssetOverview = () => {
           {/* Status Filter */}
           <div className="relative" ref={statusDropdownRef}>
             <button
-              onClick={() => {
-                const shouldOpenUp =
-                  calculateDropdownPosition(statusDropdownRef);
-                setStatusDropdownUp(shouldOpenUp);
-                setStatusDropdownOpen(!statusDropdownOpen);
-              }}
+              onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
               className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text text-sm flex items-center justify-between hover:bg-theme-hover hover:border-theme-primary/50 transition-all shadow-sm"
             >
               <span className="font-medium">
@@ -1492,9 +1537,19 @@ const AssetOverview = () => {
             </button>
             {statusDropdownOpen && (
               <div
-                className={`absolute z-50 w-full ${
-                  statusDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                } bg-theme-card border border-theme-primary rounded-lg shadow-xl`}
+                className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
+                style={{
+                  left: statusDropdownRef.current?.getBoundingClientRect().left,
+                  width: statusDropdownRef.current?.offsetWidth,
+                  ...(getDropdownPosition(statusDropdownRef.current).openUpward
+                    ? {
+                        bottom: getDropdownPosition(statusDropdownRef.current)
+                          .bottom,
+                      }
+                    : {
+                        top: getDropdownPosition(statusDropdownRef.current).top,
+                      }),
+                }}
               >
                 {["All", "Resolved", "Unresolved"].map((status) => (
                   <button
@@ -1522,11 +1577,7 @@ const AssetOverview = () => {
           {/* Type Filter */}
           <div className="relative" ref={typeDropdownRef}>
             <button
-              onClick={() => {
-                const shouldOpenUp = calculateDropdownPosition(typeDropdownRef);
-                setTypeDropdownUp(shouldOpenUp);
-                setTypeDropdownOpen(!typeDropdownOpen);
-              }}
+              onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
               className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text text-sm flex items-center justify-between hover:bg-theme-hover hover:border-theme-primary/50 transition-all shadow-sm"
             >
               <span className="font-medium">
@@ -1542,9 +1593,19 @@ const AssetOverview = () => {
             </button>
             {typeDropdownOpen && (
               <div
-                className={`absolute z-50 w-full ${
-                  typeDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                } bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-60 overflow-y-auto`}
+                className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
+                style={{
+                  left: typeDropdownRef.current?.getBoundingClientRect().left,
+                  width: typeDropdownRef.current?.offsetWidth,
+                  ...(getDropdownPosition(typeDropdownRef.current).openUpward
+                    ? {
+                        bottom: getDropdownPosition(typeDropdownRef.current)
+                          .bottom,
+                      }
+                    : {
+                        top: getDropdownPosition(typeDropdownRef.current).top,
+                      }),
+                }}
               >
                 {types.map((type) => (
                   <button
@@ -1568,12 +1629,7 @@ const AssetOverview = () => {
           {/* Library Filter */}
           <div className="relative" ref={libraryDropdownRef}>
             <button
-              onClick={() => {
-                const shouldOpenUp =
-                  calculateDropdownPosition(libraryDropdownRef);
-                setLibraryDropdownUp(shouldOpenUp);
-                setLibraryDropdownOpen(!libraryDropdownOpen);
-              }}
+              onClick={() => setLibraryDropdownOpen(!libraryDropdownOpen)}
               className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text text-sm flex items-center justify-between hover:bg-theme-hover hover:border-theme-primary/50 transition-all shadow-sm"
             >
               <span className="font-medium">
@@ -1589,9 +1645,21 @@ const AssetOverview = () => {
             </button>
             {libraryDropdownOpen && (
               <div
-                className={`absolute z-50 w-full ${
-                  libraryDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                } bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-60 overflow-y-auto`}
+                className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
+                style={{
+                  left: libraryDropdownRef.current?.getBoundingClientRect()
+                    .left,
+                  width: libraryDropdownRef.current?.offsetWidth,
+                  ...(getDropdownPosition(libraryDropdownRef.current).openUpward
+                    ? {
+                        bottom: getDropdownPosition(libraryDropdownRef.current)
+                          .bottom,
+                      }
+                    : {
+                        top: getDropdownPosition(libraryDropdownRef.current)
+                          .top,
+                      }),
+                }}
               >
                 {libraries.map((lib) => (
                   <button
@@ -1617,12 +1685,7 @@ const AssetOverview = () => {
           {/* Category Filter */}
           <div className="relative" ref={categoryDropdownRef}>
             <button
-              onClick={() => {
-                const shouldOpenUp =
-                  calculateDropdownPosition(categoryDropdownRef);
-                setCategoryDropdownUp(shouldOpenUp);
-                setCategoryDropdownOpen(!categoryDropdownOpen);
-              }}
+              onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
               className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text text-sm flex items-center justify-between hover:bg-theme-hover hover:border-theme-primary/50 transition-all shadow-sm"
             >
               <span className="font-medium">
@@ -1638,9 +1701,22 @@ const AssetOverview = () => {
             </button>
             {categoryDropdownOpen && (
               <div
-                className={`absolute z-50 w-full ${
-                  categoryDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                } bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-60 overflow-y-auto`}
+                className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto"
+                style={{
+                  left: categoryDropdownRef.current?.getBoundingClientRect()
+                    .left,
+                  width: categoryDropdownRef.current?.offsetWidth,
+                  ...(getDropdownPosition(categoryDropdownRef.current)
+                    .openUpward
+                    ? {
+                        bottom: getDropdownPosition(categoryDropdownRef.current)
+                          .bottom,
+                      }
+                    : {
+                        top: getDropdownPosition(categoryDropdownRef.current)
+                          .top,
+                      }),
+                }}
               >
                 <button
                   onClick={() => {
@@ -1854,13 +1930,9 @@ const AssetOverview = () => {
                 </label>
                 <div className="relative" ref={itemsPerPageDropdownRef}>
                   <button
-                    onClick={() => {
-                      const shouldOpenUp = calculateDropdownPosition(
-                        itemsPerPageDropdownRef
-                      );
-                      setItemsPerPageDropdownUp(shouldOpenUp);
-                      setItemsPerPageDropdownOpen(!itemsPerPageDropdownOpen);
-                    }}
+                    onClick={() =>
+                      setItemsPerPageDropdownOpen(!itemsPerPageDropdownOpen)
+                    }
                     className="px-4 py-2 bg-theme-card text-theme-text border border-theme rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all cursor-pointer shadow-sm flex items-center gap-2"
                   >
                     <span>{itemsPerPage}</span>
@@ -1872,11 +1944,25 @@ const AssetOverview = () => {
                   </button>
                   {itemsPerPageDropdownOpen && (
                     <div
-                      className={`absolute z-50 right-0 ${
-                        itemsPerPageDropdownUp
-                          ? "bottom-full mb-2"
-                          : "top-full mt-2"
-                      } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
+                      className="fixed z-50 rounded-lg bg-theme-card border border-theme shadow-lg max-h-60 overflow-y-auto min-w-[80px]"
+                      style={{
+                        right:
+                          window.innerWidth -
+                          itemsPerPageDropdownRef.current?.getBoundingClientRect()
+                            .right,
+                        ...(getDropdownPosition(itemsPerPageDropdownRef.current)
+                          .openUpward
+                          ? {
+                              bottom: getDropdownPosition(
+                                itemsPerPageDropdownRef.current
+                              ).bottom,
+                            }
+                          : {
+                              top: getDropdownPosition(
+                                itemsPerPageDropdownRef.current
+                              ).top,
+                            }),
+                      }}
                     >
                       {[25, 50, 100, 200, 500].map((value) => (
                         <button
@@ -1916,7 +2002,9 @@ const AssetOverview = () => {
       {confirmModalState.isOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80"
-          onClick={() => !isBulkProcessing && setConfirmModalState({ isOpen: false })}
+          onClick={() =>
+            !isBulkProcessing && setConfirmModalState({ isOpen: false })
+          }
         >
           <div
             className="relative w-full max-w-lg p-6 bg-theme-card border border-theme rounded-lg shadow-xl"
@@ -1947,7 +2035,9 @@ const AssetOverview = () => {
                 </p>
               </div>
               <button
-                onClick={() => !isBulkProcessing && setConfirmModalState({ isOpen: false })}
+                onClick={() =>
+                  !isBulkProcessing && setIsConfirmModalOpen(false)
+                }
                 className="absolute top-4 right-4 text-theme-muted hover:text-theme-text transition-colors"
                 disabled={isBulkProcessing}
               >

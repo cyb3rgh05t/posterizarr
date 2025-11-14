@@ -122,16 +122,16 @@ const ValidateButton = ({
       onClick={validateService}
       disabled={validating || disabled}
       className={`
-        inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium
-        transition-all duration-200 min-w-[120px] justify-center
+        inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+        transition-all shadow-sm min-w-[120px] justify-center
         ${
           validating || disabled
-            ? "bg-theme-muted/20 text-theme-muted cursor-not-allowed opacity-50"
+            ? "bg-theme-card border border-theme cursor-not-allowed opacity-50 text-theme-text"
             : lastResult?.valid
-            ? "bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30"
+            ? "bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30"
             : lastResult?.valid === false
-            ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
-            : "bg-theme-primary/20 text-theme-primary border border-theme-primary/30 hover:bg-theme-primary/30"
+            ? "bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30"
+            : "bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-primary"
         }
         ${className}
       `}

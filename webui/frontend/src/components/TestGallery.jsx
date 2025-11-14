@@ -285,12 +285,12 @@ function TestGallery() {
           <button
             onClick={runTestMode}
             disabled={scriptLoading || status.running}
-            className="flex items-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-500 border border-yellow-700 hover:border-yellow-600 disabled:bg-gray-600 disabled:border-gray-700 disabled:cursor-not-allowed disabled:opacity-50 rounded-lg text-sm font-medium transition-all shadow-sm"
+            className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-all shadow-sm"
           >
             {scriptLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Play className="w-4 h-4" />
+              <Play className="w-4 h-4 text-theme-primary" />
             )}
             <span>{t("testGallery.startTestMode")}</span>
           </button>
@@ -308,7 +308,10 @@ function TestGallery() {
               </p>
               <p className="text-sm text-orange-300/80">
                 {t("testGallery.mode")}:{" "}
-                {status.current_mode || t("testGallery.unknown")}
+                {status.current_mode
+                  ? status.current_mode.charAt(0).toUpperCase() +
+                    status.current_mode.slice(1)
+                  : t("testGallery.unknown")}
               </p>
             </div>
           </div>
