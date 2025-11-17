@@ -620,7 +620,11 @@
     "adjustFilters": "Try adjusting your search term or level filters.",
     "loadFull": "Load full log file",
     "loadingFullLog": "Loading full log file...",
-    "loadedFullLog": "Full log file loaded"
+    "loadedFullLog": "Full log file loaded",
+    "gatherSupport": "Gather Support Logs",
+    "gatheringSupport": "Gathering support files... This may take a moment.",
+    "gatheringSupportSuccess": "Support files downloaded.",
+    "gatheringSupportFailed": "Failed to gather support files: {{message}}"
   },
   "libraryExclusion": {
     "configNotFound": "Media server configuration not found",
@@ -1705,7 +1709,9 @@
       "sonarrWiki": "Sonarr Connect Settings Documentation",
       "radarrWiki": "Radarr Connect Settings Documentation",
       "triggerScript": "View trigger.py on GitHub",
-      "arrTriggerScript": "View ArrTrigger.sh on GitHub"
+      "arrTriggerScript": "View ArrTrigger.sh on GitHub",
+      "tautulliPosterizarrDocker": "Posterizarr Tautulli (Docker) Mode Docs",
+      "tautulliPosterizarrWindows": "Posterizarr Tautulli (Windows) Mode Docs"
     },
     "tautulli": {
       "selectMode": "Select Your Environment",

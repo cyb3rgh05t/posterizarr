@@ -20,8 +20,60 @@ import {
   Download,
 } from "lucide-react";
 
+// Helper function to handle robust copying to clipboard (with fallback)
+const robustCopy = (code, id, setCopiedCodeState) => {
+  if (navigator.clipboard && window.isSecureContext) {
+    // Use modern clipboard API in secure contexts (HTTPS, localhost)
+    navigator.clipboard
+      .writeText(code)
+      .then(() => {
+        setCopiedCodeState(id);
+        setTimeout(() => setCopiedCodeState(null), 2000);
+      })
+      .catch((err) => {
+        console.error("Failed to copy with navigator.clipboard", err);
+      });
+  } else {
+    // Fallback for insecure contexts (http) or older browsers
+    let textArea;
+    try {
+      textArea = document.createElement("textarea");
+      textArea.value = code;
+      // Make it invisible
+      textArea.style.position = "fixed";
+      textArea.style.top = 0;
+      textArea.style.left = 0;
+      textArea.style.width = "2em";
+      textArea.style.height = "2em";
+      textArea.style.padding = 0;
+      textArea.style.border = "none";
+      textArea.style.outline = "none";
+      textArea.style.boxShadow = "none";
+      textArea.style.background = "transparent";
+
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+
+      const successful = document.execCommand("copy");
+      if (successful) {
+        setCopiedCodeState(id);
+        setTimeout(() => setCopiedCodeState(null), 2000);
+      } else {
+        console.error("Fallback copy failed");
+      }
+    } catch (err) {
+      console.error("Fallback copy exception", err);
+    } finally {
+      if (textArea) {
+        document.body.removeChild(textArea);
+      }
+    }
+  }
+};
+
 // Helper function to render step title with optional download button
-const StepTitle = ({ step, hasCode, isExpanded, onDownload }) => {
+const StepTitle = ({ step, onDownload }) => {
   const showDownloadButton = step.title.includes("Download the Trigger Script");
 
   return (
@@ -43,13 +95,6 @@ const StepTitle = ({ step, hasCode, isExpanded, onDownload }) => {
             <span className="hidden sm:inline">Download</span>
           </button>
         )}
-        {hasCode && (
-          <ChevronRight
-            className={`w-4 h-4 sm:w-5 sm:h-5 text-theme-muted transition-transform duration-300 flex-shrink-0 mt-0.5 ${
-              isExpanded ? "rotate-90" : ""
-            }`}
-          />
-        )}
       </div>
     </div>
   );
@@ -59,7 +104,6 @@ function AutoTriggers() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("tautulli");
   const [copiedCode, setCopiedCode] = useState(null);
-  const [expandedStep, setExpandedStep] = useState(null);
 
   const tabs = [
     {
@@ -83,9 +127,8 @@ function AutoTriggers() {
   ];
 
   const handleCopyCode = (code, id) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(id);
-    setTimeout(() => setCopiedCode(null), 2000);
+    // This function seems unused in the parent, but we update it for consistency
+    robustCopy(code, id, setCopiedCode);
   };
 
   return (
@@ -156,12 +199,9 @@ function TautulliContent() {
   const { t } = useTranslation();
   const [mode, setMode] = useState("docker");
   const [copiedCode, setCopiedCode] = useState(null);
-  const [expandedStep, setExpandedStep] = useState(null);
 
   const handleCopyCode = (code, id) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(id);
-    setTimeout(() => setCopiedCode(null), 2000);
+    robustCopy(code, id, setCopiedCode);
   };
 
   const handleDownloadScript = () => {
@@ -287,7 +327,6 @@ function TautulliContent() {
 
         <div className="space-y-3 sm:space-y-4">
           {steps.map((step, index) => {
-            const isExpanded = expandedStep === index;
             const hasCode = step.code && step.code.length > 0;
 
             return (
@@ -298,14 +337,7 @@ function TautulliContent() {
                 )}
 
                 <div className="bg-theme-hover border border-theme rounded-lg p-3 sm:p-5">
-                  <div
-                    className={`flex items-start gap-3 sm:gap-4 ${
-                      hasCode ? "cursor-pointer" : ""
-                    }`}
-                    onClick={() =>
-                      hasCode && setExpandedStep(isExpanded ? null : index)
-                    }
-                  >
+                  <div className="flex items-start gap-3 sm:gap-4">
                     {/* Step Number */}
                     <div className="flex-shrink-0">
                       <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-theme-primary/10 border border-theme-primary/30 flex items-center justify-center relative">
@@ -322,8 +354,6 @@ function TautulliContent() {
                     <div className="flex-1 min-w-0">
                       <StepTitle
                         step={step}
-                        hasCode={hasCode}
-                        isExpanded={isExpanded}
                         onDownload={handleDownloadScript}
                       />
                       <p className="text-theme-muted text-xs sm:text-sm mb-2 sm:mb-3 break-words leading-relaxed">
@@ -354,8 +384,8 @@ function TautulliContent() {
                         </div>
                       )}
 
-                      {/* Code Blocks */}
-                      {hasCode && isExpanded && (
+                      {/* Code Blocks (always visible) */}
+                      {hasCode && (
                         <div className="space-y-2 sm:space-y-3 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-theme">
                           {step.code.map((codeBlock, codeIndex) => (
                             <div
@@ -437,6 +467,31 @@ function TautulliContent() {
             <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
             {t("autoTriggers.resources.tautulliWiki")}
           </a>
+
+          {/* Mode-specific Links */}
+          {mode === "docker" && (
+            <a
+              href="https://fscorrupt.github.io/posterizarr/modes/#tautulli-mode-docker"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-theme-primary hover:underline text-xs sm:text-sm break-all"
+            >
+              <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+              {t("autoTriggers.resources.tautulliPosterizarrDocker")}
+            </a>
+          )}
+          {mode === "windows" && (
+            <a
+              href="https://fscorrupt.github.io/posterizarr/modes/#tautulli-mode-windows"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-theme-primary hover:underline text-xs sm:text-sm break-all"
+            >
+              <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+              {t("autoTriggers.resources.tautulliPosterizarrWindows")}
+            </a>
+          )}
+
           <a
             href="https://github.com/fscorrupt/posterizarr/blob/main/modules/trigger.py"
             target="_blank"
@@ -456,12 +511,9 @@ function TautulliContent() {
 function SonarrContent() {
   const { t } = useTranslation();
   const [copiedCode, setCopiedCode] = useState(null);
-  const [expandedStep, setExpandedStep] = useState(null);
 
   const handleCopyCode = (code, id) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(id);
-    setTimeout(() => setCopiedCode(null), 2000);
+    robustCopy(code, id, setCopiedCode);
   };
 
   const handleDownloadScript = () => {
@@ -516,7 +568,6 @@ function SonarrContent() {
 
         <div className="space-y-3 sm:space-y-4">
           {steps.map((step, index) => {
-            const isExpanded = expandedStep === index;
             const hasCode = step.code && step.code.length > 0;
 
             return (
@@ -527,14 +578,7 @@ function SonarrContent() {
                 )}
 
                 <div className="bg-theme-hover border border-theme rounded-lg p-3 sm:p-5">
-                  <div
-                    className={`flex items-start gap-3 sm:gap-4 ${
-                      hasCode ? "cursor-pointer" : ""
-                    }`}
-                    onClick={() =>
-                      hasCode && setExpandedStep(isExpanded ? null : index)
-                    }
-                  >
+                  <div className="flex items-start gap-3 sm:gap-4">
                     {/* Step Number */}
                     <div className="flex-shrink-0">
                       <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-theme-primary/10 border border-theme-primary/30 flex items-center justify-center relative">
@@ -551,8 +595,6 @@ function SonarrContent() {
                     <div className="flex-1 min-w-0">
                       <StepTitle
                         step={step}
-                        hasCode={hasCode}
-                        isExpanded={isExpanded}
                         onDownload={handleDownloadScript}
                       />
                       <p className="text-theme-muted text-xs sm:text-sm mb-2 sm:mb-3 break-words leading-relaxed">
@@ -583,8 +625,8 @@ function SonarrContent() {
                         </div>
                       )}
 
-                      {/* Code Blocks */}
-                      {hasCode && isExpanded && (
+                      {/* Code Blocks (always visible) */}
+                      {hasCode && (
                         <div className="space-y-2 sm:space-y-3 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-theme">
                           {step.code.map((codeBlock, codeIndex) => (
                             <div
@@ -685,12 +727,9 @@ function SonarrContent() {
 function RadarrContent() {
   const { t } = useTranslation();
   const [copiedCode, setCopiedCode] = useState(null);
-  const [expandedStep, setExpandedStep] = useState(null);
 
   const handleCopyCode = (code, id) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(id);
-    setTimeout(() => setCopiedCode(null), 2000);
+    robustCopy(code, id, setCopiedCode);
   };
 
   const handleDownloadScript = () => {
@@ -745,7 +784,6 @@ function RadarrContent() {
 
         <div className="space-y-3 sm:space-y-4">
           {steps.map((step, index) => {
-            const isExpanded = expandedStep === index;
             const hasCode = step.code && step.code.length > 0;
 
             return (
@@ -756,14 +794,7 @@ function RadarrContent() {
                 )}
 
                 <div className="bg-theme-hover border border-theme rounded-lg p-3 sm:p-5">
-                  <div
-                    className={`flex items-start gap-3 sm:gap-4 ${
-                      hasCode ? "cursor-pointer" : ""
-                    }`}
-                    onClick={() =>
-                      hasCode && setExpandedStep(isExpanded ? null : index)
-                    }
-                  >
+                  <div className="flex items-start gap-3 sm:gap-4">
                     {/* Step Number */}
                     <div className="flex-shrink-0">
                       <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-theme-primary/10 border border-theme-primary/30 flex items-center justify-center relative">
@@ -778,18 +809,11 @@ function RadarrContent() {
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-2 gap-2">
-                        <h3 className="text-base sm:text-lg font-semibold text-theme-text break-words leading-tight flex-1">
-                          {step.title}
-                        </h3>
-                        {hasCode && (
-                          <ChevronRight
-                            className={`w-4 h-4 sm:w-5 sm:h-5 text-theme-muted transition-transform duration-300 flex-shrink-0 mt-0.5 ${
-                              isExpanded ? "rotate-90" : ""
-                            }`}
-                          />
-                        )}
-                      </div>
+                      {/* Refactored to use StepTitle consistently */}
+                      <StepTitle
+                        step={step}
+                        onDownload={handleDownloadScript}
+                      />
                       <p className="text-theme-muted text-xs sm:text-sm mb-2 sm:mb-3 break-words leading-relaxed">
                         {step.description}
                       </p>
@@ -818,8 +842,8 @@ function RadarrContent() {
                         </div>
                       )}
 
-                      {/* Code Blocks */}
-                      {hasCode && isExpanded && (
+                      {/* Code Blocks (always visible) */}
+                      {hasCode && (
                         <div className="space-y-2 sm:space-y-3 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-theme">
                           {step.code.map((codeBlock, codeIndex) => (
                             <div
