@@ -52,7 +52,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.10"
+$CurrentScriptVersion = "2.1.11"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -763,7 +763,7 @@ function Write-Entry {
             $totalMemory = $memoryInfo.TotalVisibleMemorySize
             $usedMemory = $memoryInfo.UsedMemory
             $freeMemory = $memoryInfo.FreePhysicalMemory
-            $OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
+            $OSVersion = (Get-CimInstance -class Win32_OperatingSystem).Caption
             $Header = @"
 ======================================================
   _____          _            _
