@@ -12152,6 +12152,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                 ignore=ignore_patterns
             )
             logger.info("[SupportZip] Copied Logs directory")
+
         if UI_LOGS_DIR.exists():
             shutil.copytree(
                 UI_LOGS_DIR,
@@ -12160,6 +12161,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                 ignore=ignore_patterns
             )
             logger.info("[SupportZip] Copied UILogs directory")
+
         if ROTATED_LOGS_DIR.exists():
             shutil.copytree(
                 ROTATED_LOGS_DIR,
@@ -12250,6 +12252,97 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                 logger.error(f"[SupportZip] Failed to sanitize imagechoices.db copy: {e}")
                 # Continue anyway; the unsanitized (but copied) DB is better than nothing
 
+        # 3c. Sanitize ALL ImageChoices.csv files (main and rotated)
+        logger.info("[SupportZip] Searching for ImageChoices.csv files to sanitize...")
+
+        # Define allowed URL prefixes (do this once)
+        ALLOWED_PREFIXES = [
+            "https://image.tmdb.org",
+            "https://artworks.thetvdb.com",
+            "https://assets.fanart.tv",
+            "https://m.media-amazon.com",
+        ]
+
+        # Use rglob to find all instances in the staging directory
+        csv_files_to_sanitize = list(staging_dir_path.rglob("ImageChoices.csv"))
+        logger.info(f"[SupportZip] Found {len(csv_files_to_sanitize)} ImageChoices.csv files.")
+
+        total_sanitized_rows = 0
+
+        for staging_csv_path in csv_files_to_sanitize:
+            logger.debug(f"[SupportZip] Sanitizing {staging_csv_path}...")
+            sanitized_rows = []
+            try:
+                # Use 'utf-8-sig' to handle potential BOM
+                with open(staging_csv_path, 'r', encoding='utf-8-sig') as f_in:
+                    # Import csv module here as it's only used in this function
+                    import csv
+                    reader = csv.reader(f_in, delimiter=';')
+
+                    header = next(reader)
+                    sanitized_rows.append(header)
+
+                    try:
+                        clean_header = [h.strip().strip('"') for h in header]
+                        download_source_idx = clean_header.index("Download Source")
+                        fav_provider_link_idx = clean_header.index("Fav Provider Link")
+                    except ValueError as e:
+                        logger.error(f"[SupportZip] Could not find required columns in {staging_csv_path.name}: {e}")
+                        continue # Skip this file, move to the next one
+
+                    sanitized_count_in_file = 0
+
+                    for row in reader:
+                        if len(row) > max(download_source_idx, fav_provider_link_idx):
+                            original_download_source = row[download_source_idx]
+                            original_fav_link = row[fav_provider_link_idx]
+
+                            sanitized_download_source = original_download_source
+                            sanitized_fav_link = original_fav_link
+
+                            # Sanitize Download Source
+                            if original_download_source and original_download_source.startswith("http"):
+                                is_allowed = any(original_download_source.startswith(prefix) for prefix in ALLOWED_PREFIXES)
+                                if not is_allowed:
+                                    sanitized_download_source = re.sub(r"(https?://)[^/]+", r"\1[MASKED_HOST]", sanitized_download_source, count=1)
+
+                                sanitized_download_source = re.sub(r"([?&][^=]*Token=)[^&]+", r"\1[MASKED_TOKEN]", sanitized_download_source, flags=re.IGNORECASE)
+                                sanitized_download_source = re.sub(r"([?&][^=]*api_key=)[^&]+", r"\1[MASKED_KEY]", sanitized_download_source, flags=re.IGNORECASE)
+                                sanitized_download_source = re.sub(r"([?&][^=]*pin=)[^&]+", r"\1[MASKED_PIN]", sanitized_download_source, flags=re.IGNORECASE)
+
+                            # Sanitize Fav Provider Link
+                            if original_fav_link and original_fav_link.startswith("http"):
+                                is_allowed = any(original_fav_link.startswith(prefix) for prefix in ALLOWED_PREFIXES)
+                                if not is_allowed:
+                                    sanitized_fav_link = re.sub(r"(https?://)[^/]+", r"\1[MASKED_HOST]", sanitized_fav_link, count=1)
+
+                                sanitized_fav_link = re.sub(r"([?&][^=]*Token=)[^&]+", r"\1[MASKED_TOKEN]", sanitized_fav_link, flags=re.IGNORECASE)
+                                sanitized_fav_link = re.sub(r"([?&][^=]*api_key=)[^&]+", r"\1[MASKED_KEY]", sanitized_fav_link, flags=re.IGNORECASE)
+                                sanitized_fav_link = re.sub(r"([?&][^=]*pin=)[^&]+", r"\1[MASKED_PIN]", sanitized_fav_link, flags=re.IGNORECASE)
+
+                            if (sanitized_download_source != original_download_source) or (sanitized_fav_link != original_fav_link):
+                                sanitized_count_in_file += 1
+                                row[download_source_idx] = sanitized_download_source
+                                row[fav_provider_link_idx] = sanitized_fav_link
+
+                        sanitized_rows.append(row)
+
+                    logger.info(f"[SupportZip] Sanitized {sanitized_count_in_file} rows in {staging_csv_path.name}.")
+                    total_sanitized_rows += sanitized_count_in_file
+
+                # Overwrite the staged file
+                with open(staging_csv_path, 'w', encoding='utf-8', newline='') as f_out:
+                    writer = csv.writer(f_out, delimiter=';')
+                    writer.writerows(sanitized_rows)
+
+                logger.debug(f"[SupportZip] Overwrote {staging_csv_path.name} with sanitized content.")
+
+            except Exception as e:
+                logger.error(f"[SupportZip] Failed to sanitize {staging_csv_path.name}: {e}")
+                # Continue to the next file
+
+        logger.info(f"[SupportZip] Total sanitized rows across all CSVs: {total_sanitized_rows}")
+
         # 4. Create ZIP file
         logger.debug(f"[SupportZip] Creating ZIP file at: {zip_file_path}")
         with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -12270,7 +12363,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
         logger.error(f"[SupportZip] Failed to create support zip: {e}")
         logger.exception("Full traceback for zip creation:")
         return False
-
 def _cleanup_support_files(staging_dir: Path):
     """
     Cleanup function for BackgroundTasks to remove the temp staging directory.
