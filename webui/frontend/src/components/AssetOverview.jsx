@@ -1112,6 +1112,83 @@ const AssetOverview = () => {
   };
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ++ NEW: Bulk Delete All Filtered (for all filtered items)
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  const handleBulkDeleteAllFiltered = () => {
+    const assetsToProcess = filteredAssets;
+    if (assetsToProcess.length === 0) {
+      showError(t("assetOverview.noAssetsToDelete"));
+      return;
+    }
+
+    setConfirmModalState({
+      isOpen: true,
+      title: t("assetOverview.bulkDeleteAllFilteredTitle"),
+      message: t("assetOverview.bulkDeleteAllFilteredConfirm", {
+        count: assetsToProcess.length,
+      }),
+      confirmText: t("assetOverview.confirmDeleteAll", {
+        count: assetsToProcess.length,
+      }),
+      confirmColor: "danger",
+      onConfirm: runBulkDeleteAllFiltered,
+    });
+  };
+
+  const runBulkDeleteAllFiltered = async () => {
+    const assetsToProcess = filteredAssets;
+    const recordIds = assetsToProcess.map(asset => asset.id);
+
+    setConfirmModalState({ isOpen: false });
+    setIsBulkProcessing(true);
+
+    try {
+      const response = await fetch("/api/assets/bulk-delete-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ record_ids: recordIds }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        if (result.failed_count > 0) {
+          showError(
+            t("assetOverview.bulkDeletePartial", {
+              success: result.deleted_count,
+              failed: result.failed_count,
+            })
+          );
+        } else {
+          showSuccess(
+            t("assetOverview.bulkDeleteSuccess", {
+              count: result.deleted_count,
+            })
+          );
+        }
+      } else {
+        showError(
+          t("assetOverview.bulkDeleteFailed", {
+            error: result.detail || "Server error",
+          })
+        );
+      }
+    } catch (error) {
+      showError(
+        t("assetOverview.bulkDeleteError", {
+          error: error.message,
+        })
+      );
+    } finally {
+      setSelectedAssetIds(new Set());
+      await fetchData();
+      window.dispatchEvent(new Event("assetReplaced")); // Update sidebar
+      setIsBulkProcessing(false);
+    }
+  };
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
   // Get all assets from all categories
   const allAssets = useMemo(() => {
     if (!data) return [];
@@ -1789,6 +1866,27 @@ const AssetOverview = () => {
                 )}
                 <span className="text-white">
                   {t("assetOverview.markAllFiltered", {
+                    count: filteredAssets.length,
+                  })}
+                </span>
+              </button>
+            )}
+
+            {/* <-- ADDED: Bulk Delete All Filtered Button --> */}
+            {filteredAssets.length > 0 && (
+              <button
+                onClick={handleBulkDeleteAllFiltered}
+                disabled={isBulkProcessing}
+                className="flex items-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-800 disabled:bg-red-700/50 rounded-lg text-sm font-medium transition-all shadow-sm text-white"
+                title={t("assetOverview.deleteAllFilteredTooltip")}
+              >
+                {isBulkProcessing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 text-white" />
+                )}
+                <span className="text-white">
+                  {t("assetOverview.deleteAllFiltered", {
                     count: filteredAssets.length,
                   })}
                 </span>

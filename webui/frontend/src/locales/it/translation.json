@@ -1432,7 +1432,13 @@
     "bulkDeleteSuccess": "{{count}} asset eliminato/i con successo.",
     "bulkDeleteFailed": "Eliminazione di massa non riuscita: {{error}}",
     "bulkDeleteError": "Errore during l'eliminazione di massa: {{error}}",
-    "favProvider": "Forn. Pref."
+    "favProvider": "Forn. Pref.",
+    "deleteAllFilteredTooltip": "Elimina tutti gli asset filtrati",
+    "deleteAllFiltered": "Elimina tutto ({{count}})",
+    "noAssetsToDelete": "Nessun asset filtrato da eliminare.",
+    "bulkDeleteAllFilteredTitle": "Eliminare tutti gli asset filtrati?",
+    "bulkDeleteAllFilteredConfirm": "Sei sicuro di voler eliminare definitivamente tutti gli {{count}} asset filtrati?\n\nQuesto eliminerà sia i file che i loro record nel database. Questa azione non può essere annullata.",
+    "confirmDeleteAll": "Conferma ed Elimina ({{count}})"
   },
   "common": {
     "view": "Visualizza",

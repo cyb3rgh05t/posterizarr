@@ -12135,7 +12135,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
     """
     try:
         # 1. Define Paths (uses globals from main.py)
-        ROTATED_LOGS_DIR = BASE_DIR / "RotatedLogs"
+        # ROTATED_LOGS_DIR is no longer needed
         db_staging_dir = staging_dir_path / "database"
         db_staging_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"[SupportZip] Staging directory: {staging_dir_path}")
@@ -12162,14 +12162,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
             )
             logger.info("[SupportZip] Copied UILogs directory")
 
-        if ROTATED_LOGS_DIR.exists():
-            shutil.copytree(
-                ROTATED_LOGS_DIR,
-                staging_dir_path / "RotatedLogs",
-                dirs_exist_ok=True,
-                ignore=ignore_patterns
-            )
-            logger.info("[SupportZip] Copied RotatedLogs directory")
+        # --- ROTATED_LOGS_DIR section has been removed as requested ---
 
         # 3. Copy & Sanitize Databases
         # 3a. Copy non-sensitive DBs
@@ -12252,18 +12245,18 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                 logger.error(f"[SupportZip] Failed to sanitize imagechoices.db copy: {e}")
                 # Continue anyway; the unsanitized (but copied) DB is better than nothing
 
-        # 3c. Sanitize ALL ImageChoices.csv files (main and rotated)
-        logger.info("[SupportZip] Searching for ImageChoices.csv files to sanitize...")
+        # 3c. Sanitize ImageChoices.csv (only the one in Logs/)
+        logger.info("[SupportZip] Searching for ImageChoices.csv file to sanitize...")
 
-        # Define allowed URL prefixes (do this once)
+        # Define allowed URL prefixes
         ALLOWED_PREFIXES = [
             "https://image.tmdb.org",
             "https://artworks.thetvdb.com",
             "https://assets.fanart.tv",
-            "https://m.media-amazon.com",
+            "https://m.media-amazon.com", # Corrected prefix
         ]
 
-        # Use rglob to find all instances in the staging directory
+        # Use rglob, but it will only find the one in the copied Logs folder
         csv_files_to_sanitize = list(staging_dir_path.rglob("ImageChoices.csv"))
         logger.info(f"[SupportZip] Found {len(csv_files_to_sanitize)} ImageChoices.csv files.")
 
@@ -12342,6 +12335,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                 # Continue to the next file
 
         logger.info(f"[SupportZip] Total sanitized rows across all CSVs: {total_sanitized_rows}")
+        # --- END NEW/MOVED SECTION ---
 
         # 4. Create ZIP file
         logger.debug(f"[SupportZip] Creating ZIP file at: {zip_file_path}")
@@ -12363,6 +12357,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
         logger.error(f"[SupportZip] Failed to create support zip: {e}")
         logger.exception("Full traceback for zip creation:")
         return False
+
 def _cleanup_support_files(staging_dir: Path):
     """
     Cleanup function for BackgroundTasks to remove the temp staging directory.

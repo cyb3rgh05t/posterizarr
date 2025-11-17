@@ -1440,7 +1440,13 @@
     "bulkDeleteSuccess": "Successfully deleted {{count}} asset(s).",
     "bulkDeleteFailed": "Bulk delete failed: {{error}}",
     "bulkDeleteError": "Bulk delete error: {{error}}",
-    "favProvider": "Fav Provider"
+    "favProvider": "Fav Provider",
+    "deleteAllFilteredTooltip": "Delete all filtered assets",
+    "deleteAllFiltered": "Delete All ({{count}})",
+    "noAssetsToDelete": "No filtered assets to delete.",
+    "bulkDeleteAllFilteredTitle": "Delete All Filtered Assets?",
+    "bulkDeleteAllFilteredConfirm": "Are you sure you want to permanently delete all {{count}} filtered assets?\n\nThis will delete both the files and their database records. This action cannot be undone.",
+    "confirmDeleteAll": "Confirm & Delete ({{count}})"
   },
   "common": {
     "view": "View",
