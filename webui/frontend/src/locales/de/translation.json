@@ -613,7 +613,11 @@
     "receivingUpdates": "Empfange Live-Updates",
     "loadFull": "Vollständige Logdatei laden",
     "loadingFullLog": "Lade vollständige Logdatei...",
-    "loadedFullLog": "Vollständige Logdatei geladen"
+    "loadedFullLog": "Vollständige Logdatei geladen",
+    "gatherSupport": "Support-Protokolle sammeln",
+    "gatheringSupport": "Sammle Support-Dateien... Dies kann einen Moment dauern.",
+    "gatheringSupportSuccess": "Support-Dateien heruntergeladen.",
+    "gatheringSupportFailed": "Fehler beim Sammeln der Support-Dateien: {{message}}"
   },
   "libraryExclusion": {
     "configNotFound": "Medienserver-Konfiguration nicht gefunden",
@@ -1756,7 +1760,9 @@
       "sonarrWiki": "Sonarr Connect-Einstellungen Dokumentation",
       "radarrWiki": "Radarr Connect-Einstellungen Dokumentation",
       "triggerScript": "trigger.py auf GitHub ansehen",
-      "arrTriggerScript": "ArrTrigger.sh auf GitHub ansehen"
+      "arrTriggerScript": "ArrTrigger.sh auf GitHub ansehen",
+      "tautulliPosterizarrDocker": "Posterizarr Tautulli (Docker) Modus-Doku",
+      "tautulliPosterizarrWindows": "Posterizarr Tautulli (Windows) Modus-Doku"
     },
     "tautulli": {
       "selectMode": "Wähle deine Umgebung",

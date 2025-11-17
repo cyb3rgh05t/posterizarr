@@ -13,8 +13,9 @@ import {
   Square,
   Search,
   Filter,
-  Database, // Added
-  Loader2, // Added
+  Database,
+  Loader2,
+  LifeBuoy, // Added
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Notification from "./Notification";
@@ -118,7 +119,8 @@ function LogViewer() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isLoadingFullLog, setIsLoadingFullLog] = useState(false); // New state
+  const [isLoadingFullLog, setIsLoadingFullLog] = useState(false);
+  const [isGatheringSupportZip, setIsGatheringSupportZip] = useState(false); // Added
 
   // --- NEW FILTER STATE ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -318,6 +320,59 @@ function LogViewer() {
       setIsLoadingFullLog(false);
     }
   };
+
+  // +++ NEW FUNCTION +++
+  const gatherSupportZip = async () => {
+    setIsGatheringSupportZip(true);
+    showInfo(t("logViewer.gatheringSupport", "Gathering support files... This may take a moment."));
+    try {
+      const response = await fetch(`${API_URL}/admin/support-zip`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        let errorMsg = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.detail || errorMsg;
+        } catch (e) {
+          // Response was not JSON
+        }
+        throw new Error(errorMsg);
+      }
+
+      // --- MODIFIED ---
+      // Get filename from Content-Disposition header
+      const contentDisposition = response.headers.get("content-disposition");
+      let downloadFilename = "posterizarr_support.zip"; // Default
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (filenameMatch && filenameMatch[1]) {
+          downloadFilename = filenameMatch[1];
+        }
+      }
+      // --- END MODIFIED ---
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = downloadFilename; // --- MODIFIED: Use dynamic filename ---
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showSuccess(t("logViewer.gatheringSupportSuccess", "Support files downloaded."));
+
+    } catch (error) {
+      console.error("Error gathering support zip:", error);
+      showError(t("logViewer.gatheringSupportFailed", "Failed to gather support files: {{message}}", { message: error.message }));
+    } finally {
+      setIsGatheringSupportZip(false);
+    }
+  };
+  // +++ END NEW FUNCTION +++
 
   const disconnectWebSocket = () => {
     if (reconnectTimeoutRef.current) {
@@ -616,7 +671,22 @@ function LogViewer() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-end">
+      {/* +++ MODIFIED: Added gap-4 and new button +++ */}
+      <div className="flex items-center justify-end gap-4">
+        {/* Gather Support Logs Button */}
+        <button
+          onClick={gatherSupportZip}
+          disabled={isGatheringSupportZip}
+          className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-primary/10 border border-theme-primary/50 rounded-lg text-theme-primary text-sm font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isGatheringSupportZip ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <LifeBuoy className="w-4 h-4" />
+          )}
+          {t("logViewer.gatherSupport", "Gather Support Logs")}
+        </button>
+
         {/* Connection Status Badge */}
         <div
           className={`flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-card border ${
@@ -649,6 +719,8 @@ function LogViewer() {
           </div>
         </div>
       </div>
+      {/* +++ END MODIFICATION +++ */}
+
 
       {status.running && (
         <div className="bg-orange-950/40 rounded-xl p-4 border border-orange-600/50">
@@ -806,6 +878,8 @@ function LogViewer() {
               <Download className="w-4 h-4 text-theme-primary" />
               {t("logViewer.download")}
             </button>
+
+            {/* +++ BUTTON REMOVED FROM HERE +++ */}
 
             {/* Clear Button */}
             <button

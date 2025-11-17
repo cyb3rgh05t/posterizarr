@@ -32,6 +32,12 @@ import threading
 import xml.etree.ElementTree as ET
 import sys
 from urllib.parse import quote
+import zipfile
+import tempfile
+import shutil
+import sqlite3
+from fastapi import BackgroundTasks
+from starlette.responses import FileResponse
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -11473,7 +11479,7 @@ async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
         logger.warning(f"[DeleteAsset] Database not available (ID: {record_id})")
         return {"success": False, "error": "Database not available"}
 
-    # --- Step 1: Get the record from DB ---
+    # Step 1: Get the record from DB
     record = db.get_choice_by_id(record_id)
     if not record:
         logger.warning(f"[DeleteAsset] Record not found in DB (ID: {record_id})")
@@ -11497,7 +11503,7 @@ async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
 
     asset_info = f"{library}/{rootfolder} ({title})"
 
-    # --- Step 2: Determine filename ---
+    # Step 2: Determine filename
     asset_filename = None
     if "background" in asset_type:
         asset_filename = "background.jpg"
@@ -11524,11 +11530,11 @@ async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
             logger.error(f"[DeleteAsset] Failed to delete DB record (ID: {record_id}): {e_db}")
         return {"success": True, "file_deleted": False, "db_deleted": True, "asset_info": asset_info}
 
-    # --- Step 3: Construct file path ---
+    # Step 3: Construct file path
     file_path = ASSETS_DIR / library / rootfolder / asset_filename
     file_deleted = False
 
-    # --- Step 4: Delete the file ---
+    # Step 4: Delete the file
     try:
         if file_path.exists() and file_path.is_file():
             file_path.unlink()
@@ -11541,7 +11547,7 @@ async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
         # Do NOT proceed to delete DB record if file delete failed
         return {"success": False, "error": f"Failed to delete file: {e_file}", "asset_info": asset_info}
 
-    # --- Step 5: Delete the DB record ---
+    # Step 5: Delete the DB record
     try:
         db.delete_choice(record_id)
         logger.info(f"[DeleteAsset] Successfully deleted DB record (ID: {record_id})")
@@ -12118,7 +12124,215 @@ async def import_imagechoices_csv():
         logger.error(f"Error importing CSV: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ============================================================================
+# SUPPORT & TROUBLESHOOTING
+# ============================================================================
 
+def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) -> bool:
+    """
+    Internal blocking function to create the support zip in a background thread.
+    This function performs all file I/O operations.
+    """
+    try:
+        # 1. Define Paths (uses globals from main.py)
+        ROTATED_LOGS_DIR = BASE_DIR / "RotatedLogs"
+        db_staging_dir = staging_dir_path / "database"
+        db_staging_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"[SupportZip] Staging directory: {staging_dir_path}")
+
+        # 2. Copy Log Folders
+        # We ignore common cache/compiled files
+        ignore_patterns = shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store')
+
+        if LOGS_DIR.exists():
+            shutil.copytree(
+                LOGS_DIR,
+                staging_dir_path / "Logs",
+                dirs_exist_ok=True,
+                ignore=ignore_patterns
+            )
+            logger.info("[SupportZip] Copied Logs directory")
+        if UI_LOGS_DIR.exists():
+            shutil.copytree(
+                UI_LOGS_DIR,
+                staging_dir_path / "UILogs",
+                dirs_exist_ok=True,
+                ignore=ignore_patterns
+            )
+            logger.info("[SupportZip] Copied UILogs directory")
+        if ROTATED_LOGS_DIR.exists():
+            shutil.copytree(
+                ROTATED_LOGS_DIR,
+                staging_dir_path / "RotatedLogs",
+                dirs_exist_ok=True,
+                ignore=ignore_patterns
+            )
+            logger.info("[SupportZip] Copied RotatedLogs directory")
+
+        # 3. Copy & Sanitize Databases
+        # 3a. Copy non-sensitive DBs
+        for db_name in [
+            "media_export.db",
+            "runtime_stats.db",
+            "server_libraries.db"
+        ]:
+            src_db = DATABASE_DIR / db_name
+            if src_db.exists():
+                shutil.copy2(src_db, db_staging_dir / db_name)
+                logger.debug(f"[SupportZip] Copied non-sensitive DB: {db_name}")
+
+        # 3b. Sanitize and copy imagechoices.db
+        src_imagechoices_db = DATABASE_DIR / "imagechoices.db"
+        if src_imagechoices_db.exists():
+            copied_db_path = db_staging_dir / "imagechoices.db"
+            # Copy the file first
+            shutil.copy2(src_imagechoices_db, copied_db_path)
+            logger.debug(f"[SupportZip] Copied imagechoices.db for sanitization")
+
+            try:
+                # Now, sanitize the *copy*
+                conn = sqlite3.connect(copied_db_path)
+                cursor = conn.cursor()
+
+                # Get all rows that need sanitizing
+                cursor.execute(
+                    "SELECT id, DownloadSource FROM imagechoices WHERE DownloadSource LIKE 'http%'"
+                )
+                rows = cursor.fetchall()
+                logger.debug(f"[SupportZip] Found {len(rows)} rows in imagechoices.db to sanitize.")
+
+                updates = []
+
+                # Define allowed URL prefixes that should NOT be masked
+                ALLOWED_PREFIXES = [
+                    "https://image.tmdb.org",
+                    "https://artworks.thetvdb.com",
+                    "https://assets.fanart.tv",
+                    "https://m.media-amazon.com",
+                ]
+
+                for row_id, source in rows:
+                    if not source:
+                        continue
+
+                    sanitized_source = source
+                    is_allowed = False
+
+                    # Check if the URL is in the allowed list
+                    for prefix in ALLOWED_PREFIXES:
+                        if source.startswith(prefix):
+                            is_allowed = True
+                            break
+
+                    # If it's NOT an allowed domain, mask the host
+                    if not is_allowed:
+                        # Regex to mask host (IP or domain), count=1 ensures it only masks the host
+                        sanitized_source = re.sub(r"(https?://)[^/]+", r"\1[MASKED_HOST]", sanitized_source, count=1)
+
+                    # ALWAYS mask tokens, keys, and pins, even on allowed domains
+                    sanitized_source = re.sub(r"([?&][^=]*Token=)[^&]+", r"\1[MASKED_TOKEN]", sanitized_source, flags=re.IGNORECASE)
+                    sanitized_source = re.sub(r"([?&][^=]*api_key=)[^&]+", r"\1[MASKED_KEY]", sanitized_source, flags=re.IGNORECASE)
+                    sanitized_source = re.sub(r"([?&][^=]*pin=)[^&]+", r"\1[MASKED_PIN]", sanitized_source, flags=re.IGNORECASE)
+
+                    if sanitized_source != source:
+                        updates.append((sanitized_source, row_id))
+
+                # Batch update the database copy
+                if updates:
+                    cursor.executemany(
+                        "UPDATE imagechoices SET DownloadSource = ? WHERE id = ?", updates
+                    )
+                    conn.commit()
+                    logger.info(f"[SupportZip] Sanitized {len(updates)} rows in imagechoices.db copy.")
+
+                conn.close()
+            except Exception as e:
+                logger.error(f"[SupportZip] Failed to sanitize imagechoices.db copy: {e}")
+                # Continue anyway; the unsanitized (but copied) DB is better than nothing
+
+        # 4. Create ZIP file
+        logger.debug(f"[SupportZip] Creating ZIP file at: {zip_file_path}")
+        with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(staging_dir_path):
+                # Exclude the zip file itself from the zip
+                if Path(root) == zip_file_path.parent and zip_file_path.name in files:
+                    files.remove(zip_file_path.name)
+
+                for file in files:
+                    file_path = Path(root) / file
+                    arcname = file_path.relative_to(staging_dir_path)
+                    zipf.write(file_path, arcname)
+
+        logger.info(f"[SupportZip] Support ZIP created successfully: {zip_file_path}")
+        return True
+
+    except Exception as e:
+        logger.error(f"[SupportZip] Failed to create support zip: {e}")
+        logger.exception("Full traceback for zip creation:")
+        return False
+
+def _cleanup_support_files(staging_dir: Path):
+    """
+    Cleanup function for BackgroundTasks to remove the temp staging directory.
+    """
+    try:
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
+            logger.debug(f"[SupportZip] Cleaned up staging directory: {staging_dir}")
+    except Exception as e:
+        logger.error(f"[SupportZip] Error cleaning up staging directory {staging_dir}: {e}")
+
+
+@app.post("/api/admin/support-zip")
+async def get_support_zip(background_tasks: BackgroundTasks):
+    """
+    Create and return a ZIP file containing logs and sanitized databases
+    for troubleshooting and support.
+    """
+    logger.info("=" * 60)
+    logger.info("SUPPORT ZIP REQUESTED")
+
+    # 1. Create a temp staging directory
+    try:
+        staging_dir = Path(tempfile.mkdtemp(prefix="posterizarr_support_"))
+
+        # Generate timestamp for unique filename
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # Ensure there is no trailing underscore after .zip
+        zip_filename = f"posterizarr_support_{timestamp}.zip"
+        zip_path = staging_dir / zip_filename
+
+        logger.debug(f"[SupportZip] Staging directory created: {staging_dir}")
+    except Exception as e:
+        logger.error(f"[SupportZip] Failed to create temp directory: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create temporary directory")
+
+    # 2. Add cleanup task to remove the *entire* staging dir
+    background_tasks.add_task(_cleanup_support_files, staging_dir)
+
+    # 3. Run the blocking zip creation in a separate thread
+    try:
+        success = await asyncio.to_thread(
+            _create_support_zip_blocking, staging_dir, zip_path
+        )
+
+        if not success or not zip_path.exists():
+            logger.error("[SupportZip] ZIP creation failed in background thread.")
+            raise HTTPException(status_code=500, detail="Failed to create support ZIP file")
+
+        # 4. Return the file
+        logger.info("[SupportZip] Sending support ZIP file to user...")
+        logger.info("=" * 60)
+        return FileResponse(
+            zip_path,
+            media_type="application/zip",
+            filename=zip_filename  # Use dynamic filename
+        )
+
+    except Exception as e:
+        logger.error(f"[SupportZip] Error during support zip endpoint execution: {e}")
+        logger.info("=" * 60)
+        raise HTTPException(status_code=500, detail=f"Failed to create support ZIP: {str(e)}")
 # ============================================
 # STATIC FILE MOUNTS
 # ============================================
