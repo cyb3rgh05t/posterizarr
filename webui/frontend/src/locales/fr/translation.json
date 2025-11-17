@@ -1432,7 +1432,13 @@
     "bulkDeleteSuccess": "{{count}} asset(s) supprimé(s) avec succès.",
     "bulkDeleteFailed": "Échec de la suppression en masse : {{error}}",
     "bulkDeleteError": "Erreur lors de la suppression en masse : {{error}}",
-    "favProvider": "Fourn. Fav."
+    "favProvider": "Fourn. Fav.",
+    "deleteAllFilteredTooltip": "Supprimer tous les actifs filtrés",
+    "deleteAllFiltered": "Tout supprimer ({{count}})",
+    "noAssetsToDelete": "Aucun actif filtré à supprimer.",
+    "bulkDeleteAllFilteredTitle": "Supprimer tous les actifs filtrés ?",
+    "bulkDeleteAllFilteredConfirm": "Êtes-vous sûr de vouloir supprimer définitivement les {{count}} actifs filtrés ?\n\nCela supprimera à la fois les fichiers et leurs enregistrements dans la base de données. Cette action ne peut pas être annulée.",
+    "confirmDeleteAll": "Confirmer & Supprimer ({{count}})"
   },
   "common": {
     "view": "Voir",

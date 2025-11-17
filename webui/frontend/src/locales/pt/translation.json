@@ -1432,7 +1432,13 @@
     "bulkDeleteSuccess": "{{count}} recurso(s) excluído(s) com sucesso.",
     "bulkDeleteFailed": "Falha na exclusão em massa: {{error}}",
     "bulkDeleteError": "Erro na exclusão em massa: {{error}}",
-    "favProvider": "Prov. Fav."
+    "favProvider": "Prov. Fav.",
+    "deleteAllFilteredTooltip": "Excluir todos os ativos filtrados",
+    "deleteAllFiltered": "Excluir tudo ({{count}})",
+    "noAssetsToDelete": "Nenhum ativo filtrado para excluir.",
+    "bulkDeleteAllFilteredTitle": "Excluir todos os ativos filtrados?",
+    "bulkDeleteAllFilteredConfirm": "Tem certeza de que deseja excluir permanentemente todos os {{count}} ativos filtrados?\n\nIsso excluirá os arquivos e seus registros no banco de dados. Esta ação não pode ser desfeita.",
+    "confirmDeleteAll": "Confirmar e Excluir ({{count}})"
   },
   "common": {
     "view": "Visualizar",

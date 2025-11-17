@@ -1485,7 +1485,13 @@
     "bulkDeleteSuccess": "{{count}} Asset(s) erfolgreich gelöscht.",
     "bulkDeleteFailed": "Massenlöschung fehlgeschlagen: {{error}}",
     "bulkDeleteError": "Fehler beim Massenlöschen: {{error}}",
-    "favProvider": "Bev. Anbieter"
+    "favProvider": "Bev. Anbieter",
+    "deleteAllFilteredTooltip": "Alle gefilterten Assets löschen",
+    "deleteAllFiltered": "Alle löschen ({{count}})",
+    "noAssetsToDelete": "Keine gefilterten Assets zum Löschen vorhanden.",
+    "bulkDeleteAllFilteredTitle": "Alle gefilterten Assets löschen?",
+    "bulkDeleteAllFilteredConfirm": "Möchten Sie wirklich alle {{count}} gefilterten Assets dauerhaft löschen?\n\nDies löscht sowohl die Dateien als auch ihre Datenbankeinträge. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "confirmDeleteAll": "Bestätigen & Löschen ({{count}})"
   },
   "common": {
     "view": "Ansehen",

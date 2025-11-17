@@ -52,7 +52,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.10"
+$CurrentScriptVersion = "2.1.11"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -763,7 +763,7 @@ function Write-Entry {
             $totalMemory = $memoryInfo.TotalVisibleMemorySize
             $usedMemory = $memoryInfo.UsedMemory
             $freeMemory = $memoryInfo.FreePhysicalMemory
-            $OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
+            $OSVersion = (Get-CimInstance -class Win32_OperatingSystem).Caption
             $Header = @"
 ======================================================
   _____          _            _
@@ -1723,7 +1723,7 @@ function GetTMDBSeasonPoster {
                             $global:TMDBAssetChangeUrl = "https://www.themoviedb.org/tv/$($global:tmdbid)/season/$global:SeasonNumber/images/posters"
                             $global:TMDBSeasonFallback = $global:posterurl
                             Write-Entry -Subtext "Posterpath: $posterpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                            Write-Entry -Subtext "PosterUrl: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                            Write-Entry -Subtext "PosterUrl: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "PosterWithText: $global:PosterWithText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "TMDBAssetTextLang: $global:TMDBAssetTextLang" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "TMDBAssetChangeUrl: $global:TMDBAssetChangeUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -1776,7 +1776,7 @@ function GetTMDBSeasonPoster {
                         $global:PosterWithText = $null
                         $global:TMDBAssetChangeUrl = "https://www.themoviedb.org/tv/$($global:tmdbid)/season/$global:SeasonNumber/images/posters"
                         Write-Entry -Subtext "Posterpath: $posterpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                        Write-Entry -Subtext "PosterUrl: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                        Write-Entry -Subtext "PosterUrl: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                         Write-Entry -Subtext "TextlessPoster: $global:TextlessPoster" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                         Write-Entry -Subtext "TMDBAssetChangeUrl: $global:TMDBAssetChangeUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                         return $global:posterurl
@@ -1851,7 +1851,7 @@ function GetTMDBSeasonPoster {
                             $global:TMDBAssetChangeUrl = "https://www.themoviedb.org/tv/$($global:tmdbid)/season/$global:SeasonNumber/images/posters"
                         }
                         Write-Entry -Subtext "Posterpath: $posterpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                        Write-Entry -Subtext "PosterUrl: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                        Write-Entry -Subtext "PosterUrl: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                         Write-Entry -Subtext "PosterWithText: $global:PosterWithText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                         Write-Entry -Subtext "TMDBAssetTextLang: $global:TMDBAssetTextLang" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                         Write-Entry -Subtext "TMDBAssetChangeUrl: $global:TMDBAssetChangeUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -2660,7 +2660,7 @@ function GetFanartSeasonPoster {
                         $global:PosterWithText = $null
                         $global:FANARTAssetChangeUrl = "https://fanart.tv/series/$id"
                         Write-Entry -Subtext "NoLangPoster: $NoLangPoster" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                        Write-Entry -Subtext "PosterUrl: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                        Write-Entry -Subtext "PosterUrl: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                         Write-Entry -Subtext "TextlessPoster: $global:TextlessPoster" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                         Write-Entry -Subtext "FANARTAssetChangeUrl: $global:FANARTAssetChangeUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                     }
@@ -2677,7 +2677,7 @@ function GetFanartSeasonPoster {
                                     $global:FANARTAssetChangeUrl = "https://fanart.tv/series/$id"
                                     $global:FANARTSeasonFallback = $global:posterurl
                                     Write-Entry -Subtext "FoundPoster: $FoundPoster" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                    Write-Entry -Subtext "PosterUrl: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    Write-Entry -Subtext "PosterUrl: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     Write-Entry -Subtext "PosterWithText: $global:PosterWithText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     Write-Entry -Subtext "FANARTAssetTextLang: $global:FANARTAssetTextLang" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     Write-Entry -Subtext "FANARTAssetChangeUrl: $global:FANARTAssetChangeUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -3305,7 +3305,7 @@ function GetTVDBSeasonPoster {
                             }
                             $global:TVDBAssetChangeUrl = "https://thetvdb.com/series/$($response.data.slug)/seasons/$($Seasonresponse.data.type.type)/$global:SeasonNumber#artwork"
                             Write-Entry -Subtext "LangArtwork: $LangArtwork" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                            Write-Entry -Subtext "PosterUrl: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                            Write-Entry -Subtext "PosterUrl: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "TextlessPoster: $global:TextlessPoster" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "PosterWithText: $global:PosterWithText" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "TVDBAssetTextLang: $global:TVDBAssetTextLang" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -12493,7 +12493,7 @@ Elseif ($Tautulli) {
                                                         }
 
                                                         if ($global:TempImagecopied -ne 'true') {
-                                                            Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                                 Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                                 $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -12673,7 +12673,7 @@ Elseif ($Tautulli) {
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                         }
-                                                        Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                             Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                             $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -13117,7 +13117,7 @@ Elseif ($Tautulli) {
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                         }
-                                                        Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                             Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                             $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -13282,7 +13282,7 @@ Elseif ($Tautulli) {
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                         }
-                                                        Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                             Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                             $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -16419,7 +16419,7 @@ Elseif ($ArrTrigger) {
                                             Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                         }
                                         Else {
-                                            Write-Entry -Subtext "Poster url: $global:posterurl" -Path "$($global:ScriptRoot)\Logs\Scriptlog.log" -Color White -log Info
+                                            Write-Entry -Subtext "Poster url: $(RedactMediaServerUrl -url $global:posterurl)" -Path "$($global:ScriptRoot)\Logs\Scriptlog.log" -Color White -log Info
                                             if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                 Write-Entry -Subtext "Downloading Poster from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                 $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -16930,7 +16930,7 @@ Elseif ($ArrTrigger) {
                                                     }
                                                     Else {
                                                         if ($global:TempImagecopied -ne 'True') {
-                                                            Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                                 Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                                 $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -17098,7 +17098,7 @@ Elseif ($ArrTrigger) {
                                                         }
                                                     }
                                                     Else {
-                                                        Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         if (Get-ChildItem -LiteralPath $EpisodeImage -ErrorAction SilentlyContinue) {
                                                             # Resize Image to 2000x3000
                                                             $Resizeargument = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$EpisodeImage`""
@@ -17438,7 +17438,7 @@ Elseif ($ArrTrigger) {
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                     Else {
-                                                        Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                             Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                             $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -21253,7 +21253,7 @@ Elseif ($ArrTrigger) {
                                                             }
 
                                                             if ($global:TempImagecopied -ne 'true') {
-                                                                Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                                Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                                 if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                                     Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                                     $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -21433,7 +21433,7 @@ Elseif ($ArrTrigger) {
                                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                             }
-                                                            Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                                 Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                                 $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -21877,7 +21877,7 @@ Elseif ($ArrTrigger) {
                                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                             }
-                                                            Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                                 Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                                 $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -22042,7 +22042,7 @@ Elseif ($ArrTrigger) {
                                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                             }
-                                                            Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                                 Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                                 $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -26278,7 +26278,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
                                     Else {
-                                        Write-Entry -Subtext "Poster url: $global:posterurl" -Path "$($global:ScriptRoot)\Logs\Scriptlog.log" -Color White -log Info
+                                        Write-Entry -Subtext "Poster url: $(RedactMediaServerUrl -url $global:posterurl)" -Path "$($global:ScriptRoot)\Logs\Scriptlog.log" -Color White -log Info
                                         if ($global:posterurl -like 'https://image.tmdb.org*') {
                                             Write-Entry -Subtext "Downloading Poster from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                             $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -26789,7 +26789,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 }
                                                 Else {
                                                     if ($global:TempImagecopied -ne 'True') {
-                                                        Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                             Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                             $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -26957,7 +26957,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     }
                                                 }
                                                 Else {
-                                                    Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     if (Get-ChildItem -LiteralPath $EpisodeImage -ErrorAction SilentlyContinue) {
                                                         # Resize Image to 2000x3000
                                                         $Resizeargument = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$EpisodeImage`""
@@ -27297,7 +27297,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                                 Else {
-                                                    Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                         Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                         $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -31817,7 +31817,7 @@ else {
 
                                                         }
                                                         if ($global:TempImagecopied -ne 'true') {
-                                                            Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                             if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                                 Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                                 $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -31996,7 +31996,7 @@ else {
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                         }
-                                                        Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                             Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                             $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -32506,7 +32506,7 @@ else {
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                         }
-                                                        Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                             Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                             $global:AssetTextLang = $global:TMDBAssetTextLang
@@ -32671,7 +32671,7 @@ else {
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                         }
-                                                        Write-Entry -Subtext "Title Card url: $global:posterurl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "Title Card url: $(RedactMediaServerUrl -url $global:posterurl)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         if ($global:posterurl -like 'https://image.tmdb.org*') {
                                                             Write-Entry -Subtext "Downloading Title Card from 'TMDB'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color DarkMagenta -log Info
                                                             $global:AssetTextLang = $global:TMDBAssetTextLang
