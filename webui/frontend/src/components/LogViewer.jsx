@@ -321,7 +321,6 @@ function LogViewer() {
     }
   };
 
-  // +++ NEW FUNCTION +++
   const gatherSupportZip = async () => {
     setIsGatheringSupportZip(true);
     showInfo(t("logViewer.gatheringSupport", "Gathering support files... This may take a moment."));
@@ -341,23 +340,21 @@ function LogViewer() {
         throw new Error(errorMsg);
       }
 
-      // --- MODIFIED ---
       // Get filename from Content-Disposition header
       const contentDisposition = response.headers.get("content-disposition");
       let downloadFilename = "posterizarr_support.zip"; // Default
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/i);
         if (filenameMatch && filenameMatch[1]) {
           downloadFilename = filenameMatch[1];
         }
       }
-      // --- END MODIFIED ---
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = downloadFilename; // --- MODIFIED: Use dynamic filename ---
+      a.download = downloadFilename; //  Use dynamic filename
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -372,7 +369,6 @@ function LogViewer() {
       setIsGatheringSupportZip(false);
     }
   };
-  // +++ END NEW FUNCTION +++
 
   const disconnectWebSocket = () => {
     if (reconnectTimeoutRef.current) {
