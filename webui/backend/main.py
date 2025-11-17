@@ -125,6 +125,7 @@ CONFIG_PATH = BASE_DIR / "config.json"
 CONFIG_EXAMPLE_PATH = BASE_DIR / "config.example.json"
 SCRIPT_PATH = APP_DIR / "Posterizarr.ps1"
 LOGS_DIR = BASE_DIR / "Logs"
+ROTATED_LOGS_DIR = BASE_DIR / "RotatedLogs"
 TEST_DIR = BASE_DIR / "test"
 TEMP_DIR = BASE_DIR / "temp"
 UI_LOGS_DIR = BASE_DIR / "UILogs"
@@ -12153,6 +12154,15 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                 ignore=ignore_patterns_logs  # Use ignore pattern with '*.json'
             )
             logger.info("[SupportZip] Copied Logs directory (excluding .json files)")
+
+        if ROTATED_LOGS_DIR.exists():
+            shutil.copytree(
+                ROTATED_LOGS_DIR,
+                staging_dir_path / "RotatedLogs",
+                dirs_exist_ok=True,
+                ignore=ignore_patterns_logs  # Same ignore rules as Logs
+            )
+            logger.info("[SupportZip] Copied RotatedLogs directory (excluding .json files)")
 
         if UI_LOGS_DIR.exists():
             shutil.copytree(
