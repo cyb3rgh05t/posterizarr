@@ -9,14 +9,15 @@ on:
   push:
     branches:
       - dev
+      - nightly
 
   # Manual builds
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to use for testing (e.g., test-1.0.0)'
+        description: "Version to use for testing (e.g., test-1.0.0)"
         required: true
-        default: 'test-1.0.0'
+        default: "test-1.0.0"
 
 jobs:
   release:
