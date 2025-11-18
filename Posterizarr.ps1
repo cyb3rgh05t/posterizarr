@@ -4488,22 +4488,29 @@ function UploadOtherMediaServerArtwork {
     if ($Imageinfotemp) {
         $Imageinfotemp = $imageinfotemp[0]
     }
+    # Clear value to ensure no old data causes a false skip
+    $value = $null
+
     # Set the API endpoint URL for magick exif check
     if (($imageinfotemp.Height) -and ($imageinfotemp.width)) {
         try {
             $ImageUrl = "$OtherMediaServerUrl/items/$itemId/images/$imageType/?api_key=$OtherMediaServerApiKey&width=$($imageinfotemp.width)&height=$($imageinfotemp.Height)"
             $tempFile = Join-Path -Path $global:ScriptRoot -ChildPath "temp\hashcompare.jpg"
+
+            # Try to download the image
             $response = Invoke-WebRequest -Uri $ImageUrl -OutFile $tempFile -ErrorAction Stop
+
             $magickcommand = "& `"$magick`" identify -verbose `"$tempFile`""
             $magickcommand | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
             $value = Invoke-Expression $magickcommand | Select-String -Pattern 'overlay|titlecard|created with ppm|created with posterizarr'
+
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue | out-null
         }
         catch {
-            Write-Entry -Subtext "An error occurred during exif check: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            # Log as a warning (not error) so we know why the check failed, but don't stop the script
+            Write-Entry -Subtext "Exif check skipped (Image 404 or missing). Proceeding to upload. Error: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
 
-            continue
+            # Ensure temp file cleanup happens if the download partially succeeded or failed
             if (Test-Path $tempFile) {
                 Remove-Item $tempFile -Force -ErrorAction SilentlyContinue | out-null
             }
@@ -23188,10 +23195,16 @@ Elseif ($SyncJelly -or $SyncEmby) {
 
                         # If no ID match, fall back to Title
                         if ($null -eq $matchingMovie) {
-                            Write-Entry -Message "No ID match for '$($entry.title)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                            $warningMsg = "No ID match for '$($entry.title)'."
+                            $warningMsg += " Source IDs (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId), ImdbId: $($entry.ImdbId)). Falling back to Title match..."
+                            Write-Entry -Subtext $warningMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+
                             $matchingMovie = $OtherAllMovies | Where-Object {
                                 $_."Library Name" -eq $entry."Library Name" -and
                                 $_.Title -eq $entry.Title
+                            }
+                            if ($matchingMovie) {
+                                Write-Entry -Subtext "Fallback to Title match SUCCESSFUL for '$($entry.title)'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             }
                         }
 
@@ -23218,6 +23231,11 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                     Write-Entry -Message "Could not find Movie ID for '$MovieTitle' in $($entry.'Library Name')" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                             }
+                        }
+                        Else {
+                            $errorMsg = "Could not match movie '$($entry.title)' in '$($entry.'Library Name')' by ID or Title."
+                            $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId), ImdbId: $($entry.ImdbId)). Please check destination library metadata."
+                            Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                         }
                     }
                     Else {
@@ -23254,10 +23272,17 @@ Elseif ($SyncJelly -or $SyncEmby) {
 
                         # If no ID match, fall back to Title
                         if ($null -eq $matchingMovie) {
-                            Write-Entry -Message "No ID match for '$($entry.title) (Background)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                            $warningMsg = "No ID match for '$($entry.title) (Background)'."
+                            $warningMsg += " Source IDs (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId), ImdbId: $($entry.ImdbId)). Falling back to Title match..."
+                            Write-Entry -Subtext $warningMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+
                             $matchingMovie = $OtherAllMovies | Where-Object {
                                 $_."Library Name" -eq $entry."Library Name" -and
                                 $_.Title -eq $entry.Title
+                            }
+
+                            if ($matchingMovie) {
+                                Write-Entry -Subtext "Fallback to Title match SUCCESSFUL for '$($entry.title) (Background)'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             }
                         }
 
@@ -23284,6 +23309,11 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                     Write-Entry -Message "Could not find Movie ID for '$MovieTitle' in $($entry.'Library Name')" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                             }
+                        }
+                        Else {
+                            $errorMsg = "Could not match movie '$($entry.title) (Background)' in '$($entry.'Library Name')' by ID or Title."
+                            $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId), ImdbId: $($entry.ImdbId)). Please check destination library metadata."
+                            Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                         }
                     }
                     Else {
@@ -23334,10 +23364,17 @@ Elseif ($SyncJelly -or $SyncEmby) {
 
                         # If no ID match, fall back to Title
                         if ($null -eq $matchingShow) {
-                            Write-Entry -Message "No ID match for show '$($entry.title)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                            $warningMsg = "No ID match for show '$($entry.title)'."
+                            $warningMsg += " Source IDs (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Falling back to Title match..."
+                            Write-Entry -Subtext $warningMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+
                             $matchingShow = $OtherAllShows | Where-Object {
                                 $_."Library Name" -eq $entry."Library Name" -and
                                 ($_.Title -eq $entry.Title -or $_.originalTitle -eq $entry.originalTitle)
+                            }
+
+                            if ($matchingShow) {
+                                Write-Entry -Subtext "Fallback to Title match SUCCESSFUL for show '$($entry.title)'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             }
                         }
 
@@ -23364,6 +23401,11 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                     Write-Entry -Message "Could not find Show ID for '$ShowTitle' in $($entry.'Library Name')" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                             }
+                        }
+                        Else {
+                            $errorMsg = "Could not match show '$($entry.title)' in '$($entry.'Library Name')' by ID or Title."
+                            $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Please check destination library metadata."
+                            Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                         }
                     }
                     Else {
@@ -23396,10 +23438,17 @@ Elseif ($SyncJelly -or $SyncEmby) {
 
                         # If no ID match, fall back to Title
                         if ($null -eq $matchingShow) {
-                            Write-Entry -Message "No ID match for show '$($entry.title) (Background)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                            $warningMsg = "No ID match for show '$($entry.title) (Background)'."
+                            $warningMsg += " Source IDs (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Falling back to Title match..."
+                            Write-Entry -Subtext $warningMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+
                             $matchingShow = $OtherAllShows | Where-Object {
                                 $_."Library Name" -eq $entry."Library Name" -and
                                 ($_.Title -eq $entry.Title -or $_.originalTitle -eq $entry.originalTitle)
+                            }
+
+                            if ($matchingShow) {
+                                Write-Entry -Subtext "Fallback to Title match SUCCESSFUL for show '$($entry.title) (Background)'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             }
                         }
 
@@ -23426,6 +23475,11 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                     Write-Entry -Message "Could not find Show ID for '$ShowTitle' in $($entry.'Library Name')" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                 }
                             }
+                        }
+                        Else {
+                            $errorMsg = "Could not match show '$($entry.title) (Background)' in '$($entry.'Library Name')' by ID or Title."
+                            $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Please check destination library metadata."
+                            Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                         }
                     }
                     Else {
@@ -23464,11 +23518,18 @@ Elseif ($SyncJelly -or $SyncEmby) {
 
                             # If no ID match, fall back to Title
                             if ($null -eq $matchingSeason) {
-                                Write-Entry -Message "No ID match for '$($entry.Title) | Season $global:SeasonNumber'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                $warningMsg = "No ID match for '$($entry.Title) | Season $global:SeasonNumber'."
+                                $warningMsg += " Source IDs (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Falling back to Title match..."
+                                Write-Entry -Subtext $warningMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+
                                 $matchingSeason = $OtherEpisodedata | Where-Object {
                                     $_."Library Name" -eq $entry."Library Name" -and
                                     $_."Season Number" -eq $global:SeasonNumber -and
                                     ($_.'Show Name' -eq $entry.Title -or $_.'Show Name' -eq $entry.originalTitle -or $_."Show Original Name" -eq $entry.originalTitle -or $_."Show Original Name" -eq $entry.Title)
+                                }
+
+                                if ($matchingSeason) {
+                                    Write-Entry -Subtext "Fallback to Title match SUCCESSFUL for '$($entry.Title) | Season $global:SeasonNumber'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                 }
                             }
 
@@ -23495,6 +23556,11 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                         Write-Entry -Message "Could not find Season ID for '$ShowTitle' in $($entry.'Library Name')" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                     }
                                 }
+                            }
+                            Else {
+                                $errorMsg = "Could not match season '$($entry.Title) | Season $global:SeasonNumber' in '$($entry.'Library Name')' by ID or Title."
+                                $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Please check destination library metadata."
+                                Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                             }
                         }
                         Else {
@@ -23546,12 +23612,19 @@ Elseif ($SyncJelly -or $SyncEmby) {
 
                                     # If no ID match, fall back to Title
                                     if ($null -eq $matchingEpisode) {
-                                        Write-Entry -Message "No ID match for '$($entry.Title) S$($global:season_number)E$($global:episodenumber)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                        $warningMsg = "No ID match for '$($entry.Title) S$($global:season_number)E$($global:episodenumber)'."
+                                        $warningMsg += " Source IDs (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Falling back to Title match..."
+                                        Write-Entry -Subtext $warningMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+
                                         $matchingEpisode = $OtherEpisodedata | Where-Object {
                                             ($_.'Show Name' -eq $entry.title -or $_.'Show Name' -eq $entry.originalTitle) -and
                                             $_."Library Name" -eq $entry."Library Name" -and
                                             $_."Season Number" -eq $global:season_number -and
                                             ($_.Episodes.Split(",") -contains $global:episodenumber)
+                                        }
+
+                                        if ($matchingEpisode) {
+                                            Write-Entry -Subtext "Fallback to Title match SUCCESSFUL for '$($entry.Title) S$($global:season_number)E$($global:episodenumber)'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         }
                                     }
 
@@ -23573,6 +23646,11 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                         Write-Entry -Subtext "Show Title: $ShowTitle" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         Write-Entry -Subtext "Type: $imageType" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         Write-Entry -Subtext "Episode ID: $global:episodeid" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                    }
+                                    Else {
+                                        $errorMsg = "Could not match episode '$($entry.Title) S$($global:season_number)E$($global:episodenumber)' in '$($entry.'Library Name')' by ID or Title."
+                                        $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Please check destination library metadata."
+                                        Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                     }
                                 }
                                 Else {
