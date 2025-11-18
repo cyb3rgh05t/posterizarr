@@ -4488,22 +4488,29 @@ function UploadOtherMediaServerArtwork {
     if ($Imageinfotemp) {
         $Imageinfotemp = $imageinfotemp[0]
     }
+    # Clear value to ensure no old data causes a false skip
+    $value = $null
+
     # Set the API endpoint URL for magick exif check
     if (($imageinfotemp.Height) -and ($imageinfotemp.width)) {
         try {
             $ImageUrl = "$OtherMediaServerUrl/items/$itemId/images/$imageType/?api_key=$OtherMediaServerApiKey&width=$($imageinfotemp.width)&height=$($imageinfotemp.Height)"
             $tempFile = Join-Path -Path $global:ScriptRoot -ChildPath "temp\hashcompare.jpg"
+
+            # Try to download the image
             $response = Invoke-WebRequest -Uri $ImageUrl -OutFile $tempFile -ErrorAction Stop
+
             $magickcommand = "& `"$magick`" identify -verbose `"$tempFile`""
             $magickcommand | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
             $value = Invoke-Expression $magickcommand | Select-String -Pattern 'overlay|titlecard|created with ppm|created with posterizarr'
+
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue | out-null
         }
         catch {
-            Write-Entry -Subtext "An error occurred during exif check: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            # Log as a warning (not error) so we know why the check failed, but don't stop the script
+            Write-Entry -Subtext "Exif check skipped (Image 404 or missing). Proceeding to upload. Error: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
 
-            continue
+            # Ensure temp file cleanup happens if the download partially succeeded or failed
             if (Test-Path $tempFile) {
                 Remove-Item $tempFile -Force -ErrorAction SilentlyContinue | out-null
             }
@@ -23226,7 +23233,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
                             }
                         }
                         Else {
-                            $errorMsg = "MATCH FAILED: Could not match movie '$($entry.title)' in '$($entry.'Library Name')' by ID or Title."
+                            $errorMsg = "Could not match movie '$($entry.title)' in '$($entry.'Library Name')' by ID or Title."
                             $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId), ImdbId: $($entry.ImdbId)). Please check destination library metadata."
                             Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                         }
@@ -23304,7 +23311,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
                             }
                         }
                         Else {
-                            $errorMsg = "MATCH FAILED: Could not match movie '$($entry.title) (Background)' in '$($entry.'Library Name')' by ID or Title."
+                            $errorMsg = "Could not match movie '$($entry.title) (Background)' in '$($entry.'Library Name')' by ID or Title."
                             $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId), ImdbId: $($entry.ImdbId)). Please check destination library metadata."
                             Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                         }
@@ -23396,7 +23403,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
                             }
                         }
                         Else {
-                            $errorMsg = "MATCH FAILED: Could not match show '$($entry.title)' in '$($entry.'Library Name')' by ID or Title."
+                            $errorMsg = "Could not match show '$($entry.title)' in '$($entry.'Library Name')' by ID or Title."
                             $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Please check destination library metadata."
                             Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                         }
@@ -23470,7 +23477,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
                             }
                         }
                         Else {
-                            $errorMsg = "MATCH FAILED: Could not match show '$($entry.title) (Background)' in '$($entry.'Library Name')' by ID or Title."
+                            $errorMsg = "Could not match show '$($entry.title) (Background)' in '$($entry.'Library Name')' by ID or Title."
                             $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Please check destination library metadata."
                             Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                         }
@@ -23551,7 +23558,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                 }
                             }
                             Else {
-                                $errorMsg = "MATCH FAILED: Could not match season '$($entry.Title) | Season $global:SeasonNumber' in '$($entry.'Library Name')' by ID or Title."
+                                $errorMsg = "Could not match season '$($entry.Title) | Season $global:SeasonNumber' in '$($entry.'Library Name')' by ID or Title."
                                 $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Please check destination library metadata."
                                 Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                             }
@@ -23641,7 +23648,7 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                         Write-Entry -Subtext "Episode ID: $global:episodeid" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     }
                                     Else {
-                                        $errorMsg = "MATCH FAILED: Could not match episode '$($entry.Title) S$($global:season_number)E$($global:episodenumber)' in '$($entry.'Library Name')' by ID or Title."
+                                        $errorMsg = "Could not match episode '$($entry.Title) S$($global:season_number)E$($global:episodenumber)' in '$($entry.'Library Name')' by ID or Title."
                                         $errorMsg += " Source (Plex) IDs were (TmdbId: $($entry.TmdbId), TvdbId: $($entry.TvdbId)). Please check destination library metadata."
                                         Write-Entry -Subtext $errorMsg -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                     }
