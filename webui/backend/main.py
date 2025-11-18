@@ -12328,41 +12328,33 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
     """
     try:
         # 1. Define Paths (uses globals from main.py)
-        ROTATED_LOGS_DIR = BASE_DIR / "RotatedLogs"
         db_staging_dir = staging_dir_path / "database"
         db_staging_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"[SupportZip] Staging directory: {staging_dir_path}")
 
         # 2. Copy Log Folders
-        # We ignore common cache/compiled files
-        ignore_patterns = shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store')
+        # Define ignore patterns
+        ignore_patterns_default = shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store')
+        # For LOGS_DIR, also ignore .json files
+        ignore_patterns_logs = shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store', '*.json')
 
         if LOGS_DIR.exists():
             shutil.copytree(
                 LOGS_DIR,
                 staging_dir_path / "Logs",
                 dirs_exist_ok=True,
-                ignore=ignore_patterns
+                ignore=ignore_patterns_logs  # Use ignore pattern with '*.json'
             )
-            logger.info("[SupportZip] Copied Logs directory")
+            logger.info("[SupportZip] Copied Logs directory (excluding .json files)")
 
         if UI_LOGS_DIR.exists():
             shutil.copytree(
                 UI_LOGS_DIR,
                 staging_dir_path / "UILogs",
                 dirs_exist_ok=True,
-                ignore=ignore_patterns
+                ignore=ignore_patterns_default # Use default ignore pattern
             )
             logger.info("[SupportZip] Copied UILogs directory")
-
-        if ROTATED_LOGS_DIR.exists():
-            shutil.copytree(
-                ROTATED_LOGS_DIR,
-                staging_dir_path / "RotatedLogs",
-                dirs_exist_ok=True,
-                ignore=ignore_patterns
-            )
-            logger.info("[SupportZip] Copied RotatedLogs directory")
 
         # 3. Copy & Sanitize Databases
         # 3a. Copy non-sensitive DBs
@@ -12389,7 +12381,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                 conn = sqlite3.connect(copied_db_path)
                 cursor = conn.cursor()
 
-                # Get all rows that need sanitizing
                 cursor.execute(
                     "SELECT id, DownloadSource FROM imagechoices WHERE DownloadSource LIKE 'http%'"
                 )
@@ -12398,7 +12389,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
 
                 updates = []
 
-                # Define allowed URL prefixes that should NOT be masked
                 ALLOWED_PREFIXES = [
                     "https://image.tmdb.org",
                     "https://artworks.thetvdb.com",
@@ -12413,18 +12403,14 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                     sanitized_source = source
                     is_allowed = False
 
-                    # Check if the URL is in the allowed list
                     for prefix in ALLOWED_PREFIXES:
                         if source.startswith(prefix):
                             is_allowed = True
                             break
 
-                    # If it's NOT an allowed domain, mask the host
                     if not is_allowed:
-                        # Regex to mask host (IP or domain), count=1 ensures it only masks the host
                         sanitized_source = re.sub(r"(https?://)[^/]+", r"\1[MASKED_HOST]", sanitized_source, count=1)
 
-                    # ALWAYS mask tokens, keys, and pins, even on allowed domains
                     sanitized_source = re.sub(r"([?&][^=]*Token=)[^&]+", r"\1[MASKED_TOKEN]", sanitized_source, flags=re.IGNORECASE)
                     sanitized_source = re.sub(r"([?&][^=]*api_key=)[^&]+", r"\1[MASKED_KEY]", sanitized_source, flags=re.IGNORECASE)
                     sanitized_source = re.sub(r"([?&][^=]*pin=)[^&]+", r"\1[MASKED_PIN]", sanitized_source, flags=re.IGNORECASE)
@@ -12432,7 +12418,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                     if sanitized_source != source:
                         updates.append((sanitized_source, row_id))
 
-                # Batch update the database copy
                 if updates:
                     cursor.executemany(
                         "UPDATE imagechoices SET DownloadSource = ? WHERE id = ?", updates
@@ -12443,12 +12428,10 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                 conn.close()
             except Exception as e:
                 logger.error(f"[SupportZip] Failed to sanitize imagechoices.db copy: {e}")
-                # Continue anyway; the unsanitized (but copied) DB is better than nothing
 
-        # 3c. Sanitize ALL ImageChoices.csv files (main and rotated)
-        logger.info("[SupportZip] Searching for ImageChoices.csv files to sanitize...")
+        # 3c. Sanitize ImageChoices.csv (only the one in Logs/)
+        logger.info("[SupportZip] Searching for ImageChoices.csv file to sanitize...")
 
-        # Define allowed URL prefixes (do this once)
         ALLOWED_PREFIXES = [
             "https://image.tmdb.org",
             "https://artworks.thetvdb.com",
@@ -12456,7 +12439,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
             "https://m.media-amazon.com",
         ]
 
-        # Use rglob to find all instances in the staging directory
+        # Use rglob, but it will only find the one in the copied Logs folder
         csv_files_to_sanitize = list(staging_dir_path.rglob("ImageChoices.csv"))
         logger.info(f"[SupportZip] Found {len(csv_files_to_sanitize)} ImageChoices.csv files.")
 
@@ -12466,9 +12449,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
             logger.debug(f"[SupportZip] Sanitizing {staging_csv_path}...")
             sanitized_rows = []
             try:
-                # Use 'utf-8-sig' to handle potential BOM
                 with open(staging_csv_path, 'r', encoding='utf-8-sig') as f_in:
-                    # Import csv module here as it's only used in this function
                     import csv
                     reader = csv.reader(f_in, delimiter=';')
 
@@ -12481,7 +12462,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                         fav_provider_link_idx = clean_header.index("Fav Provider Link")
                     except ValueError as e:
                         logger.error(f"[SupportZip] Could not find required columns in {staging_csv_path.name}: {e}")
-                        continue # Skip this file, move to the next one
+                        continue
 
                     sanitized_count_in_file = 0
 
@@ -12493,7 +12474,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                             sanitized_download_source = original_download_source
                             sanitized_fav_link = original_fav_link
 
-                            # Sanitize Download Source
                             if original_download_source and original_download_source.startswith("http"):
                                 is_allowed = any(original_download_source.startswith(prefix) for prefix in ALLOWED_PREFIXES)
                                 if not is_allowed:
@@ -12503,7 +12483,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                                 sanitized_download_source = re.sub(r"([?&][^=]*api_key=)[^&]+", r"\1[MASKED_KEY]", sanitized_download_source, flags=re.IGNORECASE)
                                 sanitized_download_source = re.sub(r"([?&][^=]*pin=)[^&]+", r"\1[MASKED_PIN]", sanitized_download_source, flags=re.IGNORECASE)
 
-                            # Sanitize Fav Provider Link
                             if original_fav_link and original_fav_link.startswith("http"):
                                 is_allowed = any(original_fav_link.startswith(prefix) for prefix in ALLOWED_PREFIXES)
                                 if not is_allowed:
@@ -12523,7 +12502,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                     logger.info(f"[SupportZip] Sanitized {sanitized_count_in_file} rows in {staging_csv_path.name}.")
                     total_sanitized_rows += sanitized_count_in_file
 
-                # Overwrite the staged file
                 with open(staging_csv_path, 'w', encoding='utf-8', newline='') as f_out:
                     writer = csv.writer(f_out, delimiter=';')
                     writer.writerows(sanitized_rows)
@@ -12532,7 +12510,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
 
             except Exception as e:
                 logger.error(f"[SupportZip] Failed to sanitize {staging_csv_path.name}: {e}")
-                # Continue to the next file
 
         logger.info(f"[SupportZip] Total sanitized rows across all CSVs: {total_sanitized_rows}")
 
@@ -12540,7 +12517,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
         logger.debug(f"[SupportZip] Creating ZIP file at: {zip_file_path}")
         with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, dirs, files in os.walk(staging_dir_path):
-                # Exclude the zip file itself from the zip
                 if Path(root) == zip_file_path.parent and zip_file_path.name in files:
                     files.remove(zip_file_path.name)
 
@@ -12556,6 +12532,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
         logger.error(f"[SupportZip] Failed to create support zip: {e}")
         logger.exception("Full traceback for zip creation:")
         return False
+
 def _cleanup_support_files(staging_dir: Path):
     """
     Cleanup function for BackgroundTasks to remove the temp staging directory.
