@@ -52,7 +52,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.12"
+$CurrentScriptVersion = "2.1.13"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -23176,14 +23176,25 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                 $Arturl = $plexurl + $entry.PlexPosterUrl
                             }
                         }
+
+                        # Attempt to match by ID (preferred)
                         $matchingMovie = $OtherAllMovies | Where-Object {
-                            $_.Title -eq $entry.Title -and
                             $_."Library Name" -eq $entry."Library Name" -and (
-                                $_.TmdbId -eq $entry.TmdbId -or
-                                $_.TvdbId -eq $entry.TvdbId -or
-                                $_.ImdbId -eq $entry.ImdbId
+                                ($null -ne $entry.TmdbId -and $_.TmdbId -eq $entry.TmdbId) -or
+                                ($null -ne $entry.TvdbId -and $_.TvdbId -eq $entry.TvdbId) -or
+                                ($null -ne $entry.ImdbId -and $_.ImdbId -eq $entry.ImdbId)
                             )
                         }
+
+                        # If no ID match, fall back to Title
+                        if ($null -eq $matchingMovie) {
+                            Write-Entry -Message "No ID match for '$($entry.title)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                            $matchingMovie = $OtherAllMovies | Where-Object {
+                                $_."Library Name" -eq $entry."Library Name" -and
+                                $_.Title -eq $entry.Title
+                            }
+                        }
+
                         if ($matchingMovie) {
                             $MovieTitle = $entry.Title
                             $imageType = "Primary"
@@ -23232,14 +23243,24 @@ Elseif ($SyncJelly -or $SyncEmby) {
                             }
                         }
 
+                        # Attempt to match by ID (preferred)
                         $matchingMovie = $OtherAllMovies | Where-Object {
-                            $_.Title -eq $entry.Title -and
                             $_."Library Name" -eq $entry."Library Name" -and (
-                                $_.TmdbId -eq $entry.TmdbId -or
-                                $_.TvdbId -eq $entry.TvdbId -or
-                                $_.ImdbId -eq $entry.ImdbId
+                                ($null -ne $entry.TmdbId -and $_.TmdbId -eq $entry.TmdbId) -or
+                                ($null -ne $entry.TvdbId -and $_.TvdbId -eq $entry.TvdbId) -or
+                                ($null -ne $entry.ImdbId -and $_.ImdbId -eq $entry.ImdbId)
                             )
                         }
+
+                        # If no ID match, fall back to Title
+                        if ($null -eq $matchingMovie) {
+                            Write-Entry -Message "No ID match for '$($entry.title) (Background)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                            $matchingMovie = $OtherAllMovies | Where-Object {
+                                $_."Library Name" -eq $entry."Library Name" -and
+                                $_.Title -eq $entry.Title
+                            }
+                        }
+
                         if ($matchingMovie) {
                             $MovieTitle = $entry.Title + " | Background"
                             $imageType = "Backdrop"
@@ -23302,13 +23323,24 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                 $Arturl = $plexurl + $entry.PlexPosterUrl
                             }
                         }
+
+                        # Attempt to match by ID (preferred)
                         $matchingShow = $OtherAllShows | Where-Object {
-                            ($_.Title -eq $entry.Title -or $_.originalTitle -eq $entry.originalTitle) -and
                             $_."Library Name" -eq $entry."Library Name" -and (
-                                $_.TmdbId -eq $entry.TmdbId -or
-                                $_.TvdbId -eq $entry.TvdbId
+                                ($null -ne $entry.TmdbId -and $_.TmdbId -eq $entry.TmdbId) -or
+                                ($null -ne $entry.TvdbId -and $_.TvdbId -eq $entry.TvdbId)
                             )
                         }
+
+                        # If no ID match, fall back to Title
+                        if ($null -eq $matchingShow) {
+                            Write-Entry -Message "No ID match for show '$($entry.title)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                            $matchingShow = $OtherAllShows | Where-Object {
+                                $_."Library Name" -eq $entry."Library Name" -and
+                                ($_.Title -eq $entry.Title -or $_.originalTitle -eq $entry.originalTitle)
+                            }
+                        }
+
                         if ($matchingShow) {
                             $ShowTitle = $entry.Title
                             $imageType = "Primary"
@@ -23354,13 +23386,23 @@ Elseif ($SyncJelly -or $SyncEmby) {
                             }
                         }
 
+                        # Attempt to match by ID (preferred)
                         $matchingShow = $OtherAllShows | Where-Object {
-                            ($_.Title -eq $entry.Title -or $_.originalTitle -eq $entry.originalTitle) -and
                             $_."Library Name" -eq $entry."Library Name" -and (
-                                $_.TmdbId -eq $entry.TmdbId -or
-                                $_.TvdbId -eq $entry.TvdbId
+                                ($null -ne $entry.TmdbId -and $_.TmdbId -eq $entry.TmdbId) -or
+                                ($null -ne $entry.TvdbId -and $_.TvdbId -eq $entry.TvdbId)
                             )
                         }
+
+                        # If no ID match, fall back to Title
+                        if ($null -eq $matchingShow) {
+                            Write-Entry -Message "No ID match for show '$($entry.title) (Background)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                            $matchingShow = $OtherAllShows | Where-Object {
+                                $_."Library Name" -eq $entry."Library Name" -and
+                                ($_.Title -eq $entry.Title -or $_.originalTitle -eq $entry.originalTitle)
+                            }
+                        }
+
                         if ($matchingShow) {
                             $ShowTitle = $entry.Title + " | Background"
                             $imageType = "Backdrop"
@@ -23410,14 +23452,26 @@ Elseif ($SyncJelly -or $SyncEmby) {
                                     $Arturl = $plexurl + $global:PlexSeasonUrl
                                 }
                             }
+
+                            # Attempt to match by ID (preferred)
                             $matchingSeason = $OtherEpisodedata | Where-Object {
-                                ($_.'Show Name' -eq $entry.Title -or $_.'Show Name' -eq $entry.originalTitle -or $_."Show Original Name" -eq $entry.originalTitle -or $_."Show Original Name" -eq $entry.Title) -and
                                 $_."Library Name" -eq $entry."Library Name" -and
                                 $_."Season Number" -eq $global:SeasonNumber -and (
-                                    $_.TmdbId -eq $entry.TmdbId -or
-                                    $_.TvdbId -eq $entry.TvdbId
+                                    ($null -ne $entry.TmdbId -and $_.TmdbId -eq $entry.TmdbId) -or
+                                    ($null -ne $entry.TvdbId -and $_.TvdbId -eq $entry.TvdbId)
                                 )
                             }
+
+                            # If no ID match, fall back to Title
+                            if ($null -eq $matchingSeason) {
+                                Write-Entry -Message "No ID match for '$($entry.Title) | Season $global:SeasonNumber'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                $matchingSeason = $OtherEpisodedata | Where-Object {
+                                    $_."Library Name" -eq $entry."Library Name" -and
+                                    $_."Season Number" -eq $global:SeasonNumber -and
+                                    ($_.'Show Name' -eq $entry.Title -or $_.'Show Name' -eq $entry.originalTitle -or $_."Show Original Name" -eq $entry.originalTitle -or $_."Show Original Name" -eq $entry.Title)
+                                }
+                            }
+
                             if ($matchingSeason) {
                                 $ShowTitle = $entry.Title + " | Season $global:SeasonNumber"
                                 $imageType = "Primary"
@@ -23461,9 +23515,10 @@ Elseif ($SyncJelly -or $SyncEmby) {
                         $global:PlexTitleCardUrls = $episode."PlexTitleCardUrls".Split(",")
 
                         # Match based on Show name, tmdbid, tvdbid, and Library Name
-                        if (($episode.tmdbid -eq $entry.tmdbid -or $episode.tvdbid -eq $entry.tvdbid) -and
-                            ($episode.'Show Name' -eq $entry.title -or $episode.'Show Name' -eq $entry.originalTitle) -and
-                            $episode.'Library Name' -eq $entry.'Library Name') {
+                        if ($episode.'Library Name' -eq $entry.'Library Name' -and (
+                                ($episode.tmdbid -eq $entry.tmdbid -or $episode.tvdbid -eq $entry.tvdbid) -or
+                                ($episode.'Show Name' -eq $entry.title -or $episode.'Show Name' -eq $entry.originalTitle)
+                            )) {
 
                             # Loop through episodes in $episode_numbers
                             for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
@@ -23481,14 +23536,25 @@ Elseif ($SyncJelly -or $SyncEmby) {
 
                                     # Find matching episode in OtherEpisodedata
                                     $matchingEpisode = $OtherEpisodedata | Where-Object {
-                                        ($_.'Show Name' -eq $entry.title -or $_.'Show Name' -eq $entry.originalTitle) -and
                                         $_."Library Name" -eq $entry."Library Name" -and
                                         $_."Season Number" -eq $global:season_number -and
                                         ($_.Episodes.Split(",") -contains $global:episodenumber) -and (
-                                            $_.TmdbId -eq $entry.TmdbId -or
-                                            $_.TvdbId -eq $entry.TvdbId
+                                            ($null -ne $entry.TmdbId -and $_.TmdbId -eq $entry.TmdbId) -or
+                                            ($null -ne $entry.TvdbId -and $_.TvdbId -eq $entry.TvdbId)
                                         )
                                     }
+
+                                    # If no ID match, fall back to Title
+                                    if ($null -eq $matchingEpisode) {
+                                        Write-Entry -Message "No ID match for '$($entry.Title) S$($global:season_number)E$($global:episodenumber)'. Falling back to Title match..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                        $matchingEpisode = $OtherEpisodedata | Where-Object {
+                                            ($_.'Show Name' -eq $entry.title -or $_.'Show Name' -eq $entry.originalTitle) -and
+                                            $_."Library Name" -eq $entry."Library Name" -and
+                                            $_."Season Number" -eq $global:season_number -and
+                                            ($_.Episodes.Split(",") -contains $global:episodenumber)
+                                        }
+                                    }
+
                                     if ($matchingEpisode) {
                                         # Select the matching episode ID based on the current index
                                         $global:episodeid = $matchingEpisode.EpisodeIds.Split(",")[$i]
@@ -23527,7 +23593,6 @@ Elseif ($SyncJelly -or $SyncEmby) {
             Write-Entry -Subtext "Could not sync shows to jelly/emby, error message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
             write-Entry -Subtext "At line $($_.InvocationInfo.ScriptLineNumber)." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
         }
     }
 
