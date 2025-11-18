@@ -12143,10 +12143,10 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
         # 2. Copy Log Folders
         # Define ignore patterns
         ignore_patterns_default = shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store')
-        # For LOGS_DIR, also ignore .json files
+        # For LOGS_DIR and ROTATED_LOGS_DIR, also ignore .json files
         ignore_patterns_logs = shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store', '*.json')
 
-        if LOGS_DIR.exists():
+        if 'LOGS_DIR' in globals() and LOGS_DIR.exists():
             shutil.copytree(
                 LOGS_DIR,
                 staging_dir_path / "Logs",
@@ -12155,7 +12155,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
             )
             logger.info("[SupportZip] Copied Logs directory (excluding .json files)")
 
-        if ROTATED_LOGS_DIR.exists():
+        if 'ROTATED_LOGS_DIR' in globals() and ROTATED_LOGS_DIR.exists():
             shutil.copytree(
                 ROTATED_LOGS_DIR,
                 staging_dir_path / "RotatedLogs",
@@ -12164,7 +12164,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
             )
             logger.info("[SupportZip] Copied RotatedLogs directory (excluding .json files)")
 
-        if UI_LOGS_DIR.exists():
+        if 'UI_LOGS_DIR' in globals() and UI_LOGS_DIR.exists():
             shutil.copytree(
                 UI_LOGS_DIR,
                 staging_dir_path / "UILogs",
@@ -12246,8 +12246,8 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
             except Exception as e:
                 logger.error(f"[SupportZip] Failed to sanitize imagechoices.db copy: {e}")
 
-        # 3c. Sanitize ImageChoices.csv (only the one in Logs/)
-        logger.info("[SupportZip] Searching for ImageChoices.csv file to sanitize...")
+        # 3c. Sanitize ImageChoices.csv (searches all subdirs)
+        logger.info("[SupportZip] Searching for ImageChoices.csv files to sanitize...")
 
         ALLOWED_PREFIXES = [
             "https://image.tmdb.org",
@@ -12256,7 +12256,6 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
             "https://m.media-amazon.com",
         ]
 
-        # Use rglob, but it will only find the one in the copied Logs folder
         csv_files_to_sanitize = list(staging_dir_path.rglob("ImageChoices.csv"))
         logger.info(f"[SupportZip] Found {len(csv_files_to_sanitize)} ImageChoices.csv files.")
 
@@ -12316,8 +12315,8 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
 
                         sanitized_rows.append(row)
 
-                    logger.info(f"[SupportZip] Sanitized {sanitized_count_in_file} rows in {staging_csv_path.name}.")
-                    total_sanitized_rows += sanitized_count_in_file
+                logger.info(f"[SupportZip] Sanitized {sanitized_count_in_file} rows in {staging_csv_path.name}.")
+                total_sanitized_rows += sanitized_count_in_file
 
                 with open(staging_csv_path, 'w', encoding='utf-8', newline='') as f_out:
                     writer = csv.writer(f_out, delimiter=';')
