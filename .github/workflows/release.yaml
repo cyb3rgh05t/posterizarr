@@ -17,7 +17,7 @@ on:
       version:
         description: "Version to use for testing (e.g., test-1.0.0)"
         required: true
-        default: "test-1.0.0"
+        default: "test"
 
 jobs:
   release:
@@ -43,7 +43,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ github.token }}
+          password: ${{ secrets.PACKAGES }}
 
       - name: Lowercase repository name
         id: repo_name_lowercase
@@ -65,6 +65,10 @@ jobs:
             # Dev tags (only on dev branch)
             type=raw,value=dev,enable=${{ github.event_name == 'push' && github.ref_name == 'dev' }}
             type=sha,prefix=dev-,enable=${{ github.event_name == 'push' && github.ref_name == 'dev' }}
+
+            # Nightly tags (only on nightly branch)
+            type=raw,value=nightly,enable=${{ github.event_name == 'push' && github.ref_name == 'nightly' }}
+            type=sha,prefix=nightly-,enable=${{ github.event_name == 'push' && github.ref_name == 'nightly' }}
 
             # Manual test tag
             type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
