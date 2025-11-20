@@ -6916,7 +6916,7 @@ if ($GatherLogs) {
     # Run the function
     try {
         Write-Host "[Posterizarr] Gathering logs and creating support zip..."
-        $zip = New-PosterizarrSupportZip -BasePath $PSScriptRoot
+        $zip = New-PosterizarrSupportZip -BasePath $global:ScriptRoot
         Write-Host "[Posterizarr] Support zip created:" -ForegroundColor Green
         Write-Host "  $zip" -ForegroundColor Green
         exit 0
