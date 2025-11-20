@@ -1,4 +1,5 @@
 param (
+    [switch]$GatherLogs, # Required for Gather Logs trigger
     [switch]$Manual, # Required for Manual trigger
     [switch]$Testing, # Required for Testing trigger
     [switch]$Tautulli, # Required for Tautulli trigger
@@ -71,6 +72,306 @@ $env:PSMODULE_ANALYSIS_CACHE_ENABLED = $false
 #### FUNCTION START ####
 #region Functions
 
+function New-PosterizarrSupportZip {
+    param(
+        [string]$BasePath
+    )
+
+    # 0. Timestamp + paths (match Python zip name)
+    $timestamp    = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+    $stagingDir   = Join-Path $BasePath "SupportZip_$timestamp"
+    $zipPath      = Join-Path $BasePath "posterizarr_support_$timestamp.zip"
+
+    # Base dirs (equivalent to globals in main.py)
+    $databaseDir  = Join-Path $BasePath "database"
+    $logsDir      = Join-Path $BasePath "Logs"
+    $rotatedDir   = Join-Path $BasePath "RotatedLogs"
+    $uiLogsDir    = Join-Path $BasePath "UILogs"
+
+    # 1. Staging + database subdir
+    New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+    $dbStagingDir = Join-Path $stagingDir "database"
+    New-Item -ItemType Directory -Path $dbStagingDir -Force | Out-Null
+
+    # ---------------------------------------------------------------------
+    # 2. Copy Log Folders (with ignore rules like Python)
+    #    - Logs / RotatedLogs: ignore *.json
+    #    - UILogs: keep .json (only ignore pyc/__pycache__/.DS_Store)
+    # ---------------------------------------------------------------------
+
+    function Copy-Tree {
+        param(
+            [string]$Source,
+            [string]$Dest,
+            [string[]]$ExcludeExtensions = @(),
+            [string[]]$ExcludeNames      = @()
+        )
+
+        if (-not (Test-Path $Source)) { return }
+
+        New-Item -ItemType Directory -Path $Dest -Force | Out-Null
+
+        Get-ChildItem -Path $Source -Recurse | ForEach-Object {
+            # Skip excluded names (e.g. __pycache__, .DS_Store)
+            if ($ExcludeNames -contains $_.Name) { return }
+
+            # Skip excluded extensions (e.g. .json)
+            if ($_.PSIsContainer -eq $false -and $ExcludeExtensions -contains $_.Extension.ToLower()) {
+                return
+            }
+
+            $relative = $_.FullName.Substring($Source.Length).TrimStart('\','/')
+            $target   = Join-Path $Dest $relative
+
+            if ($_.PSIsContainer) {
+                New-Item -ItemType Directory -Path $target -Force | Out-Null
+            } else {
+                New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null
+                Copy-Item $_.FullName -Destination $target -Force
+            }
+        }
+    }
+
+    # Logs: ignore *.asdfasdf (ignore_patterns_logs)
+    if (Test-Path $logsDir) {
+        Copy-Tree -Source $logsDir -Dest (Join-Path $stagingDir "Logs") `
+                  -ExcludeExtensions @(".asdfasdf") `
+                  -ExcludeNames @("__pycache__", ".DS_Store")
+    }
+
+    # RotatedLogs: same rule as Logs
+    if (Test-Path $rotatedDir) {
+        Copy-Tree -Source $rotatedDir -Dest (Join-Path $stagingDir "RotatedLogs") `
+                  -ExcludeExtensions @(".asdfasdf") `
+                  -ExcludeNames @("__pycache__", ".DS_Store")
+    }
+
+    # UILogs: default ignore (no .json exclusion)
+    if (Test-Path $uiLogsDir) {
+        Copy-Tree -Source $uiLogsDir -Dest (Join-Path $stagingDir "UILogs") `
+                  -ExcludeExtensions @() `
+                  -ExcludeNames @("__pycache__", ".DS_Store")
+    }
+
+    # ---------------------------------------------------------------------
+    # 3. Copy & sanitize databases (mirror Python as closely as possible)
+    # ---------------------------------------------------------------------
+
+    # 3a. Copy non-sensitive DBs
+    $nonSensitiveDbs = @(
+        "media_export.db",
+        "runtime_stats.db",
+        "server_libraries.db"
+    )
+
+    foreach ($dbName in $nonSensitiveDbs) {
+        $srcDb = Join-Path $databaseDir $dbName
+        if (Test-Path $srcDb) {
+            Copy-Item $srcDb -Destination (Join-Path $dbStagingDir $dbName) -Force
+        }
+    }
+
+    # 3b. Copy + sanitize imagechoices.db (via Python sqlite3, like your function)
+    $srcImageChoicesDb = Join-Path $databaseDir "imagechoices.db"
+    $copiedImageChoicesDb = Join-Path $dbStagingDir "imagechoices.db"
+
+    if (Test-Path $srcImageChoicesDb) {
+        Copy-Item $srcImageChoicesDb -Destination $copiedImageChoicesDb -Force
+
+        # The Python snippet below is a near-direct port of your sanitization logic.
+        $pyScript = @'
+import sqlite3, re, sys
+
+db_path = sys.argv[1]
+
+ALLOWED_PREFIXES = [
+    "https://image.tmdb.org",
+    "https://artworks.thetvdb.com",
+    "https://assets.fanart.tv",
+    "https://m.media-amazon.com",
+]
+
+conn = sqlite3.connect(db_path)
+cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT id, DownloadSource FROM imagechoices WHERE DownloadSource LIKE 'http%%'"
+)
+rows = cursor.fetchall()
+
+updates = []
+
+for row_id, source in rows:
+    if not source:
+        continue
+
+    sanitized_source = source
+    is_allowed = False
+
+    for prefix in ALLOWED_PREFIXES:
+        if source.startswith(prefix):
+            is_allowed = True
+            break
+
+    if not is_allowed:
+        sanitized_source = re.sub(r"(https?://)[^/]+", r"\\1[MASKED_HOST]", sanitized_source, count=1)
+
+    sanitized_source = re.sub(r"([?&][^=]*Token=)[^&]+", r"\\1[MASKED_TOKEN]", sanitized_source, flags=re.IGNORECASE)
+    sanitized_source = re.sub(r"([?&][^=]*api_key=)[^&]+", r"\\1[MASKED_KEY]", sanitized_source, flags=re.IGNORECASE)
+    sanitized_source = re.sub(r"([?&][^=]*pin=)[^&]+", r"\\1[MASKED_PIN]", sanitized_source, flags=re.IGNORECASE)
+
+    if sanitized_source != source:
+        updates.append((sanitized_source, row_id))
+
+if updates:
+    cursor.executemany(
+        "UPDATE imagechoices SET DownloadSource = ? WHERE id = ?", updates
+    )
+    conn.commit()
+
+conn.close()
+'@
+
+        # Write Python snippet to a temp file and execute it against the copied DB
+        $tmpPy = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.IO.Path]::GetRandomFileName() + ".py")
+        Set-Content -Path $tmpPy -Value $pyScript -Encoding UTF8
+
+        # Use your Python runtime; if you already have a $PythonExe variable, replace "python" with it
+        $pythonExe = "python"
+        & $pythonExe $tmpPy $copiedImageChoicesDb 2>$null
+
+        Remove-Item $tmpPy -Force -ErrorAction SilentlyContinue
+    }
+
+    # 3c. Sanitize ImageChoices.csv (searches all subdirs, like Python)
+    $allowedPrefixes = @(
+        "https://image.tmdb.org",
+        "https://artworks.thetvdb.com",
+        "https://assets.fanart.tv",
+        "https://m.media-amazon.com"
+    )
+
+    $csvFiles = Get-ChildItem -Path $stagingDir -Recurse -Filter "ImageChoices.csv" -File
+    $totalSanitizedRows = 0
+
+    foreach ($csv in $csvFiles) {
+        $path = $csv.FullName
+        try {
+            $rows = Import-Csv -Path $path -Delimiter ';'
+            if (-not $rows) { continue }
+
+            # Ensure required columns exist
+            $props = $rows[0].PSObject.Properties.Name
+            if (-not ($props -contains 'Download Source' -and $props -contains 'Fav Provider Link')) {
+                continue
+            }
+
+            $sanitizedInFile = 0
+
+            foreach ($row in $rows) {
+                $origDownload = $row.'Download Source'
+                $origFav      = $row.'Fav Provider Link'
+
+                $newDownload  = $origDownload
+                $newFav       = $origFav
+
+                if ($newDownload -and $newDownload -like 'http*') {
+                    $isAllowed = $false
+                    foreach ($prefix in $allowedPrefixes) {
+                        if ($newDownload.StartsWith($prefix)) { $isAllowed = $true; break }
+                    }
+
+                    if (-not $isAllowed) {
+                        $newDownload = $newDownload -replace '(https?://)[^/]+', '$1[MASKED_HOST]'
+                    }
+
+                    $newDownload = $newDownload -replace '([?&][^=]*Token=)[^&]+',   '$1[MASKED_TOKEN]'
+                    $newDownload = $newDownload -replace '([?&][^=]*api_key=)[^&]+', '$1[MASKED_KEY]'
+                    $newDownload = $newDownload -replace '([?&][^=]*pin=)[^&]+',     '$1[MASKED_PIN]'
+                }
+
+                if ($newFav -and $newFav -like 'http*') {
+                    $isAllowedFav = $false
+                    foreach ($prefix in $allowedPrefixes) {
+                        if ($newFav.StartsWith($prefix)) { $isAllowedFav = $true; break }
+                    }
+
+                    if (-not $isAllowedFav) {
+                        $newFav = $newFav -replace '(https?://)[^/]+', '$1[MASKED_HOST]'
+                    }
+
+                    $newFav = $newFav -replace '([?&][^=]*Token=)[^&]+',   '$1[MASKED_TOKEN]'
+                    $newFav = $newFav -replace '([?&][^=]*api_key=)[^&]+', '$1[MASKED_KEY]'
+                    $newFav = $newFav -replace '([?&][^=]*pin=)[^&]+',     '$1[MASKED_PIN]'
+                }
+
+                if ($newDownload -ne $origDownload -or $newFav -ne $origFav) {
+                    $sanitizedInFile++
+                    $row.'Download Source' = $newDownload
+                    $row.'Fav Provider Link' = $newFav
+                }
+            }
+
+            if ($sanitizedInFile -gt 0) {
+                $totalSanitizedRows += $sanitizedInFile
+            }
+
+            # Overwrite CSV with sanitized rows
+            $rows | Export-Csv -Path $path -Delimiter ';' -Encoding UTF8 -NoTypeInformation
+
+        } catch {
+            # Log-like behavior; in PS script we can just Write-Host or ignore
+            Write-Host "[SupportZip] Failed to sanitize $($csv.Name): $($_.Exception.Message)"
+        }
+    }
+
+    # ---------------------------------------------------------------------
+    # 3d. Sanitize JSON files (if included)
+    # ---------------------------------------------------------------------
+    $jsonFiles = Get-ChildItem -Path $stagingDir -Recurse -Filter *.json -File
+
+    foreach ($jf in $jsonFiles) {
+        try {
+        $content = Get-Content $jf.FullName -Raw
+
+            # MASK hostnames in URLs
+            $content = $content -replace '(https?://)[^/]+', '$1[MASKED_HOST]'
+
+            # MASK query tokens (Token=xxxx)
+            $content = $content -replace '([?&][^=]*Token=)[^&]+', '$1[MASKED_TOKEN]'
+
+            # MASK API keys
+            $content = $content -replace '([?&][^=]*api_key=)[^&]+', '$1[MASKED_KEY]'
+
+            # MASK PINs
+            $content = $content -replace '([?&][^=]*pin=)[^&]+', '$1[MASKED_PIN]'
+
+            # MASK bearer tokens used in headers
+            $content = $content -replace 'Authorization\s*:\s*Bearer\s+[A-Za-z0-9\.\-_]+', `
+                                        'Authorization: Bearer <REDACTED>'
+
+            # SAFE write back
+            Set-Content -Path $jf.FullName -Value $content -Encoding UTF8
+        }
+    catch {
+            Write-Host "[SupportZip] Failed to sanitize JSON file $($jf.Name): $($_.Exception.Message)"
+        }
+    }
+
+    # ---------------------------------------------------------------------
+    # 4. Create ZIP file
+    # ---------------------------------------------------------------------
+    if (Test-Path $zipPath) {
+        Remove-Item $zipPath -Force
+    }
+
+    Compress-Archive -Path (Join-Path $stagingDir '*') -DestinationPath $zipPath -Force
+
+    # 5. Cleanup staging
+    Remove-Item $stagingDir -Recurse -Force
+
+    return $zipPath
+}
 function New-TextSizeCacheKey {
     param([Parameter(Mandatory)][string]$Text, [Parameter(Mandatory)][hashtable]$Params)
     $list = [System.Collections.Generic.List[string]]::new()
@@ -85,7 +386,6 @@ function New-TextSizeCacheKey {
     $hash = ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join ''
     return $hash
 }
-
 function Get-TextSizeFromCache {
     param([Parameter(Mandatory)][string]$Key, [string]$Path = $Global:TextSizeCachePath)
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
@@ -95,7 +395,6 @@ function Get-TextSizeFromCache {
     if ($db.PSObject.Properties.Name -contains $Key) { return $db.$Key }
     return $null
 }
-
 function Set-TextSizeCacheEntry {
     param([Parameter(Mandatory)][string]$Key, [Parameter(Mandatory)]$Result, [string]$Path = $Global:TextSizeCachePath)
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -399,8 +698,6 @@ function Test-PathPermissions {
         }
     }
 }
-
-
 function Reset-PlexLibraryPictures {
     param (
         [string]$LibraryName
@@ -1016,7 +1313,6 @@ function Get-OptimalPointSize {
     $script:CurrentTextSizeSource = 'calculated'
     return $current_pointsize
 }
-
 function GetTMDBMoviePoster {
     Write-Entry -Subtext "Searching on TMDB for a movie poster - TMDBID: $global:tmdbid" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
     if (!$global:tmdbid) {
@@ -6592,6 +6888,14 @@ $Platform = Get-Platform
 $LatestScriptVersion = (Get-LatestScriptVersion -split "`r?`n" | Select-Object -First 1).Trim()
 ##### START #####
 $startTime = Get-Date
+
+if ($GatherLogs) {
+    Write-Host "[Posterizarr] Gathering logs and creating support zip..."
+    $zip = New-PosterizarrSupportZip -BasePath $PSScriptRoot
+    Write-Host "[Posterizarr] Support zip created:"
+    Write-Host "  $zip"
+    exit 0
+}
 
 if ($arrTriggers) {
     $ArrTrigger = $arrTriggers['ArrTrigger']
@@ -33287,3 +33591,4 @@ else {
         Send-UptimeKumaWebhook -status "up" -ping $executionTime.TotalMilliseconds
     }
 }
+
