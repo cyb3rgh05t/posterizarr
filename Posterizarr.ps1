@@ -53,7 +53,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.13"
+$CurrentScriptVersion = "2.1.14"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -135,22 +135,22 @@ function New-PosterizarrSupportZip {
     # Logs: ignore *.asdfasdf (ignore_patterns_logs)
     if (Test-Path $logsDir) {
         Copy-Tree -Source $logsDir -Dest (Join-Path $stagingDir "Logs") `
-                  -ExcludeExtensions @(".asdfasdf") `
-                  -ExcludeNames @("__pycache__", ".DS_Store")
+            -ExcludeExtensions @(".asdfasdf") `
+            -ExcludeNames @("__pycache__", ".DS_Store")
     }
 
     # RotatedLogs: same rule as Logs
     if (Test-Path $rotatedDir) {
         Copy-Tree -Source $rotatedDir -Dest (Join-Path $stagingDir "RotatedLogs") `
-                  -ExcludeExtensions @(".asdfasdf") `
-                  -ExcludeNames @("__pycache__", ".DS_Store")
+            -ExcludeExtensions @(".asdfasdf") `
+            -ExcludeNames @("__pycache__", ".DS_Store")
     }
 
     # UILogs: default ignore (no .json exclusion)
     if (Test-Path $uiLogsDir) {
         Copy-Tree -Source $uiLogsDir -Dest (Join-Path $stagingDir "UILogs") `
-                  -ExcludeExtensions @() `
-                  -ExcludeNames @("__pycache__", ".DS_Store")
+            -ExcludeExtensions @() `
+            -ExcludeNames @("__pycache__", ".DS_Store")
     }
 
     # ---------------------------------------------------------------------
@@ -171,7 +171,7 @@ function New-PosterizarrSupportZip {
         }
     }
 
-    # 3b. Copy + sanitize imagechoices.db (via Python sqlite3, like your function)
+    # Copy + sanitize imagechoices.db (via Python sqlite3, like your function)
     $srcImageChoicesDb = Join-Path $databaseDir "imagechoices.db"
     $copiedImageChoicesDb = Join-Path $dbStagingDir "imagechoices.db"
 
@@ -236,14 +236,13 @@ conn.close()
         $tmpPy = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.IO.Path]::GetRandomFileName() + ".py")
         Set-Content -Path $tmpPy -Value $pyScript -Encoding UTF8
 
-        # Use your Python runtime; if you already have a $PythonExe variable, replace "python" with it
         $pythonExe = "python"
         & $pythonExe $tmpPy $copiedImageChoicesDb 2>$null
 
         Remove-Item $tmpPy -Force -ErrorAction SilentlyContinue
     }
 
-    # 3c. Sanitize ImageChoices.csv (searches all subdirs, like Python)
+    # Sanitize ImageChoices.csv (searches all subdirs)
     $allowedPrefixes = @(
         "https://image.tmdb.org",
         "https://artworks.thetvdb.com",
@@ -316,9 +315,26 @@ conn.close()
                 $totalSanitizedRows += $sanitizedInFile
             }
 
-            # Overwrite CSV with sanitized rows
-            $rows | Export-Csv -Path $path -Delimiter ';' -Encoding UTF8 -NoTypeInformation
+            # Overwrite CSV with sanitized rows (Manual write to force QUOTE_ALL)
+            $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+            $sw = [System.IO.StreamWriter]::new($path, $false, $utf8NoBom)
 
+            # Get headers from the first row object
+            $headers = $rows[0].PSObject.Properties.Name
+
+            # Write headers (all quoted)
+            $headerLine = ($headers | ForEach-Object { '"{0}"' -f $_.Replace('"', '""') }) -join ';'
+            $sw.WriteLine($headerLine)
+
+            # Write data rows (all quoted)
+            foreach ($r in $rows) {
+                $line = ($headers | ForEach-Object {
+                    $val = $r.$_
+                    '"{0}"' -f "$val".Replace('"', '""')
+                }) -join ';'
+                $sw.WriteLine($line)
+            }
+            $sw.Dispose()
         } catch {
             # Log-like behavior; in PS script we can just Write-Host or ignore
             Write-Host "[SupportZip] Failed to sanitize $($csv.Name): $($_.Exception.Message)"
@@ -326,7 +342,7 @@ conn.close()
     }
 
     # ---------------------------------------------------------------------
-    # 3d. Sanitize JSON files (if included)
+    # Sanitize JSON files (if included)
     # ---------------------------------------------------------------------
     $jsonFiles = Get-ChildItem -Path $stagingDir -Recurse -Filter *.json -File
 
@@ -6890,11 +6906,25 @@ $LatestScriptVersion = (Get-LatestScriptVersion -split "`r?`n" | Select-Object -
 $startTime = Get-Date
 
 if ($GatherLogs) {
-    Write-Host "[Posterizarr] Gathering logs and creating support zip..."
-    $zip = New-PosterizarrSupportZip -BasePath $PSScriptRoot
-    Write-Host "[Posterizarr] Support zip created:"
-    Write-Host "  $zip"
-    exit 0
+    # Check if Python is present
+    if (-not (Get-Command "python" -ErrorAction SilentlyContinue)) {
+        Write-Host "[Posterizarr] Error: Python is not installed or not found in PATH." -ForegroundColor Red
+        Write-Host "[Posterizarr] Python is required to sanitize the database for the support zip." -ForegroundColor Red
+        exit 1
+    }
+
+    # Run the function
+    try {
+        Write-Host "[Posterizarr] Gathering logs and creating support zip..."
+        $zip = New-PosterizarrSupportZip -BasePath $PSScriptRoot
+        Write-Host "[Posterizarr] Support zip created:" -ForegroundColor Green
+        Write-Host "  $zip" -ForegroundColor Green
+        exit 0
+    }
+    catch {
+        Write-Host "[Posterizarr] Failed to create support zip: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
 }
 
 if ($arrTriggers) {
