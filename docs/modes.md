@@ -368,3 +368,22 @@ To use it we need to configure a script in Sonarr/Radarr, please follow these in
    - The file will be named like: `recently_added_20250925114601966_1da214d7.posterizarr`
 9. Posterizarr monitors this directory for files ending in `.posterizarr`.
    - When such a file is detected, it **waits** up to `5 minutes`(based on fileage), then reads the file and triggers a Posterizarr run for the corresponding item.
+
+### Gather Logs Mode
+
+Run the script with the `-GatherLogs` flag. In this mode, the script collects logs, rotated logs, and database files into a single archive for troubleshooting.
+
+Crucially, the script sanitizes these files before zipping them automatically masking API keys, tokens, PINs, and sensitive hostnames. The result is saved in the script root as `posterizarr_support_<timestamp>.zip`
+
+!!! tip Use this when reporting bugs or requesting support. It allows you to share comprehensive debugging information with the developer without manually scrubbing your credentials or private links from the files.
+
+
+```powershell
+.\Posterizarr.ps1 -GatherLogs
+```
+
+On [docker](platformandtools.md#docker) this way:
+
+```sh
+docker exec -it posterizarr pwsh /app/Posterizarr.ps1 -GatherLogs
+```

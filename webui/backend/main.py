@@ -12211,6 +12211,9 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                     "https://artworks.thetvdb.com",
                     "https://assets.fanart.tv",
                     "https://m.media-amazon.com",
+                    "https://www.themoviedb.org",
+                    "https://fanart.tv",
+                    "https://www.thetvdb.com",
                 ]
 
                 for row_id, source in rows:
@@ -12254,6 +12257,9 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
             "https://artworks.thetvdb.com",
             "https://assets.fanart.tv",
             "https://m.media-amazon.com",
+            "https://www.themoviedb.org",
+            "https://fanart.tv",
+            "https://www.thetvdb.com",
         ]
 
         csv_files_to_sanitize = list(staging_dir_path.rglob("ImageChoices.csv"))
@@ -12319,7 +12325,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                 total_sanitized_rows += sanitized_count_in_file
 
                 with open(staging_csv_path, 'w', encoding='utf-8', newline='') as f_out:
-                    writer = csv.writer(f_out, delimiter=';')
+                    writer = csv.writer(f_out, delimiter=';', quoting=csv.QUOTE_ALL)
                     writer.writerows(sanitized_rows)
 
                 logger.debug(f"[SupportZip] Overwrote {staging_csv_path.name} with sanitized content.")
