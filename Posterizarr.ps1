@@ -132,17 +132,17 @@ function New-PosterizarrSupportZip {
         }
     }
 
-    # Logs: ignore *.asdfasdf (ignore_patterns_logs)
+    # Logs: ignore *.json (ignore_patterns_logs)
     if (Test-Path $logsDir) {
         Copy-Tree -Source $logsDir -Dest (Join-Path $stagingDir "Logs") `
-            -ExcludeExtensions @(".asdfasdf") `
+            -ExcludeExtensions @(".json") `
             -ExcludeNames @("__pycache__", ".DS_Store")
     }
 
     # RotatedLogs: same rule as Logs
     if (Test-Path $rotatedDir) {
         Copy-Tree -Source $rotatedDir -Dest (Join-Path $stagingDir "RotatedLogs") `
-            -ExcludeExtensions @(".asdfasdf") `
+            -ExcludeExtensions @(".json") `
             -ExcludeNames @("__pycache__", ".DS_Store")
     }
 
@@ -189,6 +189,9 @@ ALLOWED_PREFIXES = [
     "https://artworks.thetvdb.com",
     "https://assets.fanart.tv",
     "https://m.media-amazon.com",
+    "https://www.themoviedb.org",
+    "https://fanart.tv",
+    "https://www.thetvdb.com",
 ]
 
 conn = sqlite3.connect(db_path)
@@ -247,7 +250,10 @@ conn.close()
         "https://image.tmdb.org",
         "https://artworks.thetvdb.com",
         "https://assets.fanart.tv",
-        "https://m.media-amazon.com"
+        "https://m.media-amazon.com",
+        "https://www.themoviedb.org",
+        "https://fanart.tv",
+        "https://www.thetvdb.com"
     )
 
     $csvFiles = Get-ChildItem -Path $stagingDir -Recurse -Filter "ImageChoices.csv" -File
@@ -342,48 +348,30 @@ conn.close()
     }
 
     # ---------------------------------------------------------------------
-    # Sanitize JSON files (if included)
-    # ---------------------------------------------------------------------
-    $jsonFiles = Get-ChildItem -Path $stagingDir -Recurse -Filter *.json -File
-
-    foreach ($jf in $jsonFiles) {
-        try {
-        $content = Get-Content $jf.FullName -Raw
-
-            # MASK hostnames in URLs
-            $content = $content -replace '(https?://)[^/]+', '$1[MASKED_HOST]'
-
-            # MASK query tokens (Token=xxxx)
-            $content = $content -replace '([?&][^=]*Token=)[^&]+', '$1[MASKED_TOKEN]'
-
-            # MASK API keys
-            $content = $content -replace '([?&][^=]*api_key=)[^&]+', '$1[MASKED_KEY]'
-
-            # MASK PINs
-            $content = $content -replace '([?&][^=]*pin=)[^&]+', '$1[MASKED_PIN]'
-
-            # MASK bearer tokens used in headers
-            $content = $content -replace 'Authorization\s*:\s*Bearer\s+[A-Za-z0-9\.\-_]+', `
-                                        'Authorization: Bearer <REDACTED>'
-
-            # SAFE write back
-            Set-Content -Path $jf.FullName -Value $content -Encoding UTF8
-        }
-    catch {
-            Write-Host "[SupportZip] Failed to sanitize JSON file $($jf.Name): $($_.Exception.Message)"
-        }
-    }
-
-    # ---------------------------------------------------------------------
     # 4. Create ZIP file
     # ---------------------------------------------------------------------
     if (Test-Path $zipPath) {
         Remove-Item $zipPath -Force
     }
 
-    Compress-Archive -Path (Join-Path $stagingDir '*') -DestinationPath $zipPath -Force
+    # Calculate the ABSOLUTE path for the zip file, because we are about to change directories
+    $absZipPath = $zipPath
+    if (-not [System.IO.Path]::IsPathRooted($zipPath)) {
+        $absZipPath = Join-Path (Get-Location).Path $zipPath
+    }
 
-    # 5. Cleanup staging
+    # Enter the staging directory to force Compress-Archive
+    # to treat the *contents* as the root of the zip.
+    Push-Location $stagingDir
+    try {
+        Compress-Archive -Path * -DestinationPath $absZipPath -Force
+    }
+    finally {
+        # Return to the original directory
+        Pop-Location
+    }
+
+    # Cleanup staging
     Remove-Item $stagingDir -Recurse -Force
 
     return $zipPath
