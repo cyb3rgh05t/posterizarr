@@ -5155,14 +5155,32 @@ function MassDownloadPlexArtwork {
                             $relativePath = $location.Substring($libpath.Length)
                             $pathSegments = $relativePath -split '[\\/]'
 
-                            # Determine the extracted folder and the root folder path
+                            # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                            $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                             if ($pathSegments.Count -gt 2) {
                                 $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                                $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                                
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                    # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                                    $extraFolder = $pathSegments[1]
+                                    Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                }
+                                else {
+                                    # Standard structure
+                                    $extraFolder = $pathSegments[0]
+                                }
                             }
                             else {
-                                $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                                $extraFolder = $null  # No parent structure
+                                # Shallow structure
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                     $extractedFolder = $pathSegments[1]
+                                     $extraFolder = $null
+                                }
+                                else {
+                                     $extractedFolder = $pathSegments[0]
+                                     $extraFolder = $null
+                                }
                             }
                             Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -5207,13 +5225,32 @@ function MassDownloadPlexArtwork {
                             $pathSegments = $relativePath -split '[\\/]'
 
                             # Determine the extracted folder and the root folder path
+                            # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                            $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                             if ($pathSegments.Count -gt 2) {
                                 $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                                $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                                
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                    # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                                    $extraFolder = $pathSegments[1]
+                                    Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                }
+                                else {
+                                    # Standard structure
+                                    $extraFolder = $pathSegments[0]
+                                }
                             }
                             else {
-                                $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                                $extraFolder = $null  # No parent structure
+                                # Shallow structure
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                     $extractedFolder = $pathSegments[1]
+                                     $extraFolder = $null
+                                }
+                                else {
+                                     $extractedFolder = $pathSegments[0]
+                                     $extraFolder = $null
+                                }
                             }
                             Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -9458,13 +9495,32 @@ Elseif ($Tautulli) {
                     $pathSegments = $relativePath -split '[\\/]'
 
                     # Determine the extracted folder and the root folder path
+                    # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                    $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                     if ($pathSegments.Count -gt 2) {
                         $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                        $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                        
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                            $extraFolder = $pathSegments[1]
+                            Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                        }
+                        else {
+                            # Standard structure
+                            $extraFolder = $pathSegments[0]
+                        }
                     }
                     else {
-                        $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                        $extraFolder = $null  # No parent structure
+                        # Shallow structure
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                $extractedFolder = $pathSegments[1]
+                                $extraFolder = $null
+                        }
+                        else {
+                                $extractedFolder = $pathSegments[0]
+                                $extraFolder = $null
+                        }
                     }
                     Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                     Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -9507,13 +9563,32 @@ Elseif ($Tautulli) {
                     $pathSegments = $relativePath -split '[\\/]'
 
                     # Determine the extracted folder and the root folder path
+                    # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                    $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                     if ($pathSegments.Count -gt 2) {
                         $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                        $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                        
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                            $extraFolder = $pathSegments[1]
+                            Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                        }
+                        else {
+                            # Standard structure
+                            $extraFolder = $pathSegments[0]
+                        }
                     }
                     else {
-                        $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                        $extraFolder = $null  # No parent structure
+                        # Shallow structure
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                $extractedFolder = $pathSegments[1]
+                                $extraFolder = $null
+                        }
+                        else {
+                                $extractedFolder = $pathSegments[0]
+                                $extraFolder = $null
+                        }
                     }
                     Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                     Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
@@ -14198,13 +14273,32 @@ Elseif ($ArrTrigger) {
                     $pathSegments = $relativePath -split '[\\/]'
 
                     # Determine the extracted folder and the root folder path
+                    # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                    $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                     if ($pathSegments.Count -gt 2) {
                         $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                        $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                        
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                            $extraFolder = $pathSegments[1]
+                            Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                        }
+                        else {
+                            # Standard structure
+                            $extraFolder = $pathSegments[0]
+                        }
                     }
                     else {
-                        $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                        $extraFolder = $null  # No parent structure
+                        # Shallow structure
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                $extractedFolder = $pathSegments[1]
+                                $extraFolder = $null
+                        }
+                        else {
+                                $extractedFolder = $pathSegments[0]
+                                $extraFolder = $null
+                        }
                     }
 
                     if ($Movie.Tags) {
@@ -14279,13 +14373,32 @@ Elseif ($ArrTrigger) {
                     $pathSegments = $relativePath -split '[\\/]'
 
                     # Determine the extracted folder and the root folder path
+                    # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                    $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                     if ($pathSegments.Count -gt 2) {
                         $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                        $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                        
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                            $extraFolder = $pathSegments[1]
+                            Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                        }
+                        else {
+                            # Standard structure
+                            $extraFolder = $pathSegments[0]
+                        }
                     }
                     else {
-                        $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                        $extraFolder = $null  # No parent structure
+                        # Shallow structure
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                $extractedFolder = $pathSegments[1]
+                                $extraFolder = $null
+                        }
+                        else {
+                                $extractedFolder = $pathSegments[0]
+                                $extraFolder = $null
+                        }
                     }
 
                     if ($Movie.Tags) {
@@ -14367,13 +14480,32 @@ Elseif ($ArrTrigger) {
                 $pathSegments = $relativePath -split '[\\/]'
 
                 # Determine the extracted folder and the root folder path
+                # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                 if ($pathSegments.Count -gt 2) {
                     $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                    $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                    
+                    if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                        # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                        $extraFolder = $pathSegments[1]
+                        Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                    }
+                    else {
+                        # Standard structure
+                        $extraFolder = $pathSegments[0]
+                    }
                 }
                 else {
-                    $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                    $extraFolder = $null  # No parent structure
+                    # Shallow structure
+                    if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            $extractedFolder = $pathSegments[1]
+                            $extraFolder = $null
+                    }
+                    else {
+                            $extractedFolder = $pathSegments[0]
+                            $extraFolder = $null
+                    }
                 }
 
                 if ($Show.Tags) {
@@ -18220,14 +18352,34 @@ Elseif ($ArrTrigger) {
                     $pathSegments = $relativePath -split '[\\/]'
 
                     # Determine the extracted folder and the root folder path
+                    # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                    $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                     if ($pathSegments.Count -gt 2) {
                         $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                        $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                        
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                            $extraFolder = $pathSegments[1]
+                            Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                        }
+                        else {
+                            # Standard structure
+                            $extraFolder = $pathSegments[0]
+                        }
                     }
                     else {
-                        $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                        $extraFolder = $null  # No parent structure
+                        # Shallow structure
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                $extractedFolder = $pathSegments[1]
+                                $extraFolder = $null
+                        }
+                        else {
+                                $extractedFolder = $pathSegments[0]
+                                $extraFolder = $null
+                        }
                     }
+
                     Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                     Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                     continue
@@ -18269,14 +18421,34 @@ Elseif ($ArrTrigger) {
                     $pathSegments = $relativePath -split '[\\/]'
 
                     # Determine the extracted folder and the root folder path
+                    # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                    $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                     if ($pathSegments.Count -gt 2) {
                         $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                        $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                        
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                            $extraFolder = $pathSegments[1]
+                            Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                        }
+                        else {
+                            # Standard structure
+                            $extraFolder = $pathSegments[0]
+                        }
                     }
                     else {
-                        $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                        $extraFolder = $null  # No parent structure
+                        # Shallow structure
+                        if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                $extractedFolder = $pathSegments[1]
+                                $extraFolder = $null
+                        }
+                        else {
+                                $extractedFolder = $pathSegments[0]
+                                $extraFolder = $null
+                        }
                     }
+
                     Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                     Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                     continue
@@ -22924,14 +23096,34 @@ Elseif ($SyncJelly -or $SyncEmby) {
                             $pathSegments = $relativePath -split '[\\/]'
 
                             # Determine the extracted folder and the root folder path
+                            # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                            $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                             if ($pathSegments.Count -gt 2) {
                                 $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                                $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                                
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                    # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                                    $extraFolder = $pathSegments[1]
+                                    Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                }
+                                else {
+                                    # Standard structure
+                                    $extraFolder = $pathSegments[0]
+                                }
                             }
                             else {
-                                $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                                $extraFolder = $null  # No parent structure
+                                # Shallow structure
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                     $extractedFolder = $pathSegments[1]
+                                     $extraFolder = $null
+                                }
+                                else {
+                                     $extractedFolder = $pathSegments[0]
+                                     $extraFolder = $null
+                                }
                             }
+
                             Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             continue
@@ -22975,14 +23167,34 @@ Elseif ($SyncJelly -or $SyncEmby) {
                             $pathSegments = $relativePath -split '[\\/]'
 
                             # Determine the extracted folder and the root folder path
+                            # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                            $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                             if ($pathSegments.Count -gt 2) {
                                 $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                                $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                                
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                    # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                                    $extraFolder = $pathSegments[1]
+                                    Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                }
+                                else {
+                                    # Standard structure
+                                    $extraFolder = $pathSegments[0]
+                                }
                             }
                             else {
-                                $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                                $extraFolder = $null  # No parent structure
+                                # Shallow structure
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                     $extractedFolder = $pathSegments[1]
+                                     $extraFolder = $null
+                                }
+                                else {
+                                     $extractedFolder = $pathSegments[0]
+                                     $extraFolder = $null
+                                }
                             }
+
                             Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             continue
@@ -23190,14 +23402,34 @@ Elseif ($SyncJelly -or $SyncEmby) {
             $pathSegments = $relativePath -split '[\\/]'
 
             # Determine the extracted folder and the root folder path
+            # Check if first segment is a sorting folder (A-Z, 0-9, #)
+            $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
             if ($pathSegments.Count -gt 2) {
                 $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                
+                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                    # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                    $extraFolder = $pathSegments[1]
+                    Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                }
+                else {
+                    # Standard structure
+                    $extraFolder = $pathSegments[0]
+                }
             }
             else {
-                $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                $extraFolder = $null  # No parent structure
+                # Shallow structure
+                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                        $extractedFolder = $pathSegments[1]
+                        $extraFolder = $null
+                }
+                else {
+                        $extractedFolder = $pathSegments[0]
+                        $extraFolder = $null
+                }
             }
+
             if ($Movie.Tags) {
                 $Labels = $($Movie.Tags -join ',')
             }
@@ -23255,14 +23487,34 @@ Elseif ($SyncJelly -or $SyncEmby) {
                 $pathSegments = $relativePath -split '[\\/]'
 
                 # Determine the extracted folder and the root folder path
+                # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                 if ($pathSegments.Count -gt 2) {
                     $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                    $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                    
+                    if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                        # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                        $extraFolder = $pathSegments[1]
+                        Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                    }
+                    else {
+                        # Standard structure
+                        $extraFolder = $pathSegments[0]
+                    }
                 }
                 else {
-                    $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                    $extraFolder = $null  # No parent structure
+                    # Shallow structure
+                    if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            $extractedFolder = $pathSegments[1]
+                            $extraFolder = $null
+                    }
+                    else {
+                            $extractedFolder = $pathSegments[0]
+                            $extraFolder = $null
+                    }
                 }
+
                 Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                 Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
             }
@@ -23334,14 +23586,34 @@ Elseif ($SyncJelly -or $SyncEmby) {
         $pathSegments = $relativePath -split '[\\/]'
 
         # Determine the extracted folder and the root folder path
+        # Check if first segment is a sorting folder (A-Z, 0-9, #)
+        $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
         if ($pathSegments.Count -gt 2) {
             $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-            $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+            
+            if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                $extraFolder = $pathSegments[1]
+                Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+            }
+            else {
+                # Standard structure
+                $extraFolder = $pathSegments[0]
+            }
         }
         else {
-            $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-            $extraFolder = $null  # No parent structure
+            # Shallow structure
+            if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                    $extractedFolder = $pathSegments[1]
+                    $extraFolder = $null
+            }
+            else {
+                    $extractedFolder = $pathSegments[0]
+                    $extraFolder = $null
+            }
         }
+
         Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
         Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
 
@@ -24155,13 +24427,32 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                 $pathSegments = $relativePath -split '[\\/]'
 
                 # Determine the extracted folder and the root folder path
+                # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                 if ($pathSegments.Count -gt 2) {
                     $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                    $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                    
+                    if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                        # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                        $extraFolder = $pathSegments[1]
+                        Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                    }
+                    else {
+                        # Standard structure
+                        $extraFolder = $pathSegments[0]
+                    }
                 }
                 else {
-                    $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                    $extraFolder = $null  # No parent structure
+                    # Shallow structure
+                    if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            $extractedFolder = $pathSegments[1]
+                            $extraFolder = $null
+                    }
+                    else {
+                            $extractedFolder = $pathSegments[0]
+                            $extraFolder = $null
+                    }
                 }
 
                 if ($Movie.Tags) {
@@ -24234,13 +24525,32 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                 $pathSegments = $relativePath -split '[\\/]'
 
                 # Determine the extracted folder and the root folder path
+                # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                 if ($pathSegments.Count -gt 2) {
                     $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                    $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                    
+                    if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                        # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                        $extraFolder = $pathSegments[1]
+                        Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                    }
+                    else {
+                        # Standard structure
+                        $extraFolder = $pathSegments[0]
+                    }
                 }
                 else {
-                    $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                    $extraFolder = $null  # No parent structure
+                    # Shallow structure
+                    if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                            $extractedFolder = $pathSegments[1]
+                            $extraFolder = $null
+                    }
+                    else {
+                            $extractedFolder = $pathSegments[0]
+                            $extraFolder = $null
+                    }
                 }
 
                 if ($Movie.Tags) {
@@ -24320,13 +24630,32 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
             $pathSegments = $relativePath -split '[\\/]'
 
             # Determine the extracted folder and the root folder path
+            # Check if first segment is a sorting folder (A-Z, 0-9, #)
+            $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
             if ($pathSegments.Count -gt 2) {
                 $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                
+                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                    # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                    $extraFolder = $pathSegments[1]
+                    Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                }
+                else {
+                    # Standard structure
+                    $extraFolder = $pathSegments[0]
+                }
             }
             else {
-                $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                $extraFolder = $null  # No parent structure
+                # Shallow structure
+                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                        $extractedFolder = $pathSegments[1]
+                        $extraFolder = $null
+                }
+                else {
+                        $extractedFolder = $pathSegments[0]
+                        $extraFolder = $null
+                }
             }
 
             if ($Show.Tags) {
@@ -28510,14 +28839,34 @@ else {
                             $pathSegments = $relativePath -split '[\\/]'
 
                             # Determine the extracted folder and the root folder path
+                            # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                            $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                             if ($pathSegments.Count -gt 2) {
                                 $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                                $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                                
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                    # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                                    $extraFolder = $pathSegments[1]
+                                    Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                }
+                                else {
+                                    # Standard structure
+                                    $extraFolder = $pathSegments[0]
+                                }
                             }
                             else {
-                                $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                                $extraFolder = $null  # No parent structure
+                                # Shallow structure
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                     $extractedFolder = $pathSegments[1]
+                                     $extraFolder = $null
+                                }
+                                else {
+                                     $extractedFolder = $pathSegments[0]
+                                     $extraFolder = $null
+                                }
                             }
+
                             Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             continue
@@ -28561,14 +28910,34 @@ else {
                             $pathSegments = $relativePath -split '[\\/]'
 
                             # Determine the extracted folder and the root folder path
+                            # Check if first segment is a sorting folder (A-Z, 0-9, #)
+                            $isSortingFolder = $pathSegments[0] -match '^[a-zA-Z0-9]$|^0-9$|^#$'
+
                             if ($pathSegments.Count -gt 2) {
                                 $extractedFolder = $pathSegments[-2]  # Second-to-last segment is the folder containing the file
-                                $extraFolder = $pathSegments[0]  # All segments up to the extracted folder
+                                
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                    # If sorting folder detected (e.g. "A"), grab the NEXT segment (Show Name)
+                                    $extraFolder = $pathSegments[1]
+                                    Write-Entry -Subtext "Detected sorting folder [$($pathSegments[0])]. Using [$extraFolder] as RootFolder." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                }
+                                else {
+                                    # Standard structure
+                                    $extraFolder = $pathSegments[0]
+                                }
                             }
                             else {
-                                $extractedFolder = $pathSegments[0]  # Only one segment, it's the folder
-                                $extraFolder = $null  # No parent structure
+                                # Shallow structure
+                                if ($isSortingFolder -and $pathSegments.Count -gt 1) {
+                                     $extractedFolder = $pathSegments[1]
+                                     $extraFolder = $null
+                                }
+                                else {
+                                     $extractedFolder = $pathSegments[0]
+                                     $extraFolder = $null
+                                }
                             }
+
                             Write-Entry -Subtext "Matchedpath: $Matchedpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             Write-Entry -Subtext "ExtractedFolder: $extractedFolder" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             continue
