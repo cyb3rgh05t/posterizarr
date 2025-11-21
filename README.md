@@ -7,6 +7,11 @@
 
   <p align="center">
     Automate the creation of beautiful, textless posters for your Plex, Jellyfin, or Emby library.
+<br />
+<div align="center">
+  <a href="https://github.com/fscorrupt/posterizarr">
+    <img src="/docs/images/posterizarr_banner.jpg" alt="Logo" width="650" height="550">
+  </a>
     <br />
     <br />
     <strong><a href="https://fscorrupt.github.io/posterizarr/">View Full Documentation »</a></strong>
