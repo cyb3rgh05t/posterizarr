@@ -3540,6 +3540,120 @@ function GetTVDBShowPoster {
         Write-Entry -Subtext "Cannot search on TVDB, missing ID..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
     }
 }
+function GetTMDBLogo {
+    param(
+        [string]$Type
+    )
+    if ($global:tvdbid) {
+        Write-Entry -Subtext "Searching on TMDB for a Logo - TMDBID: $global:tmdbid" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
+        try {
+            $response = (Invoke-WebRequest -Uri "https://api.themoviedb.org/3/$Type/$($global:tmdbid)?append_to_response=images&language=$($global:LogoLanguageOrder[0])&include_image_language=$($global:LogoLanguageOrder -join ',')" -Method GET -Headers $global:headers -ErrorAction SilentlyContinue).content | ConvertFrom-Json -ErrorAction SilentlyContinue
+        }
+        catch {
+            Write-Entry -Subtext "Could not query TVDB url, error message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+        }
+        if ($response) {
+            if ($response.images.logos) {
+                foreach ($lang in $global:LogoLanguageOrder) {
+                    if ($lang -ne 'null' -or $lang -ne 'xx') {
+                        if ($global:GetClearlogo -eq 'true'){
+                            $FavPoster = ($response.images.logos | Where-Object iso_639_1 -eq $lang)
+                        }
+                    }
+
+                    if ($FavPoster) {
+                        if ($global:TMDBVoteSorting -eq 'primary') {
+                            $posterpath = $FavPoster[0].file_path
+                        }
+                        Else {
+                            $posterpath = (($FavPoster | Sort-Object $global:TMDBVoteSorting -Descending)[0]).file_path
+                        }
+                        $global:posterurl = "https://image.tmdb.org/t/p/original$posterpath"
+                        if ($lang -ne 'null' -or $lang -ne 'xx') {
+                            Write-Entry -Subtext "Found Logo with Language '$lang' on TMDB" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Blue -log Info
+                            $global:PosterWithText = $true
+                            $global:TMDBAssetTextLang = $lang
+                            $global:TMDBAssetChangeUrl = "https://www.themoviedb.org/$Type/$($global:tmdbid)/images/logos"
+                        }
+                        return $global:posterurl
+                        continue
+                    }
+                }
+            }
+            Else {
+                Write-Entry -Subtext "No Logo found on TMDB" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                $global:TVDBAssetChangeUrl = "https://www.themoviedb.org/$Type/$($global:tmdbid)/images/logos"
+            }
+        }
+        Else {
+            Write-Entry -Subtext "TMDB API response is null" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            $global:TVDBAssetChangeUrl = "https://www.themoviedb.org/$Type/$($global:tmdbid)/images/logos"
+        }
+    }
+    Else {
+        Write-Entry -Subtext "Cannot search on TMDB, missing ID..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+    }
+}
+function GetTVDBLogo {
+    param(
+        [string]$Type
+    )
+    if ($global:tvdbid) {
+        Write-Entry -Subtext "Searching on TVDB for a Logo - TVDBID: $global:tvdbid" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
+        try {
+            $response = (Invoke-WebRequest -Uri "https://api4.thetvdb.com/v4/$Type/$($global:tvdbid)/artworks" -Method GET -Headers $global:tvdbheader).content | ConvertFrom-Json
+        }
+        catch {
+            Write-Entry -Subtext "Could not query TVDB url, error message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+        }
+        if ($response) {
+            if ($response.data) {
+                foreach ($lang in $global:LogoLanguageOrder) {
+                    if ($lang -ne 'null') {
+                        if ($global:GetClearart -eq 'true'){
+                            if ($Type -eq 'series'){
+                                $global:tvdblogo = ($response.data.artworks | Where-Object { $_.language -like "$lang*" -and $_.type -eq '22' } | Sort-Object Score -Descending)
+                            }
+                            Else {
+                                $global:tvdblogo = ($response.data.artworks | Where-Object { $_.language -like "$lang*" -and $_.type -eq '24' } | Sort-Object Score -Descending)
+                            }
+                        }
+                        elseif ($global:GetClearlogo -eq 'true'){
+                            if ($Type -eq 'series'){
+                                $global:tvdblogo = ($response.data.artworks | Where-Object { $_.language -like "$lang*" -and $_.type -eq '23' } | Sort-Object Score -Descending)
+                            }
+                            Else {
+                                $global:tvdblogo = ($response.data.artworks | Where-Object { $_.language -like "$lang*" -and $_.type -eq '25' } | Sort-Object Score -Descending)
+                            }
+                        }
+                    }
+
+                    if ($global:tvdblogo) {
+                        $global:posterurl = $global:tvdblogo[0].image
+                        Write-Entry -Subtext "Found Logo with Language '$lang' on TVDB" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Blue -log Info
+
+                        $global:TVDBAssetChangeUrl = "https://thetvdb.com/$Type/$($response.data.slug)#artwork"
+                        return $global:posterurl
+                        continue
+                    }
+                }
+            }
+            Else {
+                Write-Entry -Subtext "No Logo found on TVDB" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                $global:TVDBAssetChangeUrl = "https://thetvdb.com/$Type/$($response.data.slug)#artwork"
+            }
+        }
+        Else {
+            Write-Entry -Subtext "TVDB API response is null" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+            $global:TVDBAssetChangeUrl = "https://thetvdb.com/$Type/$($response.data.slug)#artwork"
+        }
+    }
+    Else {
+        Write-Entry -Subtext "Cannot search on TVDB, missing ID..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+    }
+}
 function GetTVDBSeasonPoster {
     if ($global:tvdbid) {
         Write-Entry -Subtext "Searching on TVDB for a Season poster - TVDBID: $global:tvdbid" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
