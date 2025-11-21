@@ -719,63 +719,51 @@ class CachedStaticFiles(StaticFiles):
 
 def is_poster_file(filename: str) -> bool:
     """
-    Check if file is a poster:
-    - poster.jpg (folder-based)
-    - Show Name (Year) [tvdb-xxxxx].jpg (file-based, ends with .jpg, no underscore before .jpg)
-
-    MUST EXCLUDE:
-    - background.jpg
-    - Season01.jpg (and all SeasonXX.jpg)
-    - S01E01.jpg (and all SxxExx.jpg)
-    - *_background.jpg
-    - *_Season01.jpg
-    - *_S01E01.jpg
+    Check if file is a poster.
+    Supports: .jpg, .jpeg, .png, .webp, .tbn
     """
-    # Exact match: poster.jpg
-    if filename == "poster.jpg":
-        return True
-
-    # EXCLUDE specific folder-based files
-    if filename == "background.jpg":
-        return False
-    if re.match(r"^Season\d+\.jpg$", filename):
-        return False
-    if re.match(r"^S\d+E\d+\.jpg$", filename):
+    lower_name = filename.lower()
+    valid_extensions = (".jpg", ".jpeg", ".png", ".webp", ".tbn")
+    
+    # 1. Must end with a valid extension
+    if not lower_name.endswith(valid_extensions):
         return False
 
-    # File-based: Must end with .jpg but NOT with special patterns
-    if filename.endswith(".jpg"):
-        # Exclude files with underscore patterns for other types
-        if re.search(r"_background\.jpg$", filename):
-            return False
-        if re.search(r"_Season\d+\.jpg$", filename):
-            return False
-        if re.search(r"_S\d+E\d+\.jpg$", filename):
-            return False
-        # If it's just *.jpg without those patterns, it's a poster
-        return True
+    # 2. EXCLUDE specific folder-based reserved filenames (regardless of extension)
+    # We check if the name starts with specific reserved words to handle background.png, Season01.webp, etc.
+    if lower_name.startswith("background."):
+        return False
+    if re.match(r"^season\d+\.", lower_name):
+        return False
+    if re.match(r"^s\d+e\d+\.", lower_name):
+        return False
 
-    return False
+    # 3. File-based exclusions (naming convention: Name_Type.ext)
+    # Exclude files ending with _background.ext, _SeasonXX.ext, _SxxExx.ext
+    if re.search(r"_background\.(jpg|jpeg|png|webp|tbn)$", lower_name):
+        return False
+    if re.search(r"_season\d+\.(jpg|jpeg|png|webp|tbn)$", lower_name):
+        return False
+    if re.search(r"_s\d+e\d+\.(jpg|jpeg|png|webp|tbn)$", lower_name):
+        return False
+
+    # If it passed all exclusions and has a valid extension, it's a poster
+    return True
 
 
 def is_background_file(filename: str) -> bool:
     """
-    Check if file is a background:
-    - background.jpg (folder-based)
-    - Show Name (Year) [tvdb-xxxxx]_background.jpg (file-based)
-
-    MUST EXCLUDE:
-    - poster.jpg
-    - Season01.jpg
-    - S01E01.jpg
-    - Any other .jpg files
+    Check if file is a background.
+    Matches: background.ext OR *_background.ext
     """
-    # Exact match: background.jpg
-    if filename == "background.jpg":
+    lower_name = filename.lower()
+    
+    # Exact match: background.jpg, background.png, etc.
+    if re.match(r"^background\.(jpg|jpeg|png|webp|tbn)$", lower_name):
         return True
 
-    # File-based: ends with _background.jpg
-    if re.search(r"_background\.jpg$", filename):
+    # File-based: ends with _background.ext
+    if re.search(r"_background\.(jpg|jpeg|png|webp|tbn)$", lower_name):
         return True
 
     return False
@@ -783,22 +771,15 @@ def is_background_file(filename: str) -> bool:
 
 def is_season_file(filename: str) -> bool:
     """
-    Check if file is a season poster (SeasonXX.jpg with capital S):
-    - Season01.jpg, Season02.jpg, Season12.jpg (folder-based)
-    - Show Name (Year) [tvdb-xxxxx]_Season01.jpg (file-based)
-
-    MUST EXCLUDE:
-    - poster.jpg
-    - background.jpg
-    - S01E01.jpg
-    - Any other .jpg files
+    Check if file is a season poster.
+    Matches: SeasonXX.ext OR *_SeasonXX.ext
     """
-    # Folder-based: SeasonXX.jpg (capital S, digits)
-    if re.match(r"^Season\d+\.jpg$", filename):
+    # Folder-based: SeasonXX.ext (case insensitive via flag or lower handling)
+    if re.match(r"^season\d+\.(jpg|jpeg|png|webp|tbn)$", filename, re.IGNORECASE):
         return True
 
-    # File-based: *_SeasonXX.jpg (capital S, digits)
-    if re.search(r"_Season\d+\.jpg$", filename):
+    # File-based: *_SeasonXX.ext
+    if re.search(r"_season\d+\.(jpg|jpeg|png|webp|tbn)$", filename, re.IGNORECASE):
         return True
 
     return False
@@ -806,22 +787,15 @@ def is_season_file(filename: str) -> bool:
 
 def is_titlecard_file(filename: str) -> bool:
     """
-    Check if file is a title card / episode (SxxExx.jpg with capital S and E):
-    - S01E01.jpg, S02E05.jpg, S12E10.jpg (folder-based)
-    - Show Name (Year) [tvdb-xxxxx]_S01E01.jpg (file-based)
-
-    MUST EXCLUDE:
-    - poster.jpg
-    - background.jpg
-    - Season01.jpg
-    - Any other .jpg files
+    Check if file is a title card / episode.
+    Matches: SxxExx.ext OR *_SxxExx.ext
     """
-    # Folder-based: SxxExx.jpg (capital S and E, digits)
-    if re.match(r"^S\d+E\d+\.jpg$", filename):
+    # Folder-based: SxxExx.ext
+    if re.match(r"^s\d+e\d+\.(jpg|jpeg|png|webp|tbn)$", filename, re.IGNORECASE):
         return True
 
-    # File-based: *_SxxExx.jpg (capital S and E, digits)
-    if re.search(r"_S\d+E\d+\.jpg$", filename):
+    # File-based: *_SxxExx.ext
+    if re.search(r"_s\d+e\d+\.(jpg|jpeg|png|webp|tbn)$", filename, re.IGNORECASE):
         return True
 
     return False
@@ -884,27 +858,24 @@ def process_image_path(image_path: Path):
 
 def determine_media_type(filename: str, library_folder: str = None) -> str:
     """
-    Determine media type from filename and library folder
-
-    Args:
-        filename: The asset filename (e.g., "poster.jpg", "Season01.jpg", "S01E01.jpg")
-        library_folder: The library folder name from assets (e.g., "TestMovies", "TestSerien")
-
-    Returns: Movie, Show, Season, Episode, or Background
+    Determine media type from filename and library folder.
+    Supports .jpg, .jpeg, .png, .webp
     """
     name = filename.lower()
+    # Regex to match supported extensions
+    ext_pattern = r"\.(jpg|jpeg|png|webp|tbn)$"
 
-    # Check for episodes/title cards first (these are always Episodes regardless of library)
-    if re.match(r"^S\d+E\d+\.jpg$", filename) or re.match(
-        r".*_S\d+E\d+\.jpg$", filename
+    # Check for episodes/title cards first (matches S01E01.jpg, S01E01.png, etc.)
+    if re.match(r"^s\d+e\d+" + ext_pattern, name) or re.match(
+        r".*_s\d+e\d+" + ext_pattern, name
     ):
         logger.debug(
             f"[MediaType] {filename} in {library_folder} -> Episode (pattern match)"
         )
         return "Episode"
 
-    # Check for season posters (these are always Seasons regardless of library)
-    if re.match(r"^Season\d+\.jpg$", filename, re.IGNORECASE):
+    # Check for season posters (matches Season01.jpg, Season01.png, etc.)
+    if re.match(r"^season\d+" + ext_pattern, name):
         logger.debug(
             f"[MediaType] {filename} in {library_folder} -> Season (pattern match)"
         )
@@ -918,61 +889,43 @@ def determine_media_type(filename: str, library_folder: str = None) -> str:
             f"[MediaType] Library '{library_folder}' type from DB: {library_type}"
         )
 
-    # Check for backgrounds
-    if name == "background.jpg":
+    # Check for backgrounds (matches background.jpg, background.png, etc.)
+    if re.match(r"^background" + ext_pattern, name):
         if library_type == "show":
-            logger.debug(
-                f"[MediaType] {filename} in {library_folder} -> Show Background (library_type=show)"
-            )
+            logger.debug(f"[MediaType] {filename} -> Show Background (library_type=show)")
             return "Show Background"
         elif library_type == "movie":
-            logger.debug(
-                f"[MediaType] {filename} in {library_folder} -> Movie Background (library_type=movie)"
-            )
+            logger.debug(f"[MediaType] {filename} -> Movie Background (library_type=movie)")
             return "Movie Background"
 
-        # If library_type is None (not in DB), try to guess from folder name
-        if library_type is None and library_folder:
+        # Guess from folder name if DB lookup failed
+        if library_folder:
             folder_lower = library_folder.lower()
-            if any(keyword in folder_lower for keyword in ["show", "series", "tv", "serien", "anime"]):
-                logger.debug(f"[MediaType] {filename} in {library_folder} -> Show Background (guessing from folder name)")
+            if any(k in folder_lower for k in ["show", "series", "tv", "serien", "anime"]):
                 return "Show Background"
-            if any(keyword in folder_lower for keyword in ["movie", "film", "kino", "4k"]):
-                logger.debug(f"[MediaType] {filename} in {library_folder} -> Movie Background (guessing from folder name)")
+            if any(k in folder_lower for k in ["movie", "film", "kino", "4k"]):
                 return "Movie Background"
 
-        # Default to generic Background if library type unknown
-        logger.debug(
-            f"[MediaType] {filename} in {library_folder} -> Background (library_type unknown)"
-        )
         return "Background"
 
-    # For poster.jpg files, check library type from database
-    if name == "poster.jpg":
+    # Check for posters (matches poster.jpg, poster.png, etc.)
+    if re.match(r"^poster" + ext_pattern, name):
         if library_type == "show":
-            logger.debug(
-                f"[MediaType] {filename} in {library_folder} -> Show (library_type=show)"
-            )
+            logger.debug(f"[MediaType] {filename} -> Show (library_type=show)")
             return "Show"
         elif library_type == "movie":
-            logger.debug(
-                f"[MediaType] {filename} in {library_folder} -> Movie (library_type=movie)"
-            )
+            logger.debug(f"[MediaType] {filename} -> Movie (library_type=movie)")
             return "Movie"
 
-        # If library_type is None (not in DB), try to guess from folder name
-        if library_type is None and library_folder:
+        # Guess from folder name if DB lookup failed
+        if library_folder:
             folder_lower = library_folder.lower()
-            # Common TV show library names
-            if any(keyword in folder_lower for keyword in ["show", "series", "tv", "serien", "anime"]):
-                logger.debug(f"[MediaType] {filename} in {library_folder} -> Show (guessing from folder name)")
+            if any(k in folder_lower for k in ["show", "series", "tv", "serien", "anime"]):
                 return "Show"
-            # Common movie library names
-            if any(keyword in folder_lower for keyword in ["movie", "film", "kino", "4k"]):
-                logger.debug(f"[MediaType] {filename} in {library_folder} -> Movie (guessing from folder name)")
+            if any(k in folder_lower for k in ["movie", "film", "kino", "4k"]):
                 return "Movie"
 
-    # Default to Movie for poster.jpg files
+    # Default to Movie for unrecognized images
     logger.debug(f"[MediaType] {filename} in {library_folder} -> Movie (default)")
     return "Movie"
 

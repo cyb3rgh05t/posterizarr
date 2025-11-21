@@ -53,7 +53,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.14"
+$CurrentScriptVersion = "2.1.15"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -1237,6 +1237,7 @@ function SendMessage {
     }
 }
 function AddTrailingSlash($path) {
+    $path = $path.TrimEnd()
     if (-not ($path -match '[\\/]$')) {
         $path += if ($path -match '\\') { '\' } else { '/' }
     }
@@ -33609,4 +33610,3 @@ else {
         Send-UptimeKumaWebhook -status "up" -ping $executionTime.TotalMilliseconds
     }
 }
-
