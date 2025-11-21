@@ -719,63 +719,51 @@ class CachedStaticFiles(StaticFiles):
 
 def is_poster_file(filename: str) -> bool:
     """
-    Check if file is a poster:
-    - poster.jpg (folder-based)
-    - Show Name (Year) [tvdb-xxxxx].jpg (file-based, ends with .jpg, no underscore before .jpg)
-
-    MUST EXCLUDE:
-    - background.jpg
-    - Season01.jpg (and all SeasonXX.jpg)
-    - S01E01.jpg (and all SxxExx.jpg)
-    - *_background.jpg
-    - *_Season01.jpg
-    - *_S01E01.jpg
+    Check if file is a poster.
+    Supports: .jpg, .jpeg, .png, .webp, .tbn
     """
-    # Exact match: poster.jpg
-    if filename == "poster.jpg":
-        return True
+    lower_name = filename.lower()
+    valid_extensions = (".jpg", ".jpeg", ".png", ".webp", ".tbn")
 
-    # EXCLUDE specific folder-based files
-    if filename == "background.jpg":
-        return False
-    if re.match(r"^Season\d+\.jpg$", filename):
-        return False
-    if re.match(r"^S\d+E\d+\.jpg$", filename):
+    # 1. Must end with a valid extension
+    if not lower_name.endswith(valid_extensions):
         return False
 
-    # File-based: Must end with .jpg but NOT with special patterns
-    if filename.endswith(".jpg"):
-        # Exclude files with underscore patterns for other types
-        if re.search(r"_background\.jpg$", filename):
-            return False
-        if re.search(r"_Season\d+\.jpg$", filename):
-            return False
-        if re.search(r"_S\d+E\d+\.jpg$", filename):
-            return False
-        # If it's just *.jpg without those patterns, it's a poster
-        return True
+    # 2. EXCLUDE specific folder-based reserved filenames (regardless of extension)
+    # We check if the name starts with specific reserved words to handle background.png, Season01.webp, etc.
+    if lower_name.startswith("background."):
+        return False
+    if re.match(r"^season\d+\.", lower_name):
+        return False
+    if re.match(r"^s\d+e\d+\.", lower_name):
+        return False
 
-    return False
+    # 3. File-based exclusions (naming convention: Name_Type.ext)
+    # Exclude files ending with _background.ext, _SeasonXX.ext, _SxxExx.ext
+    if re.search(r"_background\.(jpg|jpeg|png|webp|tbn)$", lower_name):
+        return False
+    if re.search(r"_season\d+\.(jpg|jpeg|png|webp|tbn)$", lower_name):
+        return False
+    if re.search(r"_s\d+e\d+\.(jpg|jpeg|png|webp|tbn)$", lower_name):
+        return False
+
+    # If it passed all exclusions and has a valid extension, it's a poster
+    return True
 
 
 def is_background_file(filename: str) -> bool:
     """
-    Check if file is a background:
-    - background.jpg (folder-based)
-    - Show Name (Year) [tvdb-xxxxx]_background.jpg (file-based)
-
-    MUST EXCLUDE:
-    - poster.jpg
-    - Season01.jpg
-    - S01E01.jpg
-    - Any other .jpg files
+    Check if file is a background.
+    Matches: background.ext OR *_background.ext
     """
-    # Exact match: background.jpg
-    if filename == "background.jpg":
+    lower_name = filename.lower()
+
+    # Exact match: background.jpg, background.png, etc.
+    if re.match(r"^background\.(jpg|jpeg|png|webp|tbn)$", lower_name):
         return True
 
-    # File-based: ends with _background.jpg
-    if re.search(r"_background\.jpg$", filename):
+    # File-based: ends with _background.ext
+    if re.search(r"_background\.(jpg|jpeg|png|webp|tbn)$", lower_name):
         return True
 
     return False
@@ -783,22 +771,15 @@ def is_background_file(filename: str) -> bool:
 
 def is_season_file(filename: str) -> bool:
     """
-    Check if file is a season poster (SeasonXX.jpg with capital S):
-    - Season01.jpg, Season02.jpg, Season12.jpg (folder-based)
-    - Show Name (Year) [tvdb-xxxxx]_Season01.jpg (file-based)
-
-    MUST EXCLUDE:
-    - poster.jpg
-    - background.jpg
-    - S01E01.jpg
-    - Any other .jpg files
+    Check if file is a season poster.
+    Matches: SeasonXX.ext OR *_SeasonXX.ext
     """
-    # Folder-based: SeasonXX.jpg (capital S, digits)
-    if re.match(r"^Season\d+\.jpg$", filename):
+    # Folder-based: SeasonXX.ext (case insensitive via flag or lower handling)
+    if re.match(r"^season\d+\.(jpg|jpeg|png|webp|tbn)$", filename, re.IGNORECASE):
         return True
 
-    # File-based: *_SeasonXX.jpg (capital S, digits)
-    if re.search(r"_Season\d+\.jpg$", filename):
+    # File-based: *_SeasonXX.ext
+    if re.search(r"_season\d+\.(jpg|jpeg|png|webp|tbn)$", filename, re.IGNORECASE):
         return True
 
     return False
@@ -806,22 +787,15 @@ def is_season_file(filename: str) -> bool:
 
 def is_titlecard_file(filename: str) -> bool:
     """
-    Check if file is a title card / episode (SxxExx.jpg with capital S and E):
-    - S01E01.jpg, S02E05.jpg, S12E10.jpg (folder-based)
-    - Show Name (Year) [tvdb-xxxxx]_S01E01.jpg (file-based)
-
-    MUST EXCLUDE:
-    - poster.jpg
-    - background.jpg
-    - Season01.jpg
-    - Any other .jpg files
+    Check if file is a title card / episode.
+    Matches: SxxExx.ext OR *_SxxExx.ext
     """
-    # Folder-based: SxxExx.jpg (capital S and E, digits)
-    if re.match(r"^S\d+E\d+\.jpg$", filename):
+    # Folder-based: SxxExx.ext
+    if re.match(r"^s\d+e\d+\.(jpg|jpeg|png|webp|tbn)$", filename, re.IGNORECASE):
         return True
 
-    # File-based: *_SxxExx.jpg (capital S and E, digits)
-    if re.search(r"_S\d+E\d+\.jpg$", filename):
+    # File-based: *_SxxExx.ext
+    if re.search(r"_s\d+e\d+\.(jpg|jpeg|png|webp|tbn)$", filename, re.IGNORECASE):
         return True
 
     return False
@@ -884,27 +858,24 @@ def process_image_path(image_path: Path):
 
 def determine_media_type(filename: str, library_folder: Optional[str] = None) -> str:
     """
-    Determine media type from filename and library folder
-
-    Args:
-        filename: The asset filename (e.g., "poster.jpg", "Season01.jpg", "S01E01.jpg")
-        library_folder: The library folder name from assets (e.g., "TestMovies", "TestSerien")
-
-    Returns: Movie, Show, Season, Episode, or Background
+    Determine media type from filename and library folder.
+    Supports .jpg, .jpeg, .png, .webp
     """
     name = filename.lower()
+    # Regex to match supported extensions
+    ext_pattern = r"\.(jpg|jpeg|png|webp|tbn)$"
 
-    # Check for episodes/title cards first (these are always Episodes regardless of library)
-    if re.match(r"^S\d+E\d+\.jpg$", filename) or re.match(
-        r".*_S\d+E\d+\.jpg$", filename
+    # Check for episodes/title cards first (matches S01E01.jpg, S01E01.png, etc.)
+    if re.match(r"^s\d+e\d+" + ext_pattern, name) or re.match(
+        r".*_s\d+e\d+" + ext_pattern, name
     ):
         logger.debug(
             f"[MediaType] {filename} in {library_folder} -> Episode (pattern match)"
         )
         return "Episode"
 
-    # Check for season posters (these are always Seasons regardless of library)
-    if re.match(r"^Season\d+\.jpg$", filename, re.IGNORECASE):
+    # Check for season posters (matches Season01.jpg, Season01.png, etc.)
+    if re.match(r"^season\d+" + ext_pattern, name):
         logger.debug(
             f"[MediaType] {filename} in {library_folder} -> Season (pattern match)"
         )
@@ -918,79 +889,51 @@ def determine_media_type(filename: str, library_folder: Optional[str] = None) ->
             f"[MediaType] Library '{library_folder}' type from DB: {library_type}"
         )
 
-    # Check for backgrounds
-    if name == "background.jpg":
+    # Check for backgrounds (matches background.jpg, background.png, etc.)
+    if re.match(r"^background" + ext_pattern, name):
         if library_type == "show":
             logger.debug(
-                f"[MediaType] {filename} in {library_folder} -> Show Background (library_type=show)"
+                f"[MediaType] {filename} -> Show Background (library_type=show)"
             )
             return "Show Background"
         elif library_type == "movie":
             logger.debug(
-                f"[MediaType] {filename} in {library_folder} -> Movie Background (library_type=movie)"
+                f"[MediaType] {filename} -> Movie Background (library_type=movie)"
             )
             return "Movie Background"
 
-        # If library_type is None (not in DB), try to guess from folder name
-        if library_type is None and library_folder:
+        # Guess from folder name if DB lookup failed
+        if library_folder:
             folder_lower = library_folder.lower()
             if any(
-                keyword in folder_lower
-                for keyword in ["show", "series", "tv", "serien", "anime"]
+                k in folder_lower for k in ["show", "series", "tv", "serien", "anime"]
             ):
-                logger.debug(
-                    f"[MediaType] {filename} in {library_folder} -> Show Background (guessing from folder name)"
-                )
                 return "Show Background"
-            if any(
-                keyword in folder_lower for keyword in ["movie", "film", "kino", "4k"]
-            ):
-                logger.debug(
-                    f"[MediaType] {filename} in {library_folder} -> Movie Background (guessing from folder name)"
-                )
+            if any(k in folder_lower for k in ["movie", "film", "kino", "4k"]):
                 return "Movie Background"
 
-        # Default to generic Background if library type unknown
-        logger.debug(
-            f"[MediaType] {filename} in {library_folder} -> Background (library_type unknown)"
-        )
         return "Background"
 
-    # For poster.jpg files, check library type from database
-    if name == "poster.jpg":
+    # Check for posters (matches poster.jpg, poster.png, etc.)
+    if re.match(r"^poster" + ext_pattern, name):
         if library_type == "show":
-            logger.debug(
-                f"[MediaType] {filename} in {library_folder} -> Show (library_type=show)"
-            )
+            logger.debug(f"[MediaType] {filename} -> Show (library_type=show)")
             return "Show"
         elif library_type == "movie":
-            logger.debug(
-                f"[MediaType] {filename} in {library_folder} -> Movie (library_type=movie)"
-            )
+            logger.debug(f"[MediaType] {filename} -> Movie (library_type=movie)")
             return "Movie"
 
-        # If library_type is None (not in DB), try to guess from folder name
-        if library_type is None and library_folder:
+        # Guess from folder name if DB lookup failed
+        if library_folder:
             folder_lower = library_folder.lower()
-            # Common TV show library names
             if any(
-                keyword in folder_lower
-                for keyword in ["show", "series", "tv", "serien", "anime"]
+                k in folder_lower for k in ["show", "series", "tv", "serien", "anime"]
             ):
-                logger.debug(
-                    f"[MediaType] {filename} in {library_folder} -> Show (guessing from folder name)"
-                )
                 return "Show"
-            # Common movie library names
-            if any(
-                keyword in folder_lower for keyword in ["movie", "film", "kino", "4k"]
-            ):
-                logger.debug(
-                    f"[MediaType] {filename} in {library_folder} -> Movie (guessing from folder name)"
-                )
+            if any(k in folder_lower for k in ["movie", "film", "kino", "4k"]):
                 return "Movie"
 
-    # Default to Movie for poster.jpg files
+    # Default to Movie for unrecognized images
     logger.debug(f"[MediaType] {filename} in {library_folder} -> Movie (default)")
     return "Movie"
 
@@ -12318,9 +12261,11 @@ async def import_imagechoices_csv():
         logger.error(f"Error importing CSV: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ============================================================================
 # SUPPORT & TROUBLESHOOTING
 # ============================================================================
+
 
 def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) -> bool:
     """
@@ -12335,44 +12280,46 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
 
         # 2. Copy Log Folders
         # Define ignore patterns
-        ignore_patterns_default = shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store')
+        ignore_patterns_default = shutil.ignore_patterns(
+            "*.pyc", "__pycache__", ".DS_Store"
+        )
         # For LOGS_DIR and ROTATED_LOGS_DIR, also ignore .json files
-        ignore_patterns_logs = shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store', '*.json')
+        ignore_patterns_logs = shutil.ignore_patterns(
+            "*.pyc", "__pycache__", ".DS_Store", "*.json"
+        )
 
-        if 'LOGS_DIR' in globals() and LOGS_DIR.exists():
+        if "LOGS_DIR" in globals() and LOGS_DIR.exists():
             shutil.copytree(
                 LOGS_DIR,
                 staging_dir_path / "Logs",
                 dirs_exist_ok=True,
-                ignore=ignore_patterns_logs  # Use ignore pattern with '*.json'
+                ignore=ignore_patterns_logs,  # Use ignore pattern with '*.json'
             )
             logger.info("[SupportZip] Copied Logs directory (excluding .json files)")
 
-        if 'ROTATED_LOGS_DIR' in globals() and ROTATED_LOGS_DIR.exists():
+        if "ROTATED_LOGS_DIR" in globals() and ROTATED_LOGS_DIR.exists():
             shutil.copytree(
                 ROTATED_LOGS_DIR,
                 staging_dir_path / "RotatedLogs",
                 dirs_exist_ok=True,
-                ignore=ignore_patterns_logs  # Same ignore rules as Logs
+                ignore=ignore_patterns_logs,  # Same ignore rules as Logs
             )
-            logger.info("[SupportZip] Copied RotatedLogs directory (excluding .json files)")
+            logger.info(
+                "[SupportZip] Copied RotatedLogs directory (excluding .json files)"
+            )
 
-        if 'UI_LOGS_DIR' in globals() and UI_LOGS_DIR.exists():
+        if "UI_LOGS_DIR" in globals() and UI_LOGS_DIR.exists():
             shutil.copytree(
                 UI_LOGS_DIR,
                 staging_dir_path / "UILogs",
                 dirs_exist_ok=True,
-                ignore=ignore_patterns_default # Use default ignore pattern
+                ignore=ignore_patterns_default,  # Use default ignore pattern
             )
             logger.info("[SupportZip] Copied UILogs directory")
 
         # 3. Copy & Sanitize Databases
         # 3a. Copy non-sensitive DBs
-        for db_name in [
-            "media_export.db",
-            "runtime_stats.db",
-            "server_libraries.db"
-        ]:
+        for db_name in ["media_export.db", "runtime_stats.db", "server_libraries.db"]:
             src_db = DATABASE_DIR / db_name
             if src_db.exists():
                 shutil.copy2(src_db, db_staging_dir / db_name)
@@ -12395,7 +12342,9 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                     "SELECT id, DownloadSource FROM imagechoices WHERE DownloadSource LIKE 'http%'"
                 )
                 rows = cursor.fetchall()
-                logger.debug(f"[SupportZip] Found {len(rows)} rows in imagechoices.db to sanitize.")
+                logger.debug(
+                    f"[SupportZip] Found {len(rows)} rows in imagechoices.db to sanitize."
+                )
 
                 updates = []
 
@@ -12422,25 +12371,50 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                             break
 
                     if not is_allowed:
-                        sanitized_source = re.sub(r"(https?://)[^/]+", r"\1[MASKED_HOST]", sanitized_source, count=1)
+                        sanitized_source = re.sub(
+                            r"(https?://)[^/]+",
+                            r"\1[MASKED_HOST]",
+                            sanitized_source,
+                            count=1,
+                        )
 
-                    sanitized_source = re.sub(r"([?&][^=]*Token=)[^&]+", r"\1[MASKED_TOKEN]", sanitized_source, flags=re.IGNORECASE)
-                    sanitized_source = re.sub(r"([?&][^=]*api_key=)[^&]+", r"\1[MASKED_KEY]", sanitized_source, flags=re.IGNORECASE)
-                    sanitized_source = re.sub(r"([?&][^=]*pin=)[^&]+", r"\1[MASKED_PIN]", sanitized_source, flags=re.IGNORECASE)
+                    sanitized_source = re.sub(
+                        r"([?&][^=]*Token=)[^&]+",
+                        r"\1[MASKED_TOKEN]",
+                        sanitized_source,
+                        flags=re.IGNORECASE,
+                    )
+                    sanitized_source = re.sub(
+                        r"([?&][^=]*api_key=)[^&]+",
+                        r"\1[MASKED_KEY]",
+                        sanitized_source,
+                        flags=re.IGNORECASE,
+                    )
+                    sanitized_source = re.sub(
+                        r"([?&][^=]*pin=)[^&]+",
+                        r"\1[MASKED_PIN]",
+                        sanitized_source,
+                        flags=re.IGNORECASE,
+                    )
 
                     if sanitized_source != source:
                         updates.append((sanitized_source, row_id))
 
                 if updates:
                     cursor.executemany(
-                        "UPDATE imagechoices SET DownloadSource = ? WHERE id = ?", updates
+                        "UPDATE imagechoices SET DownloadSource = ? WHERE id = ?",
+                        updates,
                     )
                     conn.commit()
-                    logger.info(f"[SupportZip] Sanitized {len(updates)} rows in imagechoices.db copy.")
+                    logger.info(
+                        f"[SupportZip] Sanitized {len(updates)} rows in imagechoices.db copy."
+                    )
 
                 conn.close()
             except Exception as e:
-                logger.error(f"[SupportZip] Failed to sanitize imagechoices.db copy: {e}")
+                logger.error(
+                    f"[SupportZip] Failed to sanitize imagechoices.db copy: {e}"
+                )
 
         # 3c. Sanitize ImageChoices.csv (searches all subdirs)
         logger.info("[SupportZip] Searching for ImageChoices.csv files to sanitize...")
@@ -12456,7 +12430,9 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
         ]
 
         csv_files_to_sanitize = list(staging_dir_path.rglob("ImageChoices.csv"))
-        logger.info(f"[SupportZip] Found {len(csv_files_to_sanitize)} ImageChoices.csv files.")
+        logger.info(
+            f"[SupportZip] Found {len(csv_files_to_sanitize)} ImageChoices.csv files."
+        )
 
         total_sanitized_rows = 0
 
@@ -12464,9 +12440,10 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
             logger.debug(f"[SupportZip] Sanitizing {staging_csv_path}...")
             sanitized_rows = []
             try:
-                with open(staging_csv_path, 'r', encoding='utf-8-sig') as f_in:
+                with open(staging_csv_path, "r", encoding="utf-8-sig") as f_in:
                     import csv
-                    reader = csv.reader(f_in, delimiter=';')
+
+                    reader = csv.reader(f_in, delimiter=";")
 
                     header = next(reader)
                     sanitized_rows.append(header)
@@ -12476,7 +12453,9 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                         download_source_idx = clean_header.index("Download Source")
                         fav_provider_link_idx = clean_header.index("Fav Provider Link")
                     except ValueError as e:
-                        logger.error(f"[SupportZip] Could not find required columns in {staging_csv_path.name}: {e}")
+                        logger.error(
+                            f"[SupportZip] Could not find required columns in {staging_csv_path.name}: {e}"
+                        )
                         continue
 
                     sanitized_count_in_file = 0
@@ -12489,48 +12468,109 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
                             sanitized_download_source = original_download_source
                             sanitized_fav_link = original_fav_link
 
-                            if original_download_source and original_download_source.startswith("http"):
-                                is_allowed = any(original_download_source.startswith(prefix) for prefix in ALLOWED_PREFIXES)
+                            if (
+                                original_download_source
+                                and original_download_source.startswith("http")
+                            ):
+                                is_allowed = any(
+                                    original_download_source.startswith(prefix)
+                                    for prefix in ALLOWED_PREFIXES
+                                )
                                 if not is_allowed:
-                                    sanitized_download_source = re.sub(r"(https?://)[^/]+", r"\1[MASKED_HOST]", sanitized_download_source, count=1)
+                                    sanitized_download_source = re.sub(
+                                        r"(https?://)[^/]+",
+                                        r"\1[MASKED_HOST]",
+                                        sanitized_download_source,
+                                        count=1,
+                                    )
 
-                                sanitized_download_source = re.sub(r"([?&][^=]*Token=)[^&]+", r"\1[MASKED_TOKEN]", sanitized_download_source, flags=re.IGNORECASE)
-                                sanitized_download_source = re.sub(r"([?&][^=]*api_key=)[^&]+", r"\1[MASKED_KEY]", sanitized_download_source, flags=re.IGNORECASE)
-                                sanitized_download_source = re.sub(r"([?&][^=]*pin=)[^&]+", r"\1[MASKED_PIN]", sanitized_download_source, flags=re.IGNORECASE)
+                                sanitized_download_source = re.sub(
+                                    r"([?&][^=]*Token=)[^&]+",
+                                    r"\1[MASKED_TOKEN]",
+                                    sanitized_download_source,
+                                    flags=re.IGNORECASE,
+                                )
+                                sanitized_download_source = re.sub(
+                                    r"([?&][^=]*api_key=)[^&]+",
+                                    r"\1[MASKED_KEY]",
+                                    sanitized_download_source,
+                                    flags=re.IGNORECASE,
+                                )
+                                sanitized_download_source = re.sub(
+                                    r"([?&][^=]*pin=)[^&]+",
+                                    r"\1[MASKED_PIN]",
+                                    sanitized_download_source,
+                                    flags=re.IGNORECASE,
+                                )
 
-                            if original_fav_link and original_fav_link.startswith("http"):
-                                is_allowed = any(original_fav_link.startswith(prefix) for prefix in ALLOWED_PREFIXES)
+                            if original_fav_link and original_fav_link.startswith(
+                                "http"
+                            ):
+                                is_allowed = any(
+                                    original_fav_link.startswith(prefix)
+                                    for prefix in ALLOWED_PREFIXES
+                                )
                                 if not is_allowed:
-                                    sanitized_fav_link = re.sub(r"(https?://)[^/]+", r"\1[MASKED_HOST]", sanitized_fav_link, count=1)
+                                    sanitized_fav_link = re.sub(
+                                        r"(https?://)[^/]+",
+                                        r"\1[MASKED_HOST]",
+                                        sanitized_fav_link,
+                                        count=1,
+                                    )
 
-                                sanitized_fav_link = re.sub(r"([?&][^=]*Token=)[^&]+", r"\1[MASKED_TOKEN]", sanitized_fav_link, flags=re.IGNORECASE)
-                                sanitized_fav_link = re.sub(r"([?&][^=]*api_key=)[^&]+", r"\1[MASKED_KEY]", sanitized_fav_link, flags=re.IGNORECASE)
-                                sanitized_fav_link = re.sub(r"([?&][^=]*pin=)[^&]+", r"\1[MASKED_PIN]", sanitized_fav_link, flags=re.IGNORECASE)
+                                sanitized_fav_link = re.sub(
+                                    r"([?&][^=]*Token=)[^&]+",
+                                    r"\1[MASKED_TOKEN]",
+                                    sanitized_fav_link,
+                                    flags=re.IGNORECASE,
+                                )
+                                sanitized_fav_link = re.sub(
+                                    r"([?&][^=]*api_key=)[^&]+",
+                                    r"\1[MASKED_KEY]",
+                                    sanitized_fav_link,
+                                    flags=re.IGNORECASE,
+                                )
+                                sanitized_fav_link = re.sub(
+                                    r"([?&][^=]*pin=)[^&]+",
+                                    r"\1[MASKED_PIN]",
+                                    sanitized_fav_link,
+                                    flags=re.IGNORECASE,
+                                )
 
-                            if (sanitized_download_source != original_download_source) or (sanitized_fav_link != original_fav_link):
+                            if (
+                                sanitized_download_source != original_download_source
+                            ) or (sanitized_fav_link != original_fav_link):
                                 sanitized_count_in_file += 1
                                 row[download_source_idx] = sanitized_download_source
                                 row[fav_provider_link_idx] = sanitized_fav_link
 
                         sanitized_rows.append(row)
 
-                logger.info(f"[SupportZip] Sanitized {sanitized_count_in_file} rows in {staging_csv_path.name}.")
+                logger.info(
+                    f"[SupportZip] Sanitized {sanitized_count_in_file} rows in {staging_csv_path.name}."
+                )
                 total_sanitized_rows += sanitized_count_in_file
 
-                with open(staging_csv_path, 'w', encoding='utf-8', newline='') as f_out:
-                    writer = csv.writer(f_out, delimiter=';', quoting=csv.QUOTE_ALL)
+                with open(staging_csv_path, "w", encoding="utf-8", newline="") as f_out:
+                    writer = csv.writer(f_out, delimiter=";", quoting=csv.QUOTE_ALL)
                     writer.writerows(sanitized_rows)
 
-                logger.debug(f"[SupportZip] Overwrote {staging_csv_path.name} with sanitized content.")
+                logger.debug(
+                    f"[SupportZip] Overwrote {staging_csv_path.name} with sanitized content."
+                )
 
             except Exception as e:
-                logger.error(f"[SupportZip] Failed to sanitize {staging_csv_path.name}: {e}")
+                logger.error(
+                    f"[SupportZip] Failed to sanitize {staging_csv_path.name}: {e}"
+                )
 
-        logger.info(f"[SupportZip] Total sanitized rows across all CSVs: {total_sanitized_rows}")
+        logger.info(
+            f"[SupportZip] Total sanitized rows across all CSVs: {total_sanitized_rows}"
+        )
 
         # 4. Create ZIP file
         logger.debug(f"[SupportZip] Creating ZIP file at: {zip_file_path}")
-        with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
             for root, dirs, files in os.walk(staging_dir_path):
                 if Path(root) == zip_file_path.parent and zip_file_path.name in files:
                     files.remove(zip_file_path.name)
@@ -12548,6 +12588,7 @@ def _create_support_zip_blocking(staging_dir_path: Path, zip_file_path: Path) ->
         logger.exception("Full traceback for zip creation:")
         return False
 
+
 def _cleanup_support_files(staging_dir: Path):
     """
     Cleanup function for BackgroundTasks to remove the temp staging directory.
@@ -12557,7 +12598,9 @@ def _cleanup_support_files(staging_dir: Path):
             shutil.rmtree(staging_dir)
             logger.debug(f"[SupportZip] Cleaned up staging directory: {staging_dir}")
     except Exception as e:
-        logger.error(f"[SupportZip] Error cleaning up staging directory {staging_dir}: {e}")
+        logger.error(
+            f"[SupportZip] Error cleaning up staging directory {staging_dir}: {e}"
+        )
 
 
 @app.post("/api/admin/support-zip")
@@ -12582,7 +12625,9 @@ async def get_support_zip(background_tasks: BackgroundTasks):
         logger.debug(f"[SupportZip] Staging directory created: {staging_dir}")
     except Exception as e:
         logger.error(f"[SupportZip] Failed to create temp directory: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create temporary directory")
+        raise HTTPException(
+            status_code=500, detail="Failed to create temporary directory"
+        )
 
     # 2. Add cleanup task to remove the *entire* staging dir
     background_tasks.add_task(_cleanup_support_files, staging_dir)
@@ -12595,7 +12640,9 @@ async def get_support_zip(background_tasks: BackgroundTasks):
 
         if not success or not zip_path.exists():
             logger.error("[SupportZip] ZIP creation failed in background thread.")
-            raise HTTPException(status_code=500, detail="Failed to create support ZIP file")
+            raise HTTPException(
+                status_code=500, detail="Failed to create support ZIP file"
+            )
 
         # 4. Return the file
         logger.info("[SupportZip] Sending support ZIP file to user...")
@@ -12603,13 +12650,17 @@ async def get_support_zip(background_tasks: BackgroundTasks):
         return FileResponse(
             zip_path,
             media_type="application/zip",
-            filename=zip_filename  # Use dynamic filename
+            filename=zip_filename,  # Use dynamic filename
         )
 
     except Exception as e:
         logger.error(f"[SupportZip] Error during support zip endpoint execution: {e}")
         logger.info("=" * 60)
-        raise HTTPException(status_code=500, detail=f"Failed to create support ZIP: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create support ZIP: {str(e)}"
+        )
+
+
 # ============================================
 # STATIC FILE MOUNTS
 # ============================================
