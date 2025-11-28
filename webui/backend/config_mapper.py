@@ -1020,7 +1020,7 @@ DISPLAY_NAMES = {
     "SkipLocalPosterTextAdd": "Skip adding local poster text",
     "SkipLocalBackgroundTextAdd": "Skip adding local background poster text",
     "SkipLocalSeasonTextAdd": "Skip adding local season poster text",
-    "SkipLocalTCTextAdd": "Skip adding local TC text"
+    "SkipLocalTCTextAdd": "Skip adding local TC text",
     "SkipAddTextAndOverlay": "Skip Add Text and Skip add Overlay",
     "FollowSymlink": "Follow Symlinks",
     "poster4k": "4K Poster Overlay",
