@@ -53,7 +53,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.15"
+$CurrentScriptVersion = "2.1.16"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -7247,6 +7247,10 @@ $BackupPath = RemoveTrailingSlash $config.PrerequisitePart.BackupPath
 $ManualAssetPath = RemoveTrailingSlash $config.PrerequisitePart.ManualAssetPath
 $Upload2Plex = $config.PrerequisitePart.PlexUpload.tolower()
 $SkipAddText = $config.PrerequisitePart.SkipAddText.tolower()
+$SkipLocalPosterTextAdd = $config.PrerequisitePart.SkipLocalPosterTextAdd.tolower()
+$SkipLocalBackgroundTextAdd = $config.PrerequisitePart.SkipLocalBackgroundTextAdd.tolower()
+$SkipLocalSeasonTextAdd = $config.PrerequisitePart.SkipLocalSeasonTextAdd.tolower()
+$SkipLocalTCTextAdd = $config.PrerequisitePart.SkipLocalTCTextAdd.tolower()
 $SkipAddTextAndOverlay = $config.PrerequisitePart.SkipAddTextAndOverlay.tolower()
 $DisableHashValidation = $config.PrerequisitePart.DisableHashValidation.tolower()
 $global:DisableOnlineAssetFetch = $config.PrerequisitePart.DisableOnlineAssetFetch.tolower()
@@ -9970,6 +9974,9 @@ Elseif ($Tautulli) {
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                     }
+                                    if ($SkipLocalPosterTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
+                                    }
                                     Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
                                 Else {
@@ -10458,6 +10465,9 @@ Elseif ($Tautulli) {
                                 if ($TakeLocal) {
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $BackgroundImage | Out-Null
+                                    }
+                                    if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
                                     }
                                     Write-Entry -Subtext "Copy local asset to: $BackgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
@@ -11036,6 +11046,9 @@ Elseif ($Tautulli) {
                                 Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                     Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                 }
+                                if ($SkipLocalPosterTextAdd -eq 'true'){
+                                    $SkippingText = 'true'
+                                }
                                 Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             }
                             Else {
@@ -11535,6 +11548,9 @@ Elseif ($Tautulli) {
                             if ($TakeLocal) {
                                 Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                     Copy-Item -LiteralPath $_.FullName -Destination $backgroundImage | Out-Null
+                                }
+                                if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                    $SkippingText = 'true'
                                 }
                                 Write-Entry -Subtext "Copy local asset to: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             }
@@ -12158,6 +12174,9 @@ Elseif ($Tautulli) {
                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                             Copy-Item -LiteralPath $_.FullName -Destination $SeasonImage | Out-Null
                                         }
+                                        if ($SkipLocalSeasonrTextAdd -eq 'true'){
+                                            $SkippingText = 'true'
+                                        }
                                         Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
                                     Else {
@@ -12343,6 +12362,9 @@ Elseif ($Tautulli) {
                                     if ($TakeLocal) {
                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                             Copy-Item -LiteralPath $_.FullName -Destination $SeasonImage | Out-Null
+                                        }
+                                        if ($SkipLocalSeasonTextAdd -eq 'true'){
+                                            $SkippingText = 'true'
                                         }
                                         Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
@@ -12801,6 +12823,9 @@ Elseif ($Tautulli) {
                                                         if ($global:TempImagecopied -ne 'true') {
                                                             Copy-Item -LiteralPath $EpisodeImage -destination $EpisodeTempImage | Out-Null
                                                         }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
+                                                        }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                     Else {
@@ -12983,6 +13008,9 @@ Elseif ($Tautulli) {
                                                     if ($TakeLocal) {
                                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                             Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage
+                                                        }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
                                                         }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
@@ -13428,6 +13456,9 @@ Elseif ($Tautulli) {
                                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                             Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage | Out-Null
                                                         }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
+                                                        }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                     Else {
@@ -13592,6 +13623,9 @@ Elseif ($Tautulli) {
                                                     if ($TakeLocal) {
                                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                             Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage
+                                                        }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
                                                         }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
@@ -14813,6 +14847,9 @@ Elseif ($ArrTrigger) {
                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                             Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                         }
+                                        if ($SkipLocalPosterTextAdd -eq 'true'){
+                                            $SkippingText = 'true'
+                                        }
                                         Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
                                     Else {
@@ -15239,6 +15276,9 @@ Elseif ($ArrTrigger) {
                                     if ($TakeLocal) {
                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                             Copy-Item -LiteralPath $_.FullName -Destination $backgroundImage | Out-Null
+                                        }
+                                        if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                            $SkippingText = 'true'
                                         }
                                         Write-Entry -Subtext "Copy local asset to: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
@@ -15749,6 +15789,9 @@ Elseif ($ArrTrigger) {
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                     }
+                                    if ($SkipLocalPosterTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
+                                    }
                                     Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
                                 Else {
@@ -16187,6 +16230,9 @@ Elseif ($ArrTrigger) {
                                 if ($TakeLocal) {
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $backgroundImage | Out-Null
+                                    }
+                                    if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
                                     }
                                     Write-Entry -Subtext "Copy local asset to: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
@@ -16746,6 +16792,9 @@ Elseif ($ArrTrigger) {
                                             Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                 Copy-Item -LiteralPath $_.FullName -Destination $SeasonImage | Out-Null
                                             }
+                                            if ($SkipLocalSeasonTextAdd -eq 'true'){
+                                                $SkippingText = 'true'
+                                            }
                                             Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                         }
                                         Else {
@@ -17256,6 +17305,9 @@ Elseif ($ArrTrigger) {
                                                         if ($global:TempImagecopied -ne 'true') {
                                                             Copy-Item -LiteralPath $EpisodeImage -destination $EpisodeTempImage | Out-Null
                                                         }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
+                                                        }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                     Else {
@@ -17764,6 +17816,9 @@ Elseif ($ArrTrigger) {
                                                     if ($TakeLocal) {
                                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                             Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage | Out-Null
+                                                        }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
                                                         }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
@@ -18731,6 +18786,9 @@ Elseif ($ArrTrigger) {
                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                             Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                         }
+                                        if ($SkipLocalPosterTextAdd -eq 'true'){
+                                            $SkippingText = 'true'
+                                        }
                                         Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
                                     Else {
@@ -19219,6 +19277,9 @@ Elseif ($ArrTrigger) {
                                     if ($TakeLocal) {
                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                             Copy-Item -LiteralPath $_.FullName -Destination $BackgroundImage | Out-Null
+                                        }
+                                        if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                            $SkippingText = 'true'
                                         }
                                         Write-Entry -Subtext "Copy local asset to: $BackgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
@@ -19797,6 +19858,9 @@ Elseif ($ArrTrigger) {
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                     }
+                                    if ($SkipLocalPosterTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
+                                    }
                                     Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
                                 Else {
@@ -20296,6 +20360,9 @@ Elseif ($ArrTrigger) {
                                 if ($TakeLocal) {
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $backgroundImage | Out-Null
+                                    }
+                                    if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
                                     }
                                     Write-Entry -Subtext "Copy local asset to: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
@@ -20919,6 +20986,9 @@ Elseif ($ArrTrigger) {
                                             Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                 Copy-Item -LiteralPath $_.FullName -Destination $SeasonImage | Out-Null
                                             }
+                                            if ($SkipLocalSeasonTextAdd -eq 'true'){
+                                                $SkippingText = 'true'
+                                            }
                                             Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                         }
                                         Else {
@@ -21104,6 +21174,9 @@ Elseif ($ArrTrigger) {
                                         if ($TakeLocal) {
                                             Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                 Copy-Item -LiteralPath $_.FullName -Destination $SeasonImage | Out-Null
+                                            }
+                                            if ($SkipLocalSeasonTextAdd -eq 'true'){
+                                                $SkippingText = 'true'
                                             }
                                             Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                         }
@@ -21561,6 +21634,9 @@ Elseif ($ArrTrigger) {
                                                             if ($global:TempImagecopied -ne 'true') {
                                                                 Copy-Item -LiteralPath $EpisodeImage -destination $EpisodeTempImage | Out-Null
                                                             }
+                                                            if ($SkipLocalTCTextAdd -eq 'true'){
+                                                                $SkippingText = 'true'
+                                                            }
                                                             Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                         }
                                                         Else {
@@ -21743,6 +21819,9 @@ Elseif ($ArrTrigger) {
                                                         if ($TakeLocal) {
                                                             Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                                 Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage
+                                                            }
+                                                            if ($SkipLocalTCTextAdd -eq 'true'){
+                                                                $SkippingText = 'true'
                                                             }
                                                             Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                         }
@@ -22188,6 +22267,9 @@ Elseif ($ArrTrigger) {
                                                             Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                                 Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage | Out-Null
                                                             }
+                                                            if ($SkipLocalTCTextAdd -eq 'true'){
+                                                                $SkippingText = 'true'
+                                                            }
                                                             Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                         }
                                                         Else {
@@ -22352,6 +22434,9 @@ Elseif ($ArrTrigger) {
                                                         if ($TakeLocal) {
                                                             Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                                 Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage
+                                                            }
+                                                            if ($SkipLocalTCTextAdd -eq 'true'){
+                                                                $SkippingText = 'true'
                                                             }
                                                             Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                         }
@@ -24794,6 +24879,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                     }
+                                    if ($SkipLocalPosterTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
+                                    }
                                     Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
                                 Else {
@@ -25220,6 +25308,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 if ($TakeLocal) {
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $backgroundImage | Out-Null
+                                    }
+                                    if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
                                     }
                                     Write-Entry -Subtext "Copy local asset to: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
@@ -25730,6 +25821,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                     Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                 }
+                                if ($SkipLocalPosterTextAdd -eq 'true'){
+                                    $SkippingText = 'true'
+                                }
                                 Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             }
                             Else {
@@ -26168,6 +26262,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                             if ($TakeLocal) {
                                 Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                     Copy-Item -LiteralPath $_.FullName -Destination $backgroundImage | Out-Null
+                                }
+                                if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                    $SkippingText = 'true'
                                 }
                                 Write-Entry -Subtext "Copy local asset to: $backgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             }
@@ -26741,6 +26838,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                             Copy-Item -LiteralPath $_.FullName -Destination $SeasonImage | Out-Null
                                         }
+                                        if ($SkipLocalSeasonTextAdd -eq 'true'){
+                                            $SkippingText = 'true'
+                                        }
                                         Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
                                     Else {
@@ -27251,6 +27351,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     if ($global:TempImagecopied -ne 'true') {
                                                         Copy-Item -LiteralPath $EpisodeImage -destination $EpisodeTempImage | Out-Null
                                                     }
+                                                    if ($SkipLocalTCTextAdd -eq 'true'){
+                                                        $SkippingText = 'true'
+                                                    }
                                                     Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
                                                 Else {
@@ -27759,6 +27862,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 if ($TakeLocal) {
                                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                         Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage | Out-Null
+                                                    }
+                                                    if ($SkipLocalTCTextAdd -eq 'true'){
+                                                        $SkippingText = 'true'
                                                     }
                                                     Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                 }
@@ -29088,6 +29194,9 @@ else {
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                     }
+                                    if ($SkipLocalPosterTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
+                                    }
                                     Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
                                 Else {
@@ -29643,6 +29752,9 @@ else {
                                 if ($TakeLocal) {
                                     Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                         Copy-Item -LiteralPath $_.FullName -Destination $BackgroundImage | Out-Null
+                                    }
+                                    if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                        $SkippingText = 'true'
                                     }
                                     Write-Entry -Subtext "Copy local asset to: $BackgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                 }
@@ -30290,6 +30402,9 @@ else {
                                 Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                     Copy-Item -LiteralPath $_.FullName -Destination $PosterImage | Out-Null
                                 }
+                                if ($SkipLocalPosterTextAdd -eq 'true'){
+                                    $SkippingText = 'true'
+                                }
                                 Write-Entry -Subtext "Copy local asset to: $PosterImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             }
                             Else {
@@ -30859,6 +30974,9 @@ else {
                             if ($TakeLocal) {
                                 Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                     Copy-Item -LiteralPath $_.FullName -Destination $BackgroundImage | Out-Null
+                                }
+                                if ($SkipLocalBackgroundTextAdd -eq 'true'){
+                                    $SkippingText = 'true'
                                 }
                                 Write-Entry -Subtext "Copy local asset to: $BackgroundImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                             }
@@ -31555,6 +31673,9 @@ else {
                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                             Copy-Item -LiteralPath $_.FullName -Destination $SeasonImage
                                         }
+                                        if ($SkipLocalSeasonTextAdd -eq 'true'){
+                                            $SkippingText = 'true'
+                                        }
                                         Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
                                     Else {
@@ -31740,6 +31861,9 @@ else {
                                     if ($TakeLocal) {
                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                             Copy-Item -LiteralPath $_.FullName -Destination $SeasonImage
+                                        }
+                                        if ($SkipLocalSeasonTextAdd -eq 'true'){
+                                            $SkippingText = 'true'
                                         }
                                         Write-Entry -Subtext "Copy local asset to: $SeasonImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                     }
@@ -32262,6 +32386,9 @@ else {
                                                         if ($global:TempImagecopied -ne 'true') {
                                                             Copy-Item -LiteralPath $EpisodeImage -destination $EpisodeTempImage | Out-Null
                                                         }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
+                                                        }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                     Else {
@@ -32442,6 +32569,9 @@ else {
                                                     if ($TakeLocal) {
                                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                             Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage
+                                                        }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
                                                         }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
@@ -32953,6 +33083,9 @@ else {
                                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                             Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage | Out-Null
                                                         }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
+                                                        }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }
                                                     Else {
@@ -33117,6 +33250,9 @@ else {
                                                     if ($TakeLocal) {
                                                         Get-ChildItem -LiteralPath "$($ManualTestPath)$posterext" | ForEach-Object {
                                                             Copy-Item -LiteralPath $_.FullName -Destination $EpisodeImage | Out-Null
+                                                        }
+                                                        if ($SkipLocalTCTextAdd -eq 'true'){
+                                                            $SkippingText = 'true'
                                                         }
                                                         Write-Entry -Subtext "Copy local asset to: $EpisodeImage" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                                                     }

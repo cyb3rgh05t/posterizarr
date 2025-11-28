@@ -205,6 +205,14 @@ const getConfigTooltips = (language) => {
         "If assets are placed in this directory with the exact naming convention, they will be preferred (must follow same naming convention as /assets)",
       SkipAddText:
         "If set to true, Posterizarr will skip adding text to the poster if it is flagged as a 'Poster with text' by the provider",
+      SkipLocalPosterTextAdd:
+        "If set to true, Posterizarr will skip adding text to the local poster.",
+      SkipLocalBackgroundTextAdd:
+        "If set to true, Posterizarr will skip adding text to the local background poster.",
+      SkipLocalSeasonTextAdd:
+        "If set to true, Posterizarr will skip adding text to the local season poster.",
+      SkipLocalTCTextAdd:
+        "If set to true, Posterizarr will skip adding text to the local TC.",
       SkipAddTextAndOverlay:
         "If set to true, Posterizarr will skip adding text/overlay to the poster if it is flagged as a 'Poster with text' by the provider",
       FollowSymlink:
@@ -633,6 +641,14 @@ const getConfigTooltips = (language) => {
         "Wenn Assets in diesem Verzeichnis mit der exakten Namenskonvention platziert werden, werden sie bevorzugt (muss dieselbe Namenskonvention wie /assets befolgen)",
       SkipAddText:
         "Wenn auf true gesetzt, überspringt Posterizarr das Hinzufügen von Text zum Poster, wenn es vom Anbieter als 'Poster mit Text' gekennzeichnet ist",
+      SkipLocalPosterTextAdd:
+        "Wenn auf true gesetzt, überspringt Posterizarr das Hinzufügen von Text zum lokalen Poster.",
+      SkipLocalBackgroundTextAdd:
+        "Wenn auf true gesetzt, überspringt Posterizarr das Hinzufügen von Text zum lokalen Hintergrundposter.",
+      SkipLocalSeasonTextAdd:
+        "Wenn auf true gesetzt, überspringt Posterizarr das Hinzufügen von Text zum lokalen Staffelposter.",
+      SkipLocalTCTextAdd:
+        "Wenn auf true gesetzt, überspringt Posterizarr das Hinzufügen von Text zum lokalen TC.",
       SkipAddTextAndOverlay:
         "Wenn auf true gesetzt, überspringt Posterizarr das Hinzufügen von Text/overlay zum Poster, wenn es vom Anbieter als 'Poster mit Text' gekennzeichnet ist",
       FollowSymlink:
@@ -1069,6 +1085,14 @@ const getConfigTooltips = (language) => {
         "Si des ressources sont placées dans ce répertoire avec la convention de nommage exacte, elles seront préférées (doit suivre la même convention de nommage que /assets)",
       SkipAddText:
         "Si défini sur true, Posterizarr sautera l'ajout de texte à l'affiche si elle est signalée comme 'Affiche avec texte' par le fournisseur",
+      SkipLocalPosterTextAdd:
+        "Si défini sur true, Posterizarr ignorera l’ajout de texte à l’affiche locale.",
+      SkipLocalBackgroundTextAdd:
+        "Si défini sur true, Posterizarr ignorera l’ajout de texte à l’affiche d’arrière-plan locale.",
+      SkipLocalSeasonTextAdd:
+        "Si défini sur true, Posterizarr ignorera l’ajout de texte à l’affiche locale de la saison.",
+      SkipLocalTCTextAdd:
+        "Si défini sur true, Posterizarr ignorera l’ajout de texte au TC local.",
       SkipAddTextAndOverlay:
         "S’il est défini sur vrai, Posterizarr ignorera l’ajout de texte/superposition à l’affiche si elle est marquée comme 'Affiche avec texte' par le fournisseur.",
       FollowSymlink:
@@ -1536,6 +1560,14 @@ const getConfigTooltips = (language) => {
         "Se le risorse sono posizionate in questa directory con la convenzione di denominazione esatta, verranno preferite (deve seguire la stessa convenzione di denominazione di /assets)",
       SkipAddText:
         "Se impostato su true, Posterizarr salterà l'aggiunta di testo al poster se è contrassegnato come 'Poster con testo' dal provider",
+      SkipLocalPosterTextAdd:
+        "Se impostato su true, Posterizarr salterà l’aggiunta di testo al poster locale.",
+      SkipLocalBackgroundTextAdd:
+        "Se impostato su true, Posterizarr salterà l’aggiunta di testo al poster locale di sfondo.",
+      SkipLocalSeasonTextAdd:
+        "Se impostato su true, Posterizarr salterà l’aggiunta di testo al poster locale della stagione.",
+      SkipLocalTCTextAdd:
+        "Se impostato su true, Posterizarr salterà l’aggiunta di testo al TC locale.",
       SkipAddTextAndOverlay:
         "Se impostato su true, Posterizarr salterà l’aggiunta di testo/sovrapposizione al poster se è contrassegnato come 'Poster con testo' dal provider.",
       FollowSymlink:
@@ -1995,6 +2027,14 @@ const getConfigTooltips = (language) => {
         "Se os recursos forem colocados neste diretório com a convenção de nomenclatura exata, eles serão preferidos (deve seguir a mesma convenção de nomenclatura de /assets)",
       SkipAddText:
         "Se definido como true, Posterizarr pulará a adição de texto ao pôster se estiver marcado como 'Pôster com texto' pelo provedor",
+      SkipLocalPosterTextAdd:
+        "Se definido como true, o Posterizarr irá ignorar a adição de texto ao pôster local.",
+      SkipLocalBackgroundTextAdd:
+        "Se definido como true, o Posterizarr irá ignorar a adição de texto ao pôster de fundo local.",
+      SkipLocalSeasonTextAdd:
+        "Se definido como true, o Posterizarr irá ignorar a adição de texto ao pôster local da temporada.",
+      SkipLocalTCTextAdd:
+        "Se definido como true, o Posterizarr irá ignorar a adição de texto ao TC local.",
       SkipAddTextAndOverlay:
         "Se definido como verdadeiro, o Posterizarr irá ignorar a adição de texto/sobreposição ao poster se este estiver marcado como 'Poster com texto' pelo fornecedor.",
       FollowSymlink:
@@ -4115,6 +4155,10 @@ function ConfigEditor() {
       "SkipTBA",
       "SkipJapTitle",
       "SkipAddText",
+      "SkipLocalPosterTextAdd",
+      "SkipLocalBackgroundTextAdd",
+      "SkipLocalSeasonTextAdd",
+      "SkipLocalTCTextAdd",
       "SkipAddTextAndOverlay",
       "DisableOnlineAssetFetch",
       "AutoUpdateIM",
