@@ -10305,7 +10305,7 @@ Elseif ($Tautulli) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -10844,7 +10844,7 @@ Elseif ($Tautulli) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -11471,7 +11471,7 @@ Elseif ($Tautulli) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true'){
+                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                         $ApplyTextInsteadOfLogo = $null
                                         $global:LogoUrl = $null
                                         $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -12021,7 +12021,7 @@ Elseif ($Tautulli) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true'){
+                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                         $ApplyTextInsteadOfLogo = $null
                                         $global:LogoUrl = $null
                                         $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -15357,7 +15357,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseLogo -eq 'true'){
+                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -15833,7 +15833,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseLogo -eq 'true'){
+                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -16392,7 +16392,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -16881,7 +16881,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -19492,7 +19492,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseLogo -eq 'true'){
+                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -20031,7 +20031,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseLogo -eq 'true'){
+                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -20658,7 +20658,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -21208,7 +21208,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -25764,7 +25764,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -26241,7 +26241,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -26800,7 +26800,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true'){
+                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                         $ApplyTextInsteadOfLogo = $null
                                         $global:LogoUrl = $null
                                         $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -27289,7 +27289,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true'){
+                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                         $ApplyTextInsteadOfLogo = $null
                                         $global:LogoUrl = $null
                                         $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -30276,7 +30276,7 @@ else {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -30882,7 +30882,7 @@ else {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true'){
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -31578,7 +31578,7 @@ else {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true'){
+                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                         $ApplyTextInsteadOfLogo = $null
                                         $global:LogoUrl = $null
                                         $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -32198,7 +32198,7 @@ else {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true'){
+                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                         $ApplyTextInsteadOfLogo = $null
                                         $global:LogoUrl = $null
                                         $allProviders = @('TMDB', 'FANART', 'TVDB')
