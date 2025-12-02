@@ -27,6 +27,7 @@ CONFIG_TOOLTIPS = {
     "PosterMinHeight": "Minimum poster height filter—greater than or equal to specified value (default: 3000)",
     "BgTcMinWidth": "Minimum background/titlecard width filter—greater than or equal to specified value (default: 3840)",
     "BgTcMinHeight": "Minimum background/titlecard height filter—greater than or equal to specified value (default: 2160)",
+    "LogoLanguageOrder": "Specify language preferences for Logos. Default is en,de. Use 2-digit ISO 3166-1 language codes.",
     # PlexPart
     "PlexLibstoExclude": "Plex libraries, by name, to exclude from processing (comma-separated list)",
     "PlexUrl": "Plex server URL (e.g., http://192.168.1.1:32400 or http://myplexserver.com:32400)",
@@ -104,6 +105,10 @@ CONFIG_TOOLTIPS = {
     "SymbolsToKeepOnNewLine": "A list of symbols that trigger a newline insertion but are not replaced by the NewLineOnSpecificSymbols setting. This only applies if the symbol is also included in NewLineSymbols. Separate each symbol with a comma (e.g., '-', ':')",
     "DisableHashValidation": "Set to true to skip hash validation (Default: false). Note: This may produce bloat, as every item will be re-uploaded to media servers",
     "DisableOnlineAssetFetch": "Set to true to skip all online lookups and use only locally available assets (Default: false)",
+    "UseLogo": "Set to true to apply logos instead of title text.",
+    "UseClearlogo": "Set to true to use Clearlogo.",
+    "UseClearart": "Set to true to use Clearart.",
+    "LogoTextFallback": "Set to true to fallback to Text if no logos are found.",
     # OverlayPart
     "ImageProcessing": "Set to true if you want the ImageMagick part (text, overlay and/or border); if false, it only downloads the posters",
     "outputQuality": "Image output quality (default is 92%). Setting to 100% doubles the image size",

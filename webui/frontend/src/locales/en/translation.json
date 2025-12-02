@@ -121,7 +121,7 @@
       "or": "or",
       "urlPlaceholder": "Or enter URL/path: C:\\\\path\\\\to\\\\image.jpg or https://url.to/image.jpg",
       "uploadHint": "Upload a local image file or enter a direct URL/path to the source image",
-      "titleText": "Title Text",
+      "titleText": "Title Text or Url to Logo",
       "titlePlaceholder": "The Martian",
       "titleHint": "Title to display on the poster",
       "folderName": "Folder Name",
@@ -1360,7 +1360,8 @@
     "confirmReplaceButton": "Replace Asset",
     "confirmFetchTitle": "Confirm Fetch Replacement Options",
     "confirmFetchMessage": "This will search TMDB, TVDB, and Fanart.tv for replacement options. Continue?",
-    "confirmFetchButton": "Fetch Replacements"
+    "confirmFetchButton": "Fetch Replacements",
+    "titleText": "Title Text or Url to Logo"
   },
   "assetOverview": {
     "title": "Action Center",

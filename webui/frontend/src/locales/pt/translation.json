@@ -121,7 +121,7 @@
       "or": "ou",
       "urlPlaceholder": "Ou insira URL/caminho: C:\\\\caminho\\\\para\\\\imagem.jpg ou https://url.to/image.jpg",
       "uploadHint": "Carregue um arquivo de imagem local ou insira um URL/caminho direto para a imagem de origem",
-      "titleText": "Texto do título",
+      "titleText": "Texto do título ou URL do logotipo",
       "titlePlaceholder": "Perdido em Marte",
       "titleHint": "Título a ser exibido no cartaz",
       "folderName": "Nome da pasta",
@@ -1352,7 +1352,8 @@
     "confirmReplaceButton": "Substituir ativo",
     "confirmFetchTitle": "Confirmar busca de opções de substituição",
     "confirmFetchMessage": "Isso buscará opções de substituição no TMDB, TVDB e Fanart.tv. Continuar?",
-    "confirmFetchButton": "Buscar substituições"
+    "confirmFetchButton": "Buscar substituições",
+    "titleText": "Texto do título ou URL do logotipo"
   },
   "assetOverview": {
     "title": "Central de Ações",
