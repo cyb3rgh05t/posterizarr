@@ -3569,6 +3569,31 @@ function ConfigEditor() {
       if (!newLineOnSpecificSymbols) return true;
     }
 
+    // UseClearlogo, UseClearart, and LogoTextFallback require UseLogo to be enabled
+    const logoDependentFields = [
+      "UseClearlogo",
+      "UseClearart",
+      "LogoTextFallback",
+    ];
+
+    if (logoDependentFields.includes(key)) {
+      let useLogo = false;
+
+      if (usingFlatStructure) {
+        const val = config["UseLogo"];
+        useLogo = val === "true" || val === true;
+      } else {
+        // In grouped structure, UseLogo is in PrerequisitePart
+        const val = config["PrerequisitePart"]?.["UseLogo"];
+        useLogo = val === "true" || val === true;
+      }
+
+      // If UseLogo is NOT enabled, disable these fields
+      if (!useLogo) {
+        return true;
+      }
+    }
+
     // === OVERLAY AND TEXT CONDITIONAL DISABLING ===
     const keyLower = key.toLowerCase();
 
