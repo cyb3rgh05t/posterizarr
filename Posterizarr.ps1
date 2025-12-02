@@ -130,7 +130,12 @@ function GetTVDBLogo {
     if ($global:tvdbid) {
         Write-Entry -Subtext "Searching on TVDB for a Logo - TVDBID: $global:tvdbid" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
         try {
-            $response = (Invoke-WebRequest -Uri "https://api4.thetvdb.com/v4/$Type/$($global:tvdbid)/artworks" -Method GET -Headers $global:tvdbheader).content | ConvertFrom-Json
+            if ($type -eq 'series'){
+                $response = (Invoke-WebRequest -Uri "https://api4.thetvdb.com/v4/$Type/$($global:tvdbid)/artworks" -Method GET -Headers $global:tvdbheader).content | ConvertFrom-Json
+            }
+            Else {
+                $response = (Invoke-WebRequest -Uri "https://api4.thetvdb.com/v4/$Type/$($global:tvdbid)/extended" -Method GET -Headers $global:tvdbheader).content | ConvertFrom-Json
+            }
         }
         catch {
             Write-Entry -Subtext "Could not query TVDB url, error message: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
@@ -3328,6 +3333,10 @@ function GetTVDBMoviePoster {
                                     if ($lang -ne 'null') {
                                         $global:PosterWithText = $true
                                         $global:TVDBAssetTextLang = $lang
+                                        if ($global:FavProvider -eq 'TVDB') {
+                                            $global:Fallback = "TMDB"
+                                            $global:TVDBfallbackposterurl = $LangArtwork[0].image
+                                        }
                                     }
                                     $global:TVDBAssetChangeUrl = "https://thetvdb.com/movies/$($response.data.slug)#artwork"
                                     return $global:posterurl
@@ -3483,6 +3492,10 @@ function GetTVDBMovieBackground {
                                     if ($lang -ne 'null') {
                                         $global:PosterWithText = $true
                                         $global:TVDBAssetTextLang = $lang
+                                        if ($global:FavProvider -eq 'TVDB') {
+                                            $global:Fallback = "TMDB"
+                                            $global:TVDBfallbackposterurl = $LangArtwork[0].image
+                                        }
                                     }
                                     $global:TVDBAssetChangeUrl = "https://thetvdb.com/movies/$($response.data.slug)#artwork"
                                     return $global:posterurl
@@ -8953,7 +8966,7 @@ if ($Manual) {
                 }
                 Elseif ($BackgroundCard -and $AddBackgroundText -eq 'true') {
                     if ($isLogo){
-                        $Arguments = "`"$PosterImage`" `( `"$LogoSource`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                        $Arguments = "`"$PosterImage`" `( `"$LogoSource`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                         Write-Entry -Subtext "    Applying logo..." -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                     }
                     Else {
@@ -8974,7 +8987,7 @@ if ($Manual) {
                 }
                 Elseif ($AddText -eq 'true') {
                     if ($isLogo){
-                        $Arguments = "`"$PosterImage`" `( `"$LogoSource`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                        $Arguments = "`"$PosterImage`" `( `"$LogoSource`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                         Write-Entry -Subtext "    Applying logo..." -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
                     }
                     Else {
@@ -10111,6 +10124,11 @@ Elseif ($Tautulli) {
                                         Write-Entry -Subtext "Took TMDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
                                         $global:IsFallback = $true
                                     }
+                                    if (!$global:TextlessPoster -and $global:TVDBfallbackposterurl) {
+                                        $global:posterurl = $global:TVDBfallbackposterurl
+                                        Write-Entry -Subtext "Took TVDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
+                                        $global:IsFallback = $true
+                                    }
                                     if ($global:FavProvider -eq 'TVDB' -and !$global:posterurl) {
                                         if ($entry.tmdbid) {
                                             $global:posterurl = GetTMDBMoviePoster
@@ -10326,7 +10344,7 @@ Elseif ($Tautulli) {
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -10341,7 +10359,7 @@ Elseif ($Tautulli) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -10865,7 +10883,7 @@ Elseif ($Tautulli) {
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -10880,7 +10898,7 @@ Elseif ($Tautulli) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -11492,7 +11510,7 @@ Elseif ($Tautulli) {
                                             $ApplyTextInsteadOfLogo = 'true'
                                         }
                                         ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png'
+                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             try {
                                                 $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                             }
@@ -11507,7 +11525,7 @@ Elseif ($Tautulli) {
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                            $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -12042,7 +12060,7 @@ Elseif ($Tautulli) {
                                             $ApplyTextInsteadOfLogo = 'true'
                                         }
                                         ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png'
+                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             try {
                                                 $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                             }
@@ -12057,7 +12075,7 @@ Elseif ($Tautulli) {
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                            $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -15181,6 +15199,11 @@ Elseif ($ArrTrigger) {
                                             Write-Entry -Subtext "Took TMDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
                                             $global:IsFallback = $true
                                         }
+                                        if (!$global:TextlessPoster -and $global:TVDBfallbackposterurl) {
+                                            $global:posterurl = $global:TVDBfallbackposterurl
+                                            Write-Entry -Subtext "Took TVDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
+                                            $global:IsFallback = $true
+                                        }
                                         if ($global:FavProvider -eq 'TVDB' -and !$global:posterurl) {
                                             if ($entry.tmdbid) {
                                                 $global:posterurl = GetTMDBMoviePoster
@@ -15378,7 +15401,7 @@ Elseif ($ArrTrigger) {
                                                     $ApplyTextInsteadOfLogo = 'true'
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png'
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -15392,7 +15415,7 @@ Elseif ($ArrTrigger) {
                                                         Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                     }
-                                                    $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -15854,7 +15877,7 @@ Elseif ($ArrTrigger) {
                                                     $ApplyTextInsteadOfLogo = 'true'
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png'
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -15869,7 +15892,7 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -16413,7 +16436,7 @@ Elseif ($ArrTrigger) {
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -16428,7 +16451,7 @@ Elseif ($ArrTrigger) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -16902,7 +16925,7 @@ Elseif ($ArrTrigger) {
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -16917,7 +16940,7 @@ Elseif ($ArrTrigger) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -19298,6 +19321,11 @@ Elseif ($ArrTrigger) {
                                             Write-Entry -Subtext "Took TMDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
                                             $global:IsFallback = $true
                                         }
+                                        if (!$global:TextlessPoster -and $global:TVDBfallbackposterurl) {
+                                            $global:posterurl = $global:TVDBfallbackposterurl
+                                            Write-Entry -Subtext "Took TVDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
+                                            $global:IsFallback = $true
+                                        }
                                         if ($global:FavProvider -eq 'TVDB' -and !$global:posterurl) {
                                             if ($entry.tmdbid) {
                                                 $global:posterurl = GetTMDBMoviePoster
@@ -19513,7 +19541,7 @@ Elseif ($ArrTrigger) {
                                                     $ApplyTextInsteadOfLogo = 'true'
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png'
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -19528,7 +19556,7 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -20052,7 +20080,7 @@ Elseif ($ArrTrigger) {
                                                     $ApplyTextInsteadOfLogo = 'true'
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png'
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -20067,7 +20095,7 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -20679,7 +20707,7 @@ Elseif ($ArrTrigger) {
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -20694,7 +20722,7 @@ Elseif ($ArrTrigger) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -21229,7 +21257,7 @@ Elseif ($ArrTrigger) {
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -21244,7 +21272,7 @@ Elseif ($ArrTrigger) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -25588,6 +25616,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         Write-Entry -Subtext "Took TMDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
                                         $global:IsFallback = $true
                                     }
+                                    if (!$global:TextlessPoster -and $global:TVDBfallbackposterurl) {
+                                        $global:posterurl = $global:TVDBfallbackposterurl
+                                        Write-Entry -Subtext "Took TVDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
+                                        $global:IsFallback = $true
+                                    }
                                     if ($global:FavProvider -eq 'TVDB' -and !$global:posterurl) {
                                         if ($entry.tmdbid) {
                                             $global:posterurl = GetTMDBMoviePoster
@@ -25785,7 +25818,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -25800,7 +25833,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -26262,7 +26295,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -26277,7 +26310,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -26821,7 +26854,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $ApplyTextInsteadOfLogo = 'true'
                                         }
                                         ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png'
+                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             try {
                                                 $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                             }
@@ -26836,7 +26869,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                            $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -27310,7 +27343,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $ApplyTextInsteadOfLogo = 'true'
                                         }
                                         ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png'
+                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             try {
                                                 $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                             }
@@ -27325,7 +27358,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                            $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -30082,6 +30115,11 @@ else {
                                         Write-Entry -Subtext "Took TMDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
                                         $global:IsFallback = $true
                                     }
+                                    if (!$global:TextlessPoster -and $global:TVDBfallbackposterurl) {
+                                        $global:posterurl = $global:TVDBfallbackposterurl
+                                        Write-Entry -Subtext "Took TVDB Fallback poster because it is your Fav Provider" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
+                                        $global:IsFallback = $true
+                                    }
                                     if ($global:FavProvider -eq 'TVDB' -and !$global:posterurl) {
                                         if ($entry.tmdbid) {
                                             $global:posterurl = GetTMDBMoviePoster
@@ -30297,7 +30335,7 @@ else {
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -30312,7 +30350,7 @@ else {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -30903,7 +30941,7 @@ else {
                                                 $ApplyTextInsteadOfLogo = 'true'
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png'
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -30918,7 +30956,7 @@ else {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -31599,7 +31637,7 @@ else {
                                             $ApplyTextInsteadOfLogo = 'true'
                                         }
                                         ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png'
+                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             try {
                                                 $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                             }
@@ -31614,7 +31652,7 @@ else {
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`>`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                            $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -32219,7 +32257,7 @@ else {
                                             $ApplyTextInsteadOfLogo = 'true'
                                         }
                                         ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png'
+                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             try {
                                                 $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                             }
@@ -32234,7 +32272,7 @@ else {
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`>`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                            $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
