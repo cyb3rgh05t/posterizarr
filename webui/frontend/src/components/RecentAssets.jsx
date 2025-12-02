@@ -18,11 +18,13 @@ import {
   Calendar,
   Folder,
   HardDrive,
+  ImageIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDashboardLoading } from "../context/DashboardLoadingContext";
 import { useToast } from "../context/ToastContext";
 import CompactImageSizeSlider from "./CompactImageSizeSlider";
+import AssetReplacer from "./AssetReplacer";
 
 const API_URL = "/api";
 
@@ -39,6 +41,9 @@ function RecentAssets({ refreshTrigger = 0 }) {
 
   const [refreshing, setRefreshing] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null); // For modal
+
+  // Asset Replacer State
+  const [replacerOpen, setReplacerOpen] = useState(false);
 
   // Tab filter state with localStorage
   const [activeTab, setActiveTab] = useState(() => {
@@ -558,16 +563,6 @@ function RecentAssets({ refreshTrigger = 0 }) {
                         </span>
                       )}
                     </div>
-
-                    {/* Source Folder (if from RotatedLogs)
-                    {asset.source_folder && (
-                      <p
-                        className="text-xs text-theme-muted mt-2 truncate"
-                        title={asset.source_folder}
-                      >
-                        📂 {asset.source_folder}
-                      </p>
-                    )} */}
                   </div>
                 </div>
               ))}
@@ -816,9 +811,19 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     </div>
                   )}
 
-                  {/* Provider Link Button */}
-                  {selectedAsset.provider_link && (
-                    <div className="pt-4 border-t border-theme">
+                  {/* Actions Section */}
+                  <div className="pt-4 border-t border-theme space-y-2">
+                    {/* Replace Button */}
+                    <button
+                      onClick={() => setReplacerOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-theme-bg hover:bg-theme-hover border border-theme text-theme-text rounded-lg transition-all"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Replace Image
+                    </button>
+
+                    {/* Provider Link Button */}
+                    {selectedAsset.provider_link && (
                       <a
                         href={selectedAsset.provider_link}
                         target="_blank"
@@ -828,13 +833,27 @@ function RecentAssets({ refreshTrigger = 0 }) {
                         <ExternalLink className="w-4 h-4" />
                         View on Provider
                       </a>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Asset Replacer Modal */}
+      {replacerOpen && selectedAsset && (
+        <AssetReplacer
+          asset={selectedAsset}
+          onClose={() => setReplacerOpen(false)}
+          onSuccess={() => {
+            setReplacerOpen(false);
+            setSelectedAsset(null); // Close the details modal to see the fresh list
+            showSuccess(t("gallery.assetReplaced") || "Asset replaced successfully.");
+            fetchRecentAssets(false); // Force refresh the list
+          }}
+        />
       )}
 
       {/* Poster Grid Styles */}
