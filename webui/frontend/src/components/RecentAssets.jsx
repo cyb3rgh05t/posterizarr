@@ -1,3 +1,10 @@
+// - CompactImageSizeSlider (5-10 Assets)
+// - Dynamic poster sizing with CSS Grid
+// - Single horizontal row, all posters visible
+// - Theme-compatible
+// - All badges at bottom (no overlay)
+// - Cached data with silent background refresh (every 2 minutes)
+
 import React, { useState, useEffect, useRef } from "react";
 import {
   FileImage,
@@ -11,13 +18,11 @@ import {
   Calendar,
   Folder,
   HardDrive,
-  ImageIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDashboardLoading } from "../context/DashboardLoadingContext";
 import { useToast } from "../context/ToastContext";
 import CompactImageSizeSlider from "./CompactImageSizeSlider";
-import AssetReplacer from "./AssetReplacer";
 
 const API_URL = "/api";
 
@@ -33,11 +38,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
   const [error, setError] = useState(null); // Error state
 
   const [refreshing, setRefreshing] = useState(false);
-
-  // -- Modal States --
-  const [selectedAsset, setSelectedAsset] = useState(null); // For the details view
-  const [replacerOpen, setReplacerOpen] = useState(false); // For the replacer modal
-  const [assetToReplace, setAssetToReplace] = useState(null); // Specific asset object for replacer
+  const [selectedAsset, setSelectedAsset] = useState(null); // For modal
 
   // Tab filter state with localStorage
   const [activeTab, setActiveTab] = useState(() => {
@@ -55,6 +56,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
   const [assetCount, setAssetCount] = useState(() => {
     const saved = localStorage.getItem("recent-assets-count");
     const count = saved ? parseInt(saved) : 10;
+    // Ensure count is between 5 and 10
     return Math.min(Math.max(count, 5), 10);
   });
 
@@ -100,8 +102,10 @@ function RecentAssets({ refreshTrigger = 0 }) {
   };
 
   useEffect(() => {
+    // Register as loading and fetch on mount (silent mode = no loading spinner)
     startLoading("recent-assets");
 
+    // Check cache first
     if (cachedAssets) {
       setAssets(cachedAssets);
       setLoading(false);
@@ -113,34 +117,51 @@ function RecentAssets({ refreshTrigger = 0 }) {
       fetchRecentAssets(true);
     }
 
+    // Background refresh every 2 minutes (silent)
     const interval = setInterval(() => {
+      console.log("Auto-refreshing recent assets...");
       fetchRecentAssets(true);
     }, 2 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // Don't finish loading on unmount - that happens when data is fetched
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Watch for external refresh triggers (e.g., when a run finishes)
   useEffect(() => {
     if (refreshTrigger > 0) {
+      console.log(
+        "External refresh trigger received, updating recent assets..."
+      );
       fetchRecentAssets(true);
     }
   }, [refreshTrigger]);
 
+  // Listen for assetReplaced events (when assets are marked as resolved/unresolved)
   useEffect(() => {
     const handleAssetReplaced = () => {
+      console.log(
+        "Asset replaced/unresolve event received, refreshing recent assets..."
+      );
       fetchRecentAssets(true);
     };
+
     window.addEventListener("assetReplaced", handleAssetReplaced);
+
     return () => {
       window.removeEventListener("assetReplaced", handleAssetReplaced);
     };
   }, []);
 
   const handleAssetCountChange = (newCount) => {
+    // Ensure count is between 5 and 10
     const validCount = Math.min(Math.max(newCount, 5), 10);
     setAssetCount(validCount);
     localStorage.setItem("recent-assets-count", validCount.toString());
+    // Reset offset when changing count
     setPageOffset(0);
     localStorage.setItem(`recent-assets-offset-${activeTab}`, "0");
   };
@@ -148,6 +169,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     localStorage.setItem("recent-assets-tab", tab);
+    // Load offset for this tab or reset to 0
     const savedOffset = localStorage.getItem(`recent-assets-offset-${tab}`);
     setPageOffset(savedOffset ? parseInt(savedOffset) : 0);
   };
@@ -231,8 +253,10 @@ function RecentAssets({ refreshTrigger = 0 }) {
     }
   };
 
+  // Get the media type label (Movie, Show, Season, Episode, Background)
   const getMediaTypeLabel = (asset) => {
     const type = asset.type?.toLowerCase() || "";
+
     switch (type) {
       case "movie":
       case "collection":
@@ -254,8 +278,10 @@ function RecentAssets({ refreshTrigger = 0 }) {
     }
   };
 
+  // Determine if asset should use landscape aspect ratio
   const isLandscapeAsset = (type) => {
     const typeStr = type?.toLowerCase() || "";
+    // Check for any background or titlecard/episode types
     const landscapeTypes = ["background", "episode", "titlecard", "title_card"];
     const isLandscape =
       landscapeTypes.some((t) => typeStr.includes(t)) ||
@@ -270,51 +296,20 @@ function RecentAssets({ refreshTrigger = 0 }) {
     return "bg-yellow-500/20 text-yellow-400 border-yellow-500/50";
   };
 
-  // --- Handlers for Replacement ---
-  const handleOpenReplacer = () => {
-    if (!selectedAsset) return;
-
-    // Normalize the asset data for AssetReplacer
-    // AssetReplacer requires 'path' and 'name'.
-    // Recent assets might have 'poster_path' or 'path'.
-    const cleanAsset = {
-        ...selectedAsset,
-        // Ensure path exists. Prefer explicit path, fallback to poster_path
-        path: selectedAsset.path || selectedAsset.poster_path,
-        name: selectedAsset.title || selectedAsset.name
-    };
-
-    if (!cleanAsset.path) {
-        showError("Could not determine file path for this asset.");
-        return;
-    }
-
-    setAssetToReplace(cleanAsset);
-    setSelectedAsset(null); // Close the details view to avoid z-index/stacking issues
-    setReplacerOpen(true);
-  };
-
-  const handleReplacerSuccess = () => {
-    setReplacerOpen(false);
-    setAssetToReplace(null);
-    showSuccess(t("gallery.assetReplaced") || "Asset replaced successfully.");
-    // Small delay to allow file system to update before refreshing list
-    setTimeout(() => {
-        fetchRecentAssets(false);
-    }, 500);
-  };
-
+  // Get the assets to display based on slider value, active tab, and pagination
   const filteredAssets = filterAssetsByTab(assets);
   const displayedAssets = filteredAssets.slice(
     pageOffset,
     pageOffset + assetCount
   );
 
+  // Calculate pagination info
   const totalPages = Math.ceil(filteredAssets.length / assetCount);
   const currentPage = Math.floor(pageOffset / assetCount) + 1;
   const hasPrevPage = pageOffset > 0;
   const hasNextPage = pageOffset + assetCount < filteredAssets.length;
 
+  // Tab configuration - dynamically filter tabs based on available assets
   const allTabs = [
     { id: "All", label: "All" },
     { id: "Posters", label: "Posters" },
@@ -324,8 +319,12 @@ function RecentAssets({ refreshTrigger = 0 }) {
     { id: "TitleCards", label: "TitleCards" },
   ];
 
+  // Filter tabs to only show those with assets
   const tabs = allTabs.filter((tab) => {
-    if (tab.id === "All") return assets.length > 0;
+    if (tab.id === "All") {
+      return assets.length > 0; // Always show "All" if there are any assets
+    }
+    // Count how many assets match this tab
     const tabAssets = assets.filter((asset) => {
       const type = asset.type?.toLowerCase() || "";
       switch (tab.id) {
@@ -345,9 +344,10 @@ function RecentAssets({ refreshTrigger = 0 }) {
           return false;
       }
     });
-    return tabAssets.length > 0;
+    return tabAssets.length > 0; // Only show tab if it has assets
   });
 
+  // Don't render the card if there are no assets and not loading
   if (!loading && assets.length === 0) {
     return null;
   }
@@ -364,6 +364,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
         </h2>
 
         <div className="flex items-center gap-3">
+          {/* Compact Image Size Slider */}
           <CompactImageSizeSlider
             value={assetCount}
             onChange={handleAssetCountChange}
@@ -372,6 +373,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
             max={10}
           />
 
+          {/* Refresh Button - SystemInfo Style */}
           <button
             onClick={() => fetchRecentAssets()}
             disabled={refreshing}
@@ -391,7 +393,9 @@ function RecentAssets({ refreshTrigger = 0 }) {
       {/* Tab Navigation */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-theme-border scrollbar-track-transparent">
         {tabs.map((tab) => {
+          const tabFilteredCount = filterAssetsByTab(assets).length;
           const isActive = activeTab === tab.id;
+
           return (
             <button
               key={tab.id}
@@ -440,6 +444,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
         </div>
       ) : (
         <>
+          {/* Flexible Grid - All posters visible in one row, responsive */}
           <div className="w-full overflow-x-auto">
             <div
               className="poster-grid"
@@ -453,6 +458,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
                   onClick={() => setSelectedAsset(asset)}
                   className="bg-theme-bg rounded-lg overflow-hidden border border-theme hover:border-theme-primary transition-all group flex flex-col cursor-pointer"
                 >
+                  {/* Poster/Background Image - Dynamic Aspect Ratio */}
                   <div
                     className={`relative bg-theme-dark flex-shrink-0 ${
                       isLandscapeAsset(asset.type)
@@ -481,6 +487,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
                       </div>
                     )}
 
+                    {/* Provider Link - shows on hover */}
                     {asset.provider_link && (
                       <a
                         href={asset.provider_link}
@@ -495,6 +502,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     )}
                   </div>
 
+                  {/* Asset Info */}
                   <div className="p-3 bg-theme-card flex-1 flex flex-col justify-between">
                     <h3
                       className="font-semibold text-theme-text text-sm truncate mb-2"
@@ -503,7 +511,9 @@ function RecentAssets({ refreshTrigger = 0 }) {
                       {asset.title}
                     </h3>
 
+                    {/* All Badges in one row */}
                     <div className="flex flex-wrap gap-1 mt-auto">
+                      {/* Type Badge (Poster/Show/Season/Episode/Background) */}
                       {asset.type && (
                         <span
                           className={`px-1.5 py-0.5 rounded text-xs font-medium border ${getTypeColor(
@@ -514,18 +524,21 @@ function RecentAssets({ refreshTrigger = 0 }) {
                         </span>
                       )}
 
+                      {/* Library Badge */}
                       {asset.library && (
                         <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-500/20 text-gray-300 border border-gray-500/50">
                           {asset.library}
                         </span>
                       )}
 
+                      {/* Manual Badge (replaces N/A) */}
                       {asset.is_manually_created && (
                         <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/50">
                           Manual
                         </span>
                       )}
 
+                      {/* Language Badge (only if not manually created) */}
                       {!asset.is_manually_created &&
                         asset.language &&
                         asset.language !== "N/A" && (
@@ -538,20 +551,33 @@ function RecentAssets({ refreshTrigger = 0 }) {
                           </span>
                         )}
 
+                      {/* Fallback Badge */}
                       {asset.fallback && (
                         <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/50">
                           FB
                         </span>
                       )}
                     </div>
+
+                    {/* Source Folder (if from RotatedLogs)
+                    {asset.source_folder && (
+                      <p
+                        className="text-xs text-theme-muted mt-2 truncate"
+                        title={asset.source_folder}
+                      >
+                        📂 {asset.source_folder}
+                      </p>
+                    )} */}
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Footer with count and pagination */}
           <div className="mt-4 pt-4 border-t border-theme">
             <div className="flex items-center justify-between">
+              {/* Left: Count info */}
               <div className="text-sm text-theme-muted">
                 Showing {pageOffset + 1}-
                 {Math.min(pageOffset + assetCount, filteredAssets.length)} of{" "}
@@ -561,6 +587,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
                 {activeTab !== "All" && ` (${assets.length} total)`}
               </div>
 
+              {/* Right: Pagination controls */}
               {totalPages > 1 && (
                 <div className="flex items-center gap-2">
                   <button
@@ -647,6 +674,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
                 </h3>
 
                 <div className="space-y-4">
+                  {/* Media Type */}
                   <div>
                     <label className="text-sm text-theme-muted">
                       {t("common.mediaType")}
@@ -662,6 +690,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     </div>
                   </div>
 
+                  {/* Title/Name */}
                   <div>
                     <label className="text-sm text-theme-muted">
                       {getMediaTypeLabel(selectedAsset) === "Episode"
@@ -673,6 +702,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     </p>
                   </div>
 
+                  {/* Timestamps */}
                   <div>
                     <label className="text-sm text-theme-muted flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5" />
@@ -680,10 +710,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
                       {selectedAsset.created
-                        ? new Date(selectedAsset.created * 1000)
-                            .toLocaleString("sv-SE")
-                            .replace("T", " ")
-                        : "Unknown"}
+						  ? new Date(selectedAsset.created * 1000).toLocaleString("sv-SE").replace("T", " ")
+						  : "Unknown"}
                     </p>
                   </div>
 
@@ -694,9 +722,9 @@ function RecentAssets({ refreshTrigger = 0 }) {
                         {t("common.modified")}
                       </label>
                       <p className="text-theme-text mt-1 text-sm">
-                        {new Date(selectedAsset.modified * 1000)
-                          .toLocaleString("sv-SE")
-                          .replace("T", " ")}
+                        {selectedAsset.modified
+                      ? new Date(selectedAsset.modified * 1000).toLocaleString("sv-SE").replace("T", " ")
+                      : "Unknown"}
                       </p>
                     </div>
                   )}
@@ -707,10 +735,12 @@ function RecentAssets({ refreshTrigger = 0 }) {
                       {t("common.lastViewed")}
                     </label>
                     <p className="text-theme-text mt-1 text-sm">
+                      {/* This now shows the current time in the correct format */}
                       {new Date().toLocaleString("sv-SE").replace("T", " ")}
                     </p>
                   </div>
 
+                  {/* Library */}
                   {selectedAsset.library && (
                     <div>
                       <label className="text-sm text-theme-muted flex items-center gap-1">
@@ -723,6 +753,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     </div>
                   )}
 
+                  {/* Path */}
                   <div>
                     <label className="text-sm text-theme-muted flex items-center gap-1">
                       <HardDrive className="w-3.5 h-3.5" />
@@ -733,23 +764,26 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     </p>
                   </div>
 
-                  {selectedAsset.language && selectedAsset.language !== "N/A" && (
-                    <div>
-                      <label className="text-sm text-theme-muted">
-                        Language
-                      </label>
-                      <div className="mt-1">
-                        <span
-                          className={`inline-flex items-center gap-1 px-3 py-1.5 rounded border text-sm font-medium ${getLanguageColor(
-                            selectedAsset.language
-                          )}`}
-                        >
-                          {selectedAsset.language}
-                        </span>
+                  {/* Language Badge */}
+                  {selectedAsset.language &&
+                    selectedAsset.language !== "N/A" && (
+                      <div>
+                        <label className="text-sm text-theme-muted">
+                          Language
+                        </label>
+                        <div className="mt-1">
+                          <span
+                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded border text-sm font-medium ${getLanguageColor(
+                              selectedAsset.language
+                            )}`}
+                          >
+                            {selectedAsset.language}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
+                  {/* Additional Badges */}
                   {(selectedAsset.is_manually_created ||
                     selectedAsset.fallback ||
                     selectedAsset.text_truncated) && (
@@ -758,16 +792,21 @@ function RecentAssets({ refreshTrigger = 0 }) {
                         Properties
                       </label>
                       <div className="flex flex-wrap gap-2 mt-1">
+                        {/* Manual Badge */}
                         {selectedAsset.is_manually_created && (
                           <span className="px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/50">
                             Manual
                           </span>
                         )}
+
+                        {/* Fallback Badge */}
                         {selectedAsset.fallback && (
                           <span className="px-2 py-1 rounded text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/50">
                             Fallback
                           </span>
                         )}
+
+                        {/* Text Truncated Badge */}
                         {selectedAsset.text_truncated && (
                           <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/50">
                             Text Truncated
@@ -777,17 +816,9 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     </div>
                   )}
 
-                  {/* Actions Section */}
-                  <div className="pt-4 border-t border-theme space-y-2">
-                    <button
-                      onClick={handleOpenReplacer}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-theme-bg hover:bg-theme-hover border border-theme text-theme-text rounded-lg transition-all"
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                      Replace Image
-                    </button>
-
-                    {selectedAsset.provider_link && (
+                  {/* Provider Link Button */}
+                  {selectedAsset.provider_link && (
+                    <div className="pt-4 border-t border-theme">
                       <a
                         href={selectedAsset.provider_link}
                         target="_blank"
@@ -797,25 +828,13 @@ function RecentAssets({ refreshTrigger = 0 }) {
                         <ExternalLink className="w-4 h-4" />
                         View on Provider
                       </a>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Asset Replacer Modal */}
-      {replacerOpen && assetToReplace && (
-        <AssetReplacer
-          asset={assetToReplace}
-          onClose={() => {
-            setReplacerOpen(false);
-            setAssetToReplace(null);
-          }}
-          onSuccess={handleReplacerSuccess}
-        />
       )}
 
       {/* Poster Grid Styles */}
@@ -825,6 +844,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
           gap: 1rem;
           align-items: flex-end;
         }
+
+        /* Cards maintain their natural size */
         .poster-grid > div {
           display: flex;
           flex-direction: column;
@@ -834,15 +855,21 @@ function RecentAssets({ refreshTrigger = 0 }) {
             );
           min-width: 0;
         }
+
+        /* Image container maintains aspect ratio */
         .poster-grid > div > div:first-child {
           flex-shrink: 0;
           width: 100%;
         }
+
+        /* Info section */
         .poster-grid > div > div:last-child {
           display: flex;
           flex-direction: column;
           justify-content: space-between;
         }
+
+        /* Responsive: Tablet */
         @media (max-width: 1024px) {
           .poster-grid {
             flex-wrap: wrap;
@@ -853,6 +880,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
             min-width: 180px;
           }
         }
+
+        /* Responsive: Mobile */
         @media (max-width: 640px) {
           .poster-grid > div {
             flex: 0 0 calc((100% - 1rem) / 2);
