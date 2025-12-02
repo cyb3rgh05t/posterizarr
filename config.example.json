@@ -33,6 +33,10 @@
     ],
     "PreferredTCLanguageOrder": [
       "PleaseFillMe"
+    ],
+    "LogoLanguageOrder": [
+      "en",
+      "de"
     ]
   },
   "PlexPart": {
@@ -140,7 +144,11 @@
     "AssetCleanup": "false",
     "AutoUpdateIM": "false",
     "DisableHashValidation": "false",
-    "DisableOnlineAssetFetch": "false"
+    "DisableOnlineAssetFetch": "false",
+    "UseLogo": "false",
+    "UseClearlogo": "false",
+    "UseClearart": "false",
+    "LogoTextFallback": "false"
   },
   "OverlayPart": {
     "ImageProcessing": "true",

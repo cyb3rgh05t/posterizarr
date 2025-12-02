@@ -264,6 +264,7 @@ CONFIG_GROUPS = {
     "FavProvider": "ApiPart",
     "PreferredLanguageOrder": "ApiPart",
     "PreferredSeasonLanguageOrder": "ApiPart",
+    "LogoLanguageOrder": "ApiPart",
     "tmdb_vote_sorting": "ApiPart",
     "WidthHeightFilter": "ApiPart",
     "PosterMinWidth": "ApiPart",
@@ -359,6 +360,10 @@ CONFIG_GROUPS = {
     "DisableOnlineAssetFetch": "PrerequisitePart",
     "collectionfont": "PrerequisitePart",
     "collectionoverlayfile": "PrerequisitePart",
+    "UseLogo": "PrerequisitePart",
+    "UseClearlogo": "PrerequisitePart",
+    "UseClearart": "PrerequisitePart",
+    "LogoTextFallback": "PrerequisitePart",
     # OverlayPart
     "ImageProcessing": "OverlayPart",
     "outputQuality": "OverlayPart",
@@ -540,6 +545,10 @@ UI_GROUPS = {
         "ForceRunningDeletion",
         "DisableHashValidation",
         "FileTestOnTrigger",
+        "UseLogo",
+        "UseClearlogo",
+        "UseClearart",
+        "LogoTextFallback",
     ],
     "API Keys & Tokens": [
         "tvdbapi",
@@ -553,6 +562,7 @@ UI_GROUPS = {
         "PreferredSeasonLanguageOrder",
         "PreferredBackgroundLanguageOrder",
         "PreferredTCLanguageOrder",
+        "LogoLanguageOrder",
     ],
     "Image Filters": [
         "WidthHeightFilter",
@@ -952,6 +962,7 @@ DISPLAY_NAMES = {
     "PreferredSeasonLanguageOrder": "Season Language Order",
     "PreferredBackgroundLanguageOrder": "Background Language Order",
     "PreferredTCLanguageOrder": "TitleCard Language Order",
+    "LogoLanguageOrder": "Logo Language Order",
     # Image Filters
     "WidthHeightFilter": "Width/Height Filter",
     "PosterMinWidth": "Poster Min Width",
@@ -1043,6 +1054,10 @@ DISPLAY_NAMES = {
     "4KHDR10TC": "4K HDR10 Title Card Overlay",
     "4KDoViHDR10TC": "4K DoVi & HDR10 Title Card Overlay",
     "DisableOnlineAssetFetch": "Disable Online Asset Fetch",
+    "UseLogo": "Use Logo",
+    "UseClearlogo": "Use Clearlogo",
+    "UseClearart": "Use Clearart",
+    "LogoTextFallback": "Fallback to Text",
     # Image Processing
     "ImageProcessing": "Image Processing",
     "outputQuality": "Output Quality",

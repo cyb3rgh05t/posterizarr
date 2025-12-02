@@ -37,6 +37,10 @@
       "xx",
       "en",
       "de"
+    ],
+    "LogoLanguageOrder": [
+      "en",
+      "de"
     ]
   },
   "PlexPart": {
@@ -153,7 +157,11 @@
     "UseTCResolutionOverlays": "false",
     "DisableOnlineAssetFetch": "false",
     "collectionfont": "Colus-Regular.ttf",
-    "collectionoverlayfile": "overlay-innerglow.png"
+    "collectionoverlayfile": "overlay-innerglow.png",
+    "UseLogo": "false",
+    "UseClearlogo": "false",
+    "UseClearart": "false",
+    "LogoTextFallback": "false"
   },
   "OverlayPart": {
     "ImageProcessing": "true",
