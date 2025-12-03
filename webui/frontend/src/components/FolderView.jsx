@@ -324,53 +324,6 @@ function FolderView() {
 
       {/* Navigation and Controls */}
       <div className="bg-theme-card border border-theme rounded-lg p-4 space-y-4">
-        {/* Sorting Dropdown */}
-        <div className="relative" ref={sortDropdownRef}>
-          {/* ... Sort Dropdown UI remains the same ... */}
-          {/* (Skipping UI repeat for brevity, assuming you have the Sort Dropdown JSX here) */}
-          <button
-            onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
-            title="Sort Assets"
-          >
-            <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
-            <span className="hidden sm:inline">
-              {sortOrder.includes("date") ? "Date" : "Name"}
-            </span>
-          </button>
-
-          {sortDropdownOpen && (
-            <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
-              <div className="py-1">
-                <button
-                  onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
-                >
-                  Name (A-Z)
-                </button>
-                <button
-                  onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
-                >
-                  Name (Z-A)
-                </button>
-                <div className="border-t border-theme-border my-1"></div>
-                <button
-                  onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
-                >
-                  Date (Newest)
-                </button>
-                <button
-                  onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
-                >
-                  Date (Oldest)
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
         {/* Breadcrumbs */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -440,6 +393,53 @@ function FolderView() {
                 <span>{selectMode ? t("folderView.cancel") : t("folderView.select")}</span>
               </button>
             )}
+
+            {/* Sorting Dropdown */}
+            <div className="relative" ref={sortDropdownRef}>
+              <button
+                onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
+                title="Sort Assets"
+              >
+                <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
+                <span className="hidden sm:inline">
+                  {sortOrder.includes("date") ? "Date" : "Name"}
+                </span>
+              </button>
+
+              {sortDropdownOpen && (
+                <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
+                  <div className="py-1">
+                    <button
+                      onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      Name (A-Z)
+                    </button>
+                    <button
+                      onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      Name (Z-A)
+                    </button>
+                    <div className="border-t border-theme-border my-1"></div>
+                    <button
+                      onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      Date (Newest)
+                    </button>
+                    <button
+                      onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      Date (Oldest)
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => fetchData(currentPath, true)}
               disabled={loading}
