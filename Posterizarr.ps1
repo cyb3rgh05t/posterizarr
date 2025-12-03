@@ -8624,7 +8624,12 @@ if ($Manual) {
         Else {
             Move-Item -LiteralPath $PicturePath -destination $PosterImage -Force -ErrorAction SilentlyContinue
         }
-        Write-Entry -Subtext "Processing Poster for: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
+        if ($Titletext -match '^(http|https)://' -or $Titletext -match '\.(png|jpg|jpeg|webp)$') {
+            Write-Entry -Subtext "Processing Poster/Logo for: `"$FolderName`"" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
+        }
+        Else {
+            Write-Entry -Subtext "Processing Poster for: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Manuallog.log -Color White -log Info
+        }
 
         $CommentArguments = "`"$PosterImage`" -set `"comment`" `"created with posterizarr`" `"$PosterImage`""
         $CommentlogEntry = "`"$magick`" $CommentArguments"
