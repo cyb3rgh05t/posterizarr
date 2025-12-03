@@ -1992,8 +1992,11 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Detect if it is a logo
-  const isLogo = preview.type === "logo" || preview.type?.includes("clearart") || preview.type?.includes("clearlogo");
+  // Detect if it is a logo (updated to handle multiple variants)
+  const isLogo = preview.type === "logo" ||
+                 preview.type?.includes("clearart") ||
+                 preview.type?.includes("clearlogo") ||
+                 preview.type?.includes("hdmovielogo");
 
   const handleDownload = async (e) => {
     e.stopPropagation();
@@ -2116,160 +2119,6 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
             )}
           </div>
 
-          <p className="text-white text-sm font-semibold mt-3 flex items-center gap-2">
-            <Check className="w-4 h-4" />
-            {disabled
-              ? t("assetReplacer.uploading")
-              : t("assetReplacer.select")}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
-  const { t } = useTranslation();
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const isLogo = preview.type === "logo" || preview.type?.includes("clearart") || preview.type?.includes("hdmovielogo");
-
-  const handleDownload = async (e) => {
-    e.stopPropagation(); // Prevent card selection when clicking download
-    try {
-      const response = await fetch(preview.original_url || preview.url);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-
-      // Create filename from source and metadata
-      const source = preview.source?.toLowerCase() || "image";
-      const lang = preview.language || "";
-      const timestamp = Date.now();
-      const extension =
-        preview.original_url?.split(".").pop()?.split("?")[0] || "jpg";
-      a.download = `${source}_${lang}_${timestamp}.${extension}`;
-
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error("Download failed:", error);
-    }
-  };
-
-  return (
-    <div
-      className="group relative bg-theme-hover rounded-lg overflow-hidden border border-theme hover:border-theme-primary transition-all cursor-pointer"
-      onClick={disabled ? undefined : onSelect}
-    >
-      <div
-        className={`relative bg-theme ${
-          isHorizontal ? "aspect-[16/9]" : "aspect-[2/3]"
-        }`}
-      >
-        {!imageLoaded && !imageError && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-theme-muted" />
-          </div>
-        )}
-        {imageError ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <ImageIcon className="w-12 h-12 text-theme-muted" />
-          </div>
-        ) : (
-          <img
-            src={preview.url}
-            alt="Preview"
-            className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-300 ${
-              imageLoaded ? "opacity-100" : "opacity-0"
-            }`}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
-          />
-        )}
-
-        {/* Hover overlay with metadata */}
-        <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 text-center">
-          {/* Download Button - Top Right */}
-          <button
-            onClick={handleDownload}
-            className="absolute top-2 right-2 px-3 py-2 bg-theme-primary hover:bg-theme-primary/80 rounded-lg transition-all shadow-lg z-10 flex items-center gap-2"
-            title={t("assetReplacer.download") || "Download"}
-          >
-            <Download className="w-4 h-4 text-white" />
-            <span className="text-white text-sm font-medium">
-              {t("assetReplacer.download")}
-            </span>
-          </button>
-
-          {/* Select Button */}
-          <Check className="w-10 h-10 text-green-400 mb-3" />
-
-          {/* Source Badge */}
-          <div
-            className={`px-3 py-1 rounded-full text-xs font-semibold mb-2 ${
-              preview.source === "TMDB"
-                ? "bg-blue-500 text-white"
-                : preview.source === "TVDB"
-                ? "bg-green-500 text-white"
-                : preview.source === "Fanart.tv"
-                ? "bg-purple-500 text-white"
-                : "bg-gray-500 text-white"
-            }`}
-          >
-            {preview.source}
-          </div>
-
-          {/* Metadata Badges */}
-          <div className="flex flex-wrap gap-1.5 justify-center mt-2">
-            {/* Dimensions */}
-            {(preview.width || preview.height) && (
-              <span className="bg-slate-600 px-2 py-1 rounded text-xs text-white font-medium">
-                {preview.width} × {preview.height}
-              </span>
-            )}
-            {/* Language */}
-            {preview.language && (
-              <span className="bg-theme-primary px-2 py-1 rounded text-xs text-white font-medium">
-                {preview.language.toUpperCase()}
-              </span>
-            )}
-
-            {/* Vote Average (TMDB/TVDB) */}
-            {preview.vote_average !== undefined && preview.vote_average > 0 && (
-              <span className="bg-yellow-500 px-2 py-1 rounded text-xs text-white font-medium flex items-center gap-1">
-                <Star className="w-3 h-3" />
-                {preview.vote_average.toFixed(1)}
-              </span>
-            )}
-
-            {/* Likes (Fanart.tv) */}
-            {preview.likes !== undefined && preview.likes > 0 && (
-              <span className="bg-red-500 px-2 py-1 rounded text-xs text-white font-medium">
-                ❤️ {preview.likes}
-              </span>
-            )}
-
-            {/* Asset Type */}
-            {preview.type && (
-              <span className="bg-gray-600 px-2 py-1 rounded text-xs text-white font-medium">
-                {preview.type === "episode_still"
-                  ? "Episode"
-                  : preview.type === "season_poster"
-                  ? "Season"
-                  : preview.type === "backdrop"
-                  ? "Backdrop"
-                  : preview.type === "poster"
-                  ? "Poster"
-                  : preview.type}
-              </span>
-            )}
-          </div>
-
-          {/* Select Text */}
           <p className="text-white text-sm font-semibold mt-3 flex items-center gap-2">
             <Check className="w-4 h-4" />
             {disabled
