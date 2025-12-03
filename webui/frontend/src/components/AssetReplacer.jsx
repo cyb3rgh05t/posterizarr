@@ -471,7 +471,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     setSelectedPreview(null);
   }, [metadata]);
 
-  // Handle Logo Fetching
+  // Handle Logo Fetching with FavProvider priority
   const handleFetchLogos = async () => {
     console.log("=== Fetching Logos ===");
     setLogoSelectionMode(true);
@@ -483,6 +483,30 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     };
 
     try {
+      // 1. Fetch User Config to get FavProvider preference
+      let userFavProvider = "fanart"; // Default fallback
+      try {
+        const configResponse = await fetch(`${API_URL}/config`);
+        if (configResponse.ok) {
+          const configData = await configResponse.json();
+          // Handle both flat and grouped structures based on how backend returns it
+          const cfg = configData.config || {};
+          const apiPart = cfg.ApiPart || {};
+
+          const provider = cfg.FavProvider || cfg.favprovider || apiPart.FavProvider || apiPart.favprovider;
+
+          if (provider) {
+             const p = provider.toLowerCase();
+             if (p.includes("tmdb")) userFavProvider = "tmdb";
+             else if (p.includes("tvdb")) userFavProvider = "tvdb";
+             else if (p.includes("fanart")) userFavProvider = "fanart";
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch config for logo preference:", e);
+      }
+
+      // 2. Fetch Replacements
       const response = await fetch(`${API_URL}/assets/fetch-replacements`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -494,16 +518,25 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
       const data = await response.json();
       if (data.success) {
-        setPreviews({
+        const results = {
           tmdb: data.results.tmdb || [],
           tvdb: data.results.tvdb || [],
           fanart: data.results.fanart || [],
-        });
+        };
 
-        if (data.results.fanart?.length > 0) setActiveProviderTab("fanart");
-        else if (data.results.tmdb?.length > 0) setActiveProviderTab("tmdb");
-        else if (data.results.tvdb?.length > 0) setActiveProviderTab("tvdb");
+        setPreviews(results);
 
+        // 3. Determine Active Provider: Use User Preference if it has results
+        let activeProvider = userFavProvider;
+
+        if (!results[activeProvider] || results[activeProvider].length === 0) {
+          // Fallback logic if fav provider has no logos
+          if (results.fanart.length > 0) activeProvider = "fanart";
+          else if (results.tmdb.length > 0) activeProvider = "tmdb";
+          else if (results.tvdb.length > 0) activeProvider = "tvdb";
+        }
+
+        setActiveProviderTab(activeProvider);
         setActiveTab("previews");
       } else {
         showError(t("assetReplacer.fetchPreviewsError"));
