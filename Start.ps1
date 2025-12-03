@@ -226,13 +226,6 @@ function GetLatestScriptVersion {
     }
 }
 function CompareScriptVersion {
-    <#
-    .SYNOPSIS
-        Compares the current script version with the latest available version
-    .DESCRIPTION
-        Extracts the version from Posterizarr.ps1 and compares it with
-        the latest version from GitHub, displaying the results
-    #>
     try {
         $posterizarrPath = "$env:APP_ROOT/Posterizarr.ps1"
         if (Test-Path $posterizarrPath) {
@@ -289,17 +282,6 @@ function CompareScriptVersion {
     }
 }
 function CopyAssetFiles {
-    <#
-    .SYNOPSIS
-        Copies asset files from APP_ROOT to APP_DATA/Overlayfiles and config to APP_DATA if missing.
-        Migrates any .png, .ttf, .otf files from APP_DATA to Overlayfiles.
-    .DESCRIPTION
-        Copies all .png, .ttf, .otf files from the APP_ROOT directory to the APP_DATA/Overlayfiles directory,
-        but only if they do not already exist in Overlayfiles.
-        Special rule: config.example.json is only copied if config.json does not exist in APP_DATA.
-        Also moves any .png, .ttf, .otf files found in APP_DATA to Overlayfiles.
-    #>
-
     $overlayDir = "$env:APP_DATA/Overlayfiles"
     if (-not (Test-Path $overlayDir)) {
         $null = New-Item -Path $overlayDir -ItemType Directory -ErrorAction SilentlyContinue
@@ -378,6 +360,132 @@ function CopyAssetFiles {
         if ($errorCount -gt 0) {
             Write-Host "Failed to copy $errorCount files" -ForegroundColor Yellow
         }
+    }
+}
+function CheckJson {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$jsonExampleUrl,
+
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [object]$jsonFilePath
+    )
+    try {
+        $AttributeChanged = $null
+        # Download the default configuration JSON file from the URL
+        $defaultConfig = Invoke-RestMethod -Uri $jsonExampleUrl -Method Get -ErrorAction Stop
+
+        # Read the existing configuration file if it exists
+        if (Test-Path $jsonFilePath) {
+            try {
+                $config = Get-Content -Path $jsonFilePath -Raw | ConvertFrom-Json
+            }
+            catch {
+                Write-Host "Failed to read the existing configuration file: $jsonFilePath. Please ensure it is valid JSON. Aborting..." -ForegroundColor Red
+                Exit
+            }
+        }
+        else {
+            $config = @{}
+        }
+
+        # Remove keys from config that are no longer in the default config
+        foreach ($existingKey in $config.PSObject.Properties.Name) {
+            if (-not $defaultConfig.PSObject.Properties.Name.Contains($existingKey)) {
+                Write-Host "Removing obsolete Main Attribute from your Config file: $existingKey." -ForegroundColor Yellow
+                $config.PSObject.Properties.Remove($existingKey)
+                $AttributeChanged = $True
+            }
+        }
+
+        # Remove sub-attributes no longer in the default config
+        foreach ($partKey in $config.PSObject.Properties.Name) {
+            if ($defaultConfig.PSObject.Properties.Name.Contains($partKey)) {
+                # Check each sub-attribute in the part
+                foreach ($existingSubKey in $config.$partKey.PSObject.Properties.Name) {
+                    if (-not $defaultConfig.$partKey.PSObject.Properties.Name.Contains($existingSubKey)) {
+                        Write-Host "Removing obsolete Sub-Attribute from your Config file: $partKey.$existingSubKey." -ForegroundColor Yellow
+                        $config.$partKey.PSObject.Properties.Remove($existingSubKey)
+                        $AttributeChanged = $True
+                    }
+                }
+            }
+        }
+
+        # Check and add missing keys from the default configuration
+        foreach ($partKey in $defaultConfig.PSObject.Properties.Name) {
+            # Check if the part exists in the current configuration
+            if (-not $config.PSObject.Properties.Name.Contains($partKey)) {
+                if (-not $config.PSObject.Properties.Name.tolower().Contains($partKey.tolower())) {
+                    # Add "SeasonPosterOverlayPart" if it's missing in $config
+                    if (-not $config.PSObject.Properties.Name.tolower().Contains("seasonposteroverlaypart")) {
+                        $config | Add-Member -MemberType NoteProperty -Name "SeasonPosterOverlayPart" -Value $defaultConfig.PosterOverlayPart
+                        Write-Host "Missing Main Attribute in your Config file: $partKey." -ForegroundColor Yellow
+                        Write-Host "    I will copy all settings from 'PosterOverlayPart'..." -ForegroundColor White
+                        Write-Host "    Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -ForegroundColor White
+                        Write-Host "    GH Readme -> https://fscorrupt.github.io/posterizarr/configuration" -ForegroundColor White
+                        # Convert the updated configuration object back to JSON and save it, then reload it
+                        $configJson = $config | ConvertTo-Json -Depth 10
+                        $configJson | Set-Content -Path $jsonFilePath -Force
+                        $config = Get-Content -Path $jsonFilePath -Raw | ConvertFrom-Json
+                    }
+                    Else {
+                        Write-Host "Missing Main Attribute in your Config file: $partKey." -ForegroundColor Yellow
+                        Write-Host "    Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -ForegroundColor White
+                        Write-Host "    GH Readme -> https://fscorrupt.github.io/posterizarr/configuration" -ForegroundColor White
+                        $config | Add-Member -MemberType NoteProperty -Name $partKey -Value $defaultConfig.$partKey
+                        $AttributeChanged = $True
+                    }
+                }
+                else {
+                    # Inform user about the case issue
+                    Write-Host "The Main Attribute '$partKey' in your configuration file has a different casing than the expected property." -ForegroundColor Red
+                    Write-Host "Please correct the casing of the property in your configuration file to '$partKey'." -ForegroundColor Yellow
+                    Exit  # Abort the script
+                }
+            }
+            else {
+                # Check each key in the part
+                foreach ($propertyKey in $defaultConfig.$partKey.PSObject.Properties.Name) {
+                    # Show user that a sub-attribute is missing
+                    if (-not $config.$partKey.PSObject.Properties.Name.Contains($propertyKey)) {
+                        if (-not $config.$partKey.PSObject.Properties.Name.tolower().Contains($propertyKey.tolower())) {
+                            Write-Host "Missing Sub-Attribute in your Config file: $partKey.$propertyKey" -ForegroundColor Yellow
+                            Write-Host "    Adding it for you... In GH Readme, look for $partKey.$propertyKey - if you want to see what changed..." -ForegroundColor White
+                            Write-Host "    GH Readme -> https://fscorrupt.github.io/posterizarr/configuration" -ForegroundColor White
+                            # Add the property using the expected casing
+                            $config.$partKey | Add-Member -MemberType NoteProperty -Name $propertyKey -Value $defaultConfig.$partKey.$propertyKey -Force
+                            $AttributeChanged = $True
+                        }
+                        else {
+                            # Inform user about the case issue
+                            Write-Host "The Sub-Attribute '$partKey.$propertyKey' in your configuration file has a different casing than the expected property." -ForegroundColor Red
+                            Write-Host "Please correct the casing of the Sub-Attribute in your configuration file to '$partKey.$propertyKey'." -ForegroundColor Yellow
+                            Exit  # Abort the script
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($AttributeChanged -eq 'true') {
+            # Convert the updated configuration object back to JSON and save it
+            $configJson = $config | ConvertTo-Json -Depth 10
+            $configJson | Set-Content -Path $jsonFilePath -Force
+
+            Write-Host "Configuration file updated successfully." -ForegroundColor Green
+        }
+    }
+    catch [System.Net.WebException] {
+        Write-Host "Failed to download the default configuration JSON file from the URL. Config check skipped." -ForegroundColor Yellow
+        # We don't exit here because the container might still work with the existing config if offline
+    }
+    catch {
+        Write-Host "An unexpected error occurred during config check: $($_.Exception.Message)" -ForegroundColor Red
+        Exit
     }
 }
 function Ensure-WebUIConfig {
@@ -488,42 +596,30 @@ else {
 # Move assets to APP_DATA
 CopyAssetFiles
 
-# Checking Config file
-if (-not (test-path "$env:APP_DATA/config.json")) {
-    Write-Host ""
-    Write-Host "Could not find a 'config.json' file" -ForegroundColor Red
-    Copy-Item "$env:APP_ROOT/config.example.json" "$env:APP_DATA/config.json" -Force | out-null
-    Write-Host "Created a default 'config.json' file from 'config.example.json'" -ForegroundColor Yellow
-    Write-Host "Please edit the config.json according to GH repo to match your needs.." -ForegroundColor Yellow
-    do {
-        Start-Sleep 30
-    } until (
-        test-path "$env:APP_DATA/config.json"
-    )
-}
-
 # Define file paths in variables for clarity and easy maintenance
 $configDir = "$env:APP_DATA"
 $configFile = Join-Path -Path $configDir -ChildPath "config.json"
 $exampleFile = Join-Path -Path $configDir -ChildPath "config.example.json"
 
-# Check if the config file exists
+# Create default config if missing completely
 if (-not (Test-Path $configFile)) {
     Write-Warning "Configuration file not found at '$configFile'."
-
-    # Check if the example file exists before trying to copy it
+    # Check if the example file exists (copied by CopyAssetFiles)
     if (Test-Path $exampleFile) {
         Copy-Item -Path $exampleFile -Destination $configFile -Force | Out-Null
         Write-Host "    A new 'config.json' has been created from the example." -ForegroundColor Green
-        Write-Host "    Please edit this file with your settings..." -ForegroundColor Yellow
     }
 }
 
-# Rest of your script continues here, knowing the config file exists
-Write-Host "Config file found. Proceeding with script..."
+# Run advanced CheckJson to fix/update keys
+Write-Host "Verifying configuration file integrity..." -ForegroundColor Cyan
+CheckJson -jsonExampleUrl "https://github.com/fscorrupt/posterizarr/raw/main/config.example.json" -jsonFilePath $configFile
 
 # Ensure WebUI config
 Ensure-WebUIConfig -jsonFilePath $configFile
+
+# Rest of your script continues here
+Write-Host "Config check complete. Proceeding with script..."
 
 # Check temp dir if there is a Currently running file present
 $CurrentlyRunning = "$env:APP_DATA/temp/Posterizarr.Running"

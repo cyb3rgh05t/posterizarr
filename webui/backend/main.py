@@ -724,7 +724,7 @@ def is_poster_file(filename: str) -> bool:
     """
     lower_name = filename.lower()
     valid_extensions = (".jpg", ".jpeg", ".png", ".webp", ".tbn")
-    
+
     # 1. Must end with a valid extension
     if not lower_name.endswith(valid_extensions):
         return False
@@ -757,7 +757,7 @@ def is_background_file(filename: str) -> bool:
     Matches: background.ext OR *_background.ext
     """
     lower_name = filename.lower()
-    
+
     # Exact match: background.jpg, background.png, etc.
     if re.match(r"^background\.(jpg|jpeg|png|webp|tbn)$", lower_name):
         return True
@@ -8268,6 +8268,13 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
         for item in current_dir.iterdir():
             if item.name == "@eaDir": # Skip Synology index folders
                 continue
+            try:
+                stat = item.stat()
+                created = stat.st_ctime
+                modified = stat.st_mtime
+            except Exception:
+                created = 0
+                modified = 0
 
             if item.is_dir():
                 # This is a folder
@@ -8281,6 +8288,8 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
                         "name": item.name,
                         "path": str(folder_path).replace("\\", "/"),
                         "item_count": item_count,
+                        "created": created,
+                        "modified": modified,
                     })
                 except Exception as e:
                     logger.warning(f"Could not scan subfolder {item.name}: {e}")
@@ -8314,6 +8323,8 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
                         "size": item.stat().st_size,
                         "asset_type": asset_type_simple, # e.g., 'poster', 'background'
                         "full_type": asset_type_str, # e.g., 'Movie', 'Show Background'
+                        "created": created,
+                        "modified": modified,
                     })
 
         # Sort: folders first, then assets
@@ -9155,7 +9166,6 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                 # Method 1: Search by asset path (for AssetReplacer)
                 if request.asset_path and not request.asset_path.startswith("manual_"):
                     # Extract show/movie name from asset path to match against Rootfolder
-                    # Example path: "D:/Media/Shows/Show Name (2020) {tmdb-123}/Season 01/poster.jpg"
                     import os
 
                     path_parts = request.asset_path.replace("\\", "/").split("/")
@@ -9688,7 +9698,33 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                     )
 
                     async with httpx.AsyncClient(timeout=10.0) as client:
-                        if (
+                        if request.asset_type == "logo":
+                            # LOGOS (PNGs)
+                            url = f"https://api.themoviedb.org/3/{media_endpoint}/{tmdb_id}/images"
+                            response = await client.get(url, headers=headers)
+                            if response.status_code == 200:
+                                data = response.json()
+                                # TMDB stores clear logos in the 'logos' array
+                                for logo in data.get("logos", []):
+                                    file_path = logo.get('file_path')
+                                    original_url = f"https://image.tmdb.org/t/p/original{file_path}"
+
+                                    if original_url not in seen_urls:
+                                        seen_urls.add(original_url)
+                                        all_results.append(
+                                            {
+                                                "url": f"https://image.tmdb.org/t/p/w500{file_path}", # Preview
+                                                "original_url": original_url, # Actual full res for the script
+                                                "source": "TMDB",
+                                                "source_type": source,
+                                                "type": "logo",
+                                                "language": logo.get("iso_639_1"),
+                                                "vote_average": logo.get("vote_average", 0),
+                                                "width": logo.get("width", 0),
+                                                "height": logo.get("height", 0),
+                                            }
+                                        )
+                        elif (
                             request.asset_type == "titlecard"
                             and request.season_number
                             and request.episode_number
@@ -9973,10 +10009,23 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                 artwork_type = artwork.get("type")
                                                 image_url = artwork.get("image")
 
-                                                # Movies endpoint uses different type codes than series
-                                                # type=14 for posters, type=15 for backgrounds
-                                                # "standard" asset type is treated as posters
-                                                if (
+                                                if request.asset_type == "logo":
+                                                    # Type 23 is ClearLogo in TVDB API v4 (usually)
+                                                    # But we should check the artwork type name or look for clearlogo/clearart
+                                                    artwork_type = artwork.get("type")
+                                                    # 23 = ClearLogo, 22 = ClearArt
+                                                    if artwork_type in [22, 23]:
+                                                        if image_url and image_url not in seen_urls:
+                                                            seen_urls.add(image_url)
+                                                            all_results.append({
+                                                                "url": image_url,
+                                                                "original_url": image_url,
+                                                                "source": "TVDB",
+                                                                "source_type": source,
+                                                                "type": "logo",
+                                                                "language": artwork.get("language"),
+                                                            })
+                                                elif (
                                                     request.asset_type
                                                     in ["poster", "standard"]
                                                 ) and artwork_type == 14:
@@ -10042,6 +10091,10 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                         if request.asset_type == "background":
                                             artwork_params["type"] = (
                                                 "3"  # type=3 for backgrounds
+                                            )
+                                        elif request.asset_type == "logo":
+                                            artwork_params["type"] = (
+                                                "23" # type=23 for logos
                                             )
 
                                         logger.info(
@@ -10142,7 +10195,12 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                     data = response.json()
 
                                     # Map asset types to fanart.tv keys
-                                    if request.asset_type == "poster":
+                                    if request.asset_type == "logo":
+                                        fanart_keys = [
+                                            "hdmovieclearart", "hdmovielogo", "clearart", "clearlogo", # Movies
+                                            "hdtvclearart", "hdtvlogo", "clearart", "clearlogo" # TV
+                                        ]
+                                    elif request.asset_type == "poster":
                                         fanart_keys = ["movieposter"]
                                     elif request.asset_type == "background":
                                         fanart_keys = ["moviebackground"]
@@ -10177,7 +10235,12 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                 data = response.json()
 
                                 # Map asset types to fanart.tv keys
-                                if request.asset_type == "poster":
+                                if request.asset_type == "logo":
+                                    fanart_keys = [
+                                        "hdmovieclearart", "hdmovielogo", "clearart", "clearlogo", # Movies
+                                        "hdtvclearart", "hdtvlogo", "clearart", "clearlogo" # TV
+                                    ]
+                                elif request.asset_type == "poster":
                                     fanart_keys = ["movieposter"]
                                 elif request.asset_type == "background":
                                     fanart_keys = ["moviebackground"]
@@ -10219,7 +10282,12 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                 data = response.json()
 
                                 # Map asset types to fanart.tv keys
-                                if request.asset_type == "poster":
+                                if request.asset_type == "logo":
+                                    fanart_keys = [
+                                        "hdmovieclearart", "hdmovielogo", "clearart", "clearlogo", # Movies
+                                        "hdtvclearart", "hdtvlogo", "clearart", "clearlogo" # TV
+                                    ]
+                                elif request.asset_type == "poster":
                                     # Standard TV show posters
                                     fanart_keys = ["tvposter"]
                                 elif request.asset_type == "season":

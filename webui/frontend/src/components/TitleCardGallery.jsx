@@ -12,6 +12,7 @@ import {
   ImageIcon,
   CheckSquare,
   Square,
+  ArrowUpDown,
 } from "lucide-react";
 import CompactImageSizeSlider from "./CompactImageSizeSlider";
 import Notification from "./Notification";
@@ -150,6 +151,53 @@ function TitleCardGallery() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // --- SORTING STATE ---
+  const [sortOrder, setSortOrder] = useState(() => {
+    return localStorage.getItem("gallery-sort-order") || "name_asc";
+  });
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const sortDropdownRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem("gallery-sort-order", sortOrder);
+  }, [sortOrder]);
+
+  // Click outside listener for sort dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        sortDropdownRef.current &&
+        !sortDropdownRef.current.contains(event.target)
+      ) {
+        setSortDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Sorting Helper Function
+  const getSortedImages = (imagesToSort) => {
+    const sorted = [...imagesToSort];
+    sorted.sort((a, b) => {
+      if (sortOrder === "name_asc") return a.name.localeCompare(b.name);
+      if (sortOrder === "name_desc") return b.name.localeCompare(a.name);
+
+      // Handle date sorting (backend sends 'modified' or 'created' timestamps)
+      // Fallback to 0 if undefined
+      const dateA = a.modified || a.created || 0;
+      const dateB = b.modified || b.created || 0;
+
+      if (sortOrder === "date_newest") return dateB - dateA;
+      if (sortOrder === "date_oldest") return dateA - dateB;
+
+      return 0;
+    });
+    return sorted;
+  };
+
   // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(() => {
@@ -250,10 +298,12 @@ function TitleCardGallery() {
     }
   };
 
-  const fetchFolderImages = async (folder, showNotification = false) => {
+  const fetchFolderImages = async (folder, showNotification = false, keepScrollPosition = false) => {
     if (!folder) return;
 
-    setImagesLoading(true);
+    if (!keepScrollPosition) {
+      setImagesLoading(true);
+    }
     try {
       const response = await fetch(
         `${API_URL}/assets-folder-images/titlecards/${folder.path}`
@@ -280,7 +330,9 @@ function TitleCardGallery() {
       showError(errorMsg);
       setImages([]);
     } finally {
-      setImagesLoading(false);
+      if (!keepScrollPosition) {
+        setImagesLoading(false);
+      }
     }
   };
 
@@ -529,13 +581,15 @@ function TitleCardGallery() {
       img.path.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // --- NEW PAGINATION LOGIC ---
-  const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
-  const displayedImages = filteredImages.slice(
+  // --- APPLY SORTING HERE ---
+  const sortedImages = getSortedImages(filteredImages);
+
+  // --- PAGINATION LOGIC (Updated to use sortedImages) ---
+  const totalPages = Math.ceil(sortedImages.length / itemsPerPage);
+  const displayedImages = sortedImages.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  // --- END NEW PAGINATION LOGIC ---
 
   return (
     <div className="space-y-6">
@@ -551,6 +605,51 @@ function TitleCardGallery() {
               <Folder className="w-5 h-5 text-theme-primary" />
               {t("titleCardGallery.folders")}
             </h2>
+            {/* Sorting Dropdown */}
+            <div className="relative" ref={sortDropdownRef}>
+              <button
+                onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
+                title="Sort Assets"
+              >
+                <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
+                <span className="hidden sm:inline">
+                  {sortOrder.includes("date") ? "Date" : "Name"}
+                </span>
+              </button>
+
+              {sortDropdownOpen && (
+                <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
+                  <div className="py-1">
+                    <button
+                      onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      Name (A-Z)
+                    </button>
+                    <button
+                      onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      Name (Z-A)
+                    </button>
+                    <div className="border-t border-theme-border my-1"></div>
+                    <button
+                      onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      Date (Newest)
+                    </button>
+                    <button
+                      onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      Date (Oldest)
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Controls - wrap on small screens */}
             <div className="flex flex-wrap items-center gap-2">
               {/* Compact Image Size Slider */}
@@ -1086,7 +1185,7 @@ function TitleCardGallery() {
             // Force cache-bust and refetch images
             setCacheBuster(Date.now());
             setTimeout(() => {
-              fetchFolderImages(activeFolder); // Refetch images for the active folder
+              fetchFolderImages(activeFolder, false, true); // Refetch images for the active folder
             }, 500);
           }}
         />
