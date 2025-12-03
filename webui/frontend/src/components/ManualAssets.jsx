@@ -26,6 +26,7 @@ import {
   HardDrive,
   Eye,
   X,
+  ArrowUpDown,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CompactImageSizeSlider from "./CompactImageSizeSlider";
