@@ -121,7 +121,7 @@
       "or": "oder",
       "urlPlaceholder": "Oder gib URL/Pfad ein: C:\\\\pfad\\\\zum\\\\bild.jpg oder https://url.zum/bild.jpg",
       "uploadHint": "Lade eine lokale Bilddatei hoch oder gib eine direkte URL/Pfad zum Quellbild ein",
-      "titleText": "Titeltext oder URL zum Logo",
+      "titleText": "Titeltext",
       "titlePlaceholder": "Der Marsianer",
       "titleHint": "Titel, der auf dem Poster angezeigt wird",
       "folderName": "Ordnername",
@@ -1364,7 +1364,7 @@
     "processWithOverlaysHint": "(wendet Rahmen, Overlays & Text an)",
     "manualRunParameters": "📝 Manuelle Ausführungsparameter (bei Bedarf anpassen)",
     "manualRunParametersHint": "Manuellen Modus automatisch ausführen, um Overlays, Text und andere Verarbeitung zum ersetzten Asset hinzuzufügen",
-    "titleText": "Titeltext oder URL zum Logo",
+    "titleText": "Titeltext",
     "titleTextRequired": "Titeltext *",
     "titleTextPlaceholder": "z.B. A Shaun the Sheep Movie Farmageddon",
     "titleTextHint": "Der auf dem {{type}} anzuzeigende Titel",
@@ -1594,7 +1594,8 @@
     "minLength": "Mindestlänge: {{min}} Zeichen",
     "maxLength": "Maximallänge: {{max}} Zeichen",
     "email": "Ungültige E-Mail-Adresse",
-    "url": "Ungültige URL"
+    "url": "Ungültige URL",
+    "enterTitleOrFolder": "Bitte geben Sie einen Titel oder Ordnernamen ein!"
   },
   "loading": {
     "initializing": "Posterizarr wird initialisiert...",

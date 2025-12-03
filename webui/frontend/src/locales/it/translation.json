@@ -121,7 +121,7 @@
       "or": "o",
       "urlPlaceholder": "Oppure inserisci URL/percorso: C:\\\\percorso\\\\immagine.jpg o https://url.to/image.jpg",
       "uploadHint": "Carica un file immagine locale o inserisci un URL/percorso diretto all'immagine sorgente",
-      "titleText": "Testo del titolo o URL del logo",
+      "titleText": "Testo del titolo",
       "titlePlaceholder": "The Martian",
       "titleHint": "Titolo da visualizzare sulla locandina",
       "folderName": "Nome cartella",
@@ -1353,7 +1353,7 @@
     "confirmFetchTitle": "Conferma recupero opzioni di sostituzione",
     "confirmFetchMessage": "Questo cercherà opzioni di sostituzione su TMDB, TVDB e Fanart.tv. Continuare?",
     "confirmFetchButton": "Recupera sostituzioni",
-    "titleText": "Testo del titolo o URL del logo"
+    "titleText": "Testo del titolo"
   },
   "assetOverview": {
     "title": "Centro azioni",
@@ -1542,7 +1542,8 @@
     "minLength": "Lunghezza minima: {{min}} caratteri",
     "maxLength": "Lunghezza massima: {{max}} caratteri",
     "email": "Indirizzo email non valido",
-    "url": "URL non valido"
+    "url": "URL non valido",
+    "enterTitleOrFolder": "Inserisci un titolo o il nome della cartella!"
   },
   "loading": {
     "initializing": "Inizializzazione di Posterizarr...",

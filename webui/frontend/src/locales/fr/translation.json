@@ -121,7 +121,7 @@
       "or": "ou",
       "urlPlaceholder": "Ou entrez une URL/chemin : C:\\\\chemin\\\\vers\\\\image.jpg ou https://url.to/image.jpg",
       "uploadHint": "Téléchargez un fichier image local ou entrez une URL/chemin direct vers l'image source",
-      "titleText": "Texte du titre ou URL du logo",
+      "titleText": "Texte du titre",
       "titlePlaceholder": "Seul sur Mars",
       "titleHint": "Titre à afficher sur l'affiche",
       "folderName": "Nom du dossier",
@@ -1353,7 +1353,7 @@
     "confirmFetchTitle": "Confirmer la récupération des options de remplacement",
     "confirmFetchMessage": "Cela recherchera des options de remplacement sur TMDB, TVDB et Fanart.tv. Continuer ?",
     "confirmFetchButton": "Récupérer les remplacements",
-    "titleText": "Texte du titre ou URL du logo"
+    "titleText": "Texte du titre"
   },
   "assetOverview": {
     "title": "Centre d'actions",
@@ -1542,7 +1542,8 @@
     "minLength": "Longueur minimale : {{min}} caractères",
     "maxLength": "Longueur maximale : {{max}} caractères",
     "email": "Adresse e-mail invalide",
-    "url": "URL invalide"
+    "url": "URL invalide",
+    "enterTitleOrFolder": "Veuillez entrer un titre ou un nom de dossier !"
   },
   "loading": {
     "initializing": "Initialisation de Posterizarr...",

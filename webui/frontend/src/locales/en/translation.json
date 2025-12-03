@@ -121,7 +121,7 @@
       "or": "or",
       "urlPlaceholder": "Or enter URL/path: C:\\\\path\\\\to\\\\image.jpg or https://url.to/image.jpg",
       "uploadHint": "Upload a local image file or enter a direct URL/path to the source image",
-      "titleText": "Title Text or Url to Logo",
+      "titleText": "Title Text",
       "titlePlaceholder": "The Martian",
       "titleHint": "Title to display on the poster",
       "folderName": "Folder Name",
@@ -1361,7 +1361,7 @@
     "confirmFetchTitle": "Confirm Fetch Replacement Options",
     "confirmFetchMessage": "This will search TMDB, TVDB, and Fanart.tv for replacement options. Continue?",
     "confirmFetchButton": "Fetch Replacements",
-    "titleText": "Title Text or Url to Logo"
+    "titleText": "Title Text"
   },
   "assetOverview": {
     "title": "Action Center",
@@ -1550,7 +1550,8 @@
     "minLength": "Minimum length: {{min}} characters",
     "maxLength": "Maximum length: {{max}} characters",
     "email": "Invalid email address",
-    "url": "Invalid URL"
+    "url": "Invalid URL",
+    "enterTitleOrFolder": "Please enter a Title or Folder Name!"
   },
   "loading": {
     "initializing": "Initializing Posterizarr...",
