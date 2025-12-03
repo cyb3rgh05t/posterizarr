@@ -1484,7 +1484,16 @@
     "season": "Saison",
     "episode": "Épisode",
     "background": "Arrière-plan",
-    "asset": "Ressource"
+    "asset": "Ressource",
+    "name": "Nom",
+    "date": "Date",
+    "sorting": {
+      "title": "Trier les ressources",
+      "nameAsc": "Nom (A-Z)",
+      "nameDesc": "Nom (Z-A)",
+      "dateNewest": "Date (Plus récent)",
+      "dateOldest": "Date (Plus ancien)"
+    }
   },
   "theme": {
     "title": "Thème",

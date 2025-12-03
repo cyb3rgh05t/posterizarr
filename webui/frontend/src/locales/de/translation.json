@@ -1536,7 +1536,16 @@
     "season": "Staffel",
     "episode": "Episode",
     "background": "Hintergrund",
-    "asset": "Asset"
+    "asset": "Asset",
+    "name": "Name",
+    "date": "Datum",
+    "sorting": {
+      "title": "Assets sortieren",
+      "nameAsc": "Name (A-Z)",
+      "nameDesc": "Name (Z-A)",
+      "dateNewest": "Datum (Neueste)",
+      "dateOldest": "Datum (Älteste)"
+    }
   },
   "theme": {
     "title": "Design",

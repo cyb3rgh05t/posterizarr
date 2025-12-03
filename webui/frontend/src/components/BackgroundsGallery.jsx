@@ -696,11 +696,11 @@ function BackgroundsGallery() {
                 <button
                   onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
                   className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
-                  title="Sort Assets"
+                  title={t("common.sorting.title")}
                 >
                   <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
                   <span className="hidden sm:inline">
-                    {sortOrder.includes("date") ? "Date" : "Name"}
+                    {sortOrder.includes("date") ? t("common.date") : t("common.name")}
                   </span>
                 </button>
 
@@ -711,26 +711,26 @@ function BackgroundsGallery() {
                         onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
                         className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
                       >
-                        Name (A-Z)
+                        {t("common.sorting.nameAsc")}
                       </button>
                       <button
                         onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
                         className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
                       >
-                        Name (Z-A)
+                        {t("common.sorting.nameDesc")}
                       </button>
                       <div className="border-t border-theme-border my-1"></div>
                       <button
                         onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
                         className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
                       >
-                        Date (Newest)
+                        {t("common.sorting.dateNewest")}
                       </button>
                       <button
                         onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
                         className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
                       >
-                        Date (Oldest)
+                        {t("common.sorting.dateOldest")}
                       </button>
                     </div>
                   </div>

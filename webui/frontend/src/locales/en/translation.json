@@ -1492,7 +1492,16 @@
     "season": "Season",
     "episode": "Episode",
     "background": "Background",
-    "asset": "Asset"
+    "asset": "Asset",
+    "name": "Name",
+    "date": "Date",
+    "sorting": {
+      "title": "Sort Assets",
+      "nameAsc": "Name (A-Z)",
+      "nameDesc": "Name (Z-A)",
+      "dateNewest": "Date (Newest)",
+      "dateOldest": "Date (Oldest)"
+    }
   },
   "theme": {
     "title": "Theme",
