@@ -10365,7 +10365,7 @@ Elseif ($Tautulli) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -10904,7 +10904,7 @@ Elseif ($Tautulli) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -11531,7 +11531,7 @@ Elseif ($Tautulli) {
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                            $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -12081,7 +12081,7 @@ Elseif ($Tautulli) {
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                            $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -15421,7 +15421,7 @@ Elseif ($ArrTrigger) {
                                                         Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                     }
-                                                    $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -15898,7 +15898,7 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -16457,7 +16457,7 @@ Elseif ($ArrTrigger) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -16946,7 +16946,7 @@ Elseif ($ArrTrigger) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -19562,7 +19562,7 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -20101,7 +20101,7 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -20728,7 +20728,7 @@ Elseif ($ArrTrigger) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -21278,7 +21278,7 @@ Elseif ($ArrTrigger) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -25839,7 +25839,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -26316,7 +26316,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -26875,7 +26875,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                            $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -27364,7 +27364,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                            $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -30356,7 +30356,7 @@ else {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -30962,7 +30962,7 @@ else {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -31658,7 +31658,7 @@ else {
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$PosterImage`" `( `"$LogoImage`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                            $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
@@ -32278,7 +32278,7 @@ else {
                                                 $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
                                             }
-                                            $Arguments = "`"$backgroundImage`" `( `"$LogoImage`" -resize `"$Backgroundboxsize`" -background none `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                            $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                             $logEntry = "`"$magick`" $Arguments"
                                             $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
