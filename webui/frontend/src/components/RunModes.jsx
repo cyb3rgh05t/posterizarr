@@ -22,6 +22,7 @@ import {
   X,
   ExternalLink,
   Download,
+  Search, // <--- Added Search Icon
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ConfirmDialog from "./ConfirmDialog";
@@ -106,20 +107,22 @@ const TMDBPosterSearchModal = React.memo(
         seasonNumber: "",
         episodeNumber: "",
         displayedCount: 10,
+        isLogoSearch: false, // Reset logo search flag
       });
     };
 
     const handleSelectPoster = (posterUrl) => {
-      setManualForm({ ...manualForm, picturePath: posterUrl });
-      setTmdbSearch({
-        ...tmdbSearch,
-        showModal: false,
-        query: "",
-        seasonNumber: "",
-        episodeNumber: "",
-        displayedCount: 10,
-      });
-      showSuccess(t("runModes.tmdb.posterSelected"));
+      if (tmdbSearch.isLogoSearch) {
+        // If logo search, update titletext with URL
+        setManualForm({ ...manualForm, titletext: posterUrl });
+        showSuccess("Logo URL applied to Title Text");
+      } else {
+        // Normal behavior: update picturePath
+        setManualForm({ ...manualForm, picturePath: posterUrl });
+        showSuccess(t("runModes.tmdb.posterSelected"));
+      }
+
+      handleClose();
     };
 
     const handleDownloadPoster = async (e, poster) => {
@@ -173,7 +176,9 @@ const TMDBPosterSearchModal = React.memo(
             <div className="flex items-center">
               <ImageIcon className="w-6 h-6 mr-3 text-white" />
               <h3 className="text-xl font-bold text-white">
-                {manualForm.posterType === "season"
+                {tmdbSearch.isLogoSearch
+                  ? "Select a Logo" + ` (${totalResults})`
+                  : manualForm.posterType === "season"
                   ? t("runModes.tmdb.seasonResults", {
                       season: tmdbSearch.seasonNumber,
                     }) + ` (${totalResults})`
@@ -377,12 +382,14 @@ const TMDBPosterSearchModal = React.memo(
                         className="group relative bg-theme-hover rounded-lg overflow-hidden border border-theme hover:border-theme-primary transition-all cursor-pointer"
                         onClick={() => handleSelectPoster(poster.original_url)}
                       >
-                        {/* Poster Image */}
-                        <img
-                          src={poster.url || poster.poster_url}
-                          alt={poster.title || poster.source}
-                          className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
+                        {/* Poster/Logo Image */}
+                        <div className={`${tmdbSearch.isLogoSearch ? 'bg-slate-700/50 p-2' : ''} h-full`}>
+                          <img
+                            src={poster.url || poster.poster_url}
+                            alt={poster.title || poster.source}
+                            className={`w-full h-auto ${tmdbSearch.isLogoSearch ? 'object-contain aspect-square' : 'object-cover'} group-hover:scale-105 transition-transform duration-300`}
+                          />
+                        </div>
 
                         {/* Overlay on Hover */}
                         <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 text-center">
@@ -456,7 +463,7 @@ const TMDBPosterSearchModal = React.memo(
           {/* Footer */}
           <div className="bg-theme-bg px-6 py-4 rounded-b-xl border-t border-theme flex-shrink-0">
             <p className="text-sm text-theme-muted text-center">
-              {t("runModes.tmdb.clickToSelect")}
+              {tmdbSearch.isLogoSearch ? "Click to use this logo URL" : t("runModes.tmdb.clickToSelect")}
             </p>
           </div>
         </div>
@@ -532,6 +539,7 @@ function RunModes() {
     activeProvider: "tmdb", // Track which provider tab is active
     // Visible providers based on search type
     visibleProviders: ["tmdb", "tvdb", "fanart"], // Default: show all tabs
+    isLogoSearch: false, // New flag for logo search mode
   });
 
   useEffect(() => {
@@ -969,6 +977,126 @@ function RunModes() {
   };
 
   // ============================================================================
+  // LOGO FETCHING (For Title Text)
+  // ============================================================================
+  const handleFetchLogos = async () => {
+    // Use titletext if available, otherwise fallback to folderName (cleaned of year)
+    let query = manualForm.titletext.trim();
+    if (!query && manualForm.folderName.trim()) {
+      // Simple clean up of folder name: "Movie (2024)" -> "Movie"
+      query = manualForm.folderName.replace(/\s*\(\d{4}\).*$/, "").trim();
+    }
+
+    if (!query) {
+      showError(t("runModes.validation.enterTitleOrFolder"));
+      return;
+    }
+
+    // Set initial loading state
+    setTmdbSearch({
+      ...tmdbSearch,
+      searching: true,
+      isLogoSearch: true,
+      visibleProviders: ["tmdb", "tvdb", "fanart"],
+      query: query
+    });
+
+    try {
+      // 1. Fetch User Config to get FavProvider preference
+      let userFavProvider = "fanart"; // Default fallback if config fails
+      try {
+        const configResponse = await fetch(`${API_URL}/config`);
+        if (configResponse.ok) {
+          const configData = await configResponse.json();
+          const cfg = configData.config || {};
+          const apiPart = cfg.ApiPart || {};
+
+          // Get provider from config (checking both flat and grouped structures)
+          const provider = cfg.FavProvider || cfg.favprovider || apiPart.FavProvider || apiPart.favprovider;
+
+          if (provider) {
+             const p = provider.toLowerCase();
+             if (p.includes("tmdb")) userFavProvider = "tmdb";
+             else if (p.includes("tvdb")) userFavProvider = "tvdb";
+             else if (p.includes("fanart")) userFavProvider = "fanart";
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch config for logo preference:", e);
+      }
+
+      // 2. Determine media type
+      let mediaType;
+      if (manualForm.posterType === "standard" || manualForm.posterType === "background") {
+        mediaType = manualForm.mediaTypeSelection;
+      } else if (manualForm.posterType === "season" || manualForm.posterType === "titlecard") {
+        mediaType = "tv";
+      } else {
+        mediaType = "movie";
+      }
+
+      // 3. Prepare request
+      const requestBody = {
+        asset_path: `manual_logo_${Date.now()}`,
+        media_type: mediaType,
+        asset_type: "logo",
+        title: query
+      };
+
+      const response = await fetch(`${API_URL}/assets/fetch-replacements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const results = {
+          tmdb: data.results.tmdb || [],
+          tvdb: data.results.tvdb || [],
+          fanart: data.results.fanart || [],
+        };
+
+        // 4. Determine Active Provider: Use User Preference if it has results
+        let activeProvider = userFavProvider;
+
+        if (!results[activeProvider] || results[activeProvider].length === 0) {
+          // Fallback logic if fav provider has no logos
+          if (results.fanart.length > 0) activeProvider = "fanart";
+          else if (results.tmdb.length > 0) activeProvider = "tmdb";
+          else if (results.tvdb.length > 0) activeProvider = "tvdb";
+        }
+
+        setTmdbSearch({
+          ...tmdbSearch,
+          searching: false,
+          isLogoSearch: true,
+          results: results,
+          showModal: true,
+          displayedCount: 10,
+          activeProvider: activeProvider, // Set based on config
+          visibleProviders: ["tmdb", "tvdb", "fanart"],
+          query: query
+        });
+
+        // Check for empty results
+        const totalResults = results.tmdb.length + results.tvdb.length + results.fanart.length;
+        if (totalResults === 0) {
+          showError(`No logos found for "${query}"`);
+        }
+
+      } else {
+        showError(`Error fetching logos: ${data.message}`);
+        setTmdbSearch({ ...tmdbSearch, searching: false, isLogoSearch: false });
+      }
+    } catch (error) {
+      showError(`Error: ${error.message}`);
+      setTmdbSearch({ ...tmdbSearch, searching: false, isLogoSearch: false });
+    }
+  };
+
+  // ============================================================================
   // MULTI-PROVIDER POSTER SEARCH (TMDB, TVDB, Fanart.tv)
   // ============================================================================
   const searchTMDBPosters = async () => {
@@ -995,7 +1123,7 @@ function RunModes() {
       }
     }
 
-    setTmdbSearch({ ...tmdbSearch, searching: true });
+    setTmdbSearch({ ...tmdbSearch, searching: true, isLogoSearch: false }); // Ensure standard search mode
 
     try {
       // Determine media type based on posterType and mediaTypeSelection
@@ -1120,6 +1248,7 @@ function RunModes() {
           displayedCount: 10, // Reset to show first 10
           activeProvider: activeProvider,
           visibleProviders: visibleProviders, // Track which tabs to show
+          isLogoSearch: false // Ensure logo search is off
         });
 
         // Check if there are any results in visible providers only
@@ -2309,16 +2438,34 @@ function RunModes() {
               <label className="block text-sm font-medium text-theme-text mb-2">
                 {t("runModes.manual.titleText")}
               </label>
-              <input
-                type="text"
-                value={manualForm.titletext}
-                onChange={(e) =>
-                  setManualForm({ ...manualForm, titletext: e.target.value })
-                }
-                placeholder={t("runModes.manual.titlePlaceholder")}
-                disabled={loading || status.running}
-                className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualForm.titletext}
+                  onChange={(e) =>
+                    setManualForm({ ...manualForm, titletext: e.target.value })
+                  }
+                  placeholder={t("runModes.manual.titlePlaceholder")}
+                  disabled={loading || status.running}
+                  className="flex-1 px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {(manualForm.posterType === "standard" || manualForm.posterType === "background") && (
+                  <button
+                    type="button"
+                    onClick={handleFetchLogos}
+                    disabled={loading || status.running || tmdbSearch.searching}
+                    className="px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme rounded-lg text-theme-text transition-colors flex items-center gap-2 whitespace-nowrap"
+                    title="Browse for Logos/ClearArt"
+                  >
+                    {tmdbSearch.searching && tmdbSearch.isLogoSearch ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">Browse Logos</span>
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-theme-muted mt-1">
                 {t("runModes.manual.titleHint")}
               </p>

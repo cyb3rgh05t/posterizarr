@@ -12,6 +12,7 @@ import {
   ImageIcon,
   CheckSquare,
   Square,
+  ArrowUpDown,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CompactImageSizeSlider from "./CompactImageSizeSlider";
@@ -150,6 +151,53 @@ function BackgroundsGallery() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // --- SORTING STATE ---
+  const [sortOrder, setSortOrder] = useState(() => {
+    return localStorage.getItem("gallery-sort-order") || "name_asc";
+  });
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const sortDropdownRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem("gallery-sort-order", sortOrder);
+  }, [sortOrder]);
+
+  // Click outside listener for sort dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        sortDropdownRef.current &&
+        !sortDropdownRef.current.contains(event.target)
+      ) {
+        setSortDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Sorting Helper Function
+  const getSortedImages = (imagesToSort) => {
+    const sorted = [...imagesToSort];
+    sorted.sort((a, b) => {
+      if (sortOrder === "name_asc") return a.name.localeCompare(b.name);
+      if (sortOrder === "name_desc") return b.name.localeCompare(a.name);
+
+      // Handle date sorting (backend sends 'modified' or 'created' timestamps)
+      // Fallback to 0 if undefined
+      const dateA = a.modified || a.created || 0;
+      const dateB = b.modified || b.created || 0;
+
+      if (sortOrder === "date_newest") return dateB - dateA;
+      if (sortOrder === "date_oldest") return dateA - dateB;
+
+      return 0;
+    });
+    return sorted;
+  };
+
   // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(() => {
@@ -251,10 +299,12 @@ function BackgroundsGallery() {
     }
   };
 
-  const fetchFolderImages = async (folder, showNotification = false) => {
+  const fetchFolderImages = async (folder, showNotification = false, keepScrollPosition = false) => {
     if (!folder) return;
 
-    setImagesLoading(true);
+    if (!keepScrollPosition) {
+      setImagesLoading(true);
+    }
     try {
       const response = await fetch(
         `${API_URL}/assets-folder-images/backgrounds/${folder.path}`
@@ -303,7 +353,9 @@ function BackgroundsGallery() {
       showError(errorMsg);
       setImages([]);
     } finally {
-      setImagesLoading(false);
+      if (!keepScrollPosition) {
+        setImagesLoading(false);
+      }
     }
   };
 
@@ -568,13 +620,15 @@ function BackgroundsGallery() {
       img.path.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // --- NEW PAGINATION LOGIC ---
-  const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
-  const displayedImages = filteredImages.slice(
+  // --- APPLY SORTING HERE ---
+  const sortedImages = getSortedImages(filteredImages);
+
+  // --- PAGINATION LOGIC (Updated to use sortedImages) ---
+  const totalPages = Math.ceil(sortedImages.length / itemsPerPage);
+  const displayedImages = sortedImages.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  // --- END NEW PAGINATION LOGIC ---
 
   return (
     <div className="space-y-6">
@@ -588,15 +642,16 @@ function BackgroundsGallery() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4">
             <h2 className="text-lg sm:text-xl font-semibold text-theme-text flex items-center gap-2">
               <Folder className="w-5 h-5 text-theme-primary" />
-              {t("backgroundsGallery.folders")}
+              {t("gallery.folders")}
             </h2>
+
             {/* Controls - wrap on small screens */}
             <div className="flex flex-wrap items-center gap-2">
               {/* Compact Image Size Slider */}
               <CompactImageSizeSlider
                 value={imageSize}
                 onChange={setImageSize}
-                storageKey="gallery-background-size"
+                storageKey="gallery-poster-size"
               />
               {/* Select Mode Toggle */}
               {activeFolder && images.length > 0 && (
@@ -618,25 +673,70 @@ function BackgroundsGallery() {
                     <>
                       <Square className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                       <span className="hidden sm:inline">
-                        {t("backgroundsGallery.cancelSelect")}
+                        {t("gallery.cancelSelect")}
                       </span>
                       <span className="sm:hidden">
-                        {t("backgroundsGallery.cancelSelect") || "Cancel"}
+                        {t("gallery.cancelSelect") || "Cancel"}
                       </span>
                     </>
                   ) : (
                     <>
                       <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                       <span className="hidden sm:inline">
-                        {t("backgroundsGallery.select")}
+                        {t("gallery.select")}
                       </span>
-                      <span className="sm:hidden">
-                        {t("backgroundsGallery.select")}
-                      </span>
+                      <span className="sm:hidden">{t("gallery.select")}</span>
                     </>
                   )}
                 </button>
               )}
+
+              {/* Sorting Dropdown */}
+              <div className="relative" ref={sortDropdownRef}>
+                <button
+                  onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
+                  title={t("common.sorting.title")}
+                >
+                  <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
+                  <span className="hidden sm:inline">
+                    {sortOrder.includes("date") ? t("common.date") : t("common.name")}
+                  </span>
+                </button>
+
+                {sortDropdownOpen && (
+                  <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
+                    <div className="py-1">
+                      <button
+                        onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.nameAsc")}
+                      </button>
+                      <button
+                        onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.nameDesc")}
+                      </button>
+                      <div className="border-t border-theme-border my-1"></div>
+                      <button
+                        onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.dateNewest")}
+                      </button>
+                      <button
+                        onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.dateOldest")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Refresh Button */}
               <button
                 onClick={() => {
@@ -653,27 +753,30 @@ function BackgroundsGallery() {
                     loading || imagesLoading ? "animate-spin" : ""
                   }`}
                 />
-                <span className="hidden sm:inline">{t("common.refresh")}</span>
+                <span className="hidden sm:inline">{t("gallery.refresh")}</span>
               </button>
             </div>
           </div>
+          {/* Folder buttons */}
           <div className="flex flex-wrap gap-2 mb-4">
             {folders
-              .filter((folder) => folder.background_count > 0)
+              .filter((folder) => folder.poster_count > 0)
               .map((folder) => (
                 <button
                   key={folder.path}
                   onClick={() => setActiveFolder(folder)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap shadow-sm ${
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap shadow-sm ${
                     activeFolder?.path === folder.path
                       ? "bg-theme-primary text-white scale-105 border-2 border-theme-primary"
                       : "bg-theme-card text-theme-text hover:bg-theme-hover border border-theme hover:border-theme-primary/50 hover:scale-105"
                   }`}
                 >
                   <Folder className="w-4 h-4 flex-shrink-0" />
-                  {folder.name}
+                  <span className="truncate max-w-[120px] sm:max-w-none">
+                    {folder.name}
+                  </span>
                   <span className="ml-1 px-2 py-0.5 bg-black/20 rounded-full text-xs font-semibold">
-                    {folder.background_count}
+                    {folder.poster_count}
                   </span>
                 </button>
               ))}
@@ -685,7 +788,7 @@ function BackgroundsGallery() {
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder={t("backgroundsGallery.searchPlaceholder", {
+                placeholder={t("gallery.searchPlaceholder", {
                   folder: activeFolder.name,
                 })}
                 value={searchTerm}
@@ -700,18 +803,16 @@ function BackgroundsGallery() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-32 bg-theme-card rounded-xl border border-theme">
           <Loader2 className="w-12 h-12 animate-spin text-theme-primary mb-4" />
-          <p className="text-theme-muted">
-            {t("backgroundsGallery.loadingFolders")}
-          </p>
+          <p className="text-theme-muted">{t("gallery.loadingFolders")}</p>
         </div>
       ) : error ? (
         <div className="bg-red-950/40 rounded-xl p-8 border-2 border-red-600/50 text-center">
           <div className="flex flex-col items-center">
             <div className="p-4 rounded-full bg-red-600/20 mb-4">
-              <Layers className="w-12 h-12 text-red-400" />
+              <ImageIcon className="w-12 h-12 text-red-400" />
             </div>
             <h3 className="text-2xl font-semibold text-red-300 mb-2">
-              {t("backgroundsGallery.errorTitle")}
+              {t("gallery.errorLoadingGallery")}
             </h3>
             <p className="text-red-200 text-sm mb-6 max-w-md">{error}</p>
             <button
@@ -724,7 +825,7 @@ function BackgroundsGallery() {
               className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-all shadow-lg hover:scale-105"
             >
               <RefreshCw className="w-5 h-5" />
-              {t("backgroundsGallery.tryAgain")}
+              {t("gallery.tryAgain")}
             </button>
           </div>
         </div>
@@ -735,67 +836,65 @@ function BackgroundsGallery() {
               <Folder className="w-12 h-12 text-theme-primary" />
             </div>
             <h3 className="text-2xl font-semibold text-theme-text mb-2">
-              {t("backgroundsGallery.noFoldersTitle")}
+              {t("gallery.noFoldersFound")}
             </h3>
             <p className="text-theme-muted max-w-md">
-              {t("backgroundsGallery.noFoldersDescription")}
+              {t("gallery.noFoldersDescription")}
             </p>
           </div>
         </div>
       ) : imagesLoading ? (
         <div className="flex flex-col items-center justify-center py-32 bg-theme-card rounded-xl border border-theme">
           <Loader2 className="w-12 h-12 animate-spin text-theme-primary mb-4" />
-          <p className="text-theme-muted">
-            {t("backgroundsGallery.loadingBackgrounds")}
-          </p>
+          <p className="text-theme-muted">{t("gallery.loadingPosters")}</p>
         </div>
       ) : filteredImages.length === 0 ? (
         <div className="bg-theme-card rounded-xl p-12 border border-theme text-center">
           <div className="flex flex-col items-center">
             <div className="p-4 rounded-full bg-theme-primary/20 mb-4">
-              <Layers className="w-12 h-12 text-theme-primary" />
+              <ImageIcon className="w-12 h-12 text-theme-primary" />
             </div>
             <h3 className="text-2xl font-semibold text-theme-text mb-2">
               {searchTerm
-                ? t("backgroundsGallery.noMatchingTitle")
-                : t("backgroundsGallery.noBackgroundsTitle")}
+                ? t("gallery.noMatchingPosters")
+                : t("gallery.noPostersFound")}
             </h3>
             <p className="text-theme-muted max-w-md">
               {searchTerm
-                ? t("backgroundsGallery.noMatchingDescription")
-                : t("backgroundsGallery.noBackgroundsDescription", {
-                    folder: activeFolder.name,
-                  })}
+                ? t("gallery.adjustSearch")
+                : t("gallery.noPostersInFolder", { folder: activeFolder.name })}
             </p>
           </div>
         </div>
       ) : (
         <>
-          {/* Selection controls */}
+          {/* Selection controls - Responsive */}
           {selectMode && (
-            <div className="bg-theme-card rounded-xl p-4 border border-theme-primary">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className="bg-theme-card rounded-xl p-3 sm:p-4 border border-theme-primary">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                   <button
                     onClick={toggleSelectAll}
-                    className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text font-medium transition-all shadow-sm"
+                    className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
                   >
                     {selectedImages.length === displayedImages.length ? (
                       <>
-                        <Square className="w-5 h-5 text-theme-primary" />
-                        {t("backgroundsGallery.deselectAll")}
+                        <Square className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
+                        <span className="text-sm sm:text-base">
+                          {t("gallery.deselectAll")}
+                        </span>
                       </>
                     ) : (
                       <>
-                        <CheckSquare className="w-5 h-5 text-theme-primary" />
-                        {t("backgroundsGallery.selectAll")}
+                        <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
+                        <span className="text-sm sm:text-base">
+                          {t("gallery.selectAll")}
+                        </span>
                       </>
                     )}
                   </button>
-                  <span className="text-theme-text font-medium">
-                    {t("backgroundsGallery.selectedCount", {
-                      count: selectedImages.length,
-                    })}
+                  <span className="text-sm sm:text-base text-theme-text font-medium">
+                    {t("gallery.selected", { count: selectedImages.length })}
                   </span>
                 </div>
                 <button
@@ -810,16 +909,18 @@ function BackgroundsGallery() {
                   disabled={
                     selectedImages.length === 0 || deletingImage === "bulk"
                   }
-                  className="flex items-center gap-2 px-6 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-all"
+                  className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-all"
                 >
                   <Trash2
-                    className={`w-5 h-5 ${
+                    className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${
                       deletingImage === "bulk" ? "animate-spin" : ""
                     }`}
                   />
-                  {t("backgroundsGallery.deleteSelected", {
-                    count: selectedImages.length,
-                  })}
+                  <span className="text-sm sm:text-base">
+                    {t("gallery.deleteSelected", {
+                      count: selectedImages.length,
+                    })}
+                  </span>
                 </button>
               </div>
             </div>
@@ -828,17 +929,15 @@ function BackgroundsGallery() {
           <div className="bg-theme-card rounded-xl p-4 border border-theme">
             <div className="flex items-center justify-between text-sm">
               <span className="text-theme-text font-medium">
-                {t("backgroundsGallery.showingCount", {
+                {t("gallery.showing", {
                   displayed: displayedImages.length,
-                  filtered: filteredImages.length,
+                  total: filteredImages.length,
                   folder: activeFolder.name,
                 })}
               </span>
               {images.length !== filteredImages.length && (
                 <span className="text-theme-primary font-semibold">
-                  {t("backgroundsGallery.filteredFrom", {
-                    total: images.length,
-                  })}
+                  {t("gallery.filteredFrom", { total: images.length })}
                 </span>
               )}
             </div>
@@ -880,7 +979,7 @@ function BackgroundsGallery() {
                     </div>
 
                     <div
-                      className="relative cursor-pointer aspect-[16/9] p-2"
+                      className="relative cursor-pointer aspect-[2/3] p-2"
                       onClick={() => toggleImageSelection(image.path)}
                     >
                       <img
@@ -897,7 +996,7 @@ function BackgroundsGallery() {
                         className="w-full h-full flex items-center justify-center bg-gray-800 rounded"
                         style={{ display: "none" }}
                       >
-                        <Layers className="w-12 h-12 text-theme-primary" />
+                        <ImageIcon className="w-12 h-12 text-theme-primary" />
                       </div>
                     </div>
                   </>
@@ -917,7 +1016,7 @@ function BackgroundsGallery() {
                           ? "bg-theme-muted cursor-not-allowed opacity-70"
                           : "bg-red-600/95 hover:bg-red-700 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
                       }`}
-                      title={t("backgroundsGallery.deleteTooltip")}
+                      title={t("gallery.deletePoster")}
                     >
                       <Trash2
                         className={`w-4 h-4 text-white ${
@@ -929,17 +1028,17 @@ function BackgroundsGallery() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setAssetToReplace({ ...image, type: "background" });
+                        setAssetToReplace(image);
                         setReplacerOpen(true);
                       }}
                       className="absolute top-2 left-2 z-10 p-2 rounded-lg bg-theme-primary/95 hover:bg-theme-primary opacity-0 group-hover:opacity-100 transition-all shadow-lg backdrop-blur-sm hover:scale-110 active:scale-95"
-                      title={t("backgroundsGallery.replaceTooltip")}
+                      title={t("gallery.replaceAsset")}
                     >
                       <RefreshCw className="w-4 h-4 text-white" />
                     </button>
 
                     <div
-                      className="relative cursor-pointer aspect-[16/9] p-2"
+                      className="relative cursor-pointer aspect-[2/3] p-2"
                       onClick={() => setSelectedImage(image)}
                     >
                       <img
@@ -956,7 +1055,7 @@ function BackgroundsGallery() {
                         className="w-full h-full flex items-center justify-center bg-gray-800 rounded"
                         style={{ display: "none" }}
                       >
-                        <Layers className="w-12 h-12 text-theme-primary" />
+                        <ImageIcon className="w-12 h-12 text-theme-primary" />
                       </div>
                     </div>
                   </>
@@ -984,7 +1083,7 @@ function BackgroundsGallery() {
              <div className="flex justify-center">
                <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
                  <label className="text-sm font-medium text-theme-text">
-                   {t("backgroundsGallery.itemsPerPage")}
+                   {t("gallery.itemsPerPage")}:
                  </label>
                  <div className="relative" ref={itemsPerPageDropdownRef}>
                    <button
@@ -1061,10 +1160,7 @@ function BackgroundsGallery() {
           });
         }}
         onReplace={(image) => {
-          setAssetToReplace({
-            ...image,
-            type: "background",
-          });
+          setAssetToReplace(image);
           setReplacerOpen(true);
         }}
         isDeleting={deletingImage === selectedImage?.path}
@@ -1082,27 +1178,25 @@ function BackgroundsGallery() {
         onConfirm={() => {
           if (deleteConfirm) {
             if (deleteConfirm.bulk) {
-              bulkDeleteBackgrounds();
+              bulkDeletePosters();
             } else {
-              deleteBackground(deleteConfirm.path, deleteConfirm.name);
+              deletePoster(deleteConfirm.path, deleteConfirm.name);
             }
             setDeleteConfirm(null);
           }
         }}
         title={
           deleteConfirm?.bulk
-            ? t("backgroundsGallery.deleteMultipleTitle")
-            : t("backgroundsGallery.deleteSingleTitle")
+            ? t("gallery.deleteMultipleTitle")
+            : t("gallery.deletePosterTitle")
         }
         message={
           deleteConfirm?.bulk
-            ? t("backgroundsGallery.deleteMultipleMessage", {
-                count: deleteConfirm.count,
-              })
-            : t("backgroundsGallery.deleteSingleMessage")
+            ? t("gallery.deleteMultipleMessage", { count: deleteConfirm.count })
+            : t("gallery.deletePosterMessage")
         }
         itemName={deleteConfirm?.bulk ? undefined : deleteConfirm?.name}
-        confirmText={t("common.delete")}
+        confirmText={t("gallery.deleteButton")}
         type="danger"
       />
 
@@ -1118,7 +1212,7 @@ function BackgroundsGallery() {
             // Force cache refresh by updating timestamp
             setCacheBuster(Date.now());
 
-            // Update selectedImage if it's still open to show the new image
+            // Update selectedImage if it's still open
             if (selectedImage && assetToReplace) {
               setSelectedImage({
                 ...selectedImage,
@@ -1126,11 +1220,11 @@ function BackgroundsGallery() {
               });
             }
 
-            // Refresh the images after successful replacement
+            // Refresh the images, passing 'true' for keepScrollPosition
             setTimeout(() => {
-              fetchFolderImages(activeFolder, false);
+              fetchFolderImages(activeFolder, false, true);
             }, 500);
-            showSuccess(t("backgroundsGallery.replaceSuccess"));
+            showSuccess(t("gallery.assetReplaced"));
           }}
         />
       )}
