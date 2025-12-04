@@ -140,7 +140,8 @@
     - `SkipTBA` : Set to `true` to skip TitleCard creation if the Titletext is `TBA`.
     - `SkipJapTitle` : Set to `true` to skip TitleCard creation if the Titletext is `Jap or Chinese`.
     - `AssetCleanup` : Set to `true` to cleanup Assets that are no longer in Plex.
-    - `UseLogo` : Set to `true` to apply logos instead of title text.
+    - `UseLogo` : Set to `true` to apply logos instead of title text to Posters.
+    - `UseBGLogo` : Set to `true` to apply logos instead of title text to Backgrounds.
     - `UseClearlogo` : Set to `true` to use `Clearlogo`.
     - `UseClearart` : Set to `true` to use `Clearart`.
     - `LogoTextFallback` : Set to `true` to fallback to `Text` if no logos are found.
