@@ -53,7 +53,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.18"
+$CurrentScriptVersion = "2.1.19"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -7436,6 +7436,7 @@ $SkipAddTextAndOverlay = $config.PrerequisitePart.SkipAddTextAndOverlay.tolower(
 $DisableHashValidation = $config.PrerequisitePart.DisableHashValidation.tolower()
 $global:DisableOnlineAssetFetch = $config.PrerequisitePart.DisableOnlineAssetFetch.tolower()
 $UseLogo = $config.PrerequisitePart.UseLogo.tolower()
+$UseBGLogo = $config.PrerequisitePart.UseBGLogo.tolower()
 $TextFallback = $config.PrerequisitePart.LogoTextFallback.tolower()
 $global:UseClearlogo = $config.PrerequisitePart.UseClearlogo.tolower()
 $global:UseClearart = $config.PrerequisitePart.UseClearart.tolower()
@@ -10867,7 +10868,7 @@ Elseif ($Tautulli) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -10912,7 +10913,7 @@ Elseif ($Tautulli) {
                                                 Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                             }
                                         }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                             if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
@@ -12044,7 +12045,7 @@ Elseif ($Tautulli) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                    if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                         $ApplyTextInsteadOfLogo = $null
                                         $global:LogoUrl = $null
                                         $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -12089,7 +12090,7 @@ Elseif ($Tautulli) {
                                             Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                         }
                                     }
-                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                         if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
@@ -15861,7 +15862,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                            if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -15906,7 +15907,7 @@ Elseif ($ArrTrigger) {
                                                     Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                                 }
                                             }
-                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                                 if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                                     if ($global:direction -eq "RTL") {
                                                         $backgroundfontImagemagick = $RTLfontImagemagick
@@ -16909,7 +16910,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -16954,7 +16955,7 @@ Elseif ($ArrTrigger) {
                                                 Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                             }
                                         }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                             if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
@@ -20064,7 +20065,7 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                            if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -20109,7 +20110,7 @@ Elseif ($ArrTrigger) {
                                                     Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                                 }
                                             }
-                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                                 if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                                     if ($global:direction -eq "RTL") {
                                                         $backgroundfontImagemagick = $RTLfontImagemagick
@@ -21241,7 +21242,7 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -21286,7 +21287,7 @@ Elseif ($ArrTrigger) {
                                                 Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                             }
                                         }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                             if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
@@ -26279,7 +26280,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -26324,7 +26325,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                             }
                                         }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                             if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
@@ -27327,7 +27328,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                    if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                         $ApplyTextInsteadOfLogo = $null
                                         $global:LogoUrl = $null
                                         $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -27372,7 +27373,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                         }
                                     }
-                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                         if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
@@ -30925,7 +30926,7 @@ else {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -30970,7 +30971,7 @@ else {
                                                 Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                             }
                                         }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                             if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                                 if ($global:direction -eq "RTL") {
                                                     $backgroundfontImagemagick = $RTLfontImagemagick
@@ -32241,7 +32242,7 @@ else {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                    if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                         $ApplyTextInsteadOfLogo = $null
                                         $global:LogoUrl = $null
                                         $allProviders = @('TMDB', 'FANART', 'TVDB')
@@ -32286,7 +32287,7 @@ else {
                                             Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
                                         }
                                     }
-                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
                                         if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
                                             if ($global:direction -eq "RTL") {
                                                 $backgroundfontImagemagick = $RTLfontImagemagick
