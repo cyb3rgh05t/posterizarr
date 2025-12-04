@@ -159,6 +159,7 @@
     "collectionfont": "Colus-Regular.ttf",
     "collectionoverlayfile": "overlay-innerglow.png",
     "UseLogo": "false",
+    "UseBGLogo": "false",
     "UseClearlogo": "false",
     "UseClearart": "false",
     "LogoTextFallback": "false"

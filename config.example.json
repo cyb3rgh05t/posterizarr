@@ -146,6 +146,7 @@
     "DisableHashValidation": "false",
     "DisableOnlineAssetFetch": "false",
     "UseLogo": "false",
+    "UseBGLogo": "false",
     "UseClearlogo": "false",
     "UseClearart": "false",
     "LogoTextFallback": "false"

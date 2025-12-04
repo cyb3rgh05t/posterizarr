@@ -299,7 +299,9 @@ const getConfigTooltips = (language) => {
       DisableOnlineAssetFetch:
         "Set to true to skip all online lookups and use only locally available assets (Default: false)",
       UseLogo:
-        "Set to true to apply logos instead of title text.",
+        "Set to true to apply logos to Posters instead of title text.",
+      UseBGLogo:
+        "Set to true to apply logos to Background instead of title text.",
       UseClearlogo:
         "Set to true to use Clearlogo.",
       UseClearart:
@@ -3569,7 +3571,7 @@ function ConfigEditor() {
       if (!newLineOnSpecificSymbols) return true;
     }
 
-    // UseClearlogo, UseClearart, and LogoTextFallback require UseLogo to be enabled
+    // UseClearlogo, UseClearart, and LogoTextFallback require UseLogo OR UseBGLogo to be enabled
     const logoDependentFields = [
       "UseClearlogo",
       "UseClearart",
@@ -3578,18 +3580,27 @@ function ConfigEditor() {
 
     if (logoDependentFields.includes(key)) {
       let useLogo = false;
+      let useBGLogo = false;
 
       if (usingFlatStructure) {
+        // Check UseLogo
         const val = config["UseLogo"];
         useLogo = val === "true" || val === true;
+
+        // Check UseBGLogo
+        const valBG = config["UseBGLogo"];
+        useBGLogo = valBG === "true" || valBG === true;
       } else {
-        // In grouped structure, UseLogo is in PrerequisitePart
+        // In grouped structure, both are likely in PrerequisitePart
         const val = config["PrerequisitePart"]?.["UseLogo"];
         useLogo = val === "true" || val === true;
+
+        const valBG = config["PrerequisitePart"]?.["UseBGLogo"];
+        useBGLogo = valBG === "true" || valBG === true;
       }
 
-      // If UseLogo is NOT enabled, disable these fields
-      if (!useLogo) {
+      // If BOTH are NOT enabled (neither is true), disable these fields
+      if (!useLogo && !useBGLogo) {
         return true;
       }
     }
@@ -4207,6 +4218,7 @@ function ConfigEditor() {
       "BackgroundPosters",
       "TitleCards",
       "UseLogo",
+      "UseBGLogo",
       "UseClearlogo",
       "UseClearart",
       "LogoTextFallback",

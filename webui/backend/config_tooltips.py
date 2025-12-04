@@ -106,6 +106,7 @@ CONFIG_TOOLTIPS = {
     "DisableHashValidation": "Set to true to skip hash validation (Default: false). Note: This may produce bloat, as every item will be re-uploaded to media servers",
     "DisableOnlineAssetFetch": "Set to true to skip all online lookups and use only locally available assets (Default: false)",
     "UseLogo": "Set to true to apply logos instead of title text.",
+    "UseBGLogo": "Set to true to apply logos instead of title text.",
     "UseClearlogo": "Set to true to use Clearlogo.",
     "UseClearart": "Set to true to use Clearart.",
     "LogoTextFallback": "Set to true to fallback to Text if no logos are found.",
