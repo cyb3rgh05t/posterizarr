@@ -471,7 +471,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     setSelectedPreview(null);
   }, [metadata]);
 
-  // Handle Logo Fetching with FavProvider priority
+  // Handle Logo Fetching with FavProvider priority AND LogoLanguageOrder
   const handleFetchLogos = async () => {
     console.log("=== Fetching Logos ===");
     setLogoSelectionMode(true);
@@ -483,30 +483,49 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     };
 
     try {
-      // 1. Fetch User Config to get FavProvider preference
+      // ----------------------------------------------------------------------
+      // 1. Fetch User Config (FavProvider & LogoLanguageOrder)
+      // ----------------------------------------------------------------------
       let userFavProvider = "fanart"; // Default fallback
+      let languageOrderList = [];
+
       try {
         const configResponse = await fetch(`${API_URL}/config`);
         if (configResponse.ok) {
           const configData = await configResponse.json();
-          // Handle both flat and grouped structures based on how backend returns it
+          // Handle flat or grouped config structure
           const cfg = configData.config || {};
           const apiPart = cfg.ApiPart || {};
 
+          // A) Get FavProvider
           const provider = cfg.FavProvider || cfg.favprovider || apiPart.FavProvider || apiPart.favprovider;
-
           if (provider) {
              const p = provider.toLowerCase();
              if (p.includes("tmdb")) userFavProvider = "tmdb";
              else if (p.includes("tvdb")) userFavProvider = "tvdb";
              else if (p.includes("fanart")) userFavProvider = "fanart";
           }
+
+          // B) Get LogoLanguageOrder (Handle Array or String)
+          const rawOrder = cfg.LogoLanguageOrder || apiPart.LogoLanguageOrder;
+
+          if (Array.isArray(rawOrder)) {
+             languageOrderList = rawOrder.map(lang => lang.trim().toLowerCase());
+          } else if (typeof rawOrder === 'string' && rawOrder) {
+             languageOrderList = rawOrder.split(",").map(lang => lang.trim().toLowerCase());
+          }
+
+          if (languageOrderList.length > 0) {
+            console.log("Applying Logo Language Order:", languageOrderList);
+          }
         }
       } catch (e) {
         console.warn("Failed to fetch config for logo preference:", e);
       }
 
+      // ----------------------------------------------------------------------
       // 2. Fetch Replacements
+      // ----------------------------------------------------------------------
       const response = await fetch(`${API_URL}/assets/fetch-replacements`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -518,26 +537,70 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
       const data = await response.json();
       if (data.success) {
-        const results = {
+        let results = {
           tmdb: data.results.tmdb || [],
           tvdb: data.results.tvdb || [],
           fanart: data.results.fanart || [],
         };
 
+        // --------------------------------------------------------------------
+        // 3. Filter & Sort by LogoLanguageOrder (STRICT MODE)
+        // --------------------------------------------------------------------
+        if (languageOrderList.length > 0) {
+          const processLogos = (logoList) => {
+            if (!logoList) return [];
+
+            // A) Filter: REMOVE logos not in the allowed list
+            const filtered = logoList.filter(logo => {
+              const logoLang = (logo.language || "xx").toLowerCase();
+              return languageOrderList.includes(logoLang);
+            });
+
+            // B) Sort: Order exactly as they appear in LogoLanguageOrder
+            return filtered.sort((a, b) => {
+              const langA = (a.language || "xx").toLowerCase();
+              const langB = (b.language || "xx").toLowerCase();
+              return languageOrderList.indexOf(langA) - languageOrderList.indexOf(langB);
+            });
+          };
+
+          // Apply to all providers
+          results.tmdb = processLogos(results.tmdb);
+          results.tvdb = processLogos(results.tvdb);
+          results.fanart = processLogos(results.fanart);
+        }
+
         setPreviews(results);
 
-        // 3. Determine Active Provider: Use User Preference if it has results
+        // --------------------------------------------------------------------
+        // 4. Determine Active Provider
+        // --------------------------------------------------------------------
         let activeProvider = userFavProvider;
 
+        // Fallback if preferred provider has no logos (after filtering)
         if (!results[activeProvider] || results[activeProvider].length === 0) {
-          // Fallback logic if fav provider has no logos
           if (results.fanart.length > 0) activeProvider = "fanart";
           else if (results.tmdb.length > 0) activeProvider = "tmdb";
           else if (results.tvdb.length > 0) activeProvider = "tvdb";
         }
 
-        setActiveProviderTab(activeProvider);
-        setActiveTab("previews");
+        // Check if we have any results at all
+        const totalResults = results.tmdb.length + results.tvdb.length + results.fanart.length;
+
+        if (totalResults > 0) {
+          setActiveProviderTab(activeProvider);
+          setActiveTab("previews");
+        } else {
+          // If 0 results, check if it was due to strict filtering
+          if (languageOrderList.length > 0) {
+             showError(t("assetReplacer.noLogosMatchingLanguages", { languages: languageOrderList.join(", ") }));
+          } else {
+             showError(t("assetReplacer.fetchPreviewsError"));
+          }
+          // Stay on upload tab or handle as prefered
+          setLogoSelectionMode(false);
+        }
+
       } else {
         showError(t("assetReplacer.fetchPreviewsError"));
         setLogoSelectionMode(false);
@@ -557,7 +620,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     }));
     setActiveTab("upload");
     setLogoSelectionMode(false);
-    showInfo("Logo URL applied to Title Text");
+    showInfo(t("assetReplacer.logoApplied"));
   };
 
   // Fetch language order preferences from config
@@ -1372,7 +1435,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                   <RefreshCw className="w-4 h-4 sm:w-6 sm:h-6 text-theme-primary" />
                 </div>
                 <span className="break-words">
-                  {logoSelectionMode ? "Select a Logo/ClearArt" : t("assetReplacer.title")}
+                  {logoSelectionMode ? t("assetReplacer.selectLogoTitle") : t("assetReplacer.title")}
                 </span>
               </h2>
               <p className="text-base sm:text-xl font-bold text-theme-text mt-2 sm:mt-3 break-words">
@@ -1504,7 +1567,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                               ) : (
                                 <Search className="w-4 h-4" />
                               )}
-                              <span className="hidden sm:inline">Browse Logos</span>
+                              <span className="hidden sm:inline">{t("assetReplacer.browseLogos")}</span>
                             </button>
                           </div>
                           {manualForm?.titletext?.startsWith("http") && (

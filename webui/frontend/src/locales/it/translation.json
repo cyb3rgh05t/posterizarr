@@ -37,6 +37,11 @@
     },
     "tmdb": {
       "title": "Cerca su TMDB per",
+      "selectLogo": "Seleziona un Logo",
+      "clickToSelectLogo": "Clicca per usare questo URL del logo",
+      "textResult": "Risultato Testo",
+      "idResult": "Risultato ID",
+      "noLogosMatchingLanguages": "Nessun logo trovato per le lingue: {{languages}}",
       "seasonPosters": "Locandine stagione",
       "episodeImages": "Immagini episodio",
       "tvShowPosters": "Locandine Serie TV",
@@ -100,6 +105,8 @@
     },
     "manual": {
       "title": "Modalità manuale (semi-automatica)",
+      "browseLogos": "Sfoglia Loghi",
+      "browseLogosTooltip": "Sfoglia Loghi/ClearArt",
       "description": "Crea o sostituisci locandine manualmente con pieno controllo su ricerca, fonte e metadati.",
       "posterType": "Tipo di locandina",
       "types": {
@@ -1303,6 +1310,10 @@
   },
   "assetReplacer": {
     "title": "Sostituisci asset",
+    "selectLogoTitle": "Seleziona un Logo/ClearArt",
+    "logoApplied": "URL del logo applicato al testo del titolo",
+    "browseLogos": "Sfoglia Loghi",
+    "noLogosMatchingLanguages": "Nessun logo trovato per le lingue: {{languages}}",
     "enterTitleError": "Inserisci un titolo da cercare",
     "foundReplacements": "Trovate {{count}} opzioni di sostituzione da {{sources}} fonti",
     "fetchPreviewsError": "Recupero anteprime non riuscito",

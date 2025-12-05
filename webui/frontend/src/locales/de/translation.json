@@ -37,6 +37,11 @@
     },
     "tmdb": {
       "title": "TMDB durchsuchen nach",
+      "selectLogo": "Wähle ein Logo",
+      "clickToSelectLogo": "Klicken, um diese Logo-URL zu verwenden",
+      "textResult": "Text-Ergebnis",
+      "idResult": "ID-Ergebnis",
+      "noLogosMatchingLanguages": "Keine Logos für folgende Sprachen gefunden: {{languages}}",
       "seasonPosters": "Season-Poster",
       "episodeImages": "Episodenbilder",
       "tvShowPosters": "TV-Serien-Poster",
@@ -100,6 +105,8 @@
     },
     "manual": {
       "title": "Manueller Modus (Halbautomatisch)",
+      "browseLogos": "Logos durchsuchen",
+      "browseLogosTooltip": "Nach Logos/ClearArt suchen",
       "description": "Erstelle oder ersetze Poster manuell mit voller Kontrolle über Suche, Quelle und Metadaten.",
       "posterType": "Poster-Typ",
       "types": {
@@ -1304,6 +1311,10 @@
   },
   "assetReplacer": {
     "title": "Asset ersetzen",
+    "selectLogoTitle": "Wähle ein Logo/ClearArt",
+    "logoApplied": "Logo-URL in Titeltext übernommen",
+    "browseLogos": "Logos durchsuchen",
+    "noLogosMatchingLanguages": "Keine Logos für folgende Sprachen gefunden: {{languages}}",
     "enterTitleError": "Bitte geben Sie einen Titel ein, nach dem gesucht werden soll",
     "foundReplacements": "{{count}} Ersatzoptionen aus {{sources}} Quellen gefunden",
     "fetchPreviewsError": "Fehler beim Abrufen der Vorschau",

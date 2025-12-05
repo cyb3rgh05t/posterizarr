@@ -481,14 +481,21 @@ function BackgroundsGallery() {
         }
       );
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(
-          data.detail || t("backgroundsGallery.failedDeleteBackground")
-        );
+      // 1. Handle Response Safely (Fixes JSON Parse Error)
+      const contentType = response.headers.get("content-type");
+      let data;
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        // If server returns text/html (common in 404s/500s), read as text
+        const text = await response.text();
+        data = { success: response.ok, message: text || response.statusText };
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || t("backgroundsGallery.failedDeleteBackground"));
+      }
 
       if (data.success) {
         showSuccess(t("backgroundsGallery.deleteSuccess", { name: imageName }));
@@ -979,7 +986,7 @@ function BackgroundsGallery() {
                     </div>
 
                     <div
-                      className="relative cursor-pointer aspect-[2/3] p-2"
+                      className="relative cursor-pointer aspect-video p-2"
                       onClick={() => toggleImageSelection(image.path)}
                     >
                       <img
@@ -1038,7 +1045,7 @@ function BackgroundsGallery() {
                     </button>
 
                     <div
-                      className="relative cursor-pointer aspect-[2/3] p-2"
+                      className="relative cursor-pointer aspect-video p-2"
                       onClick={() => setSelectedImage(image)}
                     >
                       <img
@@ -1178,9 +1185,9 @@ function BackgroundsGallery() {
         onConfirm={() => {
           if (deleteConfirm) {
             if (deleteConfirm.bulk) {
-              bulkDeletePosters();
+              bulkDeleteBackgrounds();
             } else {
-              deletePoster(deleteConfirm.path, deleteConfirm.name);
+              deleteBackground(deleteConfirm.path, deleteConfirm.name);
             }
             setDeleteConfirm(null);
           }

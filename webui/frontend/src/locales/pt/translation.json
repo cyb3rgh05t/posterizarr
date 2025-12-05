@@ -37,6 +37,11 @@
     },
     "tmdb": {
       "title": "Pesquisar no TMDB por",
+      "selectLogo": "Selecionar um Logo",
+      "clickToSelectLogo": "Clique para usar este URL de logo",
+      "textResult": "Resultado de Texto",
+      "idResult": "Resultado de ID",
+      "noLogosMatchingLanguages": "Nenhum logo encontrado para os idiomas: {{languages}}",
       "seasonPosters": "Cartazes de temporada",
       "episodeImages": "Imagens de episódio",
       "tvShowPosters": "Cartazes de Séries",
@@ -100,6 +105,8 @@
     },
     "manual": {
       "title": "Modo manual (semiautomatizado)",
+      "browseLogos": "Procurar Logotipos",
+      "browseLogosTooltip": "Procurar Logotipos/ClearArt",
       "description": "Crie ou substitua cartazes manualmente com controle total sobre pesquisa, fonte e metadados.",
       "posterType": "Tipo de cartaz",
       "types": {
@@ -1303,6 +1310,10 @@
   },
   "assetReplacer": {
     "title": "Substituir ativo",
+    "selectLogoTitle": "Selecionar um Logo/ClearArt",
+    "logoApplied": "URL do logo aplicada ao texto do título",
+    "browseLogos": "Procurar Logotipos",
+    "noLogosMatchingLanguages": "Nenhum logo encontrado para os idiomas: {{languages}}",
     "enterTitleError": "Insira um título para pesquisar",
     "foundReplacements": "Encontradas {{count}} opções de substituição de {{sources}} fontes",
     "fetchPreviewsError": "Falha ao buscar pré-visualizações",
