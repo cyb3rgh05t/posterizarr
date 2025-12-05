@@ -487,12 +487,13 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       // 1. Fetch User Config (FavProvider & LogoLanguageOrder)
       // ----------------------------------------------------------------------
       let userFavProvider = "fanart"; // Default fallback
-      let languageOrderList = []; // Store the preferred order here
+      let languageOrderList = [];
 
       try {
         const configResponse = await fetch(`${API_URL}/config`);
         if (configResponse.ok) {
           const configData = await configResponse.json();
+          // Handle flat or grouped config structure
           const cfg = configData.config || {};
           const apiPart = cfg.ApiPart || {};
 
@@ -505,11 +506,16 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
              else if (p.includes("fanart")) userFavProvider = "fanart";
           }
 
-          // B) Get LogoLanguageOrder
-          // Checks root config first, then ApiPart, handles comma-separated string
-          const orderStr = cfg.LogoLanguageOrder || apiPart.LogoLanguageOrder || "";
-          if (orderStr) {
-            languageOrderList = orderStr.split(",").map(lang => lang.trim().toLowerCase());
+          // B) Get LogoLanguageOrder (Handle Array or String)
+          const rawOrder = cfg.LogoLanguageOrder || apiPart.LogoLanguageOrder;
+
+          if (Array.isArray(rawOrder)) {
+             languageOrderList = rawOrder.map(lang => lang.trim().toLowerCase());
+          } else if (typeof rawOrder === 'string' && rawOrder) {
+             languageOrderList = rawOrder.split(",").map(lang => lang.trim().toLowerCase());
+          }
+
+          if (languageOrderList.length > 0) {
             console.log("Applying Logo Language Order:", languageOrderList);
           }
         }
@@ -538,22 +544,23 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         };
 
         // --------------------------------------------------------------------
-        // 3. Filter & Sort by LogoLanguageOrder (if configured)
+        // 3. Filter & Sort by LogoLanguageOrder (STRICT MODE)
         // --------------------------------------------------------------------
         if (languageOrderList.length > 0) {
           const processLogos = (logoList) => {
             if (!logoList) return [];
 
-            // A) Filter: Keep only languages in the list
-            const filtered = logoList.filter(logo =>
-              logo.language && languageOrderList.includes(logo.language.toLowerCase())
-            );
+            // A) Filter: REMOVE logos not in the allowed list
+            const filtered = logoList.filter(logo => {
+              const logoLang = (logo.language || "xx").toLowerCase();
+              return languageOrderList.includes(logoLang);
+            });
 
             // B) Sort: Order exactly as they appear in LogoLanguageOrder
             return filtered.sort((a, b) => {
-              const indexA = languageOrderList.indexOf(a.language.toLowerCase());
-              const indexB = languageOrderList.indexOf(b.language.toLowerCase());
-              return indexA - indexB;
+              const langA = (a.language || "xx").toLowerCase();
+              const langB = (b.language || "xx").toLowerCase();
+              return languageOrderList.indexOf(langA) - languageOrderList.indexOf(langB);
             });
           };
 
@@ -1560,7 +1567,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                               ) : (
                                 <Search className="w-4 h-4" />
                               )}
-                              <span className="hidden sm:inline">Browse Logos</span>
+                              <span className="hidden sm:inline">{t("assetReplacer.browseLogos")}</span>
                             </button>
                           </div>
                           {manualForm?.titletext?.startsWith("http") && (

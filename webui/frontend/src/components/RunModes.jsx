@@ -323,7 +323,7 @@ const TMDBPosterSearchModal = React.memo(
                                 : "bg-theme-hover text-theme-text border-theme hover:border-theme-primary"
                             }`}
                           >
-                            <span>t("runModes.tmdb.textResult")</span>
+                            <span>{t("runModes.tmdb.textResult")}</span>
                             <span
                               className={`px-2 py-0.5 rounded-full text-xs ${
                                 sourceFilter === "title_search"
@@ -350,7 +350,7 @@ const TMDBPosterSearchModal = React.memo(
                                 : "bg-theme-hover text-theme-text border-theme hover:border-theme-primary"
                             }`}
                           >
-                            <span>t("runModes.tmdb.idResult")</span>
+                            <span>{t("runModes.tmdb.idResult")}</span>
                             <span
                               className={`px-2 py-0.5 rounded-full text-xs ${
                                 sourceFilter === "provided_id"
@@ -978,9 +978,6 @@ function RunModes() {
   // ============================================================================
   // LOGO FETCHING (For Title Text)
   // ============================================================================
-  // ============================================================================
-  // LOGO FETCHING (For Title Text)
-  // ============================================================================
   const handleFetchLogos = async () => {
     // 1. Priority: Manual Title Text
     let query = manualForm.titletext.trim();
@@ -1014,12 +1011,13 @@ function RunModes() {
       // 1. Fetch User Config (FavProvider & LogoLanguageOrder)
       // ----------------------------------------------------------------------
       let userFavProvider = "fanart";
-      let languageOrder = []; // Store the preferred order here
+      let languageOrder = [];
 
       try {
         const configResponse = await fetch(`${API_URL}/config`);
         if (configResponse.ok) {
           const configData = await configResponse.json();
+          // Handle flat or grouped config structure
           const cfg = configData.config || {};
           const apiPart = cfg.ApiPart || {};
 
@@ -1032,11 +1030,18 @@ function RunModes() {
              else if (p.includes("fanart")) userFavProvider = "fanart";
           }
 
-          // B) Get LogoLanguageOrder
-          // Checks root config first, then ApiPart, handles comma-separated string
-          const orderStr = cfg.LogoLanguageOrder || apiPart.LogoLanguageOrder || "";
-          if (orderStr) {
-            languageOrder = orderStr.split(",").map(lang => lang.trim().toLowerCase());
+          // B) Get LogoLanguageOrder (Handle Array or String)
+          const rawOrder = cfg.LogoLanguageOrder || apiPart.LogoLanguageOrder;
+
+          if (Array.isArray(rawOrder)) {
+            // It's already an array ["en", "de"]
+            languageOrder = rawOrder.map(lang => lang.trim().toLowerCase());
+          } else if (typeof rawOrder === 'string' && rawOrder) {
+            // It's a string "en, de"
+            languageOrder = rawOrder.split(",").map(lang => lang.trim().toLowerCase());
+          }
+
+          if (languageOrder.length > 0) {
             console.log("Applying Logo Language Order:", languageOrder);
           }
         }
@@ -1082,22 +1087,24 @@ function RunModes() {
         };
 
         // --------------------------------------------------------------------
-        // 4. Filter & Sort by LogoLanguageOrder (if configured)
+        // 4. Filter & Sort by LogoLanguageOrder (STRICT MODE)
         // --------------------------------------------------------------------
         if (languageOrder.length > 0) {
           const processLogos = (logoList) => {
             if (!logoList) return [];
 
-            // A) Filter: Keep only languages in the list
-            const filtered = logoList.filter(logo =>
-              logo.language && languageOrder.includes(logo.language.toLowerCase())
-            );
+            // A) Filter: REMOVE logos not in the allowed list
+            const filtered = logoList.filter(logo => {
+              // Default to "xx" (textless) if language is missing
+              const logoLang = (logo.language || "xx").toLowerCase();
+              return languageOrder.includes(logoLang);
+            });
 
             // B) Sort: Order exactly as they appear in LogoLanguageOrder
             return filtered.sort((a, b) => {
-              const indexA = languageOrder.indexOf(a.language.toLowerCase());
-              const indexB = languageOrder.indexOf(b.language.toLowerCase());
-              return indexA - indexB;
+              const langA = (a.language || "xx").toLowerCase();
+              const langB = (b.language || "xx").toLowerCase();
+              return languageOrder.indexOf(langA) - languageOrder.indexOf(langB);
             });
           };
 
@@ -1134,9 +1141,9 @@ function RunModes() {
         // Check for empty results
         const totalResults = results.tmdb.length + results.tvdb.length + results.fanart.length;
         if (totalResults === 0) {
-          // Customized error message if we filtered everything out
           if (languageOrder.length > 0) {
-            showError(`No logos found matching languages: ${languageOrder.join(", ")}`);
+            // Translate: "No logos found matching languages: en, de"
+            showError(t("runModes.tmdb.noLogosMatchingLanguages", { languages: languageOrder.join(", ") }));
           } else {
             showError(`No logos found for "${query}"`);
           }
@@ -2518,7 +2525,7 @@ function RunModes() {
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    <span className="hidden sm:inline">t("runModes.manual.browseLogos")</span>
+                    <span className="hidden sm:inline">{t("runModes.manual.browseLogos")}</span>
                   </button>
                 )}
               </div>
