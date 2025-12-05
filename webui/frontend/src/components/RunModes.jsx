@@ -963,7 +963,7 @@ function RunModes() {
       const data = await response.json();
 
       if (data.success) {
-        showSuccess(t("runModes.stop.stopped"));
+        showSuccess(t("dashboard.stopped"));
         fetchStatus();
       } else {
         showError(`Error: ${data.message}`);
