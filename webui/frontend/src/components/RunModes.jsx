@@ -643,7 +643,14 @@ function RunModes() {
 
   // Handle folder selection
   const handleFolderSelect = (folderName, title) => {
-    setManualForm({ ...manualForm, folderName, titletext: title });
+    setManualForm((prevForm) => ({
+      ...prevForm,
+      folderName,
+      titletext: prevForm.titletext && prevForm.titletext.trim() !== "" 
+        ? prevForm.titletext 
+        : title
+    }));
+    
     setShowFolderSelector(false);
     setFolderSearchQuery("");
     showSuccess(`Folder "${folderName}" selected`);
