@@ -37,6 +37,11 @@
     },
     "tmdb": {
       "title": "Search TMDB for",
+      "selectLogo": "Select a Logo",
+      "clickToSelectLogo": "Click to use this logo URL",
+      "textResult": "Text Result",
+      "idResult": "ID Result",
+      "noLogosMatchingLanguages": "No logos found matching languages: {{languages}}",
       "seasonPosters": "Season Posters",
       "episodeImages": "Episode Images",
       "tvShowPosters": "TV Show Posters",
@@ -100,6 +105,8 @@
     },
     "manual": {
       "title": "Manual Mode (Semi-Automated)",
+      "browseLogos": "Browse Logos",
+      "browseLogosTooltip": "Browse for Logos/ClearArt",
       "description": "Create or replace posters manually with full control over search, source, and metadata.",
       "posterType": "Poster Type",
       "types": {
@@ -1311,6 +1318,10 @@
   },
   "assetReplacer": {
     "title": "Replace Asset",
+    "selectLogoTitle": "Select a Logo/ClearArt",
+    "logoApplied": "Logo URL applied to Title Text",
+    "browseLogos": "Browse Logos",
+    "noLogosMatchingLanguages": "No logos found matching languages: {{languages}}",
     "enterTitleError": "Please enter a title to search for",
     "foundReplacements": "Found {{count}} replacement options from {{sources}} sources",
     "fetchPreviewsError": "Failed to fetch previews",
