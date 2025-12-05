@@ -993,7 +993,7 @@ function RunModes() {
     }
 
     if (!query) {
-      showError(t("runModes.validation.enterTitleOrFolder"));
+      showError(t("validation.enterTitleOrFolder"));
       return;
     }
 
