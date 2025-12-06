@@ -57,6 +57,9 @@ class PosterizarrScheduler:
         self._scheduler_initialized = False
         # Use a threading.RLock for all methods (sync and async)
         self._lock = threading.RLock()
+        
+        # Initialize timezone cache
+        self._cached_timezone = None
 
         logger.debug(f"Config file path: {self.config_path}")
         logger.debug(f"psutil available: {PSUTIL_AVAILABLE}")
@@ -94,9 +97,13 @@ class PosterizarrScheduler:
         2. Config file timezone setting
         3. Default: Europe/Berlin
 
-        This method acquires its own lock.
+        This method acquires its own lock and uses caching to prevent log spam.
         """
         with self._lock:
+            # Return cached value if available to prevent log spam
+            if self._cached_timezone:
+                return self._cached_timezone
+
             logger.debug("Determining timezone...")
 
             # 1. If Docker, try to read TZ from ENV
@@ -105,6 +112,7 @@ class PosterizarrScheduler:
                 if env_tz:
                     logger.info(f"Using timezone from ENV (Docker): {env_tz}")
                     logger.debug(f"IS_DOCKER={IS_DOCKER}, TZ environment variable found")
+                    self._cached_timezone = env_tz
                     return env_tz
                 else:
                     logger.debug(
@@ -117,6 +125,7 @@ class PosterizarrScheduler:
             if config_tz:
                 logger.info(f"Using timezone from config: {config_tz}")
                 logger.debug(f"Loaded from config file: {self.config_path}")
+                self._cached_timezone = config_tz
                 return config_tz
             else:
                 logger.debug("No timezone found in config file")
@@ -125,6 +134,7 @@ class PosterizarrScheduler:
             default_tz = "Europe/Berlin"
             logger.info(f"Using default timezone: {default_tz}")
             logger.debug("No timezone found in ENV or config, using default")
+            self._cached_timezone = default_tz
             return default_tz
 
     def load_config(self) -> Dict:
@@ -184,6 +194,10 @@ class PosterizarrScheduler:
             logger.info("UPDATING SCHEDULER CONFIG")
             logger.info(f"Updates: {list(updates.keys())}")
             logger.debug(f"Full updates: {updates}")
+
+            # If timezone is being updated, invalidate the cache
+            if "timezone" in updates:
+                self._cached_timezone = None
 
             config = self.load_config()
             config.update(updates)
