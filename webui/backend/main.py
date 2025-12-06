@@ -12438,10 +12438,161 @@ async def get_support_zip(background_tasks: BackgroundTasks):
         logger.error(f"[SupportZip] Error during support zip endpoint execution: {e}")
         logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=f"Failed to create support ZIP: {str(e)}")
+
+# ============================================================================
+# WEBHOOK ENDPOINTS (ARR & TAUTULLI)
+# ============================================================================
+
+@app.post("/api/webhook/arr")
+async def arr_webhook(request: Request):
+    """
+    Accepts Webhooks from Sonarr/Radarr (at /api/webhook/arr), 
+    converts them to .posterizarr files, and drops them in the watcher folder.
+    """
+    try:
+        payload = await request.json()
+        
+        # Determine Event and Platform
+        event_type = payload.get("eventType", "Unknown")
+        
+        # Handle "Test" event from the Arr settings page
+        if event_type == "Test":
+            logger.info("Received Test Webhook from Arr instance")
+            return {"success": True, "message": "Test successful"}
+
+        # We typically only care about Import/Download/Grab/Delete events
+        if event_type not in ["Download", "Import", "Grab", "MovieFileDelete", "EpisodeFileDelete"]:
+            return {"success": True, "message": f"Ignored event type: {event_type}"}
+
+        data_map = {}
+        platform = "Unknown"
+
+        # Map JSON Data to Posterizarr Arguments (mimicking ArrTrigger.sh logic)
+        
+        # RADARR
+        if "movie" in payload:
+            platform = "Radarr"
+            movie = payload.get("movie", {})
+            movie_file = payload.get("movieFile", {})
+            
+            data_map["arr_platform"] = platform
+            data_map["event"] = event_type
+            data_map["arr_movie_title"] = movie.get("title", "")
+            data_map["arr_movie_tmdb"] = movie.get("tmdbId", "")
+            data_map["arr_movie_imdb"] = movie.get("imdbId", "")
+            data_map["arr_movie_year"] = movie.get("year", "")
+            data_map["arr_movie_path"] = movie.get("folderPath", "")
+            
+            # For downloads/upgrades, get specific file info
+            if movie_file:
+                data_map["arr_moviefile_path"] = movie_file.get("path", "")
+                data_map["arr_moviefile_id"] = movie_file.get("id", "")
+
+        # SONARR
+        elif "series" in payload:
+            platform = "Sonarr"
+            series = payload.get("series", {})
+            episodes = payload.get("episodes", [])
+            
+            data_map["arr_platform"] = platform
+            data_map["event"] = event_type
+            data_map["arr_series_title"] = series.get("title", "")
+            data_map["arr_series_tvdb"] = series.get("tvdbId", "")
+            data_map["arr_series_path"] = series.get("path", "")
+            
+            # Sonarr webhooks don't always send IMDB/TMDB in the main payload
+            if "imdbId" in series:
+                data_map["arr_series_imdb"] = series.get("imdbId")
+            
+            # Handle Episode Data
+            if episodes:
+                first_ep = episodes[0]
+                data_map["arr_episode_season"] = first_ep.get("seasonNumber", "")
+                data_map["arr_episode_numbers"] = first_ep.get("episodeNumber", "")
+                data_map["arr_episode_titles"] = first_ep.get("title", "")
+                
+                # If there's an episode file payload
+                if "episodeFile" in payload:
+                    data_map["arr_episode_path"] = payload["episodeFile"].get("path", "")
+
+        else:
+            logger.warning(f"Unknown payload format received: {payload.keys()}")
+            raise HTTPException(status_code=400, detail="Unknown payload format")
+
+        # 3. Write the .posterizarr file
+        watcher_dir = BASE_DIR / "watcher"
+        watcher_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create unique filename timestamp_random.posterizarr
+        # The prefix "recently_added_" is used by Start.ps1 to calculate delay times
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+        rand_str = os.urandom(3).hex()
+        filename = f"recently_added_{timestamp}_{rand_str}.posterizarr"
+        file_path = watcher_dir / filename
+
+        logger.info(f"Creating Arr trigger file for {platform}: {file_path}")
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            for key, value in data_map.items():
+                # Write in the format: [key]: value
+                f.write(f"[{key}]: {value}\n")
+
+        return {
+            "success": True, 
+            "message": f"Trigger queued for {platform}", 
+            "file": str(file_path)
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing Arr webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/webhook/tautulli")
+async def tautulli_webhook(request: Request):
+    """
+    Accepts Webhooks from Tautulli (at /api/webhook/tautulli).
+    Maps JSON keys directly to .posterizarr trigger file format.
+    """
+    try:
+        payload = await request.json()
+        
+        # Filter out empty payloads
+        if not payload:
+            return {"success": False, "message": "Empty payload"}
+
+        # Define the Watcher Directory
+        watcher_dir = BASE_DIR / "watcher"
+        watcher_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create unique filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+        rand_str = os.urandom(3).hex()
+        
+        filename = f"tautulli_trigger_{timestamp}_{rand_str}.posterizarr"
+        file_path = watcher_dir / filename
+
+        logger.info(f"Creating Tautulli trigger file: {file_path}")
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            for key, value in payload.items():
+                # Only write keys that have values. 
+                if value:
+                    f.write(f"[{key}]: {value}\n")
+
+        return {
+            "success": True, 
+            "message": "Tautulli trigger queued", 
+            "file": str(file_path)
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing Tautulli webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ============================================
 # STATIC FILE MOUNTS
 # ============================================
-
 
 if ASSETS_DIR.exists():
     app.mount(

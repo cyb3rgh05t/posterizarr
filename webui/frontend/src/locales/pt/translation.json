@@ -777,18 +777,25 @@
         "text": "Funciona em Docker, Linux, Windows, macOS e ARM"
       }
     },
-    "showcase": {
-      "title": "Veja em ação",
-      "posterizarrOutput": "Saída do Posterizarr",
-      "posterizarrDescription": "Arte de alta qualidade baixada e processada automaticamente com suas sobreposições personalizadas",
-      "kometaIntegration": "Após integração com Kometa",
-      "kometaDescription": "Resultados finais em seu servidor de mídia com sobreposições Kometa adicionais aplicadas"
+    "integration": {
+      "webhook": "Webhook Nativo",
+      "recommended": "Recomendado",
+      "script": "Script Personalizado",
+      "legacy": "Legado / Avançado",
+      "webhookDesc": "Integração perfeita com aplicativos *Arr e Tautulli via webhooks HTTP. Nenhum mapeamento de volume necessário.",
+      "scriptDesc": "Monitoramento tradicional baseado em arquivos. Requer arquivos de script e mapeamento de volume."
     },
     "cta": {
       "title": "Pronto para transformar sua biblioteca?",
-      "description": "O Posterizarr cuida de tudo, desde a descoberta da arte até o envio para o servidor de mídia, oferecendo arte bonita e consistente em toda a sua coleção.",
-      "installationGuide": "Ver guia de instalação",
-      "viewOnGitHub": "Ver no GitHub"
+      "description": "O Posterizarr cuida de tudo, desde a descoberta de arte até o upload do servidor de mídia.",
+      "selectMethod": "Selecione seu método de integração preferido para ver as instruções de configuração.",
+      "installationGuide": "Ver Guia de Instalação",
+      "viewOnGitHub": "Ver no GitHub",
+      "setupSonarrRadarr": "Config. Sonarr/Radarr",
+      "setupTautulli": "Config. Tautulli",
+      "setupArrScript": "Config. Arr (Script)",
+      "setupTautulliDocker": "Config. Tautulli (Docker)",
+      "setupTautulliWin": "Config. Tautulli (Win)"
     },
     "technical": {
       "title": "Destaques técnicos",

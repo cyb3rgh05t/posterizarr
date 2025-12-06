@@ -785,18 +785,25 @@
         "text": "Works on Docker, Linux, Windows, macOS, and ARM"
       }
     },
-    "showcase": {
-      "title": "See It In Action",
-      "posterizarrOutput": "Posterizarr Output",
-      "posterizarrDescription": "High-quality artwork automatically downloaded and processed with your custom overlays",
-      "kometaIntegration": "After Kometa Integration",
-      "kometaDescription": "Final results in your media server with additional Kometa overlays applied"
+    "integration": {
+      "webhook": "Native Webhook",
+      "recommended": "Recommended",
+      "script": "Custom Script",
+      "legacy": "Legacy / Advanced",
+      "webhookDesc": "Seamless integration with *Arr apps and Tautulli via HTTP webhooks. No volume mapping required.",
+      "scriptDesc": "Traditional file-based monitoring. Requires script files and volume mapping."
     },
     "cta": {
       "title": "Ready to Transform Your Library?",
       "description": "Posterizarr handles everything from artwork discovery to media server upload, giving you beautiful, consistent artwork across your entire collection.",
+      "selectMethod": "Select your preferred integration method to view the correct setup instructions.",
       "installationGuide": "View Installation Guide",
-      "viewOnGitHub": "View on GitHub"
+      "viewOnGitHub": "View on GitHub",
+      "setupSonarrRadarr": "Setup Sonarr/Radarr",
+      "setupTautulli": "Setup Tautulli",
+      "setupArrScript": "Setup Arr (Script)",
+      "setupTautulliDocker": "Setup Tautulli (Docker)",
+      "setupTautulliWin": "Setup Tautulli (Win)"
     },
     "technical": {
       "title": "Technical Highlights",
