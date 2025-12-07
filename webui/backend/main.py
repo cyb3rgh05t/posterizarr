@@ -42,7 +42,7 @@ from starlette.responses import FileResponse
 from PIL import Image, ImageDraw, ImageChops 
 from io import BytesIO
 from base64 import b64encode
-from overlay_generator import generate_overlay_image
+from .overlay_generator import generate_overlay_image
 
 sys.path.insert(0, str(Path(__file__).parent))
 
