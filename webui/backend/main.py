@@ -10,6 +10,7 @@ from fastapi import (
     Form,
 )
 from contextlib import asynccontextmanager
+from .defaults import setup_default_images
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse
@@ -38,6 +39,10 @@ import shutil
 import sqlite3
 from fastapi import BackgroundTasks
 from starlette.responses import FileResponse
+from PIL import Image, ImageDraw, ImageChops 
+from io import BytesIO
+from base64 import b64encode
+from .overlay_generator import generate_overlay_image
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -55,7 +60,7 @@ if IS_DOCKER:
     APP_DIR = Path("/app")
     ASSETS_DIR = Path("/assets")
     MANUAL_ASSETS_DIR = Path("/manualassets")
-    IMAGES_DIR = Path("/app/images")
+    IMAGES_DIR = Path("/config/Cache/images")
     FRONTEND_DIR = Path("/app/frontend/dist")
     BACKUP_DIR = BASE_DIR / "assetsbackup"  # Docker default
 else:
@@ -855,7 +860,6 @@ def process_image_path(image_path: Path):
         logger.error(f"Error processing image path {image_path}: {e}")
         return None
 
-
 def determine_media_type(filename: str, library_folder: str = None) -> str:
     """
     Determine media type from filename and library folder.
@@ -977,6 +981,7 @@ def get_library_type_from_db(library_folder: str) -> Optional[str]:
             )
 
     return None
+
 def scan_and_cache_assets():
     """
     Scans the assets directory and populates/refreshes the cache atomically.
@@ -1264,7 +1269,6 @@ def start_cache_refresh_background(skip_initial_scan: bool = False): # <-- MODIF
     cache_refresh_task.start()
     logger.info("Background cache refresh thread started")
 
-
 def stop_cache_refresh_background():
     """Stop the background cache refresh thread"""
     global cache_refresh_running
@@ -1276,7 +1280,6 @@ def stop_cache_refresh_background():
             cache_refresh_task.join(timeout=5)
         logger.info("Background cache refresh stopped")
 
-
 def get_fresh_assets():
     """Returns the asset cache (always fresh thanks to background refresh)"""
     # Fully rely on background refresh - no blocking scans!
@@ -1284,7 +1287,6 @@ def get_fresh_assets():
     if asset_cache["last_scanned"] == 0:
         logger.debug("Cache not yet populated - background scan in progress")
     return asset_cache
-
 
 def find_poster_in_assets(
     rootfolder: str,
@@ -1414,7 +1416,6 @@ def find_poster_in_assets(
         logger.error(f"Error searching for {asset_type} in assets: {e}")
         return None
 
-
 def find_poster_with_metadata(
     rootfolder: str,
     asset_type: str = "Poster",
@@ -1514,7 +1515,6 @@ def find_poster_with_metadata(
         logger.error(f"Error searching for {asset_type} in assets: {e}")
         return None
 
-
 def parse_image_choices_csv(csv_path: Path) -> list:
     """
     Parse ImageChoices.csv file and return list of assets
@@ -1575,7 +1575,6 @@ def parse_image_choices_csv(csv_path: Path) -> list:
 
     return assets
 
-
 async def fetch_version(local_filename: str, github_url: str, version_type: str):
     """
     A reusable function to get a local version from a file and fetch the remote
@@ -1625,7 +1624,6 @@ async def fetch_version(local_filename: str, github_url: str, version_type: str)
             )
 
     return {"local": display_version, "remote": remote_version}
-
 
 async def get_script_version():
     """
@@ -1714,6 +1712,13 @@ async def lifespan(app: FastAPI):
     global scheduler, db, config_db, media_export_db, logs_watcher, server_libraries_db
 
     logger.info("Starting Posterizarr Web UI Backend")
+
+    # Setup default images for Creator Mode preview
+    try:
+        setup_default_images(IMAGES_DIR)
+        logger.info(f"Default images checked/created in {IMAGES_DIR}")
+    except Exception as e:
+        logger.error(f"Error setting up default images: {e}")
 
     # This blocks the app from starting until the first scan is done,
     # ensuring the UI is populated on first load.
@@ -2052,6 +2057,33 @@ class AppriseValidationRequest(BaseModel):
 class UptimeKumaValidationRequest(BaseModel):
     url: str
 
+# In backend/main.py
+
+class OverlayCreatorRequest(BaseModel):
+    border_enabled: bool = False
+    border_px: int = 0
+    border_color: str = "#FFFFFF"
+    corner_radius: float = 0.0
+    
+    # Gradient / Matte
+    matte_height_ratio: float = 0.0
+    fade_height_ratio: float = 0.0
+    gradient_color: str = "#000000"
+    
+    # Effects
+    inner_glow_strength: float = 0.0
+    inner_glow_color: str = "#000000"
+    
+    vignette_strength: float = 0.0
+    vignette_color: str = "#000000"
+    
+    grain_amount: float = 0.0 
+    grain_size: float = 1.0   
+    
+    filename: Optional[str] = None
+    overlay_type: str = "poster"
+    overwrite: bool = False
+    show_text_area: bool = False
 
 @app.get("/api")
 async def api_root():
@@ -2421,6 +2453,9 @@ async def export_config_db():
 # ============================================================================
 
 
+# In backend/main.py
+
+# 1. Update the list endpoint to include modification time (mtime)
 @app.get("/api/overlayfiles")
 async def get_overlay_files():
     """Get list of overlay files from Overlayfiles directory"""
@@ -2443,6 +2478,7 @@ async def get_overlay_files():
 
         for f in OVERLAYFILES_DIR.iterdir():
             if f.is_file() and f.suffix.lower() in allowed_extensions:
+                stat = f.stat()
                 file_info = {
                     "name": f.name,
                     "type": (
@@ -2451,7 +2487,8 @@ async def get_overlay_files():
                         else "font"
                     ),
                     "extension": f.suffix.lower(),
-                    "size": f.stat().st_size,
+                    "size": stat.st_size,
+                    "mtime": int(stat.st_mtime),
                 }
                 files.append(file_info)
 
@@ -2463,6 +2500,42 @@ async def get_overlay_files():
 
     except Exception as e:
         logger.error(f"Error getting overlay files: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 2. Update the preview endpoint to disable caching headers
+@app.get("/api/overlayfiles/preview/{filename}")
+async def preview_overlay_file(filename: str):
+    """Serve overlay file for preview"""
+    try:
+        # Sanitize filename
+        safe_filename = "".join(
+            c for c in filename if c.isalnum() or c in "._- "
+        ).strip()
+
+        if not safe_filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+        file_path = OVERLAYFILES_DIR / safe_filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+
+        # Serve file with NO CACHE headers so overwrites show immediately
+        return FileResponse(
+            file_path,
+            media_type="image/png",  # Will auto-detect based on extension
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving overlay file: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -12438,10 +12511,246 @@ async def get_support_zip(background_tasks: BackgroundTasks):
         logger.error(f"[SupportZip] Error during support zip endpoint execution: {e}")
         logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=f"Failed to create support ZIP: {str(e)}")
+
+# ============================================================================
+# WEBHOOK ENDPOINTS (ARR & TAUTULLI)
+# ============================================================================
+
+@app.post("/api/webhook/arr")
+async def arr_webhook(request: Request):
+    """
+    Accepts Webhooks from Sonarr/Radarr (at /api/webhook/arr), 
+    converts them to .posterizarr files, and drops them in the watcher folder.
+    """
+    try:
+        payload = await request.json()
+        
+        # Determine Event and Platform
+        event_type = payload.get("eventType", "Unknown")
+        
+        # Handle "Test" event from the Arr settings page
+        if event_type == "Test":
+            logger.info("Received Test Webhook from Arr instance")
+            return {"success": True, "message": "Test successful"}
+
+        # We typically only care about Import/Download/Grab/Delete events
+        if event_type not in ["Download", "Import", "Grab", "MovieFileDelete", "EpisodeFileDelete"]:
+            return {"success": True, "message": f"Ignored event type: {event_type}"}
+
+        data_map = {}
+        platform = "Unknown"
+
+        # Map JSON Data to Posterizarr Arguments (mimicking ArrTrigger.sh logic)
+        
+        # RADARR
+        if "movie" in payload:
+            platform = "Radarr"
+            movie = payload.get("movie", {})
+            movie_file = payload.get("movieFile", {})
+            
+            data_map["arr_platform"] = platform
+            data_map["event"] = event_type
+            data_map["arr_movie_title"] = movie.get("title", "")
+            data_map["arr_movie_tmdb"] = movie.get("tmdbId", "")
+            data_map["arr_movie_imdb"] = movie.get("imdbId", "")
+            data_map["arr_movie_year"] = movie.get("year", "")
+            data_map["arr_movie_path"] = movie.get("folderPath", "")
+            
+            # For downloads/upgrades, get specific file info
+            if movie_file:
+                data_map["arr_moviefile_path"] = movie_file.get("path", "")
+                data_map["arr_moviefile_id"] = movie_file.get("id", "")
+
+        # SONARR
+        elif "series" in payload:
+            platform = "Sonarr"
+            series = payload.get("series", {})
+            episodes = payload.get("episodes", [])
+            
+            data_map["arr_platform"] = platform
+            data_map["event"] = event_type
+            data_map["arr_series_title"] = series.get("title", "")
+            data_map["arr_series_tvdb"] = series.get("tvdbId", "")
+            data_map["arr_series_path"] = series.get("path", "")
+            
+            # Sonarr webhooks don't always send IMDB/TMDB in the main payload
+            if "imdbId" in series:
+                data_map["arr_series_imdb"] = series.get("imdbId")
+            
+            # Handle Episode Data
+            if episodes:
+                first_ep = episodes[0]
+                data_map["arr_episode_season"] = first_ep.get("seasonNumber", "")
+                data_map["arr_episode_numbers"] = first_ep.get("episodeNumber", "")
+                data_map["arr_episode_titles"] = first_ep.get("title", "")
+                
+                # If there's an episode file payload
+                if "episodeFile" in payload:
+                    data_map["arr_episode_path"] = payload["episodeFile"].get("path", "")
+
+        else:
+            logger.warning(f"Unknown payload format received: {payload.keys()}")
+            raise HTTPException(status_code=400, detail="Unknown payload format")
+
+        # 3. Write the .posterizarr file
+        watcher_dir = BASE_DIR / "watcher"
+        watcher_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create unique filename timestamp_random.posterizarr
+        # The prefix "recently_added_" is used by Start.ps1 to calculate delay times
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+        rand_str = os.urandom(3).hex()
+        filename = f"recently_added_{timestamp}_{rand_str}.posterizarr"
+        file_path = watcher_dir / filename
+
+        logger.info(f"Creating Arr trigger file for {platform}: {file_path}")
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            for key, value in data_map.items():
+                # Write in the format: [key]: value
+                f.write(f"[{key}]: {value}\n")
+
+        return {
+            "success": True, 
+            "message": f"Trigger queued for {platform}", 
+            "file": str(file_path)
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing Arr webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/webhook/tautulli")
+async def tautulli_webhook(request: Request):
+    """
+    Accepts Webhooks from Tautulli (at /api/webhook/tautulli).
+    Maps JSON keys directly to .posterizarr trigger file format.
+    """
+    try:
+        payload = await request.json()
+        
+        # Filter out empty payloads
+        if not payload:
+            return {"success": False, "message": "Empty payload"}
+
+        # Define the Watcher Directory
+        watcher_dir = BASE_DIR / "watcher"
+        watcher_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create unique filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+        rand_str = os.urandom(3).hex()
+        
+        filename = f"tautulli_trigger_{timestamp}_{rand_str}.posterizarr"
+        file_path = watcher_dir / filename
+
+        logger.info(f"Creating Tautulli trigger file: {file_path}")
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            for key, value in payload.items():
+                # Only write keys that have values. 
+                if value:
+                    f.write(f"[{key}]: {value}\n")
+
+        return {
+            "success": True, 
+            "message": "Tautulli trigger queued", 
+            "file": str(file_path)
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing Tautulli webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# OVERLAY CREATOR ENDPOINTS
+# ============================================================================
+
+@app.post("/api/overlay-creator/preview")
+async def preview_created_overlay(options: OverlayCreatorRequest):
+    """Generates a low-res preview of the overlay settings"""
+    try:
+        # Convert options to dict
+        opt_dict = options.dict()
+
+        # If Show Text Area is enabled, fetch config values from DB
+        if options.show_text_area and config_db:
+            try:
+                # Determine which config section to look up based on type
+                # Currently matching the 2 buttons in UI (Poster vs Background)
+                # You can expand this logic if you add Season/TitleCard buttons later
+                section = ""
+                if options.overlay_type == "background":
+                    section = "BackgroundOverlayPart"
+                else:
+                    section = "PosterOverlayPart" 
+                
+                # Fetch values (defaulting to 0 if not found/error)
+                def get_int(key):
+                    val = config_db.get_value(section, key)
+                    try:
+                        return int(val) if val is not None else 0
+                    except:
+                        return 0
+
+                opt_dict["text_box_w"] = get_int("MaxWidth")
+                opt_dict["text_box_h"] = get_int("MaxHeight")
+                opt_dict["text_box_offset"] = get_int("text_offset")
+                
+            except Exception as e:
+                logger.error(f"Error fetching config for preview guide: {e}")
+
+        # Generate full res (RGBA)
+        img = generate_overlay_image(opt_dict)
+        
+        # Resize for faster preview transfer (e.g., 500px width)
+        w, h = img.size
+        preview_w = 500
+        preview_h = int(h * (preview_w / w))
+        img = img.resize((preview_w, preview_h), Image.Resampling.LANCZOS)
+        
+        # Convert to base64
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        img_str = b64encode(buffered.getvalue()).decode("utf-8")
+        
+        return {"success": True, "image_base64": img_str}
+    except Exception as e:
+        logger.error(f"Error generating preview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/overlay-creator/save")
+async def save_created_overlay(options: OverlayCreatorRequest):
+    """Generates and saves the overlay as a PNG to Overlayfiles"""
+    try:
+        if not options.filename:
+            raise HTTPException(status_code=400, detail="Filename required")
+            
+        safe_filename = "".join(c for c in options.filename if c.isalnum() or c in "._- ").strip()
+        if not safe_filename.lower().endswith(".png"):
+            safe_filename += ".png"
+            
+        save_path = OVERLAYFILES_DIR / safe_filename
+        
+        # Check existence only if overwrite is False
+        if save_path.exists() and not options.overwrite:
+            raise HTTPException(status_code=409, detail="File already exists")
+            
+        # Generate
+        img = generate_overlay_image(options.dict())
+        img.save(save_path, "PNG")
+        
+        return {"success": True, "message": f"Saved {safe_filename}", "filename": safe_filename}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving created overlay: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 # ============================================
 # STATIC FILE MOUNTS
 # ============================================
-
 
 if ASSETS_DIR.exists():
     app.mount(
@@ -12468,6 +12777,8 @@ if TEST_DIR.exists():
         name="test",
     )
     logger.info(f"Mounted /test -> {TEST_DIR} (with 24h cache)")
+
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 if IMAGES_DIR.exists():
     app.mount(

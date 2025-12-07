@@ -21,12 +21,15 @@ import {
   ArrowRight,
   Eye,
   ExternalLink,
+  Webhook,
+  FileCode,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 function HowItWorks() {
   const { t } = useTranslation();
   const [expandedStep, setExpandedStep] = useState(null);
+  const [integrationMethod, setIntegrationMethod] = useState("webhook"); // 'webhook' or 'script'
 
   const workflowSteps = [
     {
@@ -134,7 +137,6 @@ function HowItWorks() {
 
   return (
     <div className="px-4 py-6 space-y-8">
-      {/* Header */}
       {/* Header */}
       <div className="text-center mb-12">
         <div className="flex justify-center mb-4">
@@ -289,95 +291,116 @@ function HowItWorks() {
         </div>
       </div>
 
-      {/* Example Showcase */}
-      <div className="bg-theme-card border border-theme rounded-lg p-6 space-y-6">
-        <h2 className="text-2xl font-bold text-theme-text flex items-center gap-2">
-          <Eye className="w-6 h-6 text-theme-primary" />
-          {t("howItWorks.showcase.title")}
-        </h2>
-
-        {/* Posterizarr Results */}
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold text-theme-text mb-3">
-              {t("howItWorks.showcase.posterizarrOutput")}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="group relative bg-theme-hover border border-theme rounded-lg overflow-hidden hover:border-theme-primary/50 transition-all">
-                <img
-                  src="https://raw.githubusercontent.com/fscorrupt/posterizarr/main/images/posterizarr-overview.jpg"
-                  alt="Posterizarr Overview - Original"
-                  className="w-full h-auto object-contain group-hover:scale-[1.02] transition-transform duration-300"
-                />
-              </div>
-              <div className="group relative bg-theme-hover border border-theme rounded-lg overflow-hidden hover:border-theme-primary/50 transition-all">
-                <img
-                  src="https://raw.githubusercontent.com/fscorrupt/posterizarr/main/images/posterizarr-overview-new.jpg"
-                  alt="Posterizarr Overview - Updated"
-                  className="w-full h-auto object-contain group-hover:scale-[1.02] transition-transform duration-300"
-                />
-              </div>
-            </div>
-            <p className="text-sm text-theme-muted mt-3">
-              {t("howItWorks.showcase.posterizarrDescription")}
-            </p>
-          </div>
-
-          {/* Kometa Integration Results */}
-          <div>
-            <h3 className="text-lg font-semibold text-theme-text mb-3">
-              {t("howItWorks.showcase.kometaIntegration")}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="group relative bg-theme-hover border border-theme rounded-lg overflow-hidden hover:border-theme-primary/50 transition-all">
-                <img
-                  src="https://raw.githubusercontent.com/fscorrupt/posterizarr/main/images/kometa-overview.png"
-                  alt="Kometa Overview - Original"
-                  className="w-full h-auto object-contain group-hover:scale-[1.02] transition-transform duration-300"
-                />
-              </div>
-              <div className="group relative bg-theme-hover border border-theme rounded-lg overflow-hidden hover:border-theme-primary/50 transition-all">
-                <img
-                  src="https://raw.githubusercontent.com/fscorrupt/posterizarr/main/images/kometa-overview-new.jpg"
-                  alt="Kometa Overview - Updated"
-                  className="w-full h-auto object-contain group-hover:scale-[1.02] transition-transform duration-300"
-                />
-              </div>
-            </div>
-            <p className="text-sm text-theme-muted mt-3">
-              {t("howItWorks.showcase.kometaDescription")}
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Getting Started CTA */}
-      <div className="bg-theme-card border border-theme rounded-lg p-6 space-y-4">
-        <h2 className="text-2xl font-bold text-theme-text text-center">
-          {t("howItWorks.cta.title")}
-        </h2>
-        <p className="text-theme-muted text-center">
-          {t("howItWorks.cta.description")}
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-          <a
-            href="https://fscorrupt.github.io/posterizarr/walkthrough"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-5 py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+      <div className="bg-theme-card border border-theme rounded-lg p-6 space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-theme-text">
+            {t("howItWorks.cta.title")}
+          </h2>
+          <p className="text-theme-muted mt-2">
+            {t("howItWorks.cta.selectMethod")}
+          </p>
+        </div>
+
+        {/* Integration Selection Toggle */}
+        <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <button
+            onClick={() => setIntegrationMethod("webhook")}
+            className={`flex items-center gap-3 px-6 py-4 rounded-lg border transition-all duration-200 ${
+              integrationMethod === "webhook"
+                ? "bg-theme-primary/20 border-theme-primary text-theme-text shadow-sm"
+                : "bg-theme-bg border-theme hover:border-theme-primary/50 text-theme-muted hover:text-theme-text"
+            }`}
           >
-            {t("howItWorks.cta.installationGuide")}
-            <ArrowRight className="w-4 h-4" />
-          </a>
-          <a
-            href="https://github.com/fscorrupt/posterizarr#readme"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-5 py-2.5 bg-theme-hover hover:bg-theme-primary/20 text-theme-text rounded-lg font-medium transition-colors duration-200 flex items-center gap-2 border border-theme"
+            <div className="p-2 rounded-full bg-theme-primary/10 text-theme-primary">
+              <Webhook className="w-6 h-6" />
+            </div>
+            <div className="text-left">
+              <div className="font-semibold">{t("howItWorks.integration.webhook")}</div>
+              <div className="text-xs opacity-75">{t("howItWorks.integration.recommended")}</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setIntegrationMethod("script")}
+            className={`flex items-center gap-3 px-6 py-4 rounded-lg border transition-all duration-200 ${
+              integrationMethod === "script"
+                ? "bg-theme-primary/20 border-theme-primary text-theme-text shadow-sm"
+                : "bg-theme-bg border-theme hover:border-theme-primary/50 text-theme-muted hover:text-theme-text"
+            }`}
           >
-            {t("howItWorks.cta.viewOnGitHub")}
-            <ArrowRight className="w-4 h-4" />
-          </a>
+            <div className="p-2 rounded-full bg-theme-primary/10 text-theme-primary">
+              <FileCode className="w-6 h-6" />
+            </div>
+            <div className="text-left">
+              <div className="font-semibold">{t("howItWorks.integration.script")}</div>
+              <div className="text-xs opacity-75">{t("howItWorks.integration.legacy")}</div>
+            </div>
+          </button>
+        </div>
+
+        {/* Dynamic CTA Content */}
+        <div className="pt-2 text-center space-y-4">
+          <p className="text-sm text-theme-muted">
+            {integrationMethod === "webhook" 
+              ? t("howItWorks.integration.webhookDesc")
+              : t("howItWorks.integration.scriptDesc")}
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {integrationMethod === "webhook" ? (
+              <>
+                <a
+                  href="https://fscorrupt.github.io/posterizarr/modes#sonarrradarr-mode-native-webhook"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+                >
+                  {t("howItWorks.cta.setupSonarrRadarr")}
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+                <a
+                  href="https://fscorrupt.github.io/posterizarr/modes#tautulli-mode-native-webhook"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 bg-theme-hover hover:bg-theme-primary/20 text-theme-text rounded-lg font-medium transition-colors duration-200 flex items-center gap-2 border border-theme"
+                >
+                  {t("howItWorks.cta.setupTautulli")}
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+              </>
+            ) : (
+              <>
+                <a
+                  href="https://fscorrupt.github.io/posterizarr/modes#sonarrradarr-mode-docker"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+                >
+                  {t("howItWorks.cta.setupArrScript")}
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+                <a
+                  href="https://fscorrupt.github.io/posterizarr/modes#tautulli-mode-docker"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 bg-theme-hover hover:bg-theme-primary/20 text-theme-text rounded-lg font-medium transition-colors duration-200 flex items-center gap-2 border border-theme"
+                >
+                  {t("howItWorks.cta.setupTautulliDocker")}
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+                <a
+                  href="https://fscorrupt.github.io/posterizarr/modes#tautulli-mode-windows"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 bg-theme-hover hover:bg-theme-primary/20 text-theme-text rounded-lg font-medium transition-colors duration-200 flex items-center gap-2 border border-theme"
+                >
+                  {t("howItWorks.cta.setupTautulliWin")}
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

@@ -313,6 +313,71 @@
     "noReleases": "Nenhum lançamento encontrado"
   },
   "overlayAssets": {
+    "tabs": {
+        "design": "Design",
+        "layers": "Camadas"
+    },
+    "layers": {
+        "uploadTitle": "Carregar Camada",
+        "uploadDesc": "PNG, Logo, Adesivo",
+        "empty": "Nenhuma camada adicionada.",
+        "name": "Camada {{index}}",
+        "front": "FRENTE",
+        "behind": "TRÁS",
+        "dimmed": "Escurecido",
+        "bright": "Brilhante"
+    },
+    "controls": {
+        "bringFront": "Trazer para frente",
+        "sendBack": "Enviar para trás",
+        "moveUp": "Mover para cima",
+        "moveDown": "Mover para baixo",
+        "delete": "Excluir",
+        "makeBright": "Clarear (100%)",
+        "makeDim": "Escurecer (50%)",
+        "adjustOpacity": "Ajustar Opacidade"
+    },
+    "help": {
+        "title": "Controles",
+        "text": "• Arraste para mover, use a alça para redimensionar/girar",
+        "text2": "• Use os ícones para reordenar ou ajustar a opacidade."
+    },
+    "showTextGuide": "Mostrar Guia de Área de Texto",
+    "showTextGuideHint": "Exibe uma caixa vermelha baseada em 'MaxWidth', 'MaxHeight' e 'text_offset' de suas Configurações.",
+    "uploadSample": "Carregar Prévia",
+    "resetSample": "Redefinir Exemplo",
+    "customBackground": "Fundo Personalizado",
+    "list": "Biblioteca de Assets",
+    "create": "Criador de Overlay",
+    "designControls": "Controles de Design",
+    "posterRatio": "Pôster (2:3)",
+    "backgroundRatio": "16:9",
+    "enableBorder": "Ativar Borda",
+    "thickness": "Espessura",
+    "roundedCorners": "Cantos Arredondados",
+    "color": "Cor",
+    "effects": "Efeitos",
+    "vignette": "Vinheta (Cantos Escuros)",
+    "innerGlow": "Brilho Interno (Todos os lados)",
+    "filmGrainIntensity": "Intensidade da Granulação",
+    "grainSize": "Tamanho do Grão (Aspereza)",
+    "bottomGradient": "Gradiente Inferior",
+    "matteHeight": "Altura Fosca (Sólida)",
+    "fadeHeight": "Altura do Fade (Desfoque)",
+    "saveAs": "Salvar como",
+    "generateAndSave": "Salvar arquivo de sobreposição",
+    "livePreview": "Prévia ao Vivo",
+    "updating": "Atualizando...",
+    "backgroundContent": "Conteúdo do Fundo",
+    "posterContent": "Conteúdo do Pôster",
+    "previewHint": "O fundo representa sua mídia. A sobreposição (borda/gradiente) é mostrada acima.",
+    "savedSuccess": "Salvo com sucesso",
+    "saveFailed": "Falha ao salvar",
+    "filenameRequired": "Nome do arquivo obrigatório",
+    "fileExistsTitle": "Arquivo já existe",
+    "fileExistsMessage": "Um arquivo chamado {{filename}} já existe.",
+    "overwriteConfirm": "Deseja sobrescrevê-lo?",
+    "overwrite": "Sobrescrever",
     "description": "Gerenciar arquivos de sobreposição (Imagens: PNG, JPEG | Fontes: TTF, OTF, WOFF, WOFF2)",
     "loadFailed": "Falha ao carregar arquivos de sobreposição",
     "loadError": "Falha ao carregar arquivos de sobreposição: {{message}}",
@@ -777,18 +842,25 @@
         "text": "Funciona em Docker, Linux, Windows, macOS e ARM"
       }
     },
-    "showcase": {
-      "title": "Veja em ação",
-      "posterizarrOutput": "Saída do Posterizarr",
-      "posterizarrDescription": "Arte de alta qualidade baixada e processada automaticamente com suas sobreposições personalizadas",
-      "kometaIntegration": "Após integração com Kometa",
-      "kometaDescription": "Resultados finais em seu servidor de mídia com sobreposições Kometa adicionais aplicadas"
+    "integration": {
+      "webhook": "Webhook Nativo",
+      "recommended": "Recomendado",
+      "script": "Script Personalizado",
+      "legacy": "Legado / Avançado",
+      "webhookDesc": "Integração perfeita com aplicativos *Arr e Tautulli via webhooks HTTP. Nenhum mapeamento de volume necessário.",
+      "scriptDesc": "Monitoramento tradicional baseado em arquivos. Requer arquivos de script e mapeamento de volume."
     },
     "cta": {
       "title": "Pronto para transformar sua biblioteca?",
-      "description": "O Posterizarr cuida de tudo, desde a descoberta da arte até o envio para o servidor de mídia, oferecendo arte bonita e consistente em toda a sua coleção.",
-      "installationGuide": "Ver guia de instalação",
-      "viewOnGitHub": "Ver no GitHub"
+      "description": "O Posterizarr cuida de tudo, desde a descoberta de arte até o upload do servidor de mídia.",
+      "selectMethod": "Selecione seu método de integração preferido para ver as instruções de configuração.",
+      "installationGuide": "Ver Guia de Instalação",
+      "viewOnGitHub": "Ver no GitHub",
+      "setupSonarrRadarr": "Config. Sonarr/Radarr",
+      "setupTautulli": "Config. Tautulli",
+      "setupArrScript": "Config. Arr (Script)",
+      "setupTautulliDocker": "Config. Tautulli (Docker)",
+      "setupTautulliWin": "Config. Tautulli (Win)"
     },
     "technical": {
       "title": "Destaques técnicos",

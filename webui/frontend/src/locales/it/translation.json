@@ -313,6 +313,71 @@
     "noReleases": "Nessun rilascio trovato"
   },
   "overlayAssets": {
+    "tabs": {
+        "design": "Design",
+        "layers": "Livelli"
+    },
+    "layers": {
+        "uploadTitle": "Carica Livello",
+        "uploadDesc": "PNG, Logo, Adesivo",
+        "empty": "Nessun livello aggiunto.",
+        "name": "Livello {{index}}",
+        "front": "AVANTI",
+        "behind": "DIETRO",
+        "dimmed": "Oscurato",
+        "bright": "Chiaro"
+    },
+    "controls": {
+        "bringFront": "Porta in primo piano",
+        "sendBack": "Manda dietro l'overlay",
+        "moveUp": "Sposta su",
+        "moveDown": "Sposta giù",
+        "delete": "Elimina",
+        "makeBright": "Rendi chiaro (100%)",
+        "makeDim": "Oscura (50%)",
+        "adjustOpacity": "Regola opacità"
+    },
+    "help": {
+        "title": "Controlli",
+        "text": "• Trascina per muovere, usa la maniglia per ridimensionare/ruotare",
+        "text2": "• Usa le icone per riordinare o regolare l'opacità."
+    },
+    "showTextGuide": "Mostra Guida Area Testo",
+    "showTextGuideHint": "Mostra un riquadro rosso basato su 'MaxWidth', 'MaxHeight' e 'text_offset' dalle tue Impostazioni.",
+    "uploadSample": "Carica Anteprima",
+    "resetSample": "Reimposta Esempio",
+    "customBackground": "Sfondo Personalizzato",
+    "list": "Libreria Asset",
+    "create": "Creatore Overlay",
+    "designControls": "Controlli Design",
+    "posterRatio": "Poster (2:3)",
+    "backgroundRatio": "16:9",
+    "enableBorder": "Abilita Bordo",
+    "thickness": "Spessore",
+    "roundedCorners": "Angoli Arrotondati",
+    "color": "Colore",
+    "effects": "Effetti",
+    "vignette": "Vignettatura (Angoli scuri)",
+    "innerGlow": "Bagliore Interno (Tutti i lati)",
+    "filmGrainIntensity": "Intensità Grana Pellicola",
+    "grainSize": "Dimensione Grana (Ruvidità)",
+    "bottomGradient": "Sfumatura Inferiore",
+    "matteHeight": "Altezza Mascherino (Solido)",
+    "fadeHeight": "Altezza Dissolvenza (Sfocatura)",
+    "saveAs": "Salva come",
+    "generateAndSave": "Salva il file overlay",
+    "livePreview": "Anteprima Live",
+    "updating": "Aggiornamento...",
+    "backgroundContent": "Contenuto Sfondo",
+    "posterContent": "Contenuto Poster",
+    "previewHint": "Lo sfondo rappresenta i tuoi media. L'overlay (bordo/sfumatura) è mostrato sopra.",
+    "savedSuccess": "Salvato con successo",
+    "saveFailed": "Salvataggio fallito",
+    "filenameRequired": "Nome file richiesto",
+    "fileExistsTitle": "Il file esiste già",
+    "fileExistsMessage": "Un file chiamato {{filename}} esiste già.",
+    "overwriteConfirm": "Vuoi sovrascriverlo?",
+    "overwrite": "Sovrascrivi",
     "description": "Gestisci file di sovrapposizione (Immagini: PNG, JPEG | Tipi di carattere: TTF, OTF, WOFF, WOFF2)",
     "loadFailed": "Caricamento file di sovrapposizione non riuscito",
     "loadError": "Caricamento file di sovrapposizione non riuscito: {{message}}",
@@ -777,18 +842,25 @@
         "text": "Funziona su Docker, Linux, Windows, macOS e ARM"
       }
     },
-    "showcase": {
-      "title": "Guardalo in azione",
-      "posterizarrOutput": "Output di Posterizarr",
-      "posterizarrDescription": "Grafiche di alta qualità scaricate ed elaborate automaticamente con le tue sovrapposizioni personalizzate",
-      "kometaIntegration": "Dopo l'integrazione con Kometa",
-      "kometaDescription": "Risultati finali nel tuo media server con sovrapposizioni Kometa aggiuntive applicate"
+    "integration": {
+      "webhook": "Webhook Nativo",
+      "recommended": "Consigliato",
+      "script": "Script Personalizzato",
+      "legacy": "Legacy / Avanzato",
+      "webhookDesc": "Integrazione perfetta con le app *Arr e Tautulli tramite webhook HTTP. Nessuna mappatura del volume richiesta.",
+      "scriptDesc": "Monitoraggio tradizionale basato su file. Richiede file di script e mappatura del volume."
     },
     "cta": {
       "title": "Pronto a trasformare la tua libreria?",
-      "description": "Posterizarr gestisce tutto, dalla scoperta delle grafiche al caricamento sul media server, offrendoti grafiche belle e coerenti in tutta la tua collezione.",
-      "installationGuide": "Visualizza la guida all'installazione",
-      "viewOnGitHub": "Visualizza su GitHub"
+      "description": "Posterizarr gestisce tutto, dalla scoperta delle copertine al caricamento sul server multimediale.",
+      "selectMethod": "Seleziona il metodo di integrazione preferito per visualizzare le istruzioni corrette.",
+      "installationGuide": "Vedi guida all'installazione",
+      "viewOnGitHub": "Vedi su GitHub",
+      "setupSonarrRadarr": "Config. Sonarr/Radarr",
+      "setupTautulli": "Config. Tautulli",
+      "setupArrScript": "Config. Arr (Script)",
+      "setupTautulliDocker": "Config. Tautulli (Docker)",
+      "setupTautulliWin": "Config. Tautulli (Win)"
     },
     "technical": {
       "title": "Punti salienti tecnici",

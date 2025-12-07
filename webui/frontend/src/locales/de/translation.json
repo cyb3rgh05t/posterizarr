@@ -313,6 +313,71 @@
     "noReleases": "Keine Releases gefunden"
   },
   "overlayAssets": {
+    "tabs": {
+        "design": "Design",
+        "layers": "Ebenen"
+    },
+    "layers": {
+        "uploadTitle": "Ebene hochladen",
+        "uploadDesc": "PNG, Logo, Sticker",
+        "empty": "Keine Ebenen hinzugefügt.",
+        "name": "Ebene {{index}}",
+        "front": "VORNE",
+        "behind": "HINTEN",
+        "dimmed": "Gedimmt",
+        "bright": "Hell"
+    },
+    "controls": {
+        "bringFront": "In den Vordergrund",
+        "sendBack": "Hinter das Overlay",
+        "moveUp": "Nach oben",
+        "moveDown": "Nach unten",
+        "delete": "Löschen",
+        "makeBright": "Aufhellen (100%)",
+        "makeDim": "Abdunkeln (50%)",
+        "adjustOpacity": "Deckkraft anpassen"
+    },
+    "help": {
+        "title": "Steuerung",
+        "text": "• Ziehen zum Bewegen, Griff zum Skalieren/Drehen",
+        "text2": "• Nutzen Sie die Icons zum Sortieren oder für die Deckkraft."
+    },
+    "showTextGuide": "Textbereich-Hilfslinie anzeigen",
+    "showTextGuideHint": "Zeigt eine rote Box basierend auf 'MaxWidth', 'MaxHeight' und 'text_offset' aus Ihren Einstellungen.",
+    "uploadSample": "Eigene Vorschau laden",
+    "resetSample": "Beispiel zurücksetzen",
+    "customBackground": "Eigener Hintergrund",
+    "list": "Asset-Bibliothek",
+    "create": "Overlay-Ersteller",
+    "designControls": "Design-Steuerung",
+    "posterRatio": "Poster (2:3)",
+    "backgroundRatio": "16:9",
+    "enableBorder": "Rahmen aktivieren",
+    "thickness": "Dicke",
+    "roundedCorners": "Abgerundete Ecken",
+    "color": "Farbe",
+    "effects": "Effekte",
+    "vignette": "Vignette (Dunkle Ecken)",
+    "innerGlow": "Inneres Leuchten (Alle Seiten)",
+    "filmGrainIntensity": "Filmkorn-Intensität",
+    "grainSize": "Korngröße (Grobheit)",
+    "bottomGradient": "Verlauf unten",
+    "matteHeight": "Matte-Höhe (Solid)",
+    "fadeHeight": "Fade-Höhe (Unschärfe)",
+    "saveAs": "Speichern als",
+    "generateAndSave": "Overlay-Datei speichern",
+    "livePreview": "Live-Vorschau",
+    "updating": "Aktualisiere...",
+    "backgroundContent": "Hintergrundinhalt",
+    "posterContent": "Posterinhalt",
+    "previewHint": "Der Hintergrund stellt Ihre Medien dar. Das Overlay (Rahmen/Verlauf) wird darüber angezeigt.",
+    "savedSuccess": "Erfolgreich gespeichert",
+    "saveFailed": "Speichern fehlgeschlagen",
+    "filenameRequired": "Dateiname erforderlich",
+    "fileExistsTitle": "Datei existiert bereits",
+    "fileExistsMessage": "Eine Datei namens {{filename}} existiert bereits.",
+    "overwriteConfirm": "Möchten Sie sie überschreiben?",
+    "overwrite": "Überschreiben",
     "description": "Verwalte Overlay-Dateien (Bilder: PNG, JPEG | Schriftarten: TTF, OTF, WOFF, WOFF2)",
     "loadFailed": "Fehler beim Laden der Overlay-Dateien",
     "loadError": "Fehler beim Laden der Overlay-Dateien: {{message}}",
@@ -778,18 +843,25 @@
         "text": "Funktioniert auf Docker, Linux, Windows, macOS und ARM"
       }
     },
-    "showcase": {
-      "title": "In Aktion sehen",
-      "posterizarrOutput": "Posterizarr-Ausgabe",
-      "posterizarrDescription": "Hochwertige Artworks automatisch heruntergeladen und mit Ihren benutzerdefinierten Overlays verarbeitet",
-      "kometaIntegration": "Nach Kometa-Integration",
-      "kometaDescription": "Endergebnisse auf Ihrem Medienserver mit zusätzlichen Kometa-Overlays"
+    "integration": {
+      "webhook": "Nativer Webhook",
+      "recommended": "Empfohlen",
+      "script": "Benutzerdefiniertes Skript",
+      "legacy": "Veraltet / Erweitert",
+      "webhookDesc": "Nahtlose Integration mit *Arr-Apps und Tautulli über HTTP-Webhooks. Kein Volume-Mapping erforderlich.",
+      "scriptDesc": "Traditionelle dateibasierte Überwachung. Erfordert Skriptdateien und Volume-Mapping."
     },
     "cta": {
       "title": "Bereit, Ihre Bibliothek zu transformieren?",
-      "description": "Posterizarr kümmert sich um alles, von der Artwork-Suche bis zum Medienserver-Upload, und gibt Ihnen schöne, konsistente Artworks für Ihre gesamte Sammlung.",
-      "installationGuide": "Installationsanleitung anzeigen",
-      "viewOnGitHub": "Auf GitHub anzeigen"
+      "description": "Posterizarr kümmert sich um alles, von der Artwork-Suche bis zum Upload auf den Medienserver.",
+      "selectMethod": "Wählen Sie Ihre bevorzugte Integrationsmethode, um die korrekten Einrichtungsanweisungen anzuzeigen.",
+      "installationGuide": "Installationsanleitung ansehen",
+      "viewOnGitHub": "Auf GitHub ansehen",
+      "setupSonarrRadarr": "Einrichtung Sonarr/Radarr",
+      "setupTautulli": "Einrichtung Tautulli",
+      "setupArrScript": "Einrichtung Arr (Skript)",
+      "setupTautulliDocker": "Einrichtung Tautulli (Docker)",
+      "setupTautulliWin": "Einrichtung Tautulli (Win)"
     },
     "technical": {
       "title": "Technische Highlights",

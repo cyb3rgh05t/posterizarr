@@ -313,6 +313,71 @@
     "noReleases": "Aucune version trouvée"
   },
   "overlayAssets": {
+    "tabs": {
+        "design": "Design",
+        "layers": "Calques"
+    },
+    "layers": {
+        "uploadTitle": "Ajouter un calque",
+        "uploadDesc": "PNG, Logo, Sticker",
+        "empty": "Aucun calque ajouté.",
+        "name": "Calque {{index}}",
+        "front": "DEVANT",
+        "behind": "DERRIÈRE",
+        "dimmed": "Atténué",
+        "bright": "Clair"
+    },
+    "controls": {
+        "bringFront": "Mettre au premier plan",
+        "sendBack": "Mettre à l'arrière-plan",
+        "moveUp": "Monter",
+        "moveDown": "Descendre",
+        "delete": "Supprimer",
+        "makeBright": "Rendre clair (100%)",
+        "makeDim": "Atténuer (50%)",
+        "adjustOpacity": "Régler l'opacité"
+    },
+    "help": {
+        "title": "Contrôles",
+        "text": "• Glisser pour déplacer, poignée pour redimensionner/pivoter",
+        "text2": "• Utilisez les icônes pour réorganiser ou régler l'opacité."
+    },
+    "showTextGuide": "Afficher le guide de zone de texte",
+    "showTextGuideHint": "Affiche une boîte rouge basée sur 'MaxWidth', 'MaxHeight' et 'text_offset' de vos paramètres.",
+    "uploadSample": "Charger un aperçu",
+    "resetSample": "Réinitialiser l'exemple",
+    "customBackground": "Arrière-plan personnalisé",
+    "list": "Bibliothèque d'Assets",
+    "create": "Créateur d'Overlay",
+    "designControls": "Contrôles de Design",
+    "posterRatio": "Affiche (2:3)",
+    "backgroundRatio": "16:9",
+    "enableBorder": "Activer Bordure",
+    "thickness": "Épaisseur",
+    "roundedCorners": "Coins Arrondis",
+    "color": "Couleur",
+    "effects": "Effets",
+    "vignette": "Vignettage (Coins sombres)",
+    "innerGlow": "Lueur Interne (Tous côtés)",
+    "filmGrainIntensity": "Intensité du Grain",
+    "grainSize": "Taille du Grain (Rugosité)",
+    "bottomGradient": "Dégradé Inférieur",
+    "matteHeight": "Hauteur Cache (Solide)",
+    "fadeHeight": "Hauteur Fondu (Flou)",
+    "saveAs": "Enregistrer sous",
+    "generateAndSave": "Enregistrer le fichier de superposition",
+    "livePreview": "Aperçu en direct",
+    "updating": "Mise à jour...",
+    "backgroundContent": "Contenu d'Arrière-plan",
+    "posterContent": "Contenu d'Affiche",
+    "previewHint": "L'arrière-plan représente votre média. La superposition (bordure/dégradé) est affichée au-dessus.",
+    "savedSuccess": "Enregistré avec succès",
+    "saveFailed": "Échec de l'enregistrement",
+    "filenameRequired": "Nom de fichier requis",
+    "fileExistsTitle": "Le fichier existe déjà",
+    "fileExistsMessage": "Un fichier nommé {{filename}} existe déjà.",
+    "overwriteConfirm": "Voulez-vous l'écraser ?",
+    "overwrite": "Écraser",
     "description": "Gérer les fichiers de superposition (Images : PNG, JPEG | Polices : TTF, OTF, WOFF, WOFF2)",
     "loadFailed": "Échec du chargement des fichiers de superposition",
     "loadError": "Échec du chargement des fichiers de superposition : {{message}}",
@@ -777,18 +842,25 @@
         "text": "Fonctionne sur Docker, Linux, Windows, macOS et ARM"
       }
     },
-    "showcase": {
-      "title": "Voir en action",
-      "posterizarrOutput": "Résultat de Posterizarr",
-      "posterizarrDescription": "Illustrations de haute qualité téléchargées et traitées automatiquement avec vos superpositions personnalisées",
-      "kometaIntegration": "Après l'intégration Kometa",
-      "kometaDescription": "Résultats finaux dans votre serveur multimédia avec des superpositions Kometa supplémentaires appliquées"
+    "integration": {
+      "webhook": "Webhook Natif",
+      "recommended": "Recommandé",
+      "script": "Script Personnalisé",
+      "legacy": "Obsolète / Avancé",
+      "webhookDesc": "Intégration transparente avec les applications *Arr et Tautulli via des webhooks HTTP. Aucun mappage de volume requis.",
+      "scriptDesc": "Surveillance traditionnelle basée sur des fichiers. Nécessite des fichiers de script et un mappage de volume."
     },
     "cta": {
       "title": "Prêt à transformer votre bibliothèque ?",
-      "description": "Posterizarr gère tout, de la découverte des illustrations au téléversement sur le serveur multimédia, vous offrant des illustrations magnifiques et cohérentes dans toute votre collection.",
+      "description": "Posterizarr gère tout, de la découverte d'œuvres d'art au téléchargement sur le serveur multimédia.",
+      "selectMethod": "Sélectionnez votre méthode d'intégration préférée pour voir les instructions de configuration.",
       "installationGuide": "Voir le guide d'installation",
-      "viewOnGitHub": "Voir sur GitHub"
+      "viewOnGitHub": "Voir sur GitHub",
+      "setupSonarrRadarr": "Config. Sonarr/Radarr",
+      "setupTautulli": "Config. Tautulli",
+      "setupArrScript": "Config. Arr (Script)",
+      "setupTautulliDocker": "Config. Tautulli (Docker)",
+      "setupTautulliWin": "Config. Tautulli (Win)"
     },
     "technical": {
       "title": "Points forts techniques",
