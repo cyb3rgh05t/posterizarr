@@ -12778,6 +12778,8 @@ if TEST_DIR.exists():
     )
     logger.info(f"Mounted /test -> {TEST_DIR} (with 24h cache)")
 
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
 if IMAGES_DIR.exists():
     app.mount(
         "/images",

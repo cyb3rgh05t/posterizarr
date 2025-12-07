@@ -365,7 +365,7 @@
     "matteHeight": "Matte Height (Solid)",
     "fadeHeight": "Fade Height (Blur)",
     "saveAs": "Save As",
-    "generateAndSave": "Generate & Save Asset",
+    "generateAndSave": "Save Overlay file",
     "livePreview": "Live Preview",
     "updating": "Updating...",
     "backgroundContent": "Background Content",

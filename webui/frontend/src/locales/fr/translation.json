@@ -365,7 +365,7 @@
     "matteHeight": "Hauteur Cache (Solide)",
     "fadeHeight": "Hauteur Fondu (Flou)",
     "saveAs": "Enregistrer sous",
-    "generateAndSave": "Générer & Sauvegarder",
+    "generateAndSave": "Enregistrer le fichier de superposition",
     "livePreview": "Aperçu en direct",
     "updating": "Mise à jour...",
     "backgroundContent": "Contenu d'Arrière-plan",
