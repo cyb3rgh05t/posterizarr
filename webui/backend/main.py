@@ -10,7 +10,7 @@ from fastapi import (
     Form,
 )
 from contextlib import asynccontextmanager
-from defaults import setup_default_images
+from .defaults import setup_default_images
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse
