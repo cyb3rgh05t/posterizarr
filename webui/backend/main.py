@@ -22,7 +22,7 @@ import asyncio
 import os
 import httpx
 from pathlib import Path
-from typing import Optional, List, Literal, Dict, Any
+from typing import Optional, List, Literal, Dict
 import logging
 import re
 import time
@@ -439,7 +439,7 @@ except ImportError as e:
 # Import database module
 try:
     logger.debug("Attempting to import database module")
-    from database import init_database, ImageChoicesDB  # type: ignore[attr-defined]
+    from database import init_database, ImageChoicesDB
 
     DATABASE_AVAILABLE = True
     logger.info("Database module loaded successfully")
@@ -646,7 +646,7 @@ def import_imagechoices_to_db():
         logger.error(f"Error importing CSV to database: {e}")
 
 
-def parse_version(version_str: str) -> Optional[tuple]:
+def parse_version(version_str: str) -> tuple:
     """
     Parse a semantic version string into a tuple of integers for comparison.
     Handles versions like "1.9.97", "2.0.0", "1.10.5", etc.
@@ -861,7 +861,7 @@ def process_image_path(image_path: Path):
         return None
 
 
-def determine_media_type(filename: str, library_folder: str | None = None) -> str:
+def determine_media_type(filename: str, library_folder: str = None) -> str:
     """
     Determine media type from filename and library folder.
     Supports .jpg, .jpeg, .png, .webp
@@ -1329,7 +1329,7 @@ def find_poster_in_assets(
     asset_type: str = "Poster",
     title: str = "",
     download_source: str = "",
-) -> Optional[str]:
+) -> str:
     """
     Search recursively in ASSETS_DIR for a folder matching rootfolder and return image URL
 
@@ -1458,7 +1458,7 @@ def find_poster_with_metadata(
     asset_type: str = "Poster",
     title: str = "",
     download_source: str = "",
-) -> Optional[dict]:
+) -> dict:
     """
     Same as find_poster_in_assets but returns metadata including file timestamps
 
@@ -1825,16 +1825,15 @@ async def lifespan(app: FastAPI):
                         "Found existing ImageChoices.csv - importing to new database..."
                     )
                     try:
-                        if db:
-                            stats = db.import_from_csv(csv_path)
-                            if stats["added"] > 0:
-                                logger.info(
-                                    f"Initialized database with {stats['added']} records from existing CSV"
-                                )
-                            else:
-                                logger.info(
-                                    "No records imported from CSV (all empty or invalid)"
-                                )
+                        stats = db.import_from_csv(csv_path)
+                        if stats["added"] > 0:
+                            logger.info(
+                                f"Initialized database with {stats['added']} records from existing CSV"
+                            )
+                        else:
+                            logger.info(
+                                "No records imported from CSV (all empty or invalid)"
+                            )
                     except Exception as csv_error:
                         logger.warning(f"Could not import existing CSV: {csv_error}")
                 else:
@@ -1842,11 +1841,10 @@ async def lifespan(app: FastAPI):
 
             # Check if database has any records
             try:
-                if db:
-                    record_count = len(db.get_all_choices())
-                    logger.info(
-                        f"Database ready: {IMAGECHOICES_DB_PATH} ({record_count} records)"
-                    )
+                record_count = len(db.get_all_choices())
+                logger.info(
+                    f"Database ready: {IMAGECHOICES_DB_PATH} ({record_count} records)"
+                )
             except Exception:
                 logger.info(f"Database ready: {IMAGECHOICES_DB_PATH}")
 
@@ -2261,13 +2259,8 @@ async def update_config(data: ConfigUpdate):
 
             # Check if the database has libraries for this server type
             try:
-                if server_libraries_db:
-                    db_result = server_libraries_db.get_media_server_libraries(
-                        server_type
-                    )
-                    has_db_libraries = len(db_result.get("libraries", [])) > 0
-                else:
-                    has_db_libraries = False
+                db_result = server_libraries_db.get_media_server_libraries(server_type)
+                has_db_libraries = len(db_result.get("libraries", [])) > 0
 
                 # If database is empty but config.json has exclusions, preserve them
                 if not has_db_libraries and current_flat.get(exclusion_key):
@@ -2631,12 +2624,6 @@ async def upload_overlay_file(file: UploadFile = File(...)):
 
         # Validate file type - images and fonts
         logger.debug("Validating file type...")
-
-        # Check if filename exists
-        if not file.filename:
-            logger.error("No filename provided")
-            raise HTTPException(status_code=400, detail="No filename provided")
-
         allowed_extensions = {
             ".png",
             ".jpg",
@@ -2779,6 +2766,37 @@ async def delete_overlay_file(filename: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/overlayfiles/preview/{filename}")
+async def preview_overlay_file(filename: str):
+    """Serve overlay file for preview"""
+    try:
+        # Sanitize filename
+        safe_filename = "".join(
+            c for c in filename if c.isalnum() or c in "._- "
+        ).strip()
+
+        if not safe_filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+        file_path = OVERLAYFILES_DIR / safe_filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+
+        # Serve file
+        return FileResponse(
+            file_path,
+            media_type="image/png",  # Will auto-detect based on extension
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving overlay file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # FONT FILES ENDPOINTS
 # ============================================================================
@@ -2838,11 +2856,6 @@ async def upload_font_file(file: UploadFile = File(...)):
             )
 
         # Validate file type
-        # Check if filename exists
-        if not file.filename:
-            logger.error("No filename provided")
-            raise HTTPException(status_code=400, detail="No filename provided")
-
         allowed_extensions = {".ttf", ".otf", ".woff", ".woff2"}
         file_ext = Path(file.filename).suffix.lower()
 
@@ -3820,9 +3833,6 @@ async def get_cached_libraries(server_type: str):
         return {"success": False, "error": "Invalid server type"}
 
     try:
-        if not server_libraries_db:
-            return {"success": False, "error": "Database not initialized"}
-
         result = server_libraries_db.get_media_server_libraries(server_type)
         logger.info(
             f"Found {len(result['libraries'])} cached libraries for {server_type} ({len(result['excluded'])} excluded)"
@@ -3850,9 +3860,6 @@ async def update_library_exclusions(server_type: str, request: LibraryExclusionU
         return {"success": False, "error": "Invalid server type"}
 
     try:
-        if not server_libraries_db:
-            return {"success": False, "error": "Database not initialized"}
-
         server_libraries_db.update_library_exclusions(
             server_type, request.excluded_libraries
         )
@@ -3892,12 +3899,11 @@ async def get_plex_libraries(request: PlexValidationRequest):
 
                 # Save libraries to database
                 try:
-                    if server_libraries_db:
-                        # FIXED: Pass an empty list for exclusions
-                        server_libraries_db.save_media_server_libraries(
-                            "plex", libraries, []
-                        )
-                        logger.info("Saved Plex libraries to database")
+                    # FIXED: Pass an empty list for exclusions
+                    server_libraries_db.save_media_server_libraries(
+                        "plex", libraries, []
+                    )
+                    logger.info("Saved Plex libraries to database")
                 except Exception as db_error:
                     logger.error(
                         f"Failed to save Plex libraries to database: {str(db_error)}"
@@ -3953,12 +3959,11 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
 
                 # Save libraries to database
                 try:
-                    if server_libraries_db:
-                        # FIXED: Pass an empty list for exclusions
-                        server_libraries_db.save_media_server_libraries(
-                            "jellyfin", libraries, []
-                        )
-                        logger.info("Saved Jellyfin libraries to database")
+                    # FIXED: Pass an empty list for exclusions
+                    server_libraries_db.save_media_server_libraries(
+                        "jellyfin", libraries, []
+                    )
+                    logger.info("Saved Jellyfin libraries to database")
                 except Exception as db_error:
                     logger.error(
                         f"Failed to save Jellyfin libraries to database: {str(db_error)}"
@@ -4015,12 +4020,11 @@ async def get_emby_libraries(request: EmbyValidationRequest):
 
                 # Save libraries to database
                 try:
-                    if server_libraries_db:
-                        # FIXED: Pass an empty list for exclusions
-                        server_libraries_db.save_media_server_libraries(
-                            "emby", libraries, []
-                        )
-                        logger.info("Saved Emby libraries and exclusions to database")
+                    # FIXED: Pass an empty list for exclusions
+                    server_libraries_db.save_media_server_libraries(
+                        "emby", libraries, []
+                    )
+                    logger.info("Saved Emby libraries and exclusions to database")
                 except Exception as db_error:
                     logger.error(
                         f"Failed to save Emby libraries to database: {str(db_error)}"
@@ -4857,10 +4861,10 @@ async def get_upload_diagnostics():
             import grp
 
             diagnostics["user"] = {
-                "uid": os.getuid(),  # type: ignore[attr-defined]
-                "gid": os.getgid(),  # type: ignore[attr-defined]
-                "username": pwd.getpwuid(os.getuid()).pw_name,  # type: ignore[attr-defined]
-                "groupname": grp.getgrgid(os.getgid()).gr_name,  # type: ignore[attr-defined]
+                "uid": os.getuid(),
+                "gid": os.getgid(),
+                "username": pwd.getpwuid(os.getuid()).pw_name,
+                "groupname": grp.getgrgid(os.getgid()).gr_name,
             }
         except Exception as e:
             diagnostics["user"] = {"error": str(e)}
@@ -5060,16 +5064,19 @@ async def get_status():
         # Get last 25 log lines from the active log file
         last_logs = get_last_log_lines(25, log_file=active_log)
 
+        # Check for "already running" warning
+        already_running = False
+        for line in last_logs[-5:]:  # Check last 5 lines
+            if "Another Posterizarr instance already running" in line:
+                already_running = True
+                break
+
         # Check if running file exists
         running_file_exists = RUNNING_FILE.exists()
 
-        # Only show "already running" warning if running file exists but script is not detected as running
-        # This indicates a stale lock file that should be cleaned up
-        already_running = running_file_exists and not is_running
-
         # Determine PID to show
         display_pid = None
-        if manual_is_running and current_process:
+        if manual_is_running:
             display_pid = current_process.pid
         elif scheduler_is_running:
             display_pid = scheduler_pid
@@ -5262,10 +5269,8 @@ async def get_runtime_history(
                 "history": [],
             }
 
-        history = runtime_db.get_runtime_history(
-            limit=limit, offset=offset, mode=mode or ""
-        )
-        total = runtime_db.get_runtime_history_total_count(mode=mode or "")
+        history = runtime_db.get_runtime_history(limit=limit, offset=offset, mode=mode)
+        total = runtime_db.get_runtime_history_total_count(mode=mode)
 
         return {
             "success": True,
@@ -6583,12 +6588,6 @@ async def run_manual_mode_upload(
             logger.error(f"Manual upload validation failed: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
 
-        # Check if filename exists
-        if not file.filename:
-            error_msg = "No filename provided"
-            logger.error(f"Manual upload validation failed: {error_msg}")
-            raise HTTPException(status_code=400, detail=error_msg)
-
         # Validate file type
         allowed_extensions = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"]
         file_extension = Path(file.filename).suffix.lower()
@@ -6881,10 +6880,9 @@ async def run_manual_mode_upload(
             # Schedule cleanup after process completes (in background)
             async def cleanup_upload():
                 """Cleanup uploaded file after process completes"""
-                global current_process
                 try:
                     # Wait for process to complete
-                    while current_process and current_process.poll() is None:
+                    while current_process.poll() is None:
                         await asyncio.sleep(1)
 
                     # Wait a bit more to ensure file operations are complete
@@ -7095,7 +7093,7 @@ async def stop_script():
             stopped_processes = []
 
             # Stop manual process if running
-            if manual_running and current_process:
+            if manual_running:
                 try:
                     current_process.terminate()
                     current_process.wait(timeout=5)
@@ -7104,15 +7102,14 @@ async def stop_script():
                     current_start_time = None
                     stopped_processes.append("manual")
                 except subprocess.TimeoutExpired:
-                    if current_process:
-                        current_process.kill()
+                    current_process.kill()
                     current_process = None
                     current_mode = None
                     current_start_time = None
                     stopped_processes.append("manual (force killed after timeout)")
 
             # Stop scheduler process if running
-            if scheduler_running and scheduler and scheduler.current_process:
+            if scheduler_running:
                 try:
                     scheduler.current_process.terminate()
                     scheduler.current_process.wait(timeout=5)
@@ -7120,8 +7117,7 @@ async def stop_script():
                     scheduler.is_running = False
                     stopped_processes.append("scheduled")
                 except subprocess.TimeoutExpired:
-                    if scheduler.current_process:
-                        scheduler.current_process.kill()
+                    scheduler.current_process.kill()
                     scheduler.current_process = None
                     scheduler.is_running = False
                     stopped_processes.append("scheduled (force killed after timeout)")
@@ -7161,7 +7157,7 @@ async def force_kill_script():
             killed_processes = []
 
             # Kill manual process if running
-            if manual_running and current_process:
+            if manual_running:
                 try:
                     current_process.kill()
                     current_process.wait(timeout=2)
@@ -7178,7 +7174,7 @@ async def force_kill_script():
                     killed_processes.append("manual (cleared)")
 
             # Kill scheduler process if running
-            if scheduler_running and scheduler and scheduler.current_process:
+            if scheduler_running:
                 try:
                     scheduler.current_process.kill()
                     scheduler.current_process.wait(timeout=2)
@@ -7404,10 +7400,9 @@ async def websocket_logs(
     logger.info(f"WebSocket connection established for log: {log_file}")
 
     # Determine which log file to monitor - check both directories
-    log_filename = log_file or "Scriptlog.log"
-    log_path = LOGS_DIR / log_filename
+    log_path = LOGS_DIR / log_file
     if not log_path.exists():
-        log_path = UI_LOGS_DIR / log_filename
+        log_path = UI_LOGS_DIR / log_file
 
     # Track if user explicitly requested a specific log file
     user_requested_log = log_file != "Scriptlog.log"  # User manually selected a log
@@ -7773,10 +7768,10 @@ def _get_categorized_assets(config: dict) -> dict:
                 }
                 patterns = provider_patterns.get(primary_provider, [primary_provider])
                 is_download_from_primary = any(
-                    pattern in (download_source or "").lower() for pattern in patterns
+                    pattern in download_source.lower() for pattern in patterns
                 )
                 is_fav_link_from_primary = any(
-                    pattern in (provider_link or "").lower() for pattern in patterns
+                    pattern in provider_link.lower() for pattern in patterns
                 )
                 if not is_download_from_primary or not is_fav_link_from_primary:
                     categories["non_primary_provider"].append(record_dict)
@@ -8340,7 +8335,7 @@ async def bulk_delete_manual_assets(request: BulkDeleteRequest):
 
 
 @app.get("/api/assets-folders")
-async def get_assets_folders_cached():
+async def get_assets_folders():
     """Get list of folders in assets directory with image counts per type - uses cache"""
     try:
         cache = get_fresh_assets()
@@ -8525,10 +8520,7 @@ async def get_recent_assets():
             )  # This should not run
 
         # Get all assets from database (already sorted by id DESC - newest first)
-        if db:
-            db_records = db.get_all_choices()
-        else:
-            db_records = []
+        db_records = db.get_all_choices()
 
         logger.info(f"Found {len(db_records)} total assets in database")
 
@@ -9093,7 +9085,7 @@ async def add_schedule(data: ScheduleCreate):
                 detail=f"Invalid time format '{data.time}'. Must be HH:MM (00:00-23:59)",
             )
 
-        success = scheduler.add_schedule(data.time, data.description or "")
+        success = scheduler.add_schedule(data.time, data.description)
         if success:
             return {"success": True, "message": f"Schedule added: {data.time}"}
         else:
@@ -9300,7 +9292,7 @@ class AssetUploadRequest(BaseModel):
 
 
 class BulkDeleteAssetsRequest(BaseModel):
-    record_ids: List[int] = Field(default=..., min_length=1)
+    record_ids: List[int] = Field(..., min_items=1)
 
 
 @app.post("/api/assets/fetch-replacements")
@@ -9630,9 +9622,9 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                 params = {"query": title}
 
                 if year and media_type == "movie":
-                    params["year"] = str(year)
+                    params["year"] = year
                 elif year and media_type == "tv":
-                    params["first_air_date_year"] = str(year)
+                    params["first_air_date_year"] = year
 
                 logger.info(f" TMDB API Request: {url}")
                 logger.info(f"   Params: {params}")
@@ -9699,7 +9691,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                             }
 
                             if year:
-                                params["year"] = str(year)
+                                params["year"] = year
 
                             logger.info(f" TVDB API Request: {search_url}")
                             logger.info(f"   Params: {params}")
@@ -10587,14 +10579,9 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
             logger.error(f"Fanart fetch failed: {fanart_results}")
             fanart_results = []
 
-        # Ensure all results are lists (type narrowing for Pylance)
-        tmdb_list = tmdb_results if isinstance(tmdb_results, list) else []
-        tvdb_list = tvdb_results if isinstance(tvdb_results, list) else []
-        fanart_list = fanart_results if isinstance(fanart_results, list) else []
-
-        results["tmdb"] = tmdb_list
-        results["tvdb"] = tvdb_list
-        results["fanart"] = fanart_list
+        results["tmdb"] = tmdb_results
+        results["tvdb"] = tvdb_results
+        results["fanart"] = fanart_results
 
         # Apply language filtering based on asset type
         logger.info(
@@ -11547,7 +11534,7 @@ async def replace_asset_from_url(
                         titletext=(
                             final_title_text
                             if poster_type != "titlecard"
-                            else (ep_title_name or "")
+                            else ep_title_name
                         ),
                         folderName=final_folder_name,
                         libraryName=final_library_name,
@@ -11701,7 +11688,7 @@ async def trigger_manual_run_internal(request: ManualModeRequest):
     logger.info(f"Manual Run process started (PID: {current_process.pid})")
 
 
-async def _find_and_delete_asset(record_id: int) -> dict[str, Any]:
+async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
     """
     Internal helper to find an asset file by its DB record ID,
     delete the file, and then delete the DB record.
@@ -12109,24 +12096,26 @@ async def get_assets_overview():
                         "plex": ["plex"],
                     }
 
-                patterns = provider_patterns.get(
-                    primary_provider or "", [primary_provider or ""]
-                )  # Check if DownloadSource contains the primary provider
-                is_download_from_primary = any(
-                    pattern in (download_source or "").lower() for pattern in patterns
-                )
-
-                # Check if FavProviderLink contains the primary provider
-                is_fav_link_from_primary = any(
-                    pattern in (provider_link or "").lower() for pattern in patterns
-                )
-
-                # Show as non-primary if EITHER DownloadSource OR FavProviderLink is not from primary provider
-                if not is_download_from_primary or not is_fav_link_from_primary:
-                    non_primary_provider.append(record_dict)
-                    has_issue = (
-                        True  # Truncated Text: TextTruncated == "True" or "true"
+                    patterns = provider_patterns.get(
+                        primary_provider, [primary_provider]
                     )
+
+                    # Check if DownloadSource contains the primary provider
+                    is_download_from_primary = any(
+                        pattern in download_source.lower() for pattern in patterns
+                    )
+
+                    # Check if FavProviderLink contains the primary provider
+                    is_fav_link_from_primary = any(
+                        pattern in provider_link.lower() for pattern in patterns
+                    )
+
+                    # Show as non-primary if EITHER DownloadSource OR FavProviderLink is not from primary provider
+                    if not is_download_from_primary or not is_fav_link_from_primary:
+                        non_primary_provider.append(record_dict)
+                        has_issue = True
+
+            # Truncated Text: TextTruncated == "True" or "true"
             truncated_value = str(record_dict.get("TextTruncated", "")).lower()
             if truncated_value == "true":
                 truncated_text.append(record_dict)
@@ -12997,8 +12986,6 @@ async def preview_created_overlay(options: OverlayCreatorRequest):
 
                 # Fetch values (defaulting to 0 if not found/error)
                 def get_int(key):
-                    if config_db is None:
-                        return 0
                     val = config_db.get_value(section, key)
                     try:
                         return int(val) if val is not None else 0
