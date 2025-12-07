@@ -44,6 +44,8 @@ const getConfigTooltips = (language) => {
         "Minimum background/titlecard width filter—greater than or equal to specified value (default: 3840)",
       BgTcMinHeight:
         "Minimum background/titlecard height filter—greater than or equal to specified value (default: 2160)",
+      LogoLanguageOrder:
+        "Specify language preferences for Logos. Default is en,de. Use 2-digit ISO 3166-1 language codes.",
 
       // PlexPart
       PlexLibstoExclude:
@@ -196,6 +198,13 @@ const getConfigTooltips = (language) => {
         "Set to true to skip hash validation (Default: false). Note: This may produce bloat, as every item will be re-uploaded to media servers",
       DisableOnlineAssetFetch:
         "Set to true to skip all online lookups and use only locally available assets (Default: false)",
+      UseLogo: "Set to true to apply logos to Posters instead of title text.",
+      UseBGLogo:
+        "Set to true to apply logos to Background instead of title text.",
+      UseClearlogo: "Set to true to use Clearlogo.",
+      UseClearart: "Set to true to use Clearart.",
+      LogoTextFallback:
+        "Set to true to fallback to Text if no logos are found.",
 
       // OverlayPart
       ImageProcessing:
@@ -479,6 +488,8 @@ const getConfigTooltips = (language) => {
         "Mindestbreite für Hintergrund/Titelkarten-Filter – größer oder gleich dem angegebenen Wert (Standard: 3840)",
       BgTcMinHeight:
         "Mindesthöhe für Hintergrund/Titelkarten-Filter – größer oder gleich dem angegebenen Wert (Standard: 2160)",
+      LogoLanguageOrder:
+        "Geben Sie Sprachpräferenzen für Logos an. Standard ist en,de. Verwenden Sie 2-stellige ISO 3166-1 Sprachcodes.",
 
       // PlexPart
       PlexLibstoExclude:
@@ -633,6 +644,14 @@ const getConfigTooltips = (language) => {
         "Auf true setzen, um Hash-Validierung zu überspringen (Standard: false). Hinweis: Dies kann Bloat erzeugen, da jedes Element erneut auf Medienserver hochgeladen wird",
       DisableOnlineAssetFetch:
         "Auf true setzen, um alle Online-Lookups zu überspringen und nur lokal verfügbare Assets zu verwenden (Standard: false)",
+      UseLogo:
+        "Auf true setzen, um Logos auf Poster anstelle von Titeltext anzuwenden.",
+      UseBGLogo:
+        "Auf true setzen, um Logos auf Hintergrund anstelle von Titeltext anzuwenden.",
+      UseClearlogo: "Auf true setzen, um Clearlogo zu verwenden.",
+      UseClearart: "Auf true setzen, um Clearart zu verwenden.",
+      LogoTextFallback:
+        "Auf true setzen, um auf Text zurückzugreifen, wenn keine Logos gefunden werden.",
 
       // OverlayPart
       ImageProcessing:
@@ -923,6 +942,8 @@ const getConfigTooltips = (language) => {
         "Filtre de largeur minimale arrière-plan/carte de titre - supérieur ou égal à la valeur spécifiée (par défaut: 3840)",
       BgTcMinHeight:
         "Filtre de hauteur minimale arrière-plan/carte de titre - supérieur ou égal à la valeur spécifiée (par défaut: 2160)",
+      LogoLanguageOrder:
+        "Spécifier les préférences de langue pour les logos. Par défaut en,de. Utiliser les codes de langue ISO 3166-1 à 2 chiffres.",
 
       // PlexPart
       PlexLibstoExclude:
@@ -1082,6 +1103,14 @@ const getConfigTooltips = (language) => {
         "Définir sur true pour ignorer la validation de hachage (Par défaut: false). Note: Cela peut produire du gonflement, car chaque élément sera re-téléchargé sur les serveurs multimédias",
       DisableOnlineAssetFetch:
         "Définir sur true pour ignorer toutes les recherches en ligne et utiliser uniquement les ressources disponibles localement (Par défaut: false)",
+      UseLogo:
+        "Définir sur true pour appliquer des logos aux affiches au lieu du texte du titre.",
+      UseBGLogo:
+        "Définir sur true pour appliquer des logos à l'arrière-plan au lieu du texte du titre.",
+      UseClearlogo: "Définir sur true pour utiliser Clearlogo.",
+      UseClearart: "Définir sur true pour utiliser Clearart.",
+      LogoTextFallback:
+        "Définir sur true pour revenir au texte si aucun logo n'est trouvé.",
 
       // OverlayPart
       ImageProcessing:
@@ -1399,6 +1428,8 @@ const getConfigTooltips = (language) => {
         "Filtro larghezza minima sfondo/title card - maggiore o uguale al valore specificato (predefinito: 3840)",
       BgTcMinHeight:
         "Filtro altezza minima sfondo/title card - maggiore o uguale al valore specificato (predefinito: 2160)",
+      LogoLanguageOrder:
+        "Specifica le preferenze di lingua per i loghi. Predefinito è en,de. Usa i codici lingua ISO 3166-1 a 2 cifre.",
 
       // PlexPart
       PlexLibstoExclude:
@@ -1554,6 +1585,14 @@ const getConfigTooltips = (language) => {
         "Impostare su true per saltare la validazione hash (Predefinito: false). Nota: Questo può produrre gonfiamento, poiché ogni elemento verrà ri-caricato sui server multimediali",
       DisableOnlineAssetFetch:
         "Impostare su true per saltare tutte le ricerche online e usare solo le risorse disponibili localmente (Predefinito: false)",
+      UseLogo:
+        "Impostare su true per applicare i loghi ai poster invece del testo del titolo.",
+      UseBGLogo:
+        "Impostare su true per applicare i loghi allo sfondo invece del testo del titolo.",
+      UseClearlogo: "Impostare su true per usare Clearlogo.",
+      UseClearart: "Impostare su true per usare Clearart.",
+      LogoTextFallback:
+        "Impostare su true per ripiegare sul testo se non vengono trovati loghi.",
 
       // OverlayPart
       ImageProcessing:
@@ -1865,6 +1904,8 @@ const getConfigTooltips = (language) => {
         "Filtro de largura mínima fundo/cartão de título - maior ou igual ao valor especificado (padrão: 3840)",
       BgTcMinHeight:
         "Filtro de altura mínima fundo/cartão de título - maior ou igual ao valor especificado (padrão: 2160)",
+      LogoLanguageOrder:
+        "Especifique as preferências de idioma para logos. Padrão é en,de. Use códigos de idioma ISO 3166-1 de 2 dígitos.",
 
       // PlexPart
       PlexLibstoExclude:
@@ -2022,6 +2063,14 @@ const getConfigTooltips = (language) => {
         "Defina como true para pular a validação de hash (Padrão: false). Nota: Isso pode produzir inchaço, pois cada item será re-enviado aos servidores de mídia",
       DisableOnlineAssetFetch:
         "Defina como true para pular todas as pesquisas online e usar apenas recursos disponíveis localmente (Padrão: false)",
+      UseLogo:
+        "Defina como true para aplicar logos aos pôsteres em vez do texto do título.",
+      UseBGLogo:
+        "Defina como true para aplicar logos ao fundo em vez do texto do título.",
+      UseClearlogo: "Defina como true para usar Clearlogo.",
+      UseClearart: "Defina como true para usar Clearart.",
+      LogoTextFallback:
+        "Defina como true para recorrer ao texto se nenhum logo for encontrado.",
 
       // OverlayPart
       ImageProcessing:
