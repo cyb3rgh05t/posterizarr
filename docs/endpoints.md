@@ -555,3 +555,29 @@ Lists available log files on the server.
       ]
     }
     ```
+
+## 🔔 Webhooks
+
+### `/api/webhook/arr`
+Endpoint for Sonarr and Radarr `On Import` and `On Upgrade` webhooks. Converts the Arr JSON payload into a trigger file.
+
+??? example "View Response"
+    ```json
+    {
+      "success": true,
+      "message": "Trigger queued for Radarr",
+      "file": "/config/watcher/recently_added_20251125120000_a1b2c3.posterizarr"
+    }
+    ```
+
+### `/api/webhook/tautulli`
+Endpoint for Tautulli notifications. Maps incoming JSON keys directly to script arguments.
+
+??? example "View Response"
+    ```json
+    {
+      "success": true,
+      "message": "Tautulli trigger queued",
+      "file": "/config/watcher/tautulli_trigger_20251125120000_x9y8z7.posterizarr"
+    }
+    ```

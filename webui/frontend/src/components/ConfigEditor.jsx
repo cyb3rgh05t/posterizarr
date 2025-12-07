@@ -1357,6 +1357,40 @@ function ConfigEditor() {
       if (!newLineOnSpecificSymbols) return true;
     }
 
+    // UseClearlogo, UseClearart, and LogoTextFallback require UseLogo OR UseBGLogo to be enabled
+    const logoDependentFields = [
+      "UseClearlogo",
+      "UseClearart",
+      "LogoTextFallback",
+    ];
+
+    if (logoDependentFields.includes(key)) {
+      let useLogo = false;
+      let useBGLogo = false;
+
+      if (usingFlatStructure) {
+        // Check UseLogo
+        const val = config["UseLogo"];
+        useLogo = val === "true" || val === true;
+
+        // Check UseBGLogo
+        const valBG = config["UseBGLogo"];
+        useBGLogo = valBG === "true" || valBG === true;
+      } else {
+        // In grouped structure, both are likely in PrerequisitePart
+        const val = config["PrerequisitePart"]?.["UseLogo"];
+        useLogo = val === "true" || val === true;
+
+        const valBG = config["PrerequisitePart"]?.["UseBGLogo"];
+        useBGLogo = valBG === "true" || valBG === true;
+      }
+
+      // If BOTH are NOT enabled (neither is true), disable these fields
+      if (!useLogo && !useBGLogo) {
+        return true;
+      }
+    }
+
     // === OVERLAY AND TEXT CONDITIONAL DISABLING ===
     const keyLower = key.toLowerCase();
 
@@ -1817,7 +1851,8 @@ function ConfigEditor() {
       key === "PreferredLanguageOrder" ||
       key === "PreferredSeasonLanguageOrder" ||
       key === "PreferredBackgroundLanguageOrder" ||
-      key === "PreferredTCLanguageOrder"
+      key === "PreferredTCLanguageOrder" ||
+      key === "LogoLanguageOrder"
     ) {
       return (
         <LanguageOrderSelector
@@ -1975,6 +2010,11 @@ function ConfigEditor() {
       "SeasonPosters",
       "BackgroundPosters",
       "TitleCards",
+      "UseLogo",
+      "UseBGLogo",
+      "UseClearlogo",
+      "UseClearart",
+      "LogoTextFallback",
       "LibraryFolders",
       "PlexUpload",
       "PosterFontAllCaps",
@@ -2143,7 +2183,6 @@ function ConfigEditor() {
                 // Special handling for Media Server toggles - Radio button behavior
                 if (isMediaServerToggle && e.target.checked) {
                   // When turning ON a media server, turn OFF the others
-                  // We need to batch all updates together to avoid race conditions
                   let batchedConfig;
 
                   if (usingFlatStructure) {
@@ -2171,6 +2210,37 @@ function ConfigEditor() {
                     };
                   }
 
+                  setConfig(batchedConfig);
+                }
+                // Special handling for ClearLogo vs ClearArt (Mutually Exclusive)
+                else if (
+                  (key === "UseClearlogo" || key === "UseClearart") &&
+                  e.target.checked
+                ) {
+                  let batchedConfig;
+                  // These keys use lowercase string booleans ("false")
+                  const falseVal = "false";
+
+                  if (usingFlatStructure) {
+                    batchedConfig = {
+                      ...config,
+                      UseClearlogo:
+                        key === "UseClearlogo" ? newValue : falseVal,
+                      UseClearart: key === "UseClearart" ? newValue : falseVal,
+                    };
+                  } else {
+                    // Both keys belong to PrerequisitePart
+                    batchedConfig = {
+                      ...config,
+                      PrerequisitePart: {
+                        ...config.PrerequisitePart,
+                        UseClearlogo:
+                          key === "UseClearlogo" ? newValue : falseVal,
+                        UseClearart:
+                          key === "UseClearart" ? newValue : falseVal,
+                      },
+                    };
+                  }
                   setConfig(batchedConfig);
                 } else {
                   updateValue(fieldKey, newValue);
@@ -2770,16 +2840,33 @@ function ConfigEditor() {
       );
     }
 
-    // Handle text_offset specially with enhanced number input
-    if (keyLower.includes("offset") || keyLower === "text_offset") {
+    // Handle text_offset AND linespacing specially with enhanced number input
+    if (
+      keyLower.includes("offset") ||
+      keyLower === "text_offset" ||
+      keyLower.includes("linespacing")
+    ) {
       const disabled = isFieldDisabled(key, groupName);
+      const isSpacing = keyLower.includes("linespacing");
 
-      // Parse the current value - keep the sign!
-      let parsedValue = 0;
-      if (stringValue) {
-        // Remove + if present, keep - if present
-        const cleanValue = stringValue.replace(/^\+/, "");
-        parsedValue = parseInt(cleanValue, 10) || 0;
+      // Calculate display values
+      let badgeNumber = 0;
+      let inputValue = "";
+
+      if (stringValue !== null && stringValue !== undefined) {
+        if (stringValue === "-") {
+          // Allow the input to just be a minus sign temporarily while typing
+          inputValue = "-";
+          badgeNumber = 0;
+        } else if (stringValue !== "") {
+          const cleanValue = String(stringValue).replace(/^\+/, "");
+          const parsed = parseInt(cleanValue, 10);
+
+          if (!isNaN(parsed)) {
+            badgeNumber = parsed;
+            inputValue = parsed; // Show clean number in input (without +)
+          }
+        }
       }
 
       return (
@@ -2787,32 +2874,32 @@ function ConfigEditor() {
           <div className="flex items-center gap-2">
             <input
               type="number"
-              value={parsedValue}
+              value={inputValue}
               disabled={disabled}
               onChange={(e) => {
                 const val = e.target.value;
-                if (val === "" || val === "-") {
+                // Allow typing "-" to start a negative number
+                if (val === "-") {
+                  updateValue(fieldKey, "-");
+                }
+                // Handle empty input
+                else if (val === "") {
                   updateValue(fieldKey, "");
-                } else {
+                }
+                // Handle actual numbers
+                else {
                   const num = parseInt(val, 10);
                   if (!isNaN(num)) {
-                    // Format with explicit + or - sign
+                    // Format with explicit + or - sign for the config
                     const formattedValue = num >= 0 ? `+${num}` : `${num}`;
                     updateValue(fieldKey, formattedValue);
                   }
                 }
               }}
               onBlur={(e) => {
-                // Ensure proper formatting on blur
-                const val = e.target.value;
-                if (val === "" || val === "-" || val === "+") {
+                // If user leaves the field with just "-", reset to 0
+                if (e.target.value === "-" || e.target.value === "") {
                   updateValue(fieldKey, "+0");
-                } else {
-                  const num = parseInt(val, 10);
-                  if (!isNaN(num)) {
-                    const formattedValue = num >= 0 ? `+${num}` : `${num}`;
-                    updateValue(fieldKey, formattedValue);
-                  }
                 }
               }}
               className={`flex-1 h-[42px] px-4 py-2.5 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary transition-all font-mono ${
@@ -2823,17 +2910,18 @@ function ConfigEditor() {
             <div className="flex items-center gap-1 px-3 py-2 bg-theme-bg border border-theme rounded-lg text-theme-muted text-sm font-mono min-w-[60px] justify-center">
               <span
                 className={`font-bold ${
-                  parsedValue >= 0 ? "text-green-500" : "text-red-500"
+                  badgeNumber >= 0 ? "text-green-500" : "text-red-500"
                 }`}
               >
-                {parsedValue >= 0 ? "+" : "-"}
+                {badgeNumber >= 0 ? "+" : "-"}
               </span>
-              <span>{Math.abs(parsedValue)}</span>
+              <span>{Math.abs(badgeNumber)}</span>
             </div>
           </div>
           <p className="text-xs text-theme-muted">
-            Offset from bottom of image. Positive (+) moves up, negative (-)
-            moves down
+            {isSpacing
+              ? "Adjust height between lines. Positive (+) increases gap, negative (-) decreases it."
+              : "Offset from bottom of image. Positive (+) moves up, negative (-) moves down."}
           </p>
         </div>
       );

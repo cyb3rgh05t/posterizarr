@@ -40,11 +40,11 @@
         - If you set it to `xx` you tell the script it should only search for textless, posters with text will be skipped.
     - `PreferredSeasonLanguageOrder`: Specify language preferences for seasons. Default is `xx,en,de` (`xx` is Textless). Example configurations can be found in the config file. 2-digit language codes can be found here: [ISO 3166-1 Lang Codes](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2).
     - `PreferredBackgroundLanguageOrder`: Specify language preferences for backgrounds. Default is `PleaseFillMe` ( It will take your poster lang order / `xx` is Textless). Example configurations can be found in the config file. 2-digit language codes can be found here: [ISO 3166-1 Lang Codes](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2).
-
         - If you set it to `xx` you tell the script it should only search for textless, posters with text will be skipped.
     - `PreferredTCLanguageOrder`: Specify language preferences for TCs. Default is `PleaseFillMe` ( It will take your poster lang order / `xx` is Textless). Example configurations can be found in the config file. 2-digit language codes can be found here: [ISO 3166-1 Lang Codes](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2).
-
         - If you set it to `xx` you tell the script it should only search for textless, posters with text will be skipped.
+    - `LogoLanguageOrder`: Specify language preferences for Logos. Default is `en,de`. Example configurations can be found in the config file. 2-digit language codes can be found here: [ISO 3166-1 Lang Codes](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2).
+
 
     #### PlexPart
 
@@ -140,6 +140,11 @@
     - `SkipTBA` : Set to `true` to skip TitleCard creation if the Titletext is `TBA`.
     - `SkipJapTitle` : Set to `true` to skip TitleCard creation if the Titletext is `Jap or Chinese`.
     - `AssetCleanup` : Set to `true` to cleanup Assets that are no longer in Plex.
+    - `UseLogo` : Set to `true` to apply logos instead of title text to Posters.
+    - `UseBGLogo` : Set to `true` to apply logos instead of title text to Backgrounds.
+    - `UseClearlogo` : Set to `true` to use `Clearlogo`.
+    - `UseClearart` : Set to `true` to use `Clearart`.
+    - `LogoTextFallback` : Set to `true` to fallback to `Text` if no logos are found.
 
         ```diff
         - !! IMPORTANT !! -

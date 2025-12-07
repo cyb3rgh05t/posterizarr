@@ -75,4 +75,27 @@ Feel free to customize the script further to meet your specific preferences or a
 >   - this is required because the script checks against this file if a newer version is available.
 > - Do not include images on a PR.
 
-![versioning](/docs/images/versioning.jpg)
+<div align="center">
+<br />
+  <img src="docs/images/versioning.jpg" alt="Version Management" width="350">
+  <br />
+  <em>Version synchronization is critical for update detection</em>
+</div>
+
+<br />
+
+**⭐ Star this repo if Posterizarr helps organize your media library!**
+
+<div align="center">
+
+[![Star History Chart](https://api.star-history.com/svg?repos=fscorrupt/posterizarr&type=Date)](https://star-history.com/#fscorrupt/posterizarr&Date)
+
+
+
+<br />
+
+---
+
+<sub>Made with ❤️ by [fscorrupt](https://github.com/fscorrupt) and the [open source community](https://github.com/fscorrupt/posterizarr/graphs/contributors)</sub>
+
+</div>

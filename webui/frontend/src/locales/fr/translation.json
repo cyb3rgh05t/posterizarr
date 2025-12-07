@@ -37,6 +37,11 @@
     },
     "tmdb": {
       "title": "Rechercher TMDB pour",
+      "selectLogo": "Sélectionner un logo",
+      "clickToSelectLogo": "Cliquez pour utiliser cette URL de logo",
+      "textResult": "Résultat textuel",
+      "idResult": "Résultat ID",
+      "noLogosMatchingLanguages": "Aucun logo trouvé pour les langues : {{languages}}",
       "seasonPosters": "Affiches de saison",
       "episodeImages": "Images d'épisode",
       "tvShowPosters": "Affiches de série TV",
@@ -100,6 +105,8 @@
     },
     "manual": {
       "title": "Mode Manuel (Semi-Automatisé)",
+      "browseLogos": "Parcourir les logos",
+      "browseLogosTooltip": "Parcourir les logos/ClearArt",
       "description": "Créez ou remplacez des affiches manuellement avec un contrôle total sur la recherche, la source et les métadonnées.",
       "posterType": "Type d'affiche",
       "types": {
@@ -771,18 +778,25 @@
         "text": "Fonctionne sur Docker, Linux, Windows, macOS et ARM"
       }
     },
-    "showcase": {
-      "title": "Voir en action",
-      "posterizarrOutput": "Résultat de Posterizarr",
-      "posterizarrDescription": "Illustrations de haute qualité téléchargées et traitées automatiquement avec vos superpositions personnalisées",
-      "kometaIntegration": "Après l'intégration Kometa",
-      "kometaDescription": "Résultats finaux dans votre serveur multimédia avec des superpositions Kometa supplémentaires appliquées"
+    "integration": {
+      "webhook": "Webhook Natif",
+      "recommended": "Recommandé",
+      "script": "Script Personnalisé",
+      "legacy": "Obsolète / Avancé",
+      "webhookDesc": "Intégration transparente avec les applications *Arr et Tautulli via des webhooks HTTP. Aucun mappage de volume requis.",
+      "scriptDesc": "Surveillance traditionnelle basée sur des fichiers. Nécessite des fichiers de script et un mappage de volume."
     },
     "cta": {
       "title": "Prêt à transformer votre bibliothèque ?",
-      "description": "Posterizarr gère tout, de la découverte des illustrations au téléversement sur le serveur multimédia, vous offrant des illustrations magnifiques et cohérentes dans toute votre collection.",
+      "description": "Posterizarr gère tout, de la découverte d'œuvres d'art au téléchargement sur le serveur multimédia.",
+      "selectMethod": "Sélectionnez votre méthode d'intégration préférée pour voir les instructions de configuration.",
       "installationGuide": "Voir le guide d'installation",
-      "viewOnGitHub": "Voir sur GitHub"
+      "viewOnGitHub": "Voir sur GitHub",
+      "setupSonarrRadarr": "Config. Sonarr/Radarr",
+      "setupTautulli": "Config. Tautulli",
+      "setupArrScript": "Config. Arr (Script)",
+      "setupTautulliDocker": "Config. Tautulli (Docker)",
+      "setupTautulliWin": "Config. Tautulli (Win)"
     },
     "technical": {
       "title": "Points forts techniques",
@@ -1305,6 +1319,10 @@
   },
   "assetReplacer": {
     "title": "Remplacer la ressource",
+    "selectLogoTitle": "Sélectionner un Logo/ClearArt",
+    "logoApplied": "URL du logo appliquée au texte du titre",
+    "browseLogos": "Parcourir les logos",
+    "noLogosMatchingLanguages": "Aucun logo trouvé pour les langues : {{languages}}",
     "enterTitleError": "Veuillez entrer un titre à rechercher",
     "foundReplacements": "Trouvé {{count}} options de remplacement parmi {{sources}} sources",
     "fetchPreviewsError": "Échec de la récupération des aperçus",
@@ -1354,7 +1372,8 @@
     "confirmReplaceButton": "Remplacer la ressource",
     "confirmFetchTitle": "Confirmer la récupération des options de remplacement",
     "confirmFetchMessage": "Cela recherchera des options de remplacement sur TMDB, TVDB et Fanart.tv. Continuer ?",
-    "confirmFetchButton": "Récupérer les remplacements"
+    "confirmFetchButton": "Récupérer les remplacements",
+    "titleText": "Texte du titre"
   },
   "assetOverview": {
     "title": "Centre d'actions",
@@ -1485,7 +1504,16 @@
     "season": "Saison",
     "episode": "Épisode",
     "background": "Arrière-plan",
-    "asset": "Ressource"
+    "asset": "Ressource",
+    "name": "Nom",
+    "date": "Date",
+    "sorting": {
+      "title": "Trier les ressources",
+      "nameAsc": "Nom (A-Z)",
+      "nameDesc": "Nom (Z-A)",
+      "dateNewest": "Date (Plus récent)",
+      "dateOldest": "Date (Plus ancien)"
+    }
   },
   "theme": {
     "title": "Thème",
@@ -1534,7 +1562,8 @@
     "minLength": "Longueur minimale : {{min}} caractères",
     "maxLength": "Longueur maximale : {{max}} caractères",
     "email": "Adresse e-mail invalide",
-    "url": "URL invalide"
+    "url": "URL invalide",
+    "enterTitleOrFolder": "Veuillez entrer un titre ou un nom de dossier !"
   },
   "loading": {
     "initializing": "Initialisation de Posterizarr...",

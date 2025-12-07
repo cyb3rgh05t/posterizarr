@@ -26,6 +26,7 @@ import {
   HardDrive,
   Eye,
   X,
+  ArrowUpDown,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CompactImageSizeSlider from "./CompactImageSizeSlider";
@@ -162,6 +163,47 @@ function ManualAssets() {
   const [expandedFolders, setExpandedFolders] = useState({});
   const [selectedAssets, setSelectedAssets] = useState(new Set());
   const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
+
+  // --- SORTING STATE (ADDED) ---
+  const [sortOrder, setSortOrder] = useState(() => {
+    return localStorage.getItem("manual-assets-sort-order") || "name_asc";
+  });
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const sortDropdownRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem("manual-assets-sort-order", sortOrder);
+  }, [sortOrder]);
+
+  // Click outside listener for sorting
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+        setSortDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Sorting Helper Function (ADDED)
+  const getSortedAssets = (assetsToSort) => {
+    const sorted = [...assetsToSort];
+    sorted.sort((a, b) => {
+      if (sortOrder === "name_asc") return a.name.localeCompare(b.name);
+      if (sortOrder === "name_desc") return b.name.localeCompare(a.name);
+
+      // Handle date sorting
+      const dateA = a.modified || a.created || 0;
+      const dateB = b.modified || b.created || 0;
+
+      if (sortOrder === "date_newest") return dateB - dateA;
+      if (sortOrder === "date_oldest") return dateA - dateB;
+
+      return 0;
+    });
+    return sorted;
+  };
 
   // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -483,7 +525,6 @@ function ManualAssets() {
       library.folders.forEach((folder) => {
         folder.assets.forEach((asset) => {
           if (matchesSearch(asset, folder, library)) {
-            // Filter by active library in grid view
             if (activeLibrary === "all" || library.name === activeLibrary) {
               allAssets.push({
                 ...asset,
@@ -495,7 +536,7 @@ function ManualAssets() {
         });
       });
     });
-    return allAssets;
+    return getSortedAssets(allAssets);
   };
 
   // Folder view navigation
@@ -531,34 +572,43 @@ function ManualAssets() {
   // Get current view data for folder view
   const getCurrentViewData = () => {
     if (currentPath.length === 0) {
-      // Show libraries
+      // Libraries Level
+      const filteredLibraries = libraries.filter((lib) =>
+        lib.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      // Apply the selected sort order
       return {
         type: "libraries",
-        items: libraries.filter((lib) =>
-          lib.name.toLowerCase().includes(searchQuery.toLowerCase())
-        ),
+        items: getSortedAssets(filteredLibraries),
       };
     } else if (currentPath.length === 1) {
-      // Show folders in library
+      // Folders Level
       const library = libraries.find((lib) => lib.name === currentPath[0]);
       if (!library) return { type: "folders", items: [] };
+
+      const filteredFolders = library.folders.filter((folder) =>
+        folder.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      // Apply the selected sort order
       return {
         type: "folders",
-        items: library.folders.filter((folder) =>
-          folder.name.toLowerCase().includes(searchQuery.toLowerCase())
-        ),
+        items: getSortedAssets(filteredFolders),
       };
     } else if (currentPath.length === 2) {
-      // Show assets in folder
+      // Assets Level
       const library = libraries.find((lib) => lib.name === currentPath[0]);
       if (!library) return { type: "assets", items: [] };
       const folder = library.folders.find((f) => f.name === currentPath[1]);
       if (!folder) return { type: "assets", items: [] };
+
+      const filteredAssets = folder.assets.filter((asset) =>
+        asset.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
       return {
         type: "assets",
-        items: folder.assets.filter((asset) =>
-          asset.name.toLowerCase().includes(searchQuery.toLowerCase())
-        ),
+        items: getSortedAssets(filteredAssets),
       };
     }
     return { type: "libraries", items: [] };
@@ -698,6 +748,53 @@ function ManualAssets() {
                   </>
                 )}
               </button>
+
+              {/* Sorting Dropdown (Grid View) */}
+              <div className="relative" ref={sortDropdownRef}>
+                <button
+                  onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
+                  title={t("common.sorting.title")}
+                >
+                  <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
+                  <span className="hidden sm:inline">
+                    {sortOrder.includes("date") ? t("common.date") : t("common.name")}
+                  </span>
+                </button>
+
+                {sortDropdownOpen && (
+                  <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
+                    <div className="py-1">
+                      <button
+                        onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.nameAsc")}
+                      </button>
+                      <button
+                        onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.nameDesc")}
+                      </button>
+                      <div className="border-t border-theme-border my-1"></div>
+                      <button
+                        onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.dateNewest")}
+                      </button>
+                      <button
+                        onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.dateOldest")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Refresh Button */}
               <button
                 onClick={() => fetchAssets(true)}
@@ -1176,6 +1273,52 @@ function ManualAssets() {
                   </button>
                 </>
               )}
+
+              {/* Sorting Dropdown (Folder View) */}
+              <div className="relative" ref={sortDropdownRef}>
+                <button
+                  onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
+                  title={t("common.sorting.title")}
+                >
+                  <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
+                  <span className="hidden sm:inline">
+                    {sortOrder.includes("date") ? t("common.date") : t("common.name")}
+                  </span>
+                </button>
+
+                {sortDropdownOpen && (
+                  <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
+                    <div className="py-1">
+                      <button
+                        onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.nameAsc")}
+                      </button>
+                      <button
+                        onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.nameDesc")}
+                      </button>
+                      <div className="border-t border-theme-border my-1"></div>
+                      <button
+                        onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.dateNewest")}
+                      </button>
+                      <button
+                        onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      >
+                        {t("common.sorting.dateOldest")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <button
                 onClick={() => fetchAssets(true)}

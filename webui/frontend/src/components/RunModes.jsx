@@ -22,6 +22,7 @@ import {
   X,
   ExternalLink,
   Download,
+  Search, // <--- Added Search Icon
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ConfirmDialog from "./ConfirmDialog";
@@ -102,24 +103,25 @@ const TMDBPosterSearchModal = React.memo(
       setTmdbSearch({
         ...tmdbSearch,
         showModal: false,
-        query: "",
         seasonNumber: "",
         episodeNumber: "",
         displayedCount: 10,
+        isLogoSearch: false, // Reset logo search flag
       });
     };
 
     const handleSelectPoster = (posterUrl) => {
-      setManualForm({ ...manualForm, picturePath: posterUrl });
-      setTmdbSearch({
-        ...tmdbSearch,
-        showModal: false,
-        query: "",
-        seasonNumber: "",
-        episodeNumber: "",
-        displayedCount: 10,
-      });
-      showSuccess(t("runModes.tmdb.posterSelected"));
+      if (tmdbSearch.isLogoSearch) {
+        // If logo search, update titletext with URL
+        setManualForm({ ...manualForm, titletext: posterUrl });
+        showSuccess("Logo URL applied to Title Text");
+      } else {
+        // Normal behavior: update picturePath
+        setManualForm({ ...manualForm, picturePath: posterUrl });
+        showSuccess(t("runModes.tmdb.posterSelected"));
+      }
+
+      handleClose();
     };
 
     const handleDownloadPoster = async (e, poster) => {
@@ -173,7 +175,9 @@ const TMDBPosterSearchModal = React.memo(
             <div className="flex items-center">
               <ImageIcon className="w-6 h-6 mr-3 text-white" />
               <h3 className="text-xl font-bold text-white">
-                {manualForm.posterType === "season"
+                {tmdbSearch.isLogoSearch
+                  ? t("runModes.tmdb.selectLogo") + ` (${totalResults})`
+                  : manualForm.posterType === "season"
                   ? t("runModes.tmdb.seasonResults", {
                       season: tmdbSearch.seasonNumber,
                     }) + ` (${totalResults})`
@@ -319,7 +323,7 @@ const TMDBPosterSearchModal = React.memo(
                                 : "bg-theme-hover text-theme-text border-theme hover:border-theme-primary"
                             }`}
                           >
-                            <span>Text Result</span>
+                            <span>{t("runModes.tmdb.textResult")}</span>
                             <span
                               className={`px-2 py-0.5 rounded-full text-xs ${
                                 sourceFilter === "title_search"
@@ -346,7 +350,7 @@ const TMDBPosterSearchModal = React.memo(
                                 : "bg-theme-hover text-theme-text border-theme hover:border-theme-primary"
                             }`}
                           >
-                            <span>ID Result</span>
+                            <span>{t("runModes.tmdb.idResult")}</span>
                             <span
                               className={`px-2 py-0.5 rounded-full text-xs ${
                                 sourceFilter === "provided_id"
@@ -377,12 +381,14 @@ const TMDBPosterSearchModal = React.memo(
                         className="group relative bg-theme-hover rounded-lg overflow-hidden border border-theme hover:border-theme-primary transition-all cursor-pointer"
                         onClick={() => handleSelectPoster(poster.original_url)}
                       >
-                        {/* Poster Image */}
-                        <img
-                          src={poster.url || poster.poster_url}
-                          alt={poster.title || poster.source}
-                          className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
+                        {/* Poster/Logo Image */}
+                        <div className={`${tmdbSearch.isLogoSearch ? 'bg-slate-700/50 p-2' : ''} h-full`}>
+                          <img
+                            src={poster.url || poster.poster_url}
+                            alt={poster.title || poster.source}
+                            className={`w-full h-auto ${tmdbSearch.isLogoSearch ? 'object-contain aspect-square' : 'object-cover'} group-hover:scale-105 transition-transform duration-300`}
+                          />
+                        </div>
 
                         {/* Overlay on Hover */}
                         <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 text-center">
@@ -456,7 +462,7 @@ const TMDBPosterSearchModal = React.memo(
           {/* Footer */}
           <div className="bg-theme-bg px-6 py-4 rounded-b-xl border-t border-theme flex-shrink-0">
             <p className="text-sm text-theme-muted text-center">
-              {t("runModes.tmdb.clickToSelect")}
+              {tmdbSearch.isLogoSearch ? t("runModes.tmdb.clickToSelectLogo") : t("runModes.tmdb.clickToSelect")}
             </p>
           </div>
         </div>
@@ -532,6 +538,7 @@ function RunModes() {
     activeProvider: "tmdb", // Track which provider tab is active
     // Visible providers based on search type
     visibleProviders: ["tmdb", "tvdb", "fanart"], // Default: show all tabs
+    isLogoSearch: false, // New flag for logo search mode
   });
 
   useEffect(() => {
@@ -636,7 +643,14 @@ function RunModes() {
 
   // Handle folder selection
   const handleFolderSelect = (folderName, title) => {
-    setManualForm({ ...manualForm, folderName, titletext: title });
+    setManualForm((prevForm) => ({
+      ...prevForm,
+      folderName,
+      titletext: prevForm.titletext && prevForm.titletext.trim() !== "" 
+        ? prevForm.titletext 
+        : title
+    }));
+    
     setShowFolderSelector(false);
     setFolderSearchQuery("");
     showSuccess(`Folder "${folderName}" selected`);
@@ -956,7 +970,7 @@ function RunModes() {
       const data = await response.json();
 
       if (data.success) {
-        showSuccess(t("runModes.stop.stopped"));
+        showSuccess(t("dashboard.stopped"));
         fetchStatus();
       } else {
         showError(`Error: ${data.message}`);
@@ -965,6 +979,190 @@ function RunModes() {
       showError(`Error: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ============================================================================
+  // LOGO FETCHING (For Title Text)
+  // ============================================================================
+  const handleFetchLogos = async () => {
+    // 1. Priority: Manual Title Text
+    let query = manualForm.titletext.trim();
+
+    // 2. Fallback: Use the Search Box text (Supports Title, tmdb-123, tvdb-456)
+    if (!query && tmdbSearch.query.trim()) {
+      query = tmdbSearch.query.trim();
+    }
+
+    // 3. Fallback: Folder Name
+    if (!query && manualForm.folderName.trim()) {
+      query = manualForm.folderName.replace(/\s*\(\d{4}\).*$/, "").trim();
+    }
+
+    if (!query) {
+      showError(t("validation.enterTitleOrFolder"));
+      return;
+    }
+
+    // Set initial loading state
+    setTmdbSearch({
+      ...tmdbSearch,
+      searching: true,
+      isLogoSearch: true,
+      visibleProviders: ["tmdb", "tvdb", "fanart"],
+      query: query
+    });
+
+    try {
+      // ----------------------------------------------------------------------
+      // 1. Fetch User Config (FavProvider & LogoLanguageOrder)
+      // ----------------------------------------------------------------------
+      let userFavProvider = "fanart";
+      let languageOrder = [];
+
+      try {
+        const configResponse = await fetch(`${API_URL}/config`);
+        if (configResponse.ok) {
+          const configData = await configResponse.json();
+          // Handle flat or grouped config structure
+          const cfg = configData.config || {};
+          const apiPart = cfg.ApiPart || {};
+
+          // A) Get FavProvider
+          const provider = cfg.FavProvider || cfg.favprovider || apiPart.FavProvider || apiPart.favprovider;
+          if (provider) {
+             const p = provider.toLowerCase();
+             if (p.includes("tmdb")) userFavProvider = "tmdb";
+             else if (p.includes("tvdb")) userFavProvider = "tvdb";
+             else if (p.includes("fanart")) userFavProvider = "fanart";
+          }
+
+          // B) Get LogoLanguageOrder (Handle Array or String)
+          const rawOrder = cfg.LogoLanguageOrder || apiPart.LogoLanguageOrder;
+
+          if (Array.isArray(rawOrder)) {
+            // It's already an array ["en", "de"]
+            languageOrder = rawOrder.map(lang => lang.trim().toLowerCase());
+          } else if (typeof rawOrder === 'string' && rawOrder) {
+            // It's a string "en, de"
+            languageOrder = rawOrder.split(",").map(lang => lang.trim().toLowerCase());
+          }
+
+          if (languageOrder.length > 0) {
+            console.log("Applying Logo Language Order:", languageOrder);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch config for logo preference:", e);
+      }
+
+      // ----------------------------------------------------------------------
+      // 2. Determine media type & Prepare Request
+      // ----------------------------------------------------------------------
+      let mediaType;
+      if (manualForm.posterType === "standard" || manualForm.posterType === "background") {
+        mediaType = manualForm.mediaTypeSelection;
+      } else if (manualForm.posterType === "season" || manualForm.posterType === "titlecard") {
+        mediaType = "tv";
+      } else {
+        mediaType = "movie";
+      }
+
+      const requestBody = {
+        asset_path: `manual_logo_${Date.now()}`,
+        media_type: mediaType,
+        asset_type: "logo",
+        title: query
+      };
+
+      // ----------------------------------------------------------------------
+      // 3. Call API
+      // ----------------------------------------------------------------------
+      const response = await fetch(`${API_URL}/assets/fetch-replacements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        let results = {
+          tmdb: data.results.tmdb || [],
+          tvdb: data.results.tvdb || [],
+          fanart: data.results.fanart || [],
+        };
+
+        // --------------------------------------------------------------------
+        // 4. Filter & Sort by LogoLanguageOrder (STRICT MODE)
+        // --------------------------------------------------------------------
+        if (languageOrder.length > 0) {
+          const processLogos = (logoList) => {
+            if (!logoList) return [];
+
+            // A) Filter: REMOVE logos not in the allowed list
+            const filtered = logoList.filter(logo => {
+              // Default to "xx" (textless) if language is missing
+              const logoLang = (logo.language || "xx").toLowerCase();
+              return languageOrder.includes(logoLang);
+            });
+
+            // B) Sort: Order exactly as they appear in LogoLanguageOrder
+            return filtered.sort((a, b) => {
+              const langA = (a.language || "xx").toLowerCase();
+              const langB = (b.language || "xx").toLowerCase();
+              return languageOrder.indexOf(langA) - languageOrder.indexOf(langB);
+            });
+          };
+
+          // Apply to all providers
+          results.tmdb = processLogos(results.tmdb);
+          results.tvdb = processLogos(results.tvdb);
+          results.fanart = processLogos(results.fanart);
+        }
+
+        // --------------------------------------------------------------------
+        // 5. Determine Active Provider
+        // --------------------------------------------------------------------
+        let activeProvider = userFavProvider;
+
+        // Fallback if preferred provider has no logos (after filtering)
+        if (!results[activeProvider] || results[activeProvider].length === 0) {
+          if (results.fanart.length > 0) activeProvider = "fanart";
+          else if (results.tmdb.length > 0) activeProvider = "tmdb";
+          else if (results.tvdb.length > 0) activeProvider = "tvdb";
+        }
+
+        setTmdbSearch({
+          ...tmdbSearch,
+          searching: false,
+          isLogoSearch: true,
+          results: results,
+          showModal: true,
+          displayedCount: 10,
+          activeProvider: activeProvider,
+          visibleProviders: ["tmdb", "tvdb", "fanart"],
+          query: query
+        });
+
+        // Check for empty results
+        const totalResults = results.tmdb.length + results.tvdb.length + results.fanart.length;
+        if (totalResults === 0) {
+          if (languageOrder.length > 0) {
+            // Translate: "No logos found matching languages: en, de"
+            showError(t("runModes.tmdb.noLogosMatchingLanguages", { languages: languageOrder.join(", ") }));
+          } else {
+            showError(`No logos found for "${query}"`);
+          }
+        }
+
+      } else {
+        showError(`Error fetching logos: ${data.message}`);
+        setTmdbSearch({ ...tmdbSearch, searching: false, isLogoSearch: false });
+      }
+    } catch (error) {
+      showError(`Error: ${error.message}`);
+      setTmdbSearch({ ...tmdbSearch, searching: false, isLogoSearch: false });
     }
   };
 
@@ -995,7 +1193,7 @@ function RunModes() {
       }
     }
 
-    setTmdbSearch({ ...tmdbSearch, searching: true });
+    setTmdbSearch({ ...tmdbSearch, searching: true, isLogoSearch: false }); // Ensure standard search mode
 
     try {
       // Determine media type based on posterType and mediaTypeSelection
@@ -1120,6 +1318,7 @@ function RunModes() {
           displayedCount: 10, // Reset to show first 10
           activeProvider: activeProvider,
           visibleProviders: visibleProviders, // Track which tabs to show
+          isLogoSearch: false // Ensure logo search is off
         });
 
         // Check if there are any results in visible providers only
@@ -2309,16 +2508,34 @@ function RunModes() {
               <label className="block text-sm font-medium text-theme-text mb-2">
                 {t("runModes.manual.titleText")}
               </label>
-              <input
-                type="text"
-                value={manualForm.titletext}
-                onChange={(e) =>
-                  setManualForm({ ...manualForm, titletext: e.target.value })
-                }
-                placeholder={t("runModes.manual.titlePlaceholder")}
-                disabled={loading || status.running}
-                className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualForm.titletext}
+                  onChange={(e) =>
+                    setManualForm({ ...manualForm, titletext: e.target.value })
+                  }
+                  placeholder={t("runModes.manual.titlePlaceholder")}
+                  disabled={loading || status.running}
+                  className="flex-1 px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {(manualForm.posterType === "standard" || manualForm.posterType === "background") && (
+                  <button
+                    type="button"
+                    onClick={handleFetchLogos}
+                    disabled={loading || status.running || tmdbSearch.searching}
+                    className="px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme rounded-lg text-theme-text transition-colors flex items-center gap-2 whitespace-nowrap"
+                    title="Browse for Logos/ClearArt"
+                  >
+                    {tmdbSearch.searching && tmdbSearch.isLogoSearch ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">{t("runModes.manual.browseLogos")}</span>
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-theme-muted mt-1">
                 {t("runModes.manual.titleHint")}
               </p>

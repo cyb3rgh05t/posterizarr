@@ -8373,6 +8373,13 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
         for item in current_dir.iterdir():
             if item.name == "@eaDir":  # Skip Synology index folders
                 continue
+            try:
+                stat = item.stat()
+                created = stat.st_ctime
+                modified = stat.st_mtime
+            except Exception:
+                created = 0
+                modified = 0
 
             if item.is_dir():
                 # This is a folder
@@ -8389,6 +8396,8 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
                             "name": item.name,
                             "path": str(folder_path).replace("\\", "/"),
                             "item_count": item_count,
+                            "created": created,
+                            "modified": modified,
                         }
                     )
                 except Exception as e:
@@ -8424,6 +8433,8 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
                             "size": item.stat().st_size,
                             "asset_type": asset_type_simple,  # e.g., 'poster', 'background'
                             "full_type": asset_type_str,  # e.g., 'Movie', 'Show Background'
+                            "created": created,
+                            "modified": modified,
                         }
                     )
 
@@ -9275,7 +9286,6 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                 # Method 1: Search by asset path (for AssetReplacer)
                 if request.asset_path and not request.asset_path.startswith("manual_"):
                     # Extract show/movie name from asset path to match against Rootfolder
-                    # Example path: "D:/Media/Shows/Show Name (2020) {tmdb-123}/Season 01/poster.jpg"
                     import os
 
                     path_parts = request.asset_path.replace("\\", "/").split("/")
@@ -9810,7 +9820,35 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                     )
 
                     async with httpx.AsyncClient(timeout=10.0) as client:
-                        if (
+                        if request.asset_type == "logo":
+                            # LOGOS (PNGs)
+                            url = f"https://api.themoviedb.org/3/{media_endpoint}/{tmdb_id}/images"
+                            response = await client.get(url, headers=headers)
+                            if response.status_code == 200:
+                                data = response.json()
+                                # TMDB stores clear logos in the 'logos' array
+                                for logo in data.get("logos", []):
+                                    file_path = logo.get("file_path")
+                                    original_url = f"https://image.tmdb.org/t/p/original{file_path}"
+
+                                    if original_url not in seen_urls:
+                                        seen_urls.add(original_url)
+                                        all_results.append(
+                                            {
+                                                "url": f"https://image.tmdb.org/t/p/w500{file_path}",  # Preview
+                                                "original_url": original_url,  # Actual full res for the script
+                                                "source": "TMDB",
+                                                "source_type": source,
+                                                "type": "logo",
+                                                "language": logo.get("iso_639_1"),
+                                                "vote_average": logo.get(
+                                                    "vote_average", 0
+                                                ),
+                                                "width": logo.get("width", 0),
+                                                "height": logo.get("height", 0),
+                                            }
+                                        )
+                        elif (
                             request.asset_type == "titlecard"
                             and request.season_number
                             and request.episode_number
@@ -10095,10 +10133,31 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                 artwork_type = artwork.get("type")
                                                 image_url = artwork.get("image")
 
-                                                # Movies endpoint uses different type codes than series
-                                                # type=14 for posters, type=15 for backgrounds
-                                                # "standard" asset type is treated as posters
-                                                if (
+                                                if request.asset_type == "logo":
+                                                    # Type 23 is ClearLogo in TVDB API v4 (usually)
+                                                    # But we should check the artwork type name or look for clearlogo/clearart
+                                                    artwork_type = artwork.get("type")
+                                                    # 23 = ClearLogo, 22 = ClearArt
+                                                    if artwork_type in [22, 23]:
+                                                        if (
+                                                            image_url
+                                                            and image_url
+                                                            not in seen_urls
+                                                        ):
+                                                            seen_urls.add(image_url)
+                                                            all_results.append(
+                                                                {
+                                                                    "url": image_url,
+                                                                    "original_url": image_url,
+                                                                    "source": "TVDB",
+                                                                    "source_type": source,
+                                                                    "type": "logo",
+                                                                    "language": artwork.get(
+                                                                        "language"
+                                                                    ),
+                                                                }
+                                                            )
+                                                elif (
                                                     request.asset_type
                                                     in ["poster", "standard"]
                                                 ) and artwork_type == 14:
@@ -10164,6 +10223,10 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                         if request.asset_type == "background":
                                             artwork_params["type"] = (
                                                 "3"  # type=3 for backgrounds
+                                            )
+                                        elif request.asset_type == "logo":
+                                            artwork_params["type"] = (
+                                                "23"  # type=23 for logos
                                             )
 
                                         logger.info(
@@ -10266,7 +10329,18 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                     data = response.json()
 
                                     # Map asset types to fanart.tv keys
-                                    if request.asset_type == "poster":
+                                    if request.asset_type == "logo":
+                                        fanart_keys = [
+                                            "hdmovieclearart",
+                                            "hdmovielogo",
+                                            "clearart",
+                                            "clearlogo",  # Movies
+                                            "hdtvclearart",
+                                            "hdtvlogo",
+                                            "clearart",
+                                            "clearlogo",  # TV
+                                        ]
+                                    elif request.asset_type == "poster":
                                         fanart_keys = ["movieposter"]
                                     elif request.asset_type == "background":
                                         fanart_keys = ["moviebackground"]
@@ -10301,7 +10375,18 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                 data = response.json()
 
                                 # Map asset types to fanart.tv keys
-                                if request.asset_type == "poster":
+                                if request.asset_type == "logo":
+                                    fanart_keys = [
+                                        "hdmovieclearart",
+                                        "hdmovielogo",
+                                        "clearart",
+                                        "clearlogo",  # Movies
+                                        "hdtvclearart",
+                                        "hdtvlogo",
+                                        "clearart",
+                                        "clearlogo",  # TV
+                                    ]
+                                elif request.asset_type == "poster":
                                     fanart_keys = ["movieposter"]
                                 elif request.asset_type == "background":
                                     fanart_keys = ["moviebackground"]
@@ -10343,7 +10428,18 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                 data = response.json()
 
                                 # Map asset types to fanart.tv keys
-                                if request.asset_type == "poster":
+                                if request.asset_type == "logo":
+                                    fanart_keys = [
+                                        "hdmovieclearart",
+                                        "hdmovielogo",
+                                        "clearart",
+                                        "clearlogo",  # Movies
+                                        "hdtvclearart",
+                                        "hdtvlogo",
+                                        "clearart",
+                                        "clearlogo",  # TV
+                                    ]
+                                elif request.asset_type == "poster":
                                     # Standard TV show posters
                                     fanart_keys = ["tvposter"]
                                 elif request.asset_type == "season":
@@ -12661,10 +12757,170 @@ async def get_support_zip(background_tasks: BackgroundTasks):
         )
 
 
+# ============================================================================
+# WEBHOOK ENDPOINTS (ARR & TAUTULLI)
+# ============================================================================
+
+
+@app.post("/api/webhook/arr")
+async def arr_webhook(request: Request):
+    """
+    Accepts Webhooks from Sonarr/Radarr (at /api/webhook/arr),
+    converts them to .posterizarr files, and drops them in the watcher folder.
+    """
+    try:
+        payload = await request.json()
+
+        # Determine Event and Platform
+        event_type = payload.get("eventType", "Unknown")
+
+        # Handle "Test" event from the Arr settings page
+        if event_type == "Test":
+            logger.info("Received Test Webhook from Arr instance")
+            return {"success": True, "message": "Test successful"}
+
+        # We typically only care about Import/Download/Grab/Delete events
+        if event_type not in [
+            "Download",
+            "Import",
+            "Grab",
+            "MovieFileDelete",
+            "EpisodeFileDelete",
+        ]:
+            return {"success": True, "message": f"Ignored event type: {event_type}"}
+
+        data_map = {}
+        platform = "Unknown"
+
+        # Map JSON Data to Posterizarr Arguments (mimicking ArrTrigger.sh logic)
+
+        # RADARR
+        if "movie" in payload:
+            platform = "Radarr"
+            movie = payload.get("movie", {})
+            movie_file = payload.get("movieFile", {})
+
+            data_map["arr_platform"] = platform
+            data_map["event"] = event_type
+            data_map["arr_movie_title"] = movie.get("title", "")
+            data_map["arr_movie_tmdb"] = movie.get("tmdbId", "")
+            data_map["arr_movie_imdb"] = movie.get("imdbId", "")
+            data_map["arr_movie_year"] = movie.get("year", "")
+            data_map["arr_movie_path"] = movie.get("folderPath", "")
+
+            # For downloads/upgrades, get specific file info
+            if movie_file:
+                data_map["arr_moviefile_path"] = movie_file.get("path", "")
+                data_map["arr_moviefile_id"] = movie_file.get("id", "")
+
+        # SONARR
+        elif "series" in payload:
+            platform = "Sonarr"
+            series = payload.get("series", {})
+            episodes = payload.get("episodes", [])
+
+            data_map["arr_platform"] = platform
+            data_map["event"] = event_type
+            data_map["arr_series_title"] = series.get("title", "")
+            data_map["arr_series_tvdb"] = series.get("tvdbId", "")
+            data_map["arr_series_path"] = series.get("path", "")
+
+            # Sonarr webhooks don't always send IMDB/TMDB in the main payload
+            if "imdbId" in series:
+                data_map["arr_series_imdb"] = series.get("imdbId")
+
+            # Handle Episode Data
+            if episodes:
+                first_ep = episodes[0]
+                data_map["arr_episode_season"] = first_ep.get("seasonNumber", "")
+                data_map["arr_episode_numbers"] = first_ep.get("episodeNumber", "")
+                data_map["arr_episode_titles"] = first_ep.get("title", "")
+
+                # If there's an episode file payload
+                if "episodeFile" in payload:
+                    data_map["arr_episode_path"] = payload["episodeFile"].get(
+                        "path", ""
+                    )
+
+        else:
+            logger.warning(f"Unknown payload format received: {payload.keys()}")
+            raise HTTPException(status_code=400, detail="Unknown payload format")
+
+        # 3. Write the .posterizarr file
+        watcher_dir = BASE_DIR / "watcher"
+        watcher_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create unique filename timestamp_random.posterizarr
+        # The prefix "recently_added_" is used by Start.ps1 to calculate delay times
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+        rand_str = os.urandom(3).hex()
+        filename = f"recently_added_{timestamp}_{rand_str}.posterizarr"
+        file_path = watcher_dir / filename
+
+        logger.info(f"Creating Arr trigger file for {platform}: {file_path}")
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            for key, value in data_map.items():
+                # Write in the format: [key]: value
+                f.write(f"[{key}]: {value}\n")
+
+        return {
+            "success": True,
+            "message": f"Trigger queued for {platform}",
+            "file": str(file_path),
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing Arr webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/webhook/tautulli")
+async def tautulli_webhook(request: Request):
+    """
+    Accepts Webhooks from Tautulli (at /api/webhook/tautulli).
+    Maps JSON keys directly to .posterizarr trigger file format.
+    """
+    try:
+        payload = await request.json()
+
+        # Filter out empty payloads
+        if not payload:
+            return {"success": False, "message": "Empty payload"}
+
+        # Define the Watcher Directory
+        watcher_dir = BASE_DIR / "watcher"
+        watcher_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create unique filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+        rand_str = os.urandom(3).hex()
+
+        filename = f"tautulli_trigger_{timestamp}_{rand_str}.posterizarr"
+        file_path = watcher_dir / filename
+
+        logger.info(f"Creating Tautulli trigger file: {file_path}")
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            for key, value in payload.items():
+                # Only write keys that have values.
+                if value:
+                    f.write(f"[{key}]: {value}\n")
+
+        return {
+            "success": True,
+            "message": "Tautulli trigger queued",
+            "file": str(file_path),
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing Tautulli webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================
 # STATIC FILE MOUNTS
 # ============================================
-
 
 if ASSETS_DIR.exists():
     app.mount(

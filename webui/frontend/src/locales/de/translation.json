@@ -37,6 +37,11 @@
     },
     "tmdb": {
       "title": "TMDB durchsuchen nach",
+      "selectLogo": "Wähle ein Logo",
+      "clickToSelectLogo": "Klicken, um diese Logo-URL zu verwenden",
+      "textResult": "Text-Ergebnis",
+      "idResult": "ID-Ergebnis",
+      "noLogosMatchingLanguages": "Keine Logos für folgende Sprachen gefunden: {{languages}}",
       "seasonPosters": "Season-Poster",
       "episodeImages": "Episodenbilder",
       "tvShowPosters": "TV-Serien-Poster",
@@ -100,6 +105,8 @@
     },
     "manual": {
       "title": "Manueller Modus (Halbautomatisch)",
+      "browseLogos": "Logos durchsuchen",
+      "browseLogosTooltip": "Nach Logos/ClearArt suchen",
       "description": "Erstelle oder ersetze Poster manuell mit voller Kontrolle über Suche, Quelle und Metadaten.",
       "posterType": "Poster-Typ",
       "types": {
@@ -772,18 +779,25 @@
         "text": "Funktioniert auf Docker, Linux, Windows, macOS und ARM"
       }
     },
-    "showcase": {
-      "title": "In Aktion sehen",
-      "posterizarrOutput": "Posterizarr-Ausgabe",
-      "posterizarrDescription": "Hochwertige Artworks automatisch heruntergeladen und mit Ihren benutzerdefinierten Overlays verarbeitet",
-      "kometaIntegration": "Nach Kometa-Integration",
-      "kometaDescription": "Endergebnisse auf Ihrem Medienserver mit zusätzlichen Kometa-Overlays"
+    "integration": {
+      "webhook": "Nativer Webhook",
+      "recommended": "Empfohlen",
+      "script": "Benutzerdefiniertes Skript",
+      "legacy": "Veraltet / Erweitert",
+      "webhookDesc": "Nahtlose Integration mit *Arr-Apps und Tautulli über HTTP-Webhooks. Kein Volume-Mapping erforderlich.",
+      "scriptDesc": "Traditionelle dateibasierte Überwachung. Erfordert Skriptdateien und Volume-Mapping."
     },
     "cta": {
       "title": "Bereit, Ihre Bibliothek zu transformieren?",
-      "description": "Posterizarr kümmert sich um alles, von der Artwork-Suche bis zum Medienserver-Upload, und gibt Ihnen schöne, konsistente Artworks für Ihre gesamte Sammlung.",
-      "installationGuide": "Installationsanleitung anzeigen",
-      "viewOnGitHub": "Auf GitHub anzeigen"
+      "description": "Posterizarr kümmert sich um alles, von der Artwork-Suche bis zum Upload auf den Medienserver.",
+      "selectMethod": "Wählen Sie Ihre bevorzugte Integrationsmethode, um die korrekten Einrichtungsanweisungen anzuzeigen.",
+      "installationGuide": "Installationsanleitung ansehen",
+      "viewOnGitHub": "Auf GitHub ansehen",
+      "setupSonarrRadarr": "Einrichtung Sonarr/Radarr",
+      "setupTautulli": "Einrichtung Tautulli",
+      "setupArrScript": "Einrichtung Arr (Skript)",
+      "setupTautulliDocker": "Einrichtung Tautulli (Docker)",
+      "setupTautulliWin": "Einrichtung Tautulli (Win)"
     },
     "technical": {
       "title": "Technische Highlights",
@@ -1306,6 +1320,10 @@
   },
   "assetReplacer": {
     "title": "Asset ersetzen",
+    "selectLogoTitle": "Wähle ein Logo/ClearArt",
+    "logoApplied": "Logo-URL in Titeltext übernommen",
+    "browseLogos": "Logos durchsuchen",
+    "noLogosMatchingLanguages": "Keine Logos für folgende Sprachen gefunden: {{languages}}",
     "enterTitleError": "Bitte geben Sie einen Titel ein, nach dem gesucht werden soll",
     "foundReplacements": "{{count}} Ersatzoptionen aus {{sources}} Quellen gefunden",
     "fetchPreviewsError": "Fehler beim Abrufen der Vorschau",
@@ -1538,7 +1556,16 @@
     "season": "Staffel",
     "episode": "Episode",
     "background": "Hintergrund",
-    "asset": "Asset"
+    "asset": "Asset",
+    "name": "Name",
+    "date": "Datum",
+    "sorting": {
+      "title": "Assets sortieren",
+      "nameAsc": "Name (A-Z)",
+      "nameDesc": "Name (Z-A)",
+      "dateNewest": "Datum (Neueste)",
+      "dateOldest": "Datum (Älteste)"
+    }
   },
   "theme": {
     "title": "Design",
@@ -1587,7 +1614,8 @@
     "minLength": "Mindestlänge: {{min}} Zeichen",
     "maxLength": "Maximallänge: {{max}} Zeichen",
     "email": "Ungültige E-Mail-Adresse",
-    "url": "Ungültige URL"
+    "url": "Ungültige URL",
+    "enterTitleOrFolder": "Bitte geben Sie einen Titel oder Ordnernamen ein!"
   },
   "loading": {
     "initializing": "Posterizarr wird initialisiert...",
