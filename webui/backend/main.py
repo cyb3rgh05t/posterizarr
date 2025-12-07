@@ -1715,7 +1715,7 @@ async def lifespan(app: FastAPI):
 
     # Setup default images for Creator Mode preview
     try:
-        setup_default_images()
+        setup_default_images(IMAGES_DIR)
         logger.info(f"Default images checked/created in {IMAGES_DIR}")
     except Exception as e:
         logger.error(f"Error setting up default images: {e}")
