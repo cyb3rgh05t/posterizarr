@@ -26,7 +26,7 @@ IS_DOCKER = (
 # 2. Setup Target Directory
 # We must match the 'IMAGES_DIR' logic from main.py
 if IS_DOCKER:
-    target_dir = Path("/app/images")
+    target_dir = Path("/config/Cache/images")
 else:
     # Local: backend/defaults.py -> backend -> webui -> PROJECT_ROOT -> images
     target_dir = Path(__file__).parent.parent.parent / "images"

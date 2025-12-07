@@ -60,7 +60,7 @@ if IS_DOCKER:
     APP_DIR = Path("/app")
     ASSETS_DIR = Path("/assets")
     MANUAL_ASSETS_DIR = Path("/manualassets")
-    IMAGES_DIR = Path("/app/images")
+    IMAGES_DIR = Path("/config/Cache/images")
     FRONTEND_DIR = Path("/app/frontend/dist")
     BACKUP_DIR = BASE_DIR / "assetsbackup"  # Docker default
 else:

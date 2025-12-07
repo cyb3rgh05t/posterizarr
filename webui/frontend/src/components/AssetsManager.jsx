@@ -32,7 +32,7 @@ import {
 import { useToast } from "../context/ToastContext";
 import ScrollToButtons from "./ScrollToButtons";
 
-// --- HELPER: Color Input ---
+// HELPER: Color Input
 const ColorInput = ({ value, onChange, label }) => (
     <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
         <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-theme shadow-sm shrink-0">
@@ -53,7 +53,7 @@ const ColorInput = ({ value, onChange, label }) => (
     </div>
 );
 
-// --- COMPONENT: Interactive Layer ---
+// COMPONENT: Interactive Layer
 const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parentRef }) => {
     const layerRef = useRef(null);
     
@@ -68,7 +68,7 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
     const baseZ = layer.position === 'back' ? 10 : 60;
     const zIndex = isSelected ? 100 : baseZ + index;
 
-    // --- 1. DRAG ---
+    // 1. DRAG
     const handleDragStart = (e) => {
         if (e.target.dataset.handle) return;
         e.preventDefault();
@@ -105,7 +105,7 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
         window.removeEventListener('mouseup', onDragEnd);
     };
 
-    // --- 2. RESIZE ---
+    // 2. RESIZE
     const handleResizeStart = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -144,7 +144,7 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
         window.removeEventListener('mouseup', onResizeEnd);
     };
 
-    // --- 3. ROTATE ---
+    // 3. ROTATE
     const handleRotateStart = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -223,7 +223,7 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
     );
 };
 
-// ----------------------------------------
+//-------------------------------------
 
 function AssetsManager() {
   const { t } = useTranslation();
@@ -299,7 +299,7 @@ function AssetsManager() {
     } catch (err) { showError(t("overlayAssets.loadError", { message: err.message })); } finally { setLoading(false); }
   };
 
-  // --- LAYER MANAGEMENT ---
+  // LAYER MANAGEMENT
   const handleAddLayer = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -381,7 +381,7 @@ function AssetsManager() {
     } catch (err) { console.error(err); } finally { setCreatorLoading(false); }
   };
 
-  // --- SAVE FUNCTION ---
+  // SAVE FUNCTION
   const handleSaveOverlay = async (forceOverwrite = false) => {
     if (!options.filename) {
       showError(t("overlayAssets.filenameRequired"));
