@@ -53,7 +53,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.1.22"
+$CurrentScriptVersion = "2.2.0"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -10329,102 +10329,105 @@ Elseif ($Tautulli) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $fontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                    }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                    # Add Stroke
-                                                    if ($AddTextStroke -eq 'true') {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                    }
-
-                                                    Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                                if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $fontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                        # Add Stroke
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+
+                                                        Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -10868,102 +10871,105 @@ Elseif ($Tautulli) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $backgroundfontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                    }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                    # Add Stroke
-                                                    if ($AddBackgroundTextStroke -eq 'true') {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                    }
-
-                                                    Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                                if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $backgroundfontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                        # Add Stroke
+                                                        if ($AddBackgroundTextStroke -eq 'true') {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+
+                                                        Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -11495,102 +11501,105 @@ Elseif ($Tautulli) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                        $ApplyTextInsteadOfLogo = $null
-                                        $global:LogoUrl = $null
-                                        $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                        $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                    # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                    if ($SkippingText -ne 'true') {
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                            $ApplyTextInsteadOfLogo = $null
+                                            $global:LogoUrl = $null
+                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                        foreach ($provider in $searchOrder) {
-                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                            switch ($provider) {
-                                                'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                            }
-                                        }
-                                        if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                            Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                        }
-                                        if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                            $ApplyTextInsteadOfLogo = 'true'
-                                        }
-                                        ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            try {
-                                                $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                            }
-                                            catch {
-                                                if ($_.Exception.Response) {
-                                                    $statusCode = $_.Exception.Response.StatusCode.value__
+                                            foreach ($provider in $searchOrder) {
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                switch ($provider) {
+                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
-                                                else {
-                                                    $statusCode = $_.Exception.Message
+                                            }
+                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                            }
+                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                $ApplyTextInsteadOfLogo = 'true'
+                                            }
+                                            ElseIf ($global:LogoUrl){
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                try {
+                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
-                                                Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                            }
-                                            $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                            Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                            $logEntry = "`"$magick`" $Arguments"
-                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                            Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                        }
-                                    }
-                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                            if ($global:direction -eq "RTL") {
-                                                $fontImagemagick = $RTLfontImagemagick
-                                            }
-                                            $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                            # Loop through each symbol and replace it with a newline
-                                            if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                foreach ($symbol in $NewLineSymbols) {
-                                                    # Default: Replace the symbol with a newline
-                                                    $replacementString = "`n"
-
-                                                    # Check if the symbol should be kept
-                                                    $keepThisSymbol = $false
-                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                            if ($symbol -like "*$k*") {
-                                                                $keepThisSymbol = $true
-                                                                break # Match found, no need to keep checking
-                                                            }
-                                                        }
+                                                catch {
+                                                    if ($_.Exception.Response) {
+                                                        $statusCode = $_.Exception.Response.StatusCode.value__
                                                     }
-
-                                                    # If it's a "keep" symbol, change the replacement string
-                                                    if ($keepThisSymbol) {
-                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                        $replacementString = $symbol + "`n"
+                                                    else {
+                                                        $statusCode = $_.Exception.Message
                                                     }
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                }
-                                            }
-                                            $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                            $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                            if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                # Add Stroke
-                                                if ($AddTextStroke -eq 'true') {
-                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 }
-                                                Else {
-                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                }
-
-                                                Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                            }
+                                        }
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($global:direction -eq "RTL") {
+                                                    $fontImagemagick = $RTLfontImagemagick
+                                                }
+                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                # Loop through each symbol and replace it with a newline
+                                                if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                    foreach ($symbol in $NewLineSymbols) {
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                if (!$global:IsTruncated) {
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                    # Add Stroke
+                                                    if ($AddTextStroke -eq 'true') {
+                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
+                                                    Else {
+                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
+
+                                                    Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $logEntry = "`"$magick`" $Arguments"
+                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                }
                                             }
                                         }
                                     }
@@ -12045,102 +12054,105 @@ Elseif ($Tautulli) {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                        $ApplyTextInsteadOfLogo = $null
-                                        $global:LogoUrl = $null
-                                        $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                        $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                    # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                    if ($SkippingText -ne 'true') {
+                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                            $ApplyTextInsteadOfLogo = $null
+                                            $global:LogoUrl = $null
+                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                        foreach ($provider in $searchOrder) {
-                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                            switch ($provider) {
-                                                'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                            }
-                                        }
-                                        if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                            Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                        }
-                                        if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                            $ApplyTextInsteadOfLogo = 'true'
-                                        }
-                                        ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            try {
-                                                $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                            }
-                                            catch {
-                                                if ($_.Exception.Response) {
-                                                    $statusCode = $_.Exception.Response.StatusCode.value__
+                                            foreach ($provider in $searchOrder) {
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                switch ($provider) {
+                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
-                                                else {
-                                                    $statusCode = $_.Exception.Message
+                                            }
+                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                            }
+                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                $ApplyTextInsteadOfLogo = 'true'
+                                            }
+                                            ElseIf ($global:LogoUrl){
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                try {
+                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
-                                                Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                            }
-                                            $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                            Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                            $logEntry = "`"$magick`" $Arguments"
-                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                            Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                        }
-                                    }
-                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                            if ($global:direction -eq "RTL") {
-                                                $backgroundfontImagemagick = $RTLfontImagemagick
-                                            }
-                                            $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                            # Loop through each symbol and replace it with a newline
-                                            if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                foreach ($symbol in $NewLineSymbols) {
-                                                    # Default: Replace the symbol with a newline
-                                                    $replacementString = "`n"
-
-                                                    # Check if the symbol should be kept
-                                                    $keepThisSymbol = $false
-                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                            if ($symbol -like "*$k*") {
-                                                                $keepThisSymbol = $true
-                                                                break # Match found, no need to keep checking
-                                                            }
-                                                        }
+                                                catch {
+                                                    if ($_.Exception.Response) {
+                                                        $statusCode = $_.Exception.Response.StatusCode.value__
                                                     }
-
-                                                    # If it's a "keep" symbol, change the replacement string
-                                                    if ($keepThisSymbol) {
-                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                        $replacementString = $symbol + "`n"
+                                                    else {
+                                                        $statusCode = $_.Exception.Message
                                                     }
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                }
-                                            }
-                                            $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                            $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                            if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                # Add Stroke
-                                                if ($AddBackgroundTextStroke -eq 'true') {
-                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 }
-                                                Else {
-                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                }
-
-                                                Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                            }
+                                        }
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($global:direction -eq "RTL") {
+                                                    $backgroundfontImagemagick = $RTLfontImagemagick
+                                                }
+                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                # Loop through each symbol and replace it with a newline
+                                                if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                    foreach ($symbol in $NewLineSymbols) {
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                if (!$global:IsTruncated) {
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                    # Add Stroke
+                                                    if ($AddBackgroundTextStroke -eq 'true') {
+                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
+                                                    Else {
+                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
+
+                                                    Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $logEntry = "`"$magick`" $Arguments"
+                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                }
                                             }
                                         }
                                     }
@@ -15386,98 +15398,101 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                                $ApplyTextInsteadOfLogo = $null
-                                                $global:LogoUrl = $null
-                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                            # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                            if ($SkippingText -ne 'true') {
+                                                if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                    $ApplyTextInsteadOfLogo = $null
+                                                    $global:LogoUrl = $null
+                                                    $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                    $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                                foreach ($provider in $searchOrder) {
-                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                    switch ($provider) {
-                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                    }
-                                                }
-                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                                }
-                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                    $ApplyTextInsteadOfLogo = 'true'
-                                                }
-                                                ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    try {
-                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                    }
-                                                    catch {
-                                                        if ($_.Exception.Response) {
-                                                            $statusCode = $_.Exception.Response.StatusCode.value__
+                                                    foreach ($provider in $searchOrder) {
+                                                        if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                        switch ($provider) {
+                                                            'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                            'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                            'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
-                                                        else {
-                                                            $statusCode = $_.Exception.Message
+                                                    }
+                                                    if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                    }
+                                                    if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                        $ApplyTextInsteadOfLogo = 'true'
+                                                    }
+                                                    ElseIf ($global:LogoUrl){
+                                                        $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        try {
+                                                            $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                         }
-                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    }
-                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                    $logEntry = "`"$magick`" $Arguments"
-                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                                }
-                                            }
-                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                                if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                                    if ($global:direction -eq "RTL") {
-                                                        $fontImagemagick = $RTLfontImagemagick
-                                                    }
-                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-                                                    # Loop through each symbol and replace it with a newline
-                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                        foreach ($symbol in $NewLineSymbols) {
-                                                            # Default: Replace the symbol with a newline
-                                                            $replacementString = "`n"
-
-                                                            # Check if the symbol should be kept
-                                                            $keepThisSymbol = $false
-                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                    if ($symbol -like "*$k*") {
-                                                                        $keepThisSymbol = $true
-                                                                        break # Match found, no need to keep checking
-                                                                    }
-                                                                }
+                                                        catch {
+                                                            if ($_.Exception.Response) {
+                                                                $statusCode = $_.Exception.Response.StatusCode.value__
                                                             }
-
-                                                            # If it's a "keep" symbol, change the replacement string
-                                                            if ($keepThisSymbol) {
-                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                                $replacementString = $symbol + "`n"
+                                                            else {
+                                                                $statusCode = $_.Exception.Message
                                                             }
-                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                            Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                                                         }
-                                                    }
-                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                                    if (!$global:IsTruncated) {
-                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                        # Add Stroke
-                                                        if ($AddTextStroke -eq 'true') {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                        }
-                                                        Else {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                        }
-                                                        Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                        Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                    }
+                                                }
+                                                if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                        if ($global:direction -eq "RTL") {
+                                                            $fontImagemagick = $RTLfontImagemagick
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+                                                        # Loop through each symbol and replace it with a newline
+                                                        if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                            foreach ($symbol in $NewLineSymbols) {
+                                                                # Default: Replace the symbol with a newline
+                                                                $replacementString = "`n"
+
+                                                                # Check if the symbol should be kept
+                                                                $keepThisSymbol = $false
+                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                        if ($symbol -like "*$k*") {
+                                                                            $keepThisSymbol = $true
+                                                                            break # Match found, no need to keep checking
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                # If it's a "keep" symbol, change the replacement string
+                                                                if ($keepThisSymbol) {
+                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                    $replacementString = $symbol + "`n"
+                                                                }
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                        $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                        $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                        if (!$global:IsTruncated) {
+                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            # Add Stroke
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                            Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            $logEntry = "`"$magick`" $Arguments"
+                                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                        }
                                                     }
                                                 }
                                             }
@@ -15862,101 +15877,104 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                                $ApplyTextInsteadOfLogo = $null
-                                                $global:LogoUrl = $null
-                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                            # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                            if ($SkippingText -ne 'true') {
+                                                if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                    $ApplyTextInsteadOfLogo = $null
+                                                    $global:LogoUrl = $null
+                                                    $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                    $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                                foreach ($provider in $searchOrder) {
-                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                    switch ($provider) {
-                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                    }
-                                                }
-                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                                }
-                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                    $ApplyTextInsteadOfLogo = 'true'
-                                                }
-                                                ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    try {
-                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                    }
-                                                    catch {
-                                                        if ($_.Exception.Response) {
-                                                            $statusCode = $_.Exception.Response.StatusCode.value__
+                                                    foreach ($provider in $searchOrder) {
+                                                        if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                        switch ($provider) {
+                                                            'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                            'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                            'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
-                                                        else {
-                                                            $statusCode = $_.Exception.Message
+                                                    }
+                                                    if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                    }
+                                                    if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                        $ApplyTextInsteadOfLogo = 'true'
+                                                    }
+                                                    ElseIf ($global:LogoUrl){
+                                                        $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        try {
+                                                            $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                         }
-                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    }
-                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                    $logEntry = "`"$magick`" $Arguments"
-                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                                }
-                                            }
-                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                                if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                                    if ($global:direction -eq "RTL") {
-                                                        $backgroundfontImagemagick = $RTLfontImagemagick
-                                                    }
-                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-                                                    # Loop through each symbol and replace it with a newline
-                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                        foreach ($symbol in $NewLineSymbols) {
-                                                            # Default: Replace the symbol with a newline
-                                                            $replacementString = "`n"
-
-                                                            # Check if the symbol should be kept
-                                                            $keepThisSymbol = $false
-                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                    if ($symbol -like "*$k*") {
-                                                                        $keepThisSymbol = $true
-                                                                        break # Match found, no need to keep checking
-                                                                    }
-                                                                }
+                                                        catch {
+                                                            if ($_.Exception.Response) {
+                                                                $statusCode = $_.Exception.Response.StatusCode.value__
                                                             }
-
-                                                            # If it's a "keep" symbol, change the replacement string
-                                                            if ($keepThisSymbol) {
-                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                                $replacementString = $symbol + "`n"
+                                                            else {
+                                                                $statusCode = $_.Exception.Message
                                                             }
-                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                        }
-                                                    }
-                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                                    if (!$global:IsTruncated) {
-                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                        # Add Stroke
-                                                        if ($AddBackgroundTextStroke -eq 'true') {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                        }
-
-                                                        Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                        Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                    }
+                                                }
+                                                if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                        if ($global:direction -eq "RTL") {
+                                                            $backgroundfontImagemagick = $RTLfontImagemagick
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+                                                        # Loop through each symbol and replace it with a newline
+                                                        if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                            foreach ($symbol in $NewLineSymbols) {
+                                                                # Default: Replace the symbol with a newline
+                                                                $replacementString = "`n"
+
+                                                                # Check if the symbol should be kept
+                                                                $keepThisSymbol = $false
+                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                        if ($symbol -like "*$k*") {
+                                                                            $keepThisSymbol = $true
+                                                                            break # Match found, no need to keep checking
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                # If it's a "keep" symbol, change the replacement string
+                                                                if ($keepThisSymbol) {
+                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                    $replacementString = $symbol + "`n"
+                                                                }
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                        $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                        $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                        if (!$global:IsTruncated) {
+                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                            # Add Stroke
+                                                            if ($AddBackgroundTextStroke -eq 'true') {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+
+                                                            Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            $logEntry = "`"$magick`" $Arguments"
+                                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                        }
                                                     }
                                                 }
                                             }
@@ -16421,100 +16439,103 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $fontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                    }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                    # Add Stroke
-                                                    if ($AddTextStroke -eq 'true') {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                    }
-                                                    Else {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                    }
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                    Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    }
+                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                                if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $fontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        # Add Stroke
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+
+                                                        Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -16910,99 +16931,102 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $backgroundfontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+
                                                     }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                    # Add Stroke
-                                                    if ($AddBackgroundTextStroke -eq 'true') {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                    }
-                                                    Else {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                    }
-                                                    Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                                if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $backgroundfontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        # Add Stroke
+                                                        if ($AddBackgroundTextStroke -eq 'true') {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                        Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -19526,102 +19550,105 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                                $ApplyTextInsteadOfLogo = $null
-                                                $global:LogoUrl = $null
-                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                            # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                            if ($SkippingText -ne 'true') {
+                                                if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                    $ApplyTextInsteadOfLogo = $null
+                                                    $global:LogoUrl = $null
+                                                    $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                    $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                                foreach ($provider in $searchOrder) {
-                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                    switch ($provider) {
-                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                    }
-                                                }
-                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                                }
-                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                    $ApplyTextInsteadOfLogo = 'true'
-                                                }
-                                                ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    try {
-                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                    }
-                                                    catch {
-                                                        if ($_.Exception.Response) {
-                                                            $statusCode = $_.Exception.Response.StatusCode.value__
+                                                    foreach ($provider in $searchOrder) {
+                                                        if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                        switch ($provider) {
+                                                            'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                            'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                            'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
-                                                        else {
-                                                            $statusCode = $_.Exception.Message
+                                                    }
+                                                    if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                    }
+                                                    if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                        $ApplyTextInsteadOfLogo = 'true'
+                                                    }
+                                                    ElseIf ($global:LogoUrl){
+                                                        $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        try {
+                                                            $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                         }
-                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    }
-                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                    $logEntry = "`"$magick`" $Arguments"
-                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                                }
-                                            }
-                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                                if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                                    if ($global:direction -eq "RTL") {
-                                                        $fontImagemagick = $RTLfontImagemagick
-                                                    }
-                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                                    # Loop through each symbol and replace it with a newline
-                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                        foreach ($symbol in $NewLineSymbols) {
-                                                            # Default: Replace the symbol with a newline
-                                                            $replacementString = "`n"
-
-                                                            # Check if the symbol should be kept
-                                                            $keepThisSymbol = $false
-                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                    if ($symbol -like "*$k*") {
-                                                                        $keepThisSymbol = $true
-                                                                        break # Match found, no need to keep checking
-                                                                    }
-                                                                }
+                                                        catch {
+                                                            if ($_.Exception.Response) {
+                                                                $statusCode = $_.Exception.Response.StatusCode.value__
                                                             }
-
-                                                            # If it's a "keep" symbol, change the replacement string
-                                                            if ($keepThisSymbol) {
-                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                                $replacementString = $symbol + "`n"
+                                                            else {
+                                                                $statusCode = $_.Exception.Message
                                                             }
-                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                        }
-                                                    }
-                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                                    if (!$global:IsTruncated) {
-                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                        # Add Stroke
-                                                        if ($AddTextStroke -eq 'true') {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                        }
-
-                                                        Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                        Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                    }
+                                                }
+                                                if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                                    if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                        if ($global:direction -eq "RTL") {
+                                                            $fontImagemagick = $RTLfontImagemagick
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                        # Loop through each symbol and replace it with a newline
+                                                        if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                            foreach ($symbol in $NewLineSymbols) {
+                                                                # Default: Replace the symbol with a newline
+                                                                $replacementString = "`n"
+
+                                                                # Check if the symbol should be kept
+                                                                $keepThisSymbol = $false
+                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                        if ($symbol -like "*$k*") {
+                                                                            $keepThisSymbol = $true
+                                                                            break # Match found, no need to keep checking
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                # If it's a "keep" symbol, change the replacement string
+                                                                if ($keepThisSymbol) {
+                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                    $replacementString = $symbol + "`n"
+                                                                }
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                        $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                        $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                        if (!$global:IsTruncated) {
+                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                            # Add Stroke
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+
+                                                            Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            $logEntry = "`"$magick`" $Arguments"
+                                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                        }
                                                     }
                                                 }
                                             }
@@ -20065,102 +20092,105 @@ Elseif ($ArrTrigger) {
                                                 $SkippingText = 'true'
                                                 Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                             }
-                                            if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                                $ApplyTextInsteadOfLogo = $null
-                                                $global:LogoUrl = $null
-                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                            # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                            if ($SkippingText -ne 'true') {
+                                                if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                    $ApplyTextInsteadOfLogo = $null
+                                                    $global:LogoUrl = $null
+                                                    $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                    $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                                foreach ($provider in $searchOrder) {
-                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                    switch ($provider) {
-                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                    }
-                                                }
-                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                                }
-                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                    $ApplyTextInsteadOfLogo = 'true'
-                                                }
-                                                ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                    try {
-                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                    }
-                                                    catch {
-                                                        if ($_.Exception.Response) {
-                                                            $statusCode = $_.Exception.Response.StatusCode.value__
+                                                    foreach ($provider in $searchOrder) {
+                                                        if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                        switch ($provider) {
+                                                            'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                            'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                            'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
-                                                        else {
-                                                            $statusCode = $_.Exception.Message
+                                                    }
+                                                    if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                    }
+                                                    if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                        $ApplyTextInsteadOfLogo = 'true'
+                                                    }
+                                                    ElseIf ($global:LogoUrl){
+                                                        $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                        try {
+                                                            $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                         }
-                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                    }
-                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                    $logEntry = "`"$magick`" $Arguments"
-                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                                }
-                                            }
-                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                                if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                                    if ($global:direction -eq "RTL") {
-                                                        $backgroundfontImagemagick = $RTLfontImagemagick
-                                                    }
-                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                                    # Loop through each symbol and replace it with a newline
-                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                        foreach ($symbol in $NewLineSymbols) {
-                                                            # Default: Replace the symbol with a newline
-                                                            $replacementString = "`n"
-
-                                                            # Check if the symbol should be kept
-                                                            $keepThisSymbol = $false
-                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                    if ($symbol -like "*$k*") {
-                                                                        $keepThisSymbol = $true
-                                                                        break # Match found, no need to keep checking
-                                                                    }
-                                                                }
+                                                        catch {
+                                                            if ($_.Exception.Response) {
+                                                                $statusCode = $_.Exception.Response.StatusCode.value__
                                                             }
-
-                                                            # If it's a "keep" symbol, change the replacement string
-                                                            if ($keepThisSymbol) {
-                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                                $replacementString = $symbol + "`n"
+                                                            else {
+                                                                $statusCode = $_.Exception.Message
                                                             }
-                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                        }
-                                                    }
-                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                                    if (!$global:IsTruncated) {
-                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                        # Add Stroke
-                                                        if ($AddBackgroundTextStroke -eq 'true') {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                        }
-
-                                                        Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                         InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                        Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                    }
+                                                }
+                                                if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                                    if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                        if ($global:direction -eq "RTL") {
+                                                            $backgroundfontImagemagick = $RTLfontImagemagick
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                        # Loop through each symbol and replace it with a newline
+                                                        if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                            foreach ($symbol in $NewLineSymbols) {
+                                                                # Default: Replace the symbol with a newline
+                                                                $replacementString = "`n"
+
+                                                                # Check if the symbol should be kept
+                                                                $keepThisSymbol = $false
+                                                                if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                    # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                    foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                        # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                        if ($symbol -like "*$k*") {
+                                                                            $keepThisSymbol = $true
+                                                                            break # Match found, no need to keep checking
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                # If it's a "keep" symbol, change the replacement string
+                                                                if ($keepThisSymbol) {
+                                                                    # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                    $replacementString = $symbol + "`n"
+                                                                }
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                        $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                        $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                        if (!$global:IsTruncated) {
+                                                            Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                            # Add Stroke
+                                                            if ($AddBackgroundTextStroke -eq 'true') {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+
+                                                            Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                            $logEntry = "`"$magick`" $Arguments"
+                                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                        }
                                                     }
                                                 }
                                             }
@@ -20692,102 +20722,105 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $fontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                    }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                    # Add Stroke
-                                                    if ($AddTextStroke -eq 'true') {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                    }
-
-                                                    Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                                if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $fontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                        # Add Stroke
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+
+                                                        Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -21242,102 +21275,105 @@ Elseif ($ArrTrigger) {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $backgroundfontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                    }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                    # Add Stroke
-                                                    if ($AddBackgroundTextStroke -eq 'true') {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                    }
-
-                                                    Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                                if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $backgroundfontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                        # Add Stroke
+                                                        if ($AddBackgroundTextStroke -eq 'true') {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+
+                                                        Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -25803,99 +25839,102 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $fontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+
                                                     }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                    # Add Stroke
-                                                    if ($AddTextStroke -eq 'true') {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                    }
-                                                    Else {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                    }
-                                                    Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                                if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $fontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        # Add Stroke
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+                                                        Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -26280,101 +26319,104 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $backgroundfontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                    }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                    # Add Stroke
-                                                    if ($AddBackgroundTextStroke -eq 'true') {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                    }
-
-                                                    Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                                if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $backgroundfontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                        # Add Stroke
+                                                        if ($AddBackgroundTextStroke -eq 'true') {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+
+                                                        Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -26839,100 +26881,103 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                        $ApplyTextInsteadOfLogo = $null
-                                        $global:LogoUrl = $null
-                                        $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                        $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                    # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                    if ($SkippingText -ne 'true') {
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                            $ApplyTextInsteadOfLogo = $null
+                                            $global:LogoUrl = $null
+                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                        foreach ($provider in $searchOrder) {
-                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                            switch ($provider) {
-                                                'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                            }
-                                        }
-                                        if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                            Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                        }
-                                        if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                            $ApplyTextInsteadOfLogo = 'true'
-                                        }
-                                        ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            try {
-                                                $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                            }
-                                            catch {
-                                                if ($_.Exception.Response) {
-                                                    $statusCode = $_.Exception.Response.StatusCode.value__
+                                            foreach ($provider in $searchOrder) {
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                switch ($provider) {
+                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
-                                                else {
-                                                    $statusCode = $_.Exception.Message
+                                            }
+                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                            }
+                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                $ApplyTextInsteadOfLogo = 'true'
+                                            }
+                                            ElseIf ($global:LogoUrl){
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                try {
+                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
-                                                Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                            }
-                                            $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                            Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                            $logEntry = "`"$magick`" $Arguments"
-                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                            Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                        }
-                                    }
-                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                            if ($global:direction -eq "RTL") {
-                                                $fontImagemagick = $RTLfontImagemagick
-                                            }
-                                            $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-                                            # Loop through each symbol and replace it with a newline
-                                            if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                foreach ($symbol in $NewLineSymbols) {
-                                                    # Default: Replace the symbol with a newline
-                                                    $replacementString = "`n"
-
-                                                    # Check if the symbol should be kept
-                                                    $keepThisSymbol = $false
-                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                            if ($symbol -like "*$k*") {
-                                                                $keepThisSymbol = $true
-                                                                break # Match found, no need to keep checking
-                                                            }
-                                                        }
+                                                catch {
+                                                    if ($_.Exception.Response) {
+                                                        $statusCode = $_.Exception.Response.StatusCode.value__
                                                     }
-
-                                                    # If it's a "keep" symbol, change the replacement string
-                                                    if ($keepThisSymbol) {
-                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                        $replacementString = $symbol + "`n"
+                                                    else {
+                                                        $statusCode = $_.Exception.Message
                                                     }
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                }
-                                            }
-                                            $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                            $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                            if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                # Add Stroke
-                                                if ($AddTextStroke -eq 'true') {
-                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                }
-                                                Else {
-                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                }
+                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                }
+                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                            }
+                                        }
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($global:direction -eq "RTL") {
+                                                    $fontImagemagick = $RTLfontImagemagick
+                                                }
+                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+                                                # Loop through each symbol and replace it with a newline
+                                                if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                    foreach ($symbol in $NewLineSymbols) {
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                if (!$global:IsTruncated) {
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    # Add Stroke
+                                                    if ($AddTextStroke -eq 'true') {
+                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
+                                                    Else {
+                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
+
+                                                    Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $logEntry = "`"$magick`" $Arguments"
+                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                }
                                             }
                                         }
                                     }
@@ -27328,99 +27373,102 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                        $ApplyTextInsteadOfLogo = $null
-                                        $global:LogoUrl = $null
-                                        $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                        $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                    # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                    if ($SkippingText -ne 'true') {
+                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                            $ApplyTextInsteadOfLogo = $null
+                                            $global:LogoUrl = $null
+                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                        foreach ($provider in $searchOrder) {
-                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                            switch ($provider) {
-                                                'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                            }
-                                        }
-                                        if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                            Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                        }
-                                        if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                            $ApplyTextInsteadOfLogo = 'true'
-                                        }
-                                        ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            try {
-                                                $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                            }
-                                            catch {
-                                                if ($_.Exception.Response) {
-                                                    $statusCode = $_.Exception.Response.StatusCode.value__
+                                            foreach ($provider in $searchOrder) {
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                switch ($provider) {
+                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
-                                                else {
-                                                    $statusCode = $_.Exception.Message
+                                            }
+                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                            }
+                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                $ApplyTextInsteadOfLogo = 'true'
+                                            }
+                                            ElseIf ($global:LogoUrl){
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                try {
+                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
-                                                Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                            }
-                                            $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                            Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                            $logEntry = "`"$magick`" $Arguments"
-                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                            Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                        }
-                                    }
-                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                            if ($global:direction -eq "RTL") {
-                                                $backgroundfontImagemagick = $RTLfontImagemagick
-                                            }
-                                            $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-                                            # Loop through each symbol and replace it with a newline
-                                            if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                foreach ($symbol in $NewLineSymbols) {
-                                                    # Default: Replace the symbol with a newline
-                                                    $replacementString = "`n"
-
-                                                    # Check if the symbol should be kept
-                                                    $keepThisSymbol = $false
-                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                            if ($symbol -like "*$k*") {
-                                                                $keepThisSymbol = $true
-                                                                break # Match found, no need to keep checking
-                                                            }
-                                                        }
+                                                catch {
+                                                    if ($_.Exception.Response) {
+                                                        $statusCode = $_.Exception.Response.StatusCode.value__
                                                     }
-
-                                                    # If it's a "keep" symbol, change the replacement string
-                                                    if ($keepThisSymbol) {
-                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                        $replacementString = $symbol + "`n"
+                                                    else {
+                                                        $statusCode = $_.Exception.Message
                                                     }
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+
                                                 }
-                                            }
-                                            $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                            $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                            if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                # Add Stroke
-                                                if ($AddBackgroundTextStroke -eq 'true') {
-                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                }
-                                                Else {
-                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                }
-                                                Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                            }
+                                        }
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($global:direction -eq "RTL") {
+                                                    $backgroundfontImagemagick = $RTLfontImagemagick
+                                                }
+                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+                                                # Loop through each symbol and replace it with a newline
+                                                if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                    foreach ($symbol in $NewLineSymbols) {
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                if (!$global:IsTruncated) {
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    # Add Stroke
+                                                    if ($AddBackgroundTextStroke -eq 'true') {
+                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
+                                                    Else {
+                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
+                                                    Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $logEntry = "`"$magick`" $Arguments"
+                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                }
                                             }
                                         }
                                     }
@@ -30320,102 +30368,105 @@ else {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $fontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                    }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                    # Add Stroke
-                                                    if ($AddTextStroke -eq 'true') {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                    }
-
-                                                    Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                                if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $fontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                        # Add Stroke
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+
+                                                        Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -30926,102 +30977,105 @@ else {
                                             $SkippingText = 'true'
                                             Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                         }
-                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                            $ApplyTextInsteadOfLogo = $null
-                                            $global:LogoUrl = $null
-                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                        # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                        if ($SkippingText -ne 'true') {
+                                            if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                                $ApplyTextInsteadOfLogo = $null
+                                                $global:LogoUrl = $null
+                                                $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                                $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                            foreach ($provider in $searchOrder) {
-                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                                switch ($provider) {
-                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
-                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
-                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
-                                                }
-                                            }
-                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                            }
-                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                                $ApplyTextInsteadOfLogo = 'true'
-                                            }
-                                            ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                                try {
-                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                                }
-                                                catch {
-                                                    if ($_.Exception.Response) {
-                                                        $statusCode = $_.Exception.Response.StatusCode.value__
+                                                foreach ($provider in $searchOrder) {
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                    switch ($provider) {
+                                                        'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type movie } }
+                                                        'FANART' { $global:LogoUrl = GetFanartLogo -Type movies }
+                                                        'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
-                                                    else {
-                                                        $statusCode = $_.Exception.Message
+                                                }
+                                                if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                                }
+                                                if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                    $ApplyTextInsteadOfLogo = 'true'
+                                                }
+                                                ElseIf ($global:LogoUrl){
+                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                    try {
+                                                        $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
-                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                                }
-                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                                $logEntry = "`"$magick`" $Arguments"
-                                                $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                                InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                            }
-                                        }
-                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                                if ($global:direction -eq "RTL") {
-                                                    $backgroundfontImagemagick = $RTLfontImagemagick
-                                                }
-                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                                # Loop through each symbol and replace it with a newline
-                                                if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                    foreach ($symbol in $NewLineSymbols) {
-                                                        # Default: Replace the symbol with a newline
-                                                        $replacementString = "`n"
-
-                                                        # Check if the symbol should be kept
-                                                        $keepThisSymbol = $false
-                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                                if ($symbol -like "*$k*") {
-                                                                    $keepThisSymbol = $true
-                                                                    break # Match found, no need to keep checking
-                                                                }
-                                                            }
+                                                    catch {
+                                                        if ($_.Exception.Response) {
+                                                            $statusCode = $_.Exception.Response.StatusCode.value__
                                                         }
-
-                                                        # If it's a "keep" symbol, change the replacement string
-                                                        if ($keepThisSymbol) {
-                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                            $replacementString = $symbol + "`n"
+                                                        else {
+                                                            $statusCode = $_.Exception.Message
                                                         }
-                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                    }
-                                                }
-                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                                if (!$global:IsTruncated) {
-                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                        $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                    # Add Stroke
-                                                    if ($AddBackgroundTextStroke -eq 'true') {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                    }
-
-                                                    Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                     InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                    Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                                }
+                                            }
+                                            if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                                if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                    if ($global:direction -eq "RTL") {
+                                                        $backgroundfontImagemagick = $RTLfontImagemagick
+                                                    }
+                                                    $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                    # Loop through each symbol and replace it with a newline
+                                                    if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                        foreach ($symbol in $NewLineSymbols) {
+                                                            # Default: Replace the symbol with a newline
+                                                            $replacementString = "`n"
+
+                                                            # Check if the symbol should be kept
+                                                            $keepThisSymbol = $false
+                                                            if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                                # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                                foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                    # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                    if ($symbol -like "*$k*") {
+                                                                        $keepThisSymbol = $true
+                                                                        break # Match found, no need to keep checking
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            # If it's a "keep" symbol, change the replacement string
+                                                            if ($keepThisSymbol) {
+                                                                # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                                $replacementString = $symbol + "`n"
+                                                            }
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                    $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                    if (!$global:IsTruncated) {
+                                                        Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                        # Add Stroke
+                                                        if ($AddBackgroundTextStroke -eq 'true') {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+
+                                                        Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                        $logEntry = "`"$magick`" $Arguments"
+                                                        $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                        InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                    }
                                                 }
                                             }
                                         }
@@ -31622,102 +31676,105 @@ else {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                        $ApplyTextInsteadOfLogo = $null
-                                        $global:LogoUrl = $null
-                                        $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                        $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                    # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                    if ($SkippingText -ne 'true') {
+                                        if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                            $ApplyTextInsteadOfLogo = $null
+                                            $global:LogoUrl = $null
+                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                        foreach ($provider in $searchOrder) {
-                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                            switch ($provider) {
-                                                'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                            }
-                                        }
-                                        if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                            Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                        }
-                                        if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                            $ApplyTextInsteadOfLogo = 'true'
-                                        }
-                                        ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            try {
-                                                $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                            }
-                                            catch {
-                                                if ($_.Exception.Response) {
-                                                    $statusCode = $_.Exception.Response.StatusCode.value__
+                                            foreach ($provider in $searchOrder) {
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                switch ($provider) {
+                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
-                                                else {
-                                                    $statusCode = $_.Exception.Message
+                                            }
+                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                            }
+                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                $ApplyTextInsteadOfLogo = 'true'
+                                            }
+                                            ElseIf ($global:LogoUrl){
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                try {
+                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
-                                                Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                            }
-                                            $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                            Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                            $logEntry = "`"$magick`" $Arguments"
-                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                            Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                        }
-                                    }
-                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
-                                        if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
-                                            if ($global:direction -eq "RTL") {
-                                                $fontImagemagick = $RTLfontImagemagick
-                                            }
-                                            $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                            # Loop through each symbol and replace it with a newline
-                                            if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                foreach ($symbol in $NewLineSymbols) {
-                                                    # Default: Replace the symbol with a newline
-                                                    $replacementString = "`n"
-
-                                                    # Check if the symbol should be kept
-                                                    $keepThisSymbol = $false
-                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                            if ($symbol -like "*$k*") {
-                                                                $keepThisSymbol = $true
-                                                                break # Match found, no need to keep checking
-                                                            }
-                                                        }
+                                                catch {
+                                                    if ($_.Exception.Response) {
+                                                        $statusCode = $_.Exception.Response.StatusCode.value__
                                                     }
-
-                                                    # If it's a "keep" symbol, change the replacement string
-                                                    if ($keepThisSymbol) {
-                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                        $replacementString = $symbol + "`n"
+                                                    else {
+                                                        $statusCode = $_.Exception.Message
                                                     }
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                }
-                                            }
-                                            $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                            $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
-                                            if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                # Add Stroke
-                                                if ($AddTextStroke -eq 'true') {
-                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                                                 }
-                                                Else {
-                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                }
-
-                                                Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                            }
+                                        }
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseLogo -eq 'false'){
+                                            if ($AddText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($global:direction -eq "RTL") {
+                                                    $fontImagemagick = $RTLfontImagemagick
+                                                }
+                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                # Loop through each symbol and replace it with a newline
+                                                if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                    foreach ($symbol in $NewLineSymbols) {
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+                                                if (!$global:IsTruncated) {
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                    # Add Stroke
+                                                    if ($AddTextStroke -eq 'true') {
+                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
+                                                    Else {
+                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
+
+                                                    Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $logEntry = "`"$magick`" $Arguments"
+                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                }
                                             }
                                         }
                                     }
@@ -32242,102 +32299,105 @@ else {
                                         $SkippingText = 'true'
                                         Write-Entry -Subtext "Skipping 'AddText' because poster alreaedy has text." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Info
                                     }
-                                    if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
-                                        $ApplyTextInsteadOfLogo = $null
-                                        $global:LogoUrl = $null
-                                        $allProviders = @('TMDB', 'FANART', 'TVDB')
-                                        $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
+                                    # ONLY proceed with Logo or Text application if SkippingText is NOT true
+                                    if ($SkippingText -ne 'true') {
+                                        if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
+                                            $ApplyTextInsteadOfLogo = $null
+                                            $global:LogoUrl = $null
+                                            $allProviders = @('TMDB', 'FANART', 'TVDB')
+                                            $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
-                                        foreach ($provider in $searchOrder) {
-                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
-                                            switch ($provider) {
-                                                'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
-                                                'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
-                                                'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
-                                            }
-                                        }
-                                        if ([string]::IsNullOrEmpty($global:LogoUrl)) {
-                                            Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
-                                        }
-                                        if (!$global:LogoUrl -and $TextFallback -eq 'true'){
-                                            $ApplyTextInsteadOfLogo = 'true'
-                                        }
-                                        ElseIf ($global:LogoUrl){
-                                            $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
-                                            try {
-                                                $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
-                                            }
-                                            catch {
-                                                if ($_.Exception.Response) {
-                                                    $statusCode = $_.Exception.Response.StatusCode.value__
+                                            foreach ($provider in $searchOrder) {
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) { break }
+                                                switch ($provider) {
+                                                    'TMDB' { if ($entry.tmdbid) { $global:LogoUrl = GetTMDBLogo -Type tv } }
+                                                    'FANART' { $global:LogoUrl = GetFanartLogo -Type tv }
+                                                    'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
-                                                else {
-                                                    $statusCode = $_.Exception.Message
+                                            }
+                                            if ([string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                                            }
+                                            if (!$global:LogoUrl -and $TextFallback -eq 'true'){
+                                                $ApplyTextInsteadOfLogo = 'true'
+                                            }
+                                            ElseIf ($global:LogoUrl){
+                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
+                                                try {
+                                                    $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
-                                                Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                                                $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-
-                                            }
-                                            $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                            Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
-                                            $logEntry = "`"$magick`" $Arguments"
-                                            $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
-                                            InvokeMagickCommand -Command $magick -Arguments $Arguments
-
-                                            Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
-                                        }
-                                    }
-                                    if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
-                                        if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
-                                            if ($global:direction -eq "RTL") {
-                                                $backgroundfontImagemagick = $RTLfontImagemagick
-                                            }
-                                            $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
-
-                                            # Loop through each symbol and replace it with a newline
-                                            if ($NewLineOnSpecificSymbols -eq 'true') {
-                                                foreach ($symbol in $NewLineSymbols) {
-                                                    # Default: Replace the symbol with a newline
-                                                    $replacementString = "`n"
-
-                                                    # Check if the symbol should be kept
-                                                    $keepThisSymbol = $false
-                                                    if ($null -ne $SymbolsToKeepOnNewLine) {
-                                                        # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
-                                                        foreach ($k in $SymbolsToKeepOnNewLine) {
-                                                            # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
-                                                            if ($symbol -like "*$k*") {
-                                                                $keepThisSymbol = $true
-                                                                break # Match found, no need to keep checking
-                                                            }
-                                                        }
+                                                catch {
+                                                    if ($_.Exception.Response) {
+                                                        $statusCode = $_.Exception.Response.StatusCode.value__
                                                     }
-
-                                                    # If it's a "keep" symbol, change the replacement string
-                                                    if ($keepThisSymbol) {
-                                                        # Replace ": " with ": \n" (keeps the symbol, adds newline after)
-                                                        $replacementString = $symbol + "`n"
+                                                    else {
+                                                        $statusCode = $_.Exception.Message
                                                     }
-                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
-                                                }
-                                            }
-                                            $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
-                                            $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
-                                            if (!$global:IsTruncated) {
-                                                Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                                                    $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
 
-                                                # Add Stroke
-                                                if ($AddBackgroundTextStroke -eq 'true') {
-                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 }
-                                                Else {
-                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
-                                                }
-
-                                                Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                Write-Entry -Subtext "Applying Logo..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $Arguments
+
+                                                Remove-Item -LiteralPath $LogoImage -Force -ErrorAction SilentlyContinue | out-null
+                                            }
+                                        }
+                                        if ($ApplyTextInsteadOfLogo -eq 'true' -or $UseBGLogo -eq 'false'){
+                                            if ($AddBackgroundText -eq 'true' -and $SkippingText -eq 'false') {
+                                                if ($global:direction -eq "RTL") {
+                                                    $backgroundfontImagemagick = $RTLfontImagemagick
+                                                }
+                                                $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
+
+                                                # Loop through each symbol and replace it with a newline
+                                                if ($NewLineOnSpecificSymbols -eq 'true') {
+                                                    foreach ($symbol in $NewLineSymbols) {
+                                                        # Default: Replace the symbol with a newline
+                                                        $replacementString = "`n"
+
+                                                        # Check if the symbol should be kept
+                                                        $keepThisSymbol = $false
+                                                        if ($null -ne $SymbolsToKeepOnNewLine) {
+                                                            # Loop through all items in $SymbolsToKeepOnNewLine (in case it's an array like [':', '!'])
+                                                            foreach ($k in $SymbolsToKeepOnNewLine) {
+                                                                # Check if the $symbol (e.g., ": ") contains the $k character (e.g., ":")
+                                                                if ($symbol -like "*$k*") {
+                                                                    $keepThisSymbol = $true
+                                                                    break # Match found, no need to keep checking
+                                                                }
+                                                            }
+                                                        }
+
+                                                        # If it's a "keep" symbol, change the replacement string
+                                                        if ($keepThisSymbol) {
+                                                            # Replace ": " with ": \n" (keeps the symbol, adds newline after)
+                                                            $replacementString = $symbol + "`n"
+                                                        }
+                                                        $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
+                                                $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
+                                                if (!$global:IsTruncated) {
+                                                    Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+
+                                                    # Add Stroke
+                                                    if ($AddBackgroundTextStroke -eq 'true') {
+                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
+                                                    Else {
+                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
+
+                                                    Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $logEntry = "`"$magick`" $Arguments"
+                                                    $logEntry | Out-File $global:ScriptRoot\Logs\ImageMagickCommands.log -Append
+                                                    InvokeMagickCommand -Command $magick -Arguments $Arguments
+                                                }
                                             }
                                         }
                                     }

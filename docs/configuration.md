@@ -143,7 +143,13 @@
     - `UseLogo` : Set to `true` to apply logos instead of title text to Posters.
     - `UseBGLogo` : Set to `true` to apply logos instead of title text to Backgrounds.
     - `UseClearlogo` : Set to `true` to use `Clearlogo`.
+        - `What it is:` A Clearlogo is a transparent PNG image that contains only the title text (logo) of a movie or show - no characters, no background, no extra artwork.
+        - `Example:` https://artworks.thetvdb.com/banners/v4/movie/165/clearlogo/61249c87cb251.png
+        - `What the setting does:` When set to `true`, the system will use the Clearlogo image instead of the standard title text.
     - `UseClearart` : Set to `true` to use `Clearart`.
+        - `What it is:` Clearart is a transparent PNG image that contains the logo *plus* additional artwork (e.g., characters or promotional art) - still fully transparent with no background.
+        - `Example:` https://artworks.thetvdb.com/banners/v4/movie/165/clearart/61249caa0924f.png
+        - `What the setting does:` When set to `true`, the system will use the Clearart image instead of the standard title text.
     - `LogoTextFallback` : Set to `true` to fallback to `Text` if no logos are found.
 
         ```diff

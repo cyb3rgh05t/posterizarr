@@ -10,6 +10,7 @@ from fastapi import (
     Form,
 )
 from contextlib import asynccontextmanager
+from .defaults import setup_default_images
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse
@@ -38,6 +39,10 @@ import shutil
 import sqlite3
 from fastapi import BackgroundTasks
 from starlette.responses import FileResponse
+from PIL import Image, ImageDraw, ImageChops
+from io import BytesIO
+from base64 import b64encode
+from .overlay_generator import generate_overlay_image
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -55,7 +60,7 @@ if IS_DOCKER:
     APP_DIR = Path("/app")
     ASSETS_DIR = Path("/assets")
     MANUAL_ASSETS_DIR = Path("/manualassets")
-    IMAGES_DIR = Path("/app/images")
+    IMAGES_DIR = Path("/config/Cache/images")
     FRONTEND_DIR = Path("/app/frontend/dist")
     BACKUP_DIR = BASE_DIR / "assetsbackup"  # Docker default
 else:
@@ -856,7 +861,7 @@ def process_image_path(image_path: Path):
         return None
 
 
-def determine_media_type(filename: str, library_folder: Optional[str] = None) -> str:
+def determine_media_type(filename: str, library_folder: str | None = None) -> str:
     """
     Determine media type from filename and library folder.
     Supports .jpg, .jpeg, .png, .webp
@@ -1749,6 +1754,13 @@ async def lifespan(app: FastAPI):
 
     logger.info("Starting Posterizarr Web UI Backend")
 
+    # Setup default images for Creator Mode preview
+    try:
+        setup_default_images(IMAGES_DIR)
+        logger.info(f"Default images checked/created in {IMAGES_DIR}")
+    except Exception as e:
+        logger.error(f"Error setting up default images: {e}")
+
     # This blocks the app from starting until the first scan is done,
     # ensuring the UI is populated on first load.
     logger.info(
@@ -2089,6 +2101,36 @@ class AppriseValidationRequest(BaseModel):
 
 class UptimeKumaValidationRequest(BaseModel):
     url: str
+
+
+# In backend/main.py
+
+
+class OverlayCreatorRequest(BaseModel):
+    border_enabled: bool = False
+    border_px: int = 0
+    border_color: str = "#FFFFFF"
+    corner_radius: float = 0.0
+
+    # Gradient / Matte
+    matte_height_ratio: float = 0.0
+    fade_height_ratio: float = 0.0
+    gradient_color: str = "#000000"
+
+    # Effects
+    inner_glow_strength: float = 0.0
+    inner_glow_color: str = "#000000"
+
+    vignette_strength: float = 0.0
+    vignette_color: str = "#000000"
+
+    grain_amount: float = 0.0
+    grain_size: float = 1.0
+
+    filename: Optional[str] = None
+    overlay_type: str = "poster"
+    overwrite: bool = False
+    show_text_area: bool = False
 
 
 @app.get("/api")
@@ -2465,6 +2507,10 @@ async def export_config_db():
 # ============================================================================
 
 
+# In backend/main.py
+
+
+# 1. Update the list endpoint to include modification time (mtime)
 @app.get("/api/overlayfiles")
 async def get_overlay_files():
     """Get list of overlay files from Overlayfiles directory"""
@@ -2487,6 +2533,7 @@ async def get_overlay_files():
 
         for f in OVERLAYFILES_DIR.iterdir():
             if f.is_file() and f.suffix.lower() in allowed_extensions:
+                stat = f.stat()
                 file_info = {
                     "name": f.name,
                     "type": (
@@ -2495,7 +2542,8 @@ async def get_overlay_files():
                         else "font"
                     ),
                     "extension": f.suffix.lower(),
-                    "size": f.stat().st_size,
+                    "size": stat.st_size,
+                    "mtime": int(stat.st_mtime),
                 }
                 files.append(file_info)
 
@@ -2507,6 +2555,42 @@ async def get_overlay_files():
 
     except Exception as e:
         logger.error(f"Error getting overlay files: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 2. Update the preview endpoint to disable caching headers
+@app.get("/api/overlayfiles/preview/{filename}")
+async def preview_overlay_file(filename: str):
+    """Serve overlay file for preview"""
+    try:
+        # Sanitize filename
+        safe_filename = "".join(
+            c for c in filename if c.isalnum() or c in "._- "
+        ).strip()
+
+        if not safe_filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+        file_path = OVERLAYFILES_DIR / safe_filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+
+        # Serve file with NO CACHE headers so overwrites show immediately
+        return FileResponse(
+            file_path,
+            media_type="image/png",  # Will auto-detect based on extension
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving overlay file: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -2692,37 +2776,6 @@ async def delete_overlay_file(filename: str):
         raise
     except Exception as e:
         logger.error(f"Error deleting overlay file: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/overlayfiles/preview/{filename}")
-async def preview_overlay_file(filename: str):
-    """Serve overlay file for preview"""
-    try:
-        # Sanitize filename
-        safe_filename = "".join(
-            c for c in filename if c.isalnum() or c in "._- "
-        ).strip()
-
-        if not safe_filename:
-            raise HTTPException(status_code=400, detail="Invalid filename")
-
-        file_path = OVERLAYFILES_DIR / safe_filename
-
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="File not found")
-
-        # Serve file
-        return FileResponse(
-            file_path,
-            media_type="image/png",  # Will auto-detect based on extension
-            headers={"Cache-Control": "public, max-age=3600"},
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error serving overlay file: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -12915,6 +12968,102 @@ async def tautulli_webhook(request: Request):
 
     except Exception as e:
         logger.error(f"Error processing Tautulli webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# OVERLAY CREATOR ENDPOINTS
+# ============================================================================
+
+
+@app.post("/api/overlay-creator/preview")
+async def preview_created_overlay(options: OverlayCreatorRequest):
+    """Generates a low-res preview of the overlay settings"""
+    try:
+        # Convert options to dict
+        opt_dict = options.dict()
+
+        # If Show Text Area is enabled, fetch config values from DB
+        if options.show_text_area and config_db:
+            try:
+                # Determine which config section to look up based on type
+                # Currently matching the 2 buttons in UI (Poster vs Background)
+                # You can expand this logic if you add Season/TitleCard buttons later
+                section = ""
+                if options.overlay_type == "background":
+                    section = "BackgroundOverlayPart"
+                else:
+                    section = "PosterOverlayPart"
+
+                # Fetch values (defaulting to 0 if not found/error)
+                def get_int(key):
+                    if config_db is None:
+                        return 0
+                    val = config_db.get_value(section, key)
+                    try:
+                        return int(val) if val is not None else 0
+                    except:
+                        return 0
+
+                opt_dict["text_box_w"] = get_int("MaxWidth")
+                opt_dict["text_box_h"] = get_int("MaxHeight")
+                opt_dict["text_box_offset"] = get_int("text_offset")
+
+            except Exception as e:
+                logger.error(f"Error fetching config for preview guide: {e}")
+
+        # Generate full res (RGBA)
+        img = generate_overlay_image(opt_dict)
+
+        # Resize for faster preview transfer (e.g., 500px width)
+        w, h = img.size
+        preview_w = 500
+        preview_h = int(h * (preview_w / w))
+        img = img.resize((preview_w, preview_h), Image.Resampling.LANCZOS)
+
+        # Convert to base64
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        img_str = b64encode(buffered.getvalue()).decode("utf-8")
+
+        return {"success": True, "image_base64": img_str}
+    except Exception as e:
+        logger.error(f"Error generating preview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/overlay-creator/save")
+async def save_created_overlay(options: OverlayCreatorRequest):
+    """Generates and saves the overlay as a PNG to Overlayfiles"""
+    try:
+        if not options.filename:
+            raise HTTPException(status_code=400, detail="Filename required")
+
+        safe_filename = "".join(
+            c for c in options.filename if c.isalnum() or c in "._- "
+        ).strip()
+        if not safe_filename.lower().endswith(".png"):
+            safe_filename += ".png"
+
+        save_path = OVERLAYFILES_DIR / safe_filename
+
+        # Check existence only if overwrite is False
+        if save_path.exists() and not options.overwrite:
+            raise HTTPException(status_code=409, detail="File already exists")
+
+        # Generate
+        img = generate_overlay_image(options.dict())
+        img.save(save_path, "PNG")
+
+        return {
+            "success": True,
+            "message": f"Saved {safe_filename}",
+            "filename": safe_filename,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving created overlay: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
