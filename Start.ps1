@@ -540,7 +540,7 @@ Set-PSReadLineOption -HistorySaveStyle SaveNothing
 $Header = @"
 ----------------------------------------------------
 Ideas for the container were taken from:
-DapperDrivers & Onedr0p
+DapperDrivers, Onedr0p and PJGitHub9 (effect toolkit inspiration)
 ----------------------------------------------------
 ======================================================
   _____          _            _
