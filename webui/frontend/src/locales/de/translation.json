@@ -365,7 +365,7 @@
     "matteHeight": "Matte-Höhe (Solid)",
     "fadeHeight": "Fade-Höhe (Unschärfe)",
     "saveAs": "Speichern als",
-    "generateAndSave": "Asset generieren & speichern",
+    "generateAndSave": "Overlay-Datei speichern",
     "livePreview": "Live-Vorschau",
     "updating": "Aktualisiere...",
     "backgroundContent": "Hintergrundinhalt",
