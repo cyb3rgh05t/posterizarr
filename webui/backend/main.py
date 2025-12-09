@@ -3800,23 +3800,39 @@ async def perform_plex_action(request: PlexActionRequest):
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             config = json.load(f)
 
-        # Robust Config Loading
+        # --- FIX START: Robust Config Loading ---
+        # 1. Try Root level (Flat structure)
         plex_url = config.get("PlexUrl")
         plex_token = config.get("PlexToken")
 
+        # 2. Try ApiPart (PlexToken is defined here in config_mapper.py)
+        if not plex_token:
+            api_part = config.get("ApiPart")
+            if isinstance(api_part, dict):
+                plex_token = api_part.get("PlexToken")
+
+        # 3. Try PlexPart (PlexUrl is defined here, Token might be here in older configs)
         if not plex_url or not plex_token:
             plex_part = config.get("PlexPart")
             if isinstance(plex_part, dict):
-                if not plex_url: plex_url = plex_part.get("PlexUrl")
-                if not plex_token: plex_token = plex_part.get("PlexToken")
+                if not plex_url:
+                    plex_url = plex_part.get("PlexUrl")
+                if not plex_token:
+                    plex_token = plex_part.get("PlexToken")
+        # --- FIX END ---
 
         if not plex_url or not plex_token:
+            # Log what we found to help debug if it still fails
+            logger.error(f"Config Check Failed - URL found: {bool(plex_url)}, Token found: {bool(plex_token)}")
             raise HTTPException(status_code=400, detail="Plex URL or Token not configured")
 
         plex_url = plex_url.rstrip("/")
 
     except Exception as e:
         logger.error(f"Error loading Plex config: {e}")
+        # Only return detailed error if it wasn't the HTTPException raised above
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=f"Failed to load configuration: {str(e)}")
 
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -3922,9 +3938,14 @@ async def perform_jellyfin_emby_action(request: JellyfinEmbyActionRequest):
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             config = json.load(f)
 
-        # Helper to check nested dicts (flat vs grouped)
-        def get_val(key, section):
-            return config.get(key) or config.get(section, {}).get(key)
+        # Helper to check nested dicts safely
+        def get_val(key, section_name):
+            # 1. Try Root (Flat)
+            val = config.get(key)
+            # 2. Try Section (Grouped)
+            if not val:
+                val = config.get(section_name, {}).get(key)
+            return val
 
         # Check enabled flags
         use_jellyfin = get_val("UseJellyfin", "JellyfinPart")
@@ -3933,19 +3954,36 @@ async def perform_jellyfin_emby_action(request: JellyfinEmbyActionRequest):
         if use_jellyfin:
             server_type = "Jellyfin"
             server_url = get_val("JellyfinUrl", "JellyfinPart")
-            api_key = get_val("JellyfinApiKey", "JellyfinPart")
+
+            # FIX: API Key is in ApiPart, not JellyfinPart
+            api_key = config.get("JellyfinAPIKey") # Flat
+            if not api_key:
+                api_key = config.get("ApiPart", {}).get("JellyfinAPIKey") # Correct Group
+            if not api_key:
+                api_key = config.get("JellyfinPart", {}).get("JellyfinAPIKey") # Legacy Group fallback
+
         elif use_emby:
             server_type = "Emby"
             server_url = get_val("EmbyUrl", "EmbyPart")
-            api_key = get_val("EmbyApiKey", "EmbyPart")
+
+            # FIX: API Key is in ApiPart, not EmbyPart
+            api_key = config.get("EmbyAPIKey") # Flat
+            if not api_key:
+                api_key = config.get("ApiPart", {}).get("EmbyAPIKey") # Correct Group
+            if not api_key:
+                api_key = config.get("EmbyPart", {}).get("EmbyAPIKey") # Legacy Group fallback
 
         if not server_url or not api_key:
+            # Log specific missing items for debugging
+            logger.error(f"{server_type} Config Check Failed - URL found: {bool(server_url)}, Key found: {bool(api_key)}")
             raise HTTPException(status_code=400, detail="Jellyfin/Emby not enabled or missing configuration")
 
         server_url = server_url.rstrip("/")
 
     except Exception as e:
         logger.error(f"Error loading config: {e}")
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail="Failed to load configuration")
 
     async with httpx.AsyncClient(timeout=10.0) as client:
