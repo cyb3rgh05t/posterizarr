@@ -12360,6 +12360,7 @@ Elseif ($Tautulli) {
                             $TestPath = $EntryDir
                             $ManualTestPath = $ManualEntryDir
                             $Testfile = "$global:seasontmp"
+                            $TestfileTemplate = "SeasonTemplate"
                         }
                         Else {
                             if ($entry.extraFolder) {
@@ -12371,12 +12372,14 @@ Elseif ($Tautulli) {
                             $TestPath = $AssetPath
                             $ManualTestPath = $ManualPath
                             $Testfile = "$($entry.RootFoldername)_$global:seasontmp"
+                            $TestfileTemplate = "$($entry.RootFoldername)_SeasonTemplate"
                         }
 
                         if ($Platform -eq 'Docker' -or $Platform -eq 'Linux' -or $Platform -eq 'macOS') {
                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                             $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                         }
                         else {
                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -12384,10 +12387,12 @@ Elseif ($Tautulli) {
                             if ($fullTestPath) {
                                 $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                 $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                             }
                             Else {
                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                             }
                         }
 
@@ -12413,8 +12418,17 @@ Elseif ($Tautulli) {
                                 }
                             }
                             foreach ($ext in $allowedExtensions) {
-                                $filePath = "$ManualTestPath$ext"
-                                if (Test-Path -LiteralPath $filePath) {
+                                $manualFile   = "$ManualTestPath$ext"
+                                $templateFile = "$Templatetestpath$ext"
+                                $filePath = $null
+
+                                if (Test-Path -LiteralPath $manualFile) {
+                                    $filePath = $manualFile
+                                } elseif (Test-Path -LiteralPath $templateFile) {
+                                    $filePath = $templateFile
+                                }
+
+                                if ($filePath) {
                                     Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     $posterext = $ext
                                     break
@@ -12423,6 +12437,11 @@ Elseif ($Tautulli) {
 
                             if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                 Write-Entry -Message "Found Manual Season Poster for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                $TakeLocal = $true
+                            }
+                            elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                $ManualTestPath = $Templatetestpath
                                 $TakeLocal = $true
                             }
                             Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -13079,6 +13098,7 @@ Elseif ($Tautulli) {
                                         $TestPath = $EntryDir
                                         $ManualTestPath = $ManualEntryDir
                                         $Testfile = "$global:FileNaming"
+                                        $TestfileTemplate = "EpisodeTemplate"
                                     }
                                     Else {
                                         if ($entry.extraFolder) {
@@ -13090,12 +13110,14 @@ Elseif ($Tautulli) {
                                         $TestPath = $AssetPath
                                         $ManualTestPath = $ManualPath
                                         $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                        $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                     }
 
                                     if ($Platform -eq 'Docker' -or $Platform -eq 'Linux' -or $Platform -eq 'macOS') {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -13103,10 +13125,12 @@ Elseif ($Tautulli) {
                                         if ($fullTestPath) {
                                             $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -13144,8 +13168,17 @@ Elseif ($Tautulli) {
                                                 }
                                             }
                                             foreach ($ext in $allowedExtensions) {
-                                                $filePath = "$ManualTestPath$ext"
-                                                if (Test-Path -LiteralPath $filePath) {
+                                                $manualFile   = "$ManualTestPath$ext"
+                                                $templateFile = "$Templatetestpath$ext"
+                                                $filePath = $null
+
+                                                if (Test-Path -LiteralPath $manualFile) {
+                                                    $filePath = $manualFile
+                                                } elseif (Test-Path -LiteralPath $templateFile) {
+                                                    $filePath = $templateFile
+                                                }
+
+                                                if ($filePath) {
                                                     Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     $posterext = $ext
                                                     break
@@ -13154,6 +13187,11 @@ Elseif ($Tautulli) {
 
                                             if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                                 Write-Entry -Message "Found Manual Title Card for: $global:show_name - $global:SeasonEPNumber" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $TakeLocal = $true
+                                            }
+                                            elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $ManualTestPath = $Templatetestpath
                                                 $TakeLocal = $true
                                             }
                                             Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -13678,6 +13716,7 @@ Elseif ($Tautulli) {
                                         $TestPath = $EntryDir
                                         $ManualTestPath = $ManualEntryDir
                                         $Testfile = "$global:FileNaming"
+                                        $TestfileTemplate = "EpisodeTemplate"
                                     }
                                     Else {
                                         if ($entry.extraFolder) {
@@ -13689,12 +13728,14 @@ Elseif ($Tautulli) {
                                         $TestPath = $AssetPath
                                         $ManualTestPath = $ManualPath
                                         $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                        $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                     }
 
                                     if ($Platform -eq 'Docker' -or $Platform -eq 'Linux' -or $Platform -eq 'macOS') {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -13702,10 +13743,12 @@ Elseif ($Tautulli) {
                                         if ($fullTestPath) {
                                             $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -13733,8 +13776,17 @@ Elseif ($Tautulli) {
                                                 }
                                             }
                                             foreach ($ext in $allowedExtensions) {
-                                                $filePath = "$ManualTestPath$ext"
-                                                if (Test-Path -LiteralPath $filePath) {
+                                                $manualFile   = "$ManualTestPath$ext"
+                                                $templateFile = "$Templatetestpath$ext"
+                                                $filePath = $null
+
+                                                if (Test-Path -LiteralPath $manualFile) {
+                                                    $filePath = $manualFile
+                                                } elseif (Test-Path -LiteralPath $templateFile) {
+                                                    $filePath = $templateFile
+                                                }
+
+                                                if ($filePath) {
                                                     Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     $posterext = $ext
                                                     break
@@ -13742,6 +13794,11 @@ Elseif ($Tautulli) {
                                             }
                                             if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                                 Write-Entry -Message "Found Manual Title Card for: $global:show_name - $global:SeasonEPNumber" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $TakeLocal = $true
+                                            }
+                                            elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $ManualTestPath = $Templatetestpath
                                                 $TakeLocal = $true
                                             }
                                             Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -17205,6 +17262,7 @@ Elseif ($ArrTrigger) {
                                     $TestPath = $EntryDir
                                     $ManualTestPath = $ManualEntryDir
                                     $Testfile = "$global:seasontmp"
+                                    $TestfileTemplate = "SeasonTemplate"
                                 }
                                 Else {
                                     if ($entry.extraFolder) {
@@ -17216,12 +17274,14 @@ Elseif ($ArrTrigger) {
                                     $TestPath = $AssetPath
                                     $ManualTestPath = $ManualPath
                                     $Testfile = "$($entry.RootFoldername)_$global:seasontmp"
+                                    $TestfileTemplate = "$($entry.RootFoldername)_SeasonTemplate"
                                 }
 
                                 if ($Platform -eq 'Docker' -or $Platform -eq 'Linux') {
                                     $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                     $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                                     $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                    $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                 }
                                 else {
                                     $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -17229,10 +17289,12 @@ Elseif ($ArrTrigger) {
                                     if ($fullTestPath) {
                                         $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                         $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                        $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                     }
                                     Else {
                                         $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                         $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                        $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                     }
                                 }
 
@@ -17248,8 +17310,17 @@ Elseif ($ArrTrigger) {
                                 $SeasonImage = $SeasonImage.Replace('[', '_').Replace(']', '_').Replace('{', '_').Replace('}', '_')
                                 if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                     foreach ($ext in $allowedExtensions) {
-                                        $filePath = "$ManualTestPath$ext"
-                                        if (Test-Path -LiteralPath $filePath) {
+                                        $manualFile   = "$ManualTestPath$ext"
+                                        $templateFile = "$Templatetestpath$ext"
+                                        $filePath = $null
+
+                                        if (Test-Path -LiteralPath $manualFile) {
+                                            $filePath = $manualFile
+                                        } elseif (Test-Path -LiteralPath $templateFile) {
+                                            $filePath = $templateFile
+                                        }
+
+                                        if ($filePath) {
                                             Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                             $posterext = $ext
                                             break
@@ -17258,6 +17329,11 @@ Elseif ($ArrTrigger) {
 
                                     if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                         Write-Entry -Message "Found Manual Season Poster for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                        $TakeLocal = $true
+                                    }
+                                    elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                        Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                        $ManualTestPath = $Templatetestpath
                                         $TakeLocal = $true
                                     }
                                     Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -17800,6 +17876,7 @@ Elseif ($ArrTrigger) {
                                             $TestPath = $EntryDir
                                             $ManualTestPath = $ManualEntryDir
                                             $Testfile = "$global:FileNaming"
+                                            $TestfileTemplate = "EpisodeTemplate"
                                         }
                                         Else {
                                             if ($entry.extraFolder) {
@@ -17811,12 +17888,14 @@ Elseif ($ArrTrigger) {
                                             $TestPath = $AssetPath
                                             $ManualTestPath = $ManualPath
                                             $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                            $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                         }
 
                                         if ($Platform -eq 'Docker' -or $Platform -eq 'Linux') {
                                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                             $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                         }
                                         else {
                                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -17824,10 +17903,12 @@ Elseif ($ArrTrigger) {
                                             if ($fullTestPath) {
                                                 $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                                $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                             Else {
                                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                         }
 
@@ -17855,8 +17936,17 @@ Elseif ($ArrTrigger) {
                                         Else {
                                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                                 foreach ($ext in $allowedExtensions) {
-                                                    $filePath = "$ManualTestPath$ext"
-                                                    if (Test-Path -LiteralPath $filePath) {
+                                                    $manualFile   = "$ManualTestPath$ext"
+                                                    $templateFile = "$Templatetestpath$ext"
+                                                    $filePath = $null
+
+                                                    if (Test-Path -LiteralPath $manualFile) {
+                                                        $filePath = $manualFile
+                                                    } elseif (Test-Path -LiteralPath $templateFile) {
+                                                        $filePath = $templateFile
+                                                    }
+
+                                                    if ($filePath) {
                                                         Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                         $posterext = $ext
                                                         break
@@ -17865,6 +17955,11 @@ Elseif ($ArrTrigger) {
 
                                                 if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                                     Write-Entry -Message "Found Manual Title Card for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $TakeLocal = $true
+                                                }
+                                                elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                    Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $ManualTestPath = $Templatetestpath
                                                     $TakeLocal = $true
                                                 }
                                                 Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -18277,6 +18372,7 @@ Elseif ($ArrTrigger) {
                                             $TestPath = $EntryDir
                                             $ManualTestPath = $ManualEntryDir
                                             $Testfile = "$global:FileNaming"
+                                            $TestfileTemplate = "EpisodeTemplate"
                                         }
                                         Else {
                                             if ($entry.extraFolder) {
@@ -18288,12 +18384,14 @@ Elseif ($ArrTrigger) {
                                             $TestPath = $AssetPath
                                             $ManualTestPath = $ManualPath
                                             $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                            $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                         }
 
                                         if ($Platform -eq 'Docker' -or $Platform -eq 'Linux') {
                                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                             $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                         }
                                         else {
                                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -18301,10 +18399,12 @@ Elseif ($ArrTrigger) {
                                             if ($fullTestPath) {
                                                 $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                                $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                             Else {
                                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                         }
 
@@ -18322,8 +18422,17 @@ Elseif ($ArrTrigger) {
                                         Else {
                                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                                 foreach ($ext in $allowedExtensions) {
-                                                    $filePath = "$ManualTestPath$ext"
-                                                    if (Test-Path -LiteralPath $filePath) {
+                                                    $manualFile   = "$ManualTestPath$ext"
+                                                    $templateFile = "$Templatetestpath$ext"
+                                                    $filePath = $null
+
+                                                    if (Test-Path -LiteralPath $manualFile) {
+                                                        $filePath = $manualFile
+                                                    } elseif (Test-Path -LiteralPath $templateFile) {
+                                                        $filePath = $templateFile
+                                                    }
+
+                                                    if ($filePath) {
                                                         Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                         $posterext = $ext
                                                         break
@@ -18332,6 +18441,11 @@ Elseif ($ArrTrigger) {
 
                                                 if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                                     Write-Entry -Message "Found Manual Title Card for: $global:show_name - $global:SeasonEPNumber" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $TakeLocal = $true
+                                                }
+                                                elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                    Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $ManualTestPath = $Templatetestpath
                                                     $TakeLocal = $true
                                                 }
                                                 Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -21581,6 +21695,7 @@ Elseif ($ArrTrigger) {
                                 $TestPath = $EntryDir
                                 $ManualTestPath = $ManualEntryDir
                                 $Testfile = "$global:seasontmp"
+                                $TestfileTemplate = "SeasonTemplate"
                             }
                             Else {
                                 if ($entry.extraFolder) {
@@ -21592,12 +21707,14 @@ Elseif ($ArrTrigger) {
                                 $TestPath = $AssetPath
                                 $ManualTestPath = $ManualPath
                                 $Testfile = "$($entry.RootFoldername)_$global:seasontmp"
+                                $TestfileTemplate = "$($entry.RootFoldername)_SeasonTemplate"
                             }
 
                             if ($Platform -eq 'Docker' -or $Platform -eq 'Linux' -or $Platform -eq 'macOS') {
                                 $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                 $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                                 $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                             }
                             else {
                                 $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -21605,10 +21722,12 @@ Elseif ($ArrTrigger) {
                                 if ($fullTestPath) {
                                     $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                     $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                    $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                 }
                                 Else {
                                     $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                     $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                    $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                 }
                             }
 
@@ -21634,8 +21753,17 @@ Elseif ($ArrTrigger) {
                                     }
                                 }
                                 foreach ($ext in $allowedExtensions) {
-                                    $filePath = "$ManualTestPath$ext"
-                                    if (Test-Path -LiteralPath $filePath) {
+                                    $manualFile   = "$ManualTestPath$ext"
+                                    $templateFile = "$Templatetestpath$ext"
+                                    $filePath = $null
+
+                                    if (Test-Path -LiteralPath $manualFile) {
+                                        $filePath = $manualFile
+                                    } elseif (Test-Path -LiteralPath $templateFile) {
+                                        $filePath = $templateFile
+                                    }
+
+                                    if ($filePath) {
                                         Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         $posterext = $ext
                                         break
@@ -21644,6 +21772,11 @@ Elseif ($ArrTrigger) {
 
                                 if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                     Write-Entry -Message "Found Manual Season Poster for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                    $TakeLocal = $true
+                                }
+                                elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                    Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                    $ManualTestPath = $Templatetestpath
                                     $TakeLocal = $true
                                 }
                                 Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -22299,6 +22432,7 @@ Elseif ($ArrTrigger) {
                                             $TestPath = $EntryDir
                                             $ManualTestPath = $ManualEntryDir
                                             $Testfile = "$global:FileNaming"
+                                            $TestfileTemplate = "EpisodeTemplate"
                                         }
                                         Else {
                                             if ($entry.extraFolder) {
@@ -22310,12 +22444,14 @@ Elseif ($ArrTrigger) {
                                             $TestPath = $AssetPath
                                             $ManualTestPath = $ManualPath
                                             $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                            $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                         }
 
                                         if ($Platform -eq 'Docker' -or $Platform -eq 'Linux' -or $Platform -eq 'macOS') {
                                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                             $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                         }
                                         else {
                                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -22323,10 +22459,12 @@ Elseif ($ArrTrigger) {
                                             if ($fullTestPath) {
                                                 $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                                $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                             Else {
                                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                         }
 
@@ -22364,8 +22502,17 @@ Elseif ($ArrTrigger) {
                                                     }
                                                 }
                                                 foreach ($ext in $allowedExtensions) {
-                                                    $filePath = "$ManualTestPath$ext"
-                                                    if (Test-Path -LiteralPath $filePath) {
+                                                    $manualFile   = "$ManualTestPath$ext"
+                                                    $templateFile = "$Templatetestpath$ext"
+                                                    $filePath = $null
+
+                                                    if (Test-Path -LiteralPath $manualFile) {
+                                                        $filePath = $manualFile
+                                                    } elseif (Test-Path -LiteralPath $templateFile) {
+                                                        $filePath = $templateFile
+                                                    }
+
+                                                    if ($filePath) {
                                                         Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                         $posterext = $ext
                                                         break
@@ -22374,6 +22521,11 @@ Elseif ($ArrTrigger) {
 
                                                 if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                                     Write-Entry -Message "Found Manual Title Card for: $global:show_name - $global:SeasonEPNumber" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $TakeLocal = $true
+                                                }
+                                                elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                    Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $ManualTestPath = $Templatetestpath
                                                     $TakeLocal = $true
                                                 }
                                                 Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -22898,6 +23050,7 @@ Elseif ($ArrTrigger) {
                                             $TestPath = $EntryDir
                                             $ManualTestPath = $ManualEntryDir
                                             $Testfile = "$global:FileNaming"
+                                            $TestfileTemplate = "EpisodeTemplate"
                                         }
                                         Else {
                                             if ($entry.extraFolder) {
@@ -22909,12 +23062,14 @@ Elseif ($ArrTrigger) {
                                             $TestPath = $AssetPath
                                             $ManualTestPath = $ManualPath
                                             $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                            $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                         }
 
                                         if ($Platform -eq 'Docker' -or $Platform -eq 'Linux' -or $Platform -eq 'macOS') {
                                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                             $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                         }
                                         else {
                                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -22922,10 +23077,12 @@ Elseif ($ArrTrigger) {
                                             if ($fullTestPath) {
                                                 $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                                $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                             Else {
                                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                         }
 
@@ -22953,8 +23110,17 @@ Elseif ($ArrTrigger) {
                                                     }
                                                 }
                                                 foreach ($ext in $allowedExtensions) {
-                                                    $filePath = "$ManualTestPath$ext"
-                                                    if (Test-Path -LiteralPath $filePath) {
+                                                    $manualFile   = "$ManualTestPath$ext"
+                                                    $templateFile = "$Templatetestpath$ext"
+                                                    $filePath = $null
+
+                                                    if (Test-Path -LiteralPath $manualFile) {
+                                                        $filePath = $manualFile
+                                                    } elseif (Test-Path -LiteralPath $templateFile) {
+                                                        $filePath = $templateFile
+                                                    }
+
+                                                    if ($filePath) {
                                                         Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                         $posterext = $ext
                                                         break
@@ -22962,6 +23128,11 @@ Elseif ($ArrTrigger) {
                                                 }
                                                 if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                                     Write-Entry -Message "Found Manual Title Card for: $global:show_name - $global:SeasonEPNumber" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $TakeLocal = $true
+                                                }
+                                                elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                    Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                    $ManualTestPath = $Templatetestpath
                                                     $TakeLocal = $true
                                                 }
                                                 Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -27653,6 +27824,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 $TestPath = $EntryDir
                                 $ManualTestPath = $ManualEntryDir
                                 $Testfile = "$global:seasontmp"
+                                $TestfileTemplate = "SeasonTemplate"
                                 Write-Entry -Message "LibraryFolders enabled. SeasonImageoriginal: $SeasonImageoriginal, TestPath: $TestPath, ManualTestPath: $ManualTestPath, Testfile: $Testfile" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             }
                             Else {
@@ -27665,6 +27837,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 $TestPath = $AssetPath
                                 $ManualTestPath = $ManualPath
                                 $Testfile = "$($entry.RootFoldername)_$global:seasontmp"
+                                $TestfileTemplate = "$($entry.RootFoldername)_SeasonTemplate"
                                 Write-Entry -Message "LibraryFolders disabled. SeasonImageoriginal: $SeasonImageoriginal, TestPath: $TestPath, ManualTestPath: $ManualTestPath, Testfile: $Testfile" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             }
 
@@ -27672,6 +27845,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                 $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                                 $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                 Write-Entry -Message "Platform is Docker/Linux. hashtestpath: $hashtestpath, SeasonImageoriginal: $SeasonImageoriginal, manualtestpath: $manualtestpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             }
                             else {
@@ -27680,11 +27854,13 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 if ($fullTestPath) {
                                     $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                     $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                    $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                     Write-Entry -Message "Windows path resolved. fullTestPath: $($fullTestPath.ProviderPath), fullManualTestPath: $($fullManualTestPath.ProviderPath)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                 }
                                 Else {
                                     $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                     $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                    $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                     Write-Entry -Message "Windows path fallback. TestPath: $TestPath, ManualTestPath: $ManualTestPath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Debug
                                 }
                             }
@@ -27704,8 +27880,17 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                             Write-Entry -Message "Added $hashtestpath to checkedItems" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                                 foreach ($ext in $allowedExtensions) {
-                                    $filePath = "$ManualTestPath$ext"
-                                    if (Test-Path -LiteralPath $filePath) {
+                                    $manualFile   = "$ManualTestPath$ext"
+                                    $templateFile = "$Templatetestpath$ext"
+                                    $filePath = $null
+
+                                    if (Test-Path -LiteralPath $manualFile) {
+                                        $filePath = $manualFile
+                                    } elseif (Test-Path -LiteralPath $templateFile) {
+                                        $filePath = $templateFile
+                                    }
+
+                                    if ($filePath) {
                                         Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                         $posterext = $ext
                                         break
@@ -27714,6 +27899,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
 
                                 if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                     Write-Entry -Message "Found Manual Season Poster for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                    $TakeLocal = $true
+                                }
+                                elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                    Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                    $ManualTestPath = $Templatetestpath
                                     $TakeLocal = $true
                                 }
                                 Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -28255,6 +28445,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $TestPath = $EntryDir
                                         $ManualTestPath = $ManualEntryDir
                                         $Testfile = "$global:FileNaming"
+                                        $TestfileTemplate = "EpisodeTemplate"
                                     }
                                     Else {
                                         if ($entry.extraFolder) {
@@ -28266,12 +28457,14 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $TestPath = $AssetPath
                                         $ManualTestPath = $ManualPath
                                         $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                        $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                     }
 
                                     if ($Platform -eq 'Docker' -or $Platform -eq 'Linux') {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -28279,10 +28472,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         if ($fullTestPath) {
                                             $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -28311,8 +28506,17 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $checkedItems += $hashtestpath
                                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                                             foreach ($ext in $allowedExtensions) {
-                                                $filePath = "$ManualTestPath$ext"
-                                                if (Test-Path -LiteralPath $filePath) {
+                                                $manualFile   = "$ManualTestPath$ext"
+                                                $templateFile = "$Templatetestpath$ext"
+                                                $filePath = $null
+
+                                                if (Test-Path -LiteralPath $manualFile) {
+                                                    $filePath = $manualFile
+                                                } elseif (Test-Path -LiteralPath $templateFile) {
+                                                    $filePath = $templateFile
+                                                }
+
+                                                if ($filePath) {
                                                     Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     $posterext = $ext
                                                     break
@@ -28321,6 +28525,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
 
                                             if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                                 Write-Entry -Message "Found Manual Title Card for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $TakeLocal = $true
+                                            }
+                                            elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $ManualTestPath = $Templatetestpath
                                                 $TakeLocal = $true
                                             }
                                             Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -28732,6 +28941,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $TestPath = $EntryDir
                                         $ManualTestPath = $ManualEntryDir
                                         $Testfile = "$global:FileNaming"
+                                        $TestfileTemplate = "EpisodeTemplate"
                                     }
                                     Else {
                                         if ($entry.extraFolder) {
@@ -28743,12 +28953,14 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $TestPath = $AssetPath
                                         $ManualTestPath = $ManualPath
                                         $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                        $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                     }
 
                                     if ($Platform -eq 'Docker' -or $Platform -eq 'Linux') {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -28756,10 +28968,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         if ($fullTestPath) {
                                             $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -28778,8 +28992,17 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $checkedItems += $hashtestpath
                                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                                             foreach ($ext in $allowedExtensions) {
-                                                $filePath = "$ManualTestPath$ext"
-                                                if (Test-Path -LiteralPath $filePath) {
+                                                $manualFile   = "$ManualTestPath$ext"
+                                                $templateFile = "$Templatetestpath$ext"
+                                                $filePath = $null
+
+                                                if (Test-Path -LiteralPath $manualFile) {
+                                                    $filePath = $manualFile
+                                                } elseif (Test-Path -LiteralPath $templateFile) {
+                                                    $filePath = $templateFile
+                                                }
+
+                                                if ($filePath) {
                                                     Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     $posterext = $ext
                                                     break
@@ -28788,6 +29011,11 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
 
                                             if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                                 Write-Entry -Message "Found Manual Title Card for: $global:show_name - $global:SeasonEPNumber" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $TakeLocal = $true
+                                            }
+                                            elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $ManualTestPath = $Templatetestpath
                                                 $TakeLocal = $true
                                             }
                                             Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -32660,6 +32888,7 @@ else {
                             $TestPath = $EntryDir
                             $ManualTestPath = $ManualEntryDir
                             $Testfile = "$global:seasontmp"
+                            $TestfileTemplate = "SeasonTemplate"
                         }
                         Else {
                             if ($entry.extraFolder) {
@@ -32671,12 +32900,14 @@ else {
                             $TestPath = $AssetPath
                             $ManualTestPath = $ManualPath
                             $Testfile = "$($entry.RootFoldername)_$global:seasontmp"
+                            $TestfileTemplate = "$($entry.RootFoldername)_SeasonTemplate"
                         }
 
                         if ($Platform -eq 'Docker' -or $Platform -eq 'Linux' -or $Platform -eq 'macOS') {
                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                             $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                         }
                         else {
                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -32684,10 +32915,12 @@ else {
                             if ($fullTestPath) {
                                 $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                 $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                             }
                             Else {
                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                             }
                         }
 
@@ -32714,8 +32947,17 @@ else {
                                 }
                             }
                             foreach ($ext in $allowedExtensions) {
-                                $filePath = "$ManualTestPath$ext"
-                                if (Test-Path -LiteralPath $filePath) {
+                                $manualFile   = "$ManualTestPath$ext"
+                                $templateFile = "$Templatetestpath$ext"
+                                $filePath = $null
+
+                                if (Test-Path -LiteralPath $manualFile) {
+                                    $filePath = $manualFile
+                                } elseif (Test-Path -LiteralPath $templateFile) {
+                                    $filePath = $templateFile
+                                }
+
+                                if ($filePath) {
                                     Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                     $posterext = $ext
                                     break
@@ -32723,6 +32965,11 @@ else {
                             }
                             if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                 Write-Entry -Message "Found Manual Season Poster for: $Titletext" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                $TakeLocal = $true
+                            }
+                            elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                $ManualTestPath = $Templatetestpath
                                 $TakeLocal = $true
                             }
                             Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
@@ -33456,6 +33703,7 @@ else {
                                         $TestPath = $EntryDir
                                         $ManualTestPath = $ManualEntryDir
                                         $Testfile = "$global:FileNaming"
+                                        $TestfileTemplate = "EpisodeTemplate"
                                     }
                                     Else {
                                         if ($entry.extraFolder) {
@@ -33467,12 +33715,14 @@ else {
                                         $TestPath = $AssetPath
                                         $ManualTestPath = $ManualPath
                                         $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                        $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                     }
 
                                     if ($Platform -eq 'Docker' -or $Platform -eq 'Linux' -or $Platform -eq 'macOS') {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -33480,10 +33730,12 @@ else {
                                         if ($fullTestPath) {
                                             $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -33522,8 +33774,17 @@ else {
                                                 }
                                             }
                                             foreach ($ext in $allowedExtensions) {
-                                                $filePath = "$ManualTestPath$ext"
-                                                if (Test-Path -LiteralPath $filePath) {
+                                                $manualFile   = "$ManualTestPath$ext"
+                                                $templateFile = "$Templatetestpath$ext"
+                                                $filePath = $null
+
+                                                if (Test-Path -LiteralPath $manualFile) {
+                                                    $filePath = $manualFile
+                                                } elseif (Test-Path -LiteralPath $templateFile) {
+                                                    $filePath = $templateFile
+                                                }
+
+                                                if ($filePath) {
                                                     Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     $posterext = $ext
                                                     break
@@ -33533,6 +33794,11 @@ else {
                                                 Write-Entry -Message "Found Manual Title Card for: $global:show_name - $global:SeasonEPNumber" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
                                                 $TakeLocal = $true
                                                 $Episodepostersearchtext = $true
+                                            }
+                                            elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $ManualTestPath = $Templatetestpath
+                                                $TakeLocal = $true
                                             }
                                             Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
                                                 $LocalAssetMissing = 'true'
@@ -34119,6 +34385,7 @@ else {
                                         $TestPath = $EntryDir
                                         $ManualTestPath = $ManualEntryDir
                                         $Testfile = "$global:FileNaming"
+                                        $TestfileTemplate = "EpisodeTemplate"
                                     }
                                     Else {
                                         if ($entry.extraFolder) {
@@ -34130,12 +34397,14 @@ else {
                                         $TestPath = $AssetPath
                                         $ManualTestPath = $ManualPath
                                         $Testfile = "$($entry.RootFoldername)_$global:FileNaming"
+                                        $TestfileTemplate = "$($entry.RootFoldername)_EpisodeTemplate"
                                     }
 
                                     if ($Platform -eq 'Docker' -or $Platform -eq 'Linux' -or $Platform -eq 'macOS') {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -34143,10 +34412,12 @@ else {
                                         if ($fullTestPath) {
                                             $hashtestpath = ($fullTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($fullManualTestPath.ProviderPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($fullManualTestPath.ProviderPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
+                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -34175,8 +34446,17 @@ else {
                                                 }
                                             }
                                             foreach ($ext in $allowedExtensions) {
-                                                $filePath = "$ManualTestPath$ext"
-                                                if (Test-Path -LiteralPath $filePath) {
+                                                $manualFile   = "$ManualTestPath$ext"
+                                                $templateFile = "$Templatetestpath$ext"
+                                                $filePath = $null
+
+                                                if (Test-Path -LiteralPath $manualFile) {
+                                                    $filePath = $manualFile
+                                                } elseif (Test-Path -LiteralPath $templateFile) {
+                                                    $filePath = $templateFile
+                                                }
+
+                                                if ($filePath) {
                                                     Write-Entry -Message "Local file exists: $filePath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                                                     $posterext = $ext
                                                     break
@@ -34184,6 +34464,11 @@ else {
                                             }
                                             if ((Test-Path -LiteralPath "$($Manualtestpath)$posterext") -and $Manualtestpath -ne '\') {
                                                 Write-Entry -Message "Found Manual Title Card for: $global:show_name - $global:SeasonEPNumber" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $TakeLocal = $true
+                                            }
+                                            elseif ((Test-Path -LiteralPath "$($Templatetestpath)$posterext") -and $Templatetestpath -ne '\') {
+                                                Write-Entry -Message "Found Template Poster..." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color White -log Info
+                                                $ManualTestPath = $Templatetestpath
                                                 $TakeLocal = $true
                                             }
                                             Elseif ($global:DisableOnlineAssetFetch -eq 'true') {
