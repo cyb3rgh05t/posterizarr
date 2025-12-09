@@ -27,7 +27,8 @@ import {
   BringToFront,
   SendToBack,
   Sun,
-  Moon
+  Moon,
+  Grid
 } from "lucide-react";
 import { useToast } from "../context/ToastContext";
 import ScrollToButtons from "./ScrollToButtons";
@@ -36,16 +37,16 @@ import ScrollToButtons from "./ScrollToButtons";
 const ColorInput = ({ value, onChange, label }) => (
     <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
         <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-theme shadow-sm shrink-0">
-            <input 
-                type="color" 
+            <input
+                type="color"
                 value={value}
                 onChange={e => onChange(e.target.value)}
                 className="absolute -top-2 -left-2 w-12 h-12 cursor-pointer p-0 border-0"
                 title={label}
             />
         </div>
-        <input 
-            type="text" 
+        <input
+            type="text"
             value={value}
             onChange={e => onChange(e.target.value)}
             className="w-24 bg-transparent border border-theme rounded-md px-2 py-1 text-xs font-mono uppercase text-white focus:border-theme-primary focus:outline-none transition-colors"
@@ -53,16 +54,51 @@ const ColorInput = ({ value, onChange, label }) => (
     </div>
 );
 
+// HELPER: Background Class Generator
+const getBackgroundClass = (mode) => {
+    if (mode === 'light') return "bg-gray-100";
+    if (mode === 'checker') return "bg-white [background-image:linear-gradient(45deg,#ccc_25%,transparent_25%),linear-gradient(-45deg,#ccc_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#ccc_75%),linear-gradient(-45deg,transparent_75%,#ccc_75%)] [background-size:20px_20px] [background-position:0_0,0_10px,10px_-10px,-10px_0px]";
+    // Default Dark
+    return "bg-[#1a1a1a] bg-[url('https://transparenttextures.com/patterns/dark-matter.png')]";
+};
+
+// COMPONENT: Background Toggle Buttons
+const BackgroundToggle = ({ current, onChange, className = "" }) => (
+    <div className={`flex items-center bg-theme-input rounded-lg p-1 border border-theme/50 ${className}`}>
+        <button
+            onClick={(e) => { e.stopPropagation(); onChange("dark"); }}
+            className={`p-1.5 rounded-md transition-all ${current === 'dark' ? 'bg-theme-primary text-white shadow-sm' : 'text-theme-muted hover:text-white'}`}
+            title="Dark Background"
+        >
+            <Moon className="w-3.5 h-3.5" />
+        </button>
+        <button
+            onClick={(e) => { e.stopPropagation(); onChange("light"); }}
+            className={`p-1.5 rounded-md transition-all ${current === 'light' ? 'bg-theme-primary text-white shadow-sm' : 'text-theme-muted hover:text-white'}`}
+            title="Light Background"
+        >
+            <Sun className="w-3.5 h-3.5" />
+        </button>
+        <button
+            onClick={(e) => { e.stopPropagation(); onChange("checker"); }}
+            className={`p-1.5 rounded-md transition-all ${current === 'checker' ? 'bg-theme-primary text-white shadow-sm' : 'text-theme-muted hover:text-white'}`}
+            title="Transparent/Grid Background"
+        >
+            <Grid className="w-3.5 h-3.5" />
+        </button>
+    </div>
+);
+
 // COMPONENT: Interactive Layer
 const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parentRef }) => {
     const layerRef = useRef(null);
-    
+
     // Store drag state
-    const dragStart = useRef({ 
-        centerX: 0, centerY: 0, 
+    const dragStart = useRef({
+        centerX: 0, centerY: 0,
         startX: 0, startY: 0,
-        startDist: 0, startWidth: 0, 
-        aspectRatio: 1 
+        startDist: 0, startWidth: 0,
+        aspectRatio: 1
     });
 
     const baseZ = layer.position === 'back' ? 10 : 60;
@@ -74,7 +110,7 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
         e.preventDefault();
         e.stopPropagation();
         onSelect(layer.id);
-        
+
         if (!parentRef.current) return;
 
         dragStart.current = {
@@ -109,12 +145,12 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
     const handleResizeStart = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         if (!parentRef.current || !layerRef.current) return;
         const rect = layerRef.current.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
-        
+
         dragStart.current = {
             centerX, centerY,
             startDist: Math.hypot(e.clientX - centerX, e.clientY - centerY),
@@ -150,7 +186,7 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
         e.stopPropagation();
         if (!layerRef.current) return;
         const rect = layerRef.current.getBoundingClientRect();
-        
+
         dragStart.current = {
             centerX: rect.left + rect.width / 2,
             centerY: rect.top + rect.height / 2
@@ -164,7 +200,7 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
         const { centerX, centerY } = dragStart.current;
         const angleRad = Math.atan2(e.clientY - centerY, e.clientX - centerX);
         let angleDeg = angleRad * (180 / Math.PI);
-        angleDeg += 90; 
+        angleDeg += 90;
         onChange(layer.id, { rotation: angleDeg });
     };
 
@@ -177,7 +213,7 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
         <div
             ref={layerRef}
             onMouseDown={handleDragStart}
-            onClick={(e) => e.stopPropagation()} 
+            onClick={(e) => e.stopPropagation()}
             className={`absolute cursor-move select-none`}
             style={{
                 left: `${layer.x * 100}%`,
@@ -194,13 +230,13 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
                      <div className="absolute inset-0 border-2 border-dashed border-red-400/50 pointer-events-none" />
                 )}
 
-                <img 
-                    src={layer.src} 
-                    alt="layer" 
+                <img
+                    src={layer.src}
+                    alt="layer"
                     style={{ opacity: layer.opacity }}
-                    className={`w-full h-full object-contain pointer-events-none transition-opacity duration-300`} 
+                    className={`w-full h-full object-contain pointer-events-none transition-opacity duration-300`}
                 />
-                
+
                 {isSelected && (
                     <>
                         <div
@@ -228,7 +264,7 @@ const InteractiveLayer = ({ layer, index, isSelected, onSelect, onChange, parent
 function AssetsManager() {
   const { t } = useTranslation();
   const { showSuccess, showError } = useToast();
-  
+
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -239,20 +275,23 @@ function AssetsManager() {
   const [selectedFile, setSelectedFile] = useState(null);
 
   // Creator State
-  const [viewMode, setViewMode] = useState("list"); 
+  const [viewMode, setViewMode] = useState("list");
   const [activeTab, setActiveTab] = useState("design");
   const [creatorLoading, setCreatorLoading] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [sampleImage, setSampleImage] = useState(null);
-  
+
   const [layers, setLayers] = useState([]);
   const [selectedLayerId, setSelectedLayerId] = useState(null);
   const canvasRef = useRef(null);
   const [customPreviews, setCustomPreviews] = useState({ poster: null, background: null });
-  const [overwriteConfirm, setOverwriteConfirm] = useState(null); 
-  
+  const [overwriteConfirm, setOverwriteConfirm] = useState(null);
+
+  // Preview Background State
+  const [previewBg, setPreviewBg] = useState("dark"); // 'dark', 'light', 'checker'
+
   const [options, setOptions] = useState({
-    overlay_type: "poster", 
+    overlay_type: "poster",
     border_enabled: false,
     border_px: 20,
     border_color: "#ffffff",
@@ -265,7 +304,7 @@ function AssetsManager() {
     vignette_strength: 0.0,
     vignette_color: "#000000",
     grain_amount: 0.0,
-    grain_size: 1.0, 
+    grain_size: 1.0,
     show_text_area: false,
     filename: "custom_overlay"
   });
@@ -316,8 +355,8 @@ function AssetsManager() {
                 height: 0.3 / aspectRatio,
                 aspectRatio: aspectRatio,
                 rotation: 0,
-                position: 'front', 
-                opacity: 1.0 
+                position: 'front',
+                opacity: 1.0
             };
             setLayers(prev => [...prev, newLayer]);
             setSelectedLayerId(newLayer.id);
@@ -393,14 +432,14 @@ function AssetsManager() {
             setCreatorLoading(true);
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d");
-            
+
             const baseImg = new Image();
             await new Promise((resolve, reject) => {
                 baseImg.onload = resolve;
                 baseImg.onerror = reject;
-                baseImg.src = previewImage; 
+                baseImg.src = previewImage;
             });
-            
+
             canvas.width = baseImg.naturalWidth;
             canvas.height = baseImg.naturalHeight;
 
@@ -412,8 +451,8 @@ function AssetsManager() {
                     img.src = layer.src;
                 });
                 const imgRatio = img.naturalWidth / img.naturalHeight;
-                const w = layer.width * canvas.width; 
-                const h = w / imgRatio; 
+                const w = layer.width * canvas.width;
+                const h = w / imgRatio;
                 const x = layer.x * canvas.width;
                 const y = layer.y * canvas.height;
                 const centerX = x + w / 2;
@@ -421,7 +460,7 @@ function AssetsManager() {
 
                 ctx.save();
                 ctx.globalAlpha = layer.opacity !== undefined ? layer.opacity : 1.0;
-                
+
                 ctx.translate(centerX, centerY);
                 ctx.rotate((layer.rotation || 0) * Math.PI / 180);
                 ctx.drawImage(img, -w / 2, -h / 2, w, h);
@@ -435,20 +474,20 @@ function AssetsManager() {
             }
 
             // 2. Draw Overlay
-            ctx.globalAlpha = 1.0; 
+            ctx.globalAlpha = 1.0;
             ctx.drawImage(baseImg, 0, 0);
-            
+
             // 3. Draw FRONT Layers
             const frontLayers = layers.filter(l => l.position !== 'back');
             for (const layer of frontLayers) {
                 await drawLayerToCanvas(layer);
             }
-            
+
             const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
             const formData = new FormData();
             const finalFilename = options.filename.endsWith('.png') ? options.filename : `${options.filename}.png`;
             formData.append("file", new File([blob], finalFilename, { type: "image/png" }));
-            
+
             const response = await fetch("/api/overlayfiles/upload", { method: "POST", body: formData });
             const data = await response.json();
             if (response.ok && data.success) {
@@ -462,7 +501,7 @@ function AssetsManager() {
             console.error("Compositing error:", err);
             showError("Failed to combine layers: " + err.message);
         } finally { setCreatorLoading(false); }
-        return; 
+        return;
     }
 
     try {
@@ -541,7 +580,7 @@ function AssetsManager() {
   return (
     <div className="space-y-6" onClick={() => setSelectedLayerId(null)}>
       <ScrollToButtons />
-      
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="text-theme-muted"><p>{t("overlayAssets.description")}</p></div>
@@ -671,8 +710,8 @@ function AssetsManager() {
                                             {layer.position === 'back' && (
                                                 <div className="flex flex-col items-end justify-center w-16 mr-2 group" onClick={(e) => e.stopPropagation()} title={t("overlayAssets.controls.adjustOpacity")}>
                                                     <span className="text-[9px] text-theme-muted leading-none mb-0.5">{Math.round(layer.opacity * 100)}%</span>
-                                                    <input 
-                                                        type="range" 
+                                                    <input
+                                                        type="range"
                                                         min="0" max="1" step="0.05"
                                                         value={layer.opacity}
                                                         onChange={(e) => updateLayer(layer.id, { opacity: parseFloat(e.target.value) })}
@@ -680,7 +719,7 @@ function AssetsManager() {
                                                     />
                                                 </div>
                                             )}
-                                            
+
                                             <button onClick={(e) => { e.stopPropagation(); toggleLayerPosition(layer.id) }} className="p-1 hover:bg-white/10 rounded" title={layer.position === 'back' ? t("overlayAssets.controls.bringFront") : t("overlayAssets.controls.sendBack")}>
                                                 {layer.position === 'back' ? <BringToFront className="w-4 h-4 text-theme-primary" /> : <SendToBack className="w-4 h-4 text-theme-text" />}
                                             </button>
@@ -718,13 +757,27 @@ function AssetsManager() {
 
             {/* Preview Panel */}
             <div className="lg:col-span-2 bg-theme-card border border-theme rounded-lg p-6 flex flex-col min-h-[600px]">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
                     <h3 className="text-theme-muted text-sm font-medium uppercase tracking-wide flex items-center gap-2">
-                        {t("overlayAssets.livePreview")} <span className="bg-theme-hover px-2 py-0.5 rounded text-xs normal-case">{options.overlay_type === "background" ? "16:9" : "2:3"}</span>
+                        {t("overlayAssets.livePreview")}
+                        <span className="bg-theme-hover px-2 py-0.5 rounded text-xs normal-case">
+                            {options.overlay_type === "background" ? "16:9" : "2:3"}
+                        </span>
                     </h3>
+
+                    {/* Background Controls & Upload Actions */}
                     <div className="flex items-center gap-3">
-                        {creatorLoading && (<span className="text-xs text-theme-primary flex items-center gap-1 animate-pulse"><RefreshCw className="w-3 h-3 animate-spin"/> {t("overlayAssets.updating")}</span>)}
+                        <BackgroundToggle current={previewBg} onChange={setPreviewBg} className="mr-2" />
+
+                        {/* Existing Loading/Reset logic */}
+                        {creatorLoading && (
+                            <span className="text-xs text-theme-primary flex items-center gap-1 animate-pulse">
+                                <RefreshCw className="w-3 h-3 animate-spin"/> {t("overlayAssets.updating")}
+                            </span>
+                        )}
+
                         <div className="h-4 w-px bg-theme-border mx-1"></div>
+
                         {currentActivePreview ? (
                             <button onClick={resetCustomPreview} className="px-3 py-1.5 text-xs font-medium bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-md flex items-center gap-2 transition-all hover:shadow-sm" title={t("overlayAssets.resetSample")}>
                                 <RotateCcw className="w-3 h-3" /> {t("overlayAssets.resetSample")}
@@ -737,17 +790,18 @@ function AssetsManager() {
                         )}
                     </div>
                 </div>
-                
-                <div className="flex-1 bg-[#1a1a1a] rounded-lg border border-theme/50 relative overflow-hidden flex items-center justify-center p-8 bg-[url('https://transparenttextures.com/patterns/dark-matter.png')]">
+
+                {/* Dynamic Background Container */}
+                <div className={`flex-1 rounded-lg border border-theme/50 relative overflow-hidden flex items-center justify-center p-8 transition-colors duration-300 ${getBackgroundClass(previewBg)}`}>
                     <div ref={canvasRef} className={`relative shadow-2xl bg-gray-800 rounded-sm ring-1 ring-white/10 group w-full ${options.overlay_type === 'background' ? 'aspect-video max-w-4xl' : 'aspect-[2/3] max-w-sm'}`}>
                         {/* 1. Base Content (Sample Image) */}
                         <div className="absolute inset-0 flex items-center justify-center text-gray-700 bg-gray-800 z-0 pointer-events-none">
                             {currentActivePreview ? (<img src={currentActivePreview} alt="Custom Sample" className="w-full h-full object-cover" />) : sampleImage ? (<img src={sampleImage} alt="Sample" className="w-full h-full object-cover" />) : (<div className="text-center"><ImageIcon className="w-16 h-16 mx-auto mb-2 opacity-20" /></div>)}
                         </div>
-                        
+
                         {/* 2. Generated Overlay Effect (Z-Index 50) */}
                         {previewImage && (<img src={previewImage} alt="Overlay Preview" className="absolute inset-0 w-full h-full object-contain z-[50] pointer-events-none" />)}
-                        
+
                         {/* 3. Interactive Layers (Z-Index determined inside component) */}
                         {layers.map((layer, index) => (
                             <InteractiveLayer key={layer.id} layer={layer} index={index} isSelected={selectedLayerId === layer.id} onSelect={setSelectedLayerId} onChange={updateLayer} parentRef={canvasRef} />
@@ -765,7 +819,12 @@ function AssetsManager() {
       {viewMode === "list" && (
         <div className="animate-in fade-in duration-300">
             <div className="bg-theme-card border border-theme rounded-lg p-6 mb-6">
-                <div className="flex items-center gap-3 mb-4"><Upload className="w-5 h-5 text-theme-primary" /><h2 className="text-xl font-semibold text-theme-text">{t("overlayAssets.uploadTitle")}</h2></div>
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                        <Upload className="w-5 h-5 text-theme-primary" />
+                        <h2 className="text-xl font-semibold text-theme-text">{t("overlayAssets.uploadTitle")}</h2>
+                    </div>
+                </div>
                 <div className="border-2 border-dashed border-theme rounded-lg p-8 text-center">
                     <input type="file" id="file-upload" accept="image/png,image/jpeg,image/jpg,.ttf,.otf,.woff,.woff2" onChange={handleFileUpload} disabled={uploading} className="hidden" />
                     <label htmlFor="file-upload" className={`cursor-pointer ${uploading ? "opacity-50" : ""}`}>
@@ -777,22 +836,31 @@ function AssetsManager() {
                 </div>
             </div>
             <div className="bg-theme-card border border-theme rounded-lg p-6">
+                <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
+                    <h3 className="font-semibold text-theme-text">Your Assets</h3>
+                    <div className="flex items-center gap-2">
+                         <span className="text-xs text-theme-muted mr-2">Preview Background:</span>
+                         <BackgroundToggle current={previewBg} onChange={setPreviewBg} />
+                    </div>
+                </div>
+
                  {loading ? (<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-theme-primary animate-spin" /></div>) : filteredFiles.length === 0 ? (<div className="text-center py-12"><ImageIcon className="w-16 h-16 text-theme-muted mx-auto mb-4 opacity-50" /><p className="text-theme-muted text-lg mb-2">{t("overlayAssets.noFiles")}</p></div>) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {filteredFiles.map((file) => (
                             <div key={file.name} className="bg-theme-card border-2 border-theme rounded-lg overflow-hidden group hover:border-theme-primary hover:shadow-lg hover:shadow-theme-primary/20 transition-all duration-300">
-                                <div className="aspect-square relative overflow-hidden flex items-center justify-center bg-gray-800">
+                                {/* DYNAMIC BACKGROUND APPLIED HERE */}
+                                <div className={`aspect-square relative overflow-hidden flex items-center justify-center transition-colors duration-300 ${getBackgroundClass(previewBg)}`}>
                                     {file.type === "image" ? (
-                                        <img 
-                                            src={`/api/overlayfiles/preview/${file.name}?v=${file.mtime}`} 
-                                            alt={file.name} 
-                                            className="max-w-full max-h-full object-contain" 
+                                        <img
+                                            src={`/api/overlayfiles/preview/${file.name}?v=${file.mtime}`}
+                                            alt={file.name}
+                                            className="max-w-full max-h-full object-contain"
                                         />
                                     ) : file.type === "font" ? (
-                                        <img 
-                                            src={`/api/fonts/preview/${file.name}?text=Abc&v=${file.size}`} 
-                                            alt={file.name} 
-                                            className="max-w-full max-h-full object-contain bg-white/90 p-2 rounded-md" 
+                                        <img
+                                            src={`/api/fonts/preview/${file.name}?text=Abc&v=${file.size}`}
+                                            alt={file.name}
+                                            className="max-w-full max-h-full object-contain bg-white/90 p-2 rounded-md"
                                         />
                                     ) : (
                                         <Type className="w-12 h-12 text-theme-muted" />
@@ -802,7 +870,7 @@ function AssetsManager() {
                                         <button onClick={() => setDeleteConfirm(file)} className="p-2 bg-red-500 rounded text-white"><Trash2 size={20} /></button>
                                     </div>
                                 </div>
-                                <div className="p-3"><p className="text-sm font-medium text-theme-text truncate">{file.name}</p><p className="text-xs text-theme-muted">{formatFileSize(file.size)}</p></div>
+                                <div className="p-3 bg-theme-card"><p className="text-sm font-medium text-theme-text truncate">{file.name}</p><p className="text-xs text-theme-muted">{formatFileSize(file.size)}</p></div>
                             </div>
                         ))}
                     </div>
@@ -814,13 +882,28 @@ function AssetsManager() {
       {/* Preview Modal */}
       {previewFile && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setPreviewFile(null)}>
-          <div className="relative max-w-7xl max-h-[90vh] bg-theme-card rounded-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-7xl max-h-[90vh] bg-theme-card rounded-lg overflow-hidden flex flex-col w-full h-full" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setPreviewFile(null)} className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"><X className="w-6 h-6" /></button>
-            <div className="flex flex-col md:flex-row max-h-[90vh]">
-              <div className="flex-1 flex items-center justify-center bg-black p-4">
-                {previewFile.type === "image" ? (<img src={`/api/overlayfiles/preview/${previewFile.name}?v=${previewFile.mtime}`} alt={previewFile.name} className="relative z-10 max-w-full max-h-[80vh] object-contain" />) : (<div className="w-full max-h-[80vh] overflow-y-auto px-4 py-8"><img src={`/api/fonts/preview/${previewFile.name}?text=The Quick Brown Fox&v=${previewFile.size}`} alt="Sample text" className="w-full h-auto object-contain bg-white rounded p-4" loading="lazy" /></div>)}
+
+            <div className="flex flex-col md:flex-row h-full">
+              {/* Modal Image Area */}
+              <div className={`flex-1 flex items-center justify-center p-4 relative transition-colors duration-300 ${getBackgroundClass(previewBg)}`}>
+
+                {/* Floating Toggles inside Modal */}
+                <div className="absolute top-4 left-4 z-10">
+                    <BackgroundToggle current={previewBg} onChange={setPreviewBg} className="bg-theme-card/90 shadow-xl border-theme-primary/30" />
+                </div>
+
+                {previewFile.type === "image" ? (
+                    <img src={`/api/overlayfiles/preview/${previewFile.name}?v=${previewFile.mtime}`} alt={previewFile.name} className="relative z-0 max-w-full max-h-[80vh] object-contain shadow-2xl" />
+                ) : (
+                    <div className="w-full max-h-[80vh] overflow-y-auto px-4 py-8">
+                        <img src={`/api/fonts/preview/${previewFile.name}?text=The Quick Brown Fox&v=${previewFile.size}`} alt="Sample text" className="w-full h-auto object-contain bg-white rounded p-4 shadow-xl" loading="lazy" />
+                    </div>
+                )}
               </div>
-              <div className="md:w-80 p-6 bg-theme-card overflow-y-auto border-l border-theme">
+
+              <div className="md:w-80 p-6 bg-theme-card overflow-y-auto border-l border-theme shrink-0">
                 <h3 className="text-xl font-bold text-theme-text mb-4">Details</h3>
                 <div className="space-y-4"><div><label className="text-sm text-theme-muted">Filename</label><p className="text-theme-text break-all font-mono text-sm mt-1">{previewFile.name}</p></div></div>
               </div>

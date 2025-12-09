@@ -1390,6 +1390,7 @@ const AssetOverview = () => {
       downloadSource === "false" || downloadSource === false || !downloadSource;
     const isProviderLinkMissing =
       providerLink === "false" || providerLink === false || !providerLink;
+
     if (isDownloadMissing) {
       tags.push({
         label: t("assetOverview.missingAsset"),
@@ -1402,6 +1403,7 @@ const AssetOverview = () => {
         color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
       });
     }
+
     if (!isDownloadMissing && !isProviderLinkMissing) {
       const primaryProvider = data?.config?.primary_provider || "";
       if (primaryProvider) {
@@ -1426,6 +1428,19 @@ const AssetOverview = () => {
         }
       }
     }
+
+    // --- UPDATED LANGUAGE LOGIC ---
+    const assetTypeRaw = (asset.Type || "").toLowerCase();
+
+    // Determine the correct primary language based on asset type
+    let targetPrimaryLang = data?.config?.primary_language; // Default (Posters)
+
+    if (assetTypeRaw.includes("background")) {
+      targetPrimaryLang = data?.config?.primary_language_background || targetPrimaryLang;
+    } else if (assetTypeRaw.includes("season")) {
+      targetPrimaryLang = data?.config?.primary_language_season || targetPrimaryLang;
+    }
+
     if (
       !asset.Language ||
       asset.Language === "false" ||
@@ -1436,22 +1451,24 @@ const AssetOverview = () => {
         label: t("assetOverview.notPrimaryLanguage"),
         color: "bg-sky-500/20 text-sky-400 border-sky-500/30",
       });
-    } else if (data?.config?.primary_language) {
+    } else if (targetPrimaryLang) {
       const langNormalized =
         asset.Language.toLowerCase() === "textless"
           ? "xx"
           : asset.Language.toLowerCase();
       const primaryNormalized =
-        data.config.primary_language.toLowerCase() === "textless"
+        targetPrimaryLang.toLowerCase() === "textless"
           ? "xx"
-          : data.config.primary_language.toLowerCase();
+          : targetPrimaryLang.toLowerCase();
+
       if (langNormalized !== primaryNormalized) {
         tags.push({
           label: t("assetOverview.notPrimaryLanguage"),
           color: "bg-sky-500/20 text-sky-400 border-sky-500/30",
         });
       }
-    } else if (!data?.config?.primary_language) {
+    } else if (!targetPrimaryLang) {
+      // If no config found, fallback behavior
       if (!["textless", "xx"].includes(asset.Language.toLowerCase())) {
         tags.push({
           label: t("assetOverview.notPrimaryLanguage"),
@@ -1459,6 +1476,7 @@ const AssetOverview = () => {
         });
       }
     }
+
     if (
       asset.TextTruncated &&
       (asset.TextTruncated.toLowerCase() === "true" ||

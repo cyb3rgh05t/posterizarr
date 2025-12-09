@@ -10,7 +10,10 @@ from fastapi import (
     Form,
 )
 from contextlib import asynccontextmanager
-from .defaults import setup_default_images
+try:
+    from .defaults import setup_default_images
+except ImportError:
+    from defaults import setup_default_images
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse
@@ -39,10 +42,13 @@ import shutil
 import sqlite3
 from fastapi import BackgroundTasks
 from starlette.responses import FileResponse
-from PIL import Image, ImageDraw, ImageChops 
+from PIL import Image, ImageDraw, ImageChops
 from io import BytesIO
 from base64 import b64encode
-from .overlay_generator import generate_overlay_image
+try:
+    from .overlay_generator import generate_overlay_image
+except ImportError:
+    from overlay_generator import generate_overlay_image
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -2064,22 +2070,22 @@ class OverlayCreatorRequest(BaseModel):
     border_px: int = 0
     border_color: str = "#FFFFFF"
     corner_radius: float = 0.0
-    
+
     # Gradient / Matte
     matte_height_ratio: float = 0.0
     fade_height_ratio: float = 0.0
     gradient_color: str = "#000000"
-    
+
     # Effects
     inner_glow_strength: float = 0.0
     inner_glow_color: str = "#000000"
-    
+
     vignette_strength: float = 0.0
     vignette_color: str = "#000000"
-    
-    grain_amount: float = 0.0 
-    grain_size: float = 1.0   
-    
+
+    grain_amount: float = 0.0
+    grain_size: float = 1.0
+
     filename: Optional[str] = None
     overlay_type: str = "poster"
     overwrite: bool = False
@@ -11743,7 +11749,6 @@ class ImageChoiceRecord(BaseModel):
     FavProviderLink: Optional[str] = None
     Manual: Optional[str] = None
 
-
 @app.get("/api/assets/overview")
 async def get_assets_overview():
     """
@@ -11774,8 +11779,10 @@ async def get_assets_overview():
         }
         logger.debug(f"Asset map created with {len(asset_map)} items for overview")
 
-        # Get primary language and provider from config
+        # Get primary languages and provider from config
         primary_language = None
+        primary_background_language = None
+        primary_season_language = None
         primary_provider = None
 
         try:
@@ -11783,11 +11790,27 @@ async def get_assets_overview():
                 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                     config = json.load(f)
 
-                    # Check ApiPart for PreferredLanguageOrder
+                    # Check ApiPart for Language Orders
                     api_part = config.get("ApiPart", {})
+
+                    # 1. Main Poster Language
                     lang_order = api_part.get("PreferredLanguageOrder", [])
                     if lang_order and len(lang_order) > 0:
                         primary_language = lang_order[0]
+
+                    # 2. Background Language (Fallback to Main if empty or "PleaseFillMe")
+                    bg_lang_order = api_part.get("PreferredBackgroundLanguageOrder", [])
+                    if bg_lang_order and len(bg_lang_order) > 0 and bg_lang_order[0].lower() != "pleasefillme":
+                        primary_background_language = bg_lang_order[0]
+                    else:
+                        primary_background_language = primary_language
+
+                    # 3. Season Language (Fallback to Main if empty or "PleaseFillMe")
+                    season_lang_order = api_part.get("PreferredSeasonLanguageOrder", [])
+                    if season_lang_order and len(season_lang_order) > 0 and season_lang_order[0].lower() != "pleasefillme":
+                        primary_season_language = season_lang_order[0]
+                    else:
+                        primary_season_language = primary_language
 
                     # Get FavProvider from ApiPart
                     fav_provider = api_part.get("FavProvider", "")
@@ -11804,7 +11827,7 @@ async def get_assets_overview():
         non_primary_provider = []
         truncated_text = []
         assets_with_issues = []
-        resolved_assets = []  # New category for Manual=true items
+        resolved_assets = []
 
         # Categorize each record
         for record in records:
@@ -11826,19 +11849,19 @@ async def get_assets_overview():
                     season_num = season_match.group(1).zfill(2)
                     asset_filename = f"Season{season_num}.jpg"
                 else:
-                    asset_filename = "Season_unknown.jpg" # Will not match
+                    asset_filename = "Season_unknown.jpg"
             elif "titlecard" in asset_type_lower or "episode" in asset_type_lower:
                 episode_match = re.search(r"(S\d+E\d+)", title, re.IGNORECASE)
                 if episode_match:
                     episode_code = episode_match.group(1).upper()
                     asset_filename = f"{episode_code}.jpg"
                 else:
-                    asset_filename = "Episode_unknown.jpg" # Will not match
+                    asset_filename = "Episode_unknown.jpg"
 
             relative_path_key = f"{library}/{rootfolder}/{asset_filename}"
             poster_data = asset_map.get(relative_path_key)
 
-            # Add cache data to the record dictionary
+            # Add cache data
             if poster_data:
                 record_dict["poster_url"] = poster_data["url"]
                 record_dict["has_poster"] = True
@@ -11850,16 +11873,15 @@ async def get_assets_overview():
                 record_dict["created"] = None
                 record_dict["modified"] = None
 
-            # Check if this is a Manual entry (resolved)
-            # Manual can be "Yes" (new), "true" (legacy), or True (boolean)
+            # Check Resolved Status
             manual_value = str(record_dict.get("Manual", "")).lower()
             if manual_value == "yes" or manual_value == "true":
                 resolved_assets.append(record_dict)
-                continue  # Skip issue categorization for resolved items
+                continue
 
             has_issue = False
 
-            # Missing Assets: DownloadSource == "false" (string) or False (boolean) or empty
+            # Missing Assets Logic
             download_source = record_dict.get("DownloadSource")
             provider_link = record_dict.get("FavProviderLink", "")
 
@@ -11873,114 +11895,84 @@ async def get_assets_overview():
                 provider_link == "false" or provider_link == False or not provider_link
             )
 
-            # Category 1: Missing Asset (DownloadSource is missing)
             if is_download_missing:
                 missing_assets.append(record_dict)
                 has_issue = True
 
-            # Category 2: Missing Asset at Favorite Provider (FavProviderLink is missing)
             if is_provider_link_missing:
                 missing_assets_fav_provider.append(record_dict)
                 has_issue = True
 
-            # Non-Primary Language: Check language against config
+            # Non-Primary Language Logic - TYPE AWARE
             language = record_dict.get("Language", "")
 
-            if language and primary_language:
-                # Normalize: "Textless" = "xx", case-insensitive
+            # Determine which primary language setting to use
+            target_primary_lang = primary_language # Default to poster preference
+            if "background" in asset_type_lower:
+                target_primary_lang = primary_background_language
+            elif "season" in asset_type_lower:
+                target_primary_lang = primary_season_language
+
+            if language and target_primary_lang:
+                # Normalize: "Textless" = "xx"
                 lang_normalized = (
                     "xx" if language.lower() == "textless" else language.lower()
                 )
                 primary_normalized = (
                     "xx"
-                    if primary_language.lower() == "textless"
-                    else primary_language.lower()
+                    if target_primary_lang.lower() == "textless"
+                    else target_primary_lang.lower()
                 )
 
                 if lang_normalized != primary_normalized:
                     non_primary_lang.append(record_dict)
                     has_issue = True
-            elif language and not primary_language:
-                # If no primary language set, consider anything that's not Textless/xx as non-primary
+            elif language and not target_primary_lang:
+                # Fallback if no config: assume non-textless is wrong
                 if language.lower() not in ["xx", "textless"]:
                     non_primary_lang.append(record_dict)
                     has_issue = True
 
-            # Non-Primary Provider: Check if DownloadSource OR FavProviderLink don't match primary provider
-            # Only check if we have both DownloadSource AND FavProviderLink
+            # Non-Primary Provider Logic
             if not is_download_missing and not is_provider_link_missing:
                 if primary_provider:
-                    # Check if provider link contains the primary provider
-                    # Map provider names to their URL patterns
                     provider_patterns = {
                         "tmdb": ["tmdb", "themoviedb"],
                         "tvdb": ["tvdb", "thetvdb"],
                         "fanart": ["fanart"],
                         "plex": ["plex"],
                     }
+                    patterns = provider_patterns.get(primary_provider, [primary_provider])
+                    is_download_from_primary = any(pattern in download_source.lower() for pattern in patterns)
+                    is_fav_link_from_primary = any(pattern in provider_link.lower() for pattern in patterns)
 
-                    patterns = provider_patterns.get(
-                        primary_provider, [primary_provider]
-                    )
-
-                    # Check if DownloadSource contains the primary provider
-                    is_download_from_primary = any(
-                        pattern in download_source.lower() for pattern in patterns
-                    )
-
-                    # Check if FavProviderLink contains the primary provider
-                    is_fav_link_from_primary = any(
-                        pattern in provider_link.lower() for pattern in patterns
-                    )
-
-                    # Show as non-primary if EITHER DownloadSource OR FavProviderLink is not from primary provider
                     if not is_download_from_primary or not is_fav_link_from_primary:
                         non_primary_provider.append(record_dict)
                         has_issue = True
 
-            # Truncated Text: TextTruncated == "True" or "true"
+            # Truncated Text Logic
             truncated_value = str(record_dict.get("TextTruncated", "")).lower()
             if truncated_value == "true":
                 truncated_text.append(record_dict)
                 has_issue = True
 
-            # Add to assets_with_issues if any issue flag is set
             if has_issue:
                 assets_with_issues.append(record_dict)
 
         return {
             "categories": {
-                "missing_assets": {
-                    "count": len(missing_assets),
-                    "assets": missing_assets,
-                },
-                "missing_assets_fav_provider": {
-                    "count": len(missing_assets_fav_provider),
-                    "assets": missing_assets_fav_provider,
-                },
-                "non_primary_lang": {
-                    "count": len(non_primary_lang),
-                    "assets": non_primary_lang,
-                },
-                "non_primary_provider": {
-                    "count": len(non_primary_provider),
-                    "assets": non_primary_provider,
-                },
-                "truncated_text": {
-                    "count": len(truncated_text),
-                    "assets": truncated_text,
-                },
-                "assets_with_issues": {
-                    "count": len(assets_with_issues),
-                    "assets": assets_with_issues,
-                },
-                "resolved": {
-                    "count": len(resolved_assets),
-                    "assets": resolved_assets,
-                },
+                "missing_assets": {"count": len(missing_assets), "assets": missing_assets},
+                "missing_assets_fav_provider": {"count": len(missing_assets_fav_provider), "assets": missing_assets_fav_provider},
+                "non_primary_lang": {"count": len(non_primary_lang), "assets": non_primary_lang},
+                "non_primary_provider": {"count": len(non_primary_provider), "assets": non_primary_provider},
+                "truncated_text": {"count": len(truncated_text), "assets": truncated_text},
+                "assets_with_issues": {"count": len(assets_with_issues), "assets": assets_with_issues},
+                "resolved": {"count": len(resolved_assets), "assets": resolved_assets},
             },
             "config": {
                 "primary_language": primary_language,
+                "primary_language_background": primary_background_language,
+                "primary_language_season": primary_season_language,
                 "primary_provider": primary_provider,
             },
         }
@@ -12519,15 +12511,15 @@ async def get_support_zip(background_tasks: BackgroundTasks):
 @app.post("/api/webhook/arr")
 async def arr_webhook(request: Request):
     """
-    Accepts Webhooks from Sonarr/Radarr (at /api/webhook/arr), 
+    Accepts Webhooks from Sonarr/Radarr (at /api/webhook/arr),
     converts them to .posterizarr files, and drops them in the watcher folder.
     """
     try:
         payload = await request.json()
-        
+
         # Determine Event and Platform
         event_type = payload.get("eventType", "Unknown")
-        
+
         # Handle "Test" event from the Arr settings page
         if event_type == "Test":
             logger.info("Received Test Webhook from Arr instance")
@@ -12541,13 +12533,13 @@ async def arr_webhook(request: Request):
         platform = "Unknown"
 
         # Map JSON Data to Posterizarr Arguments (mimicking ArrTrigger.sh logic)
-        
+
         # RADARR
         if "movie" in payload:
             platform = "Radarr"
             movie = payload.get("movie", {})
             movie_file = payload.get("movieFile", {})
-            
+
             data_map["arr_platform"] = platform
             data_map["event"] = event_type
             data_map["arr_movie_title"] = movie.get("title", "")
@@ -12555,7 +12547,7 @@ async def arr_webhook(request: Request):
             data_map["arr_movie_imdb"] = movie.get("imdbId", "")
             data_map["arr_movie_year"] = movie.get("year", "")
             data_map["arr_movie_path"] = movie.get("folderPath", "")
-            
+
             # For downloads/upgrades, get specific file info
             if movie_file:
                 data_map["arr_moviefile_path"] = movie_file.get("path", "")
@@ -12566,24 +12558,24 @@ async def arr_webhook(request: Request):
             platform = "Sonarr"
             series = payload.get("series", {})
             episodes = payload.get("episodes", [])
-            
+
             data_map["arr_platform"] = platform
             data_map["event"] = event_type
             data_map["arr_series_title"] = series.get("title", "")
             data_map["arr_series_tvdb"] = series.get("tvdbId", "")
             data_map["arr_series_path"] = series.get("path", "")
-            
+
             # Sonarr webhooks don't always send IMDB/TMDB in the main payload
             if "imdbId" in series:
                 data_map["arr_series_imdb"] = series.get("imdbId")
-            
+
             # Handle Episode Data
             if episodes:
                 first_ep = episodes[0]
                 data_map["arr_episode_season"] = first_ep.get("seasonNumber", "")
                 data_map["arr_episode_numbers"] = first_ep.get("episodeNumber", "")
                 data_map["arr_episode_titles"] = first_ep.get("title", "")
-                
+
                 # If there's an episode file payload
                 if "episodeFile" in payload:
                     data_map["arr_episode_path"] = payload["episodeFile"].get("path", "")
@@ -12611,8 +12603,8 @@ async def arr_webhook(request: Request):
                 f.write(f"[{key}]: {value}\n")
 
         return {
-            "success": True, 
-            "message": f"Trigger queued for {platform}", 
+            "success": True,
+            "message": f"Trigger queued for {platform}",
             "file": str(file_path)
         }
 
@@ -12629,7 +12621,7 @@ async def tautulli_webhook(request: Request):
     """
     try:
         payload = await request.json()
-        
+
         # Filter out empty payloads
         if not payload:
             return {"success": False, "message": "Empty payload"}
@@ -12641,7 +12633,7 @@ async def tautulli_webhook(request: Request):
         # Create unique filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
         rand_str = os.urandom(3).hex()
-        
+
         filename = f"tautulli_trigger_{timestamp}_{rand_str}.posterizarr"
         file_path = watcher_dir / filename
 
@@ -12649,13 +12641,13 @@ async def tautulli_webhook(request: Request):
 
         with open(file_path, "w", encoding="utf-8") as f:
             for key, value in payload.items():
-                # Only write keys that have values. 
+                # Only write keys that have values.
                 if value:
                     f.write(f"[{key}]: {value}\n")
 
         return {
-            "success": True, 
-            "message": "Tautulli trigger queued", 
+            "success": True,
+            "message": "Tautulli trigger queued",
             "file": str(file_path)
         }
 
@@ -12684,8 +12676,8 @@ async def preview_created_overlay(options: OverlayCreatorRequest):
                 if options.overlay_type == "background":
                     section = "BackgroundOverlayPart"
                 else:
-                    section = "PosterOverlayPart" 
-                
+                    section = "PosterOverlayPart"
+
                 # Fetch values (defaulting to 0 if not found/error)
                 def get_int(key):
                     val = config_db.get_value(section, key)
@@ -12697,24 +12689,24 @@ async def preview_created_overlay(options: OverlayCreatorRequest):
                 opt_dict["text_box_w"] = get_int("MaxWidth")
                 opt_dict["text_box_h"] = get_int("MaxHeight")
                 opt_dict["text_box_offset"] = get_int("text_offset")
-                
+
             except Exception as e:
                 logger.error(f"Error fetching config for preview guide: {e}")
 
         # Generate full res (RGBA)
         img = generate_overlay_image(opt_dict)
-        
+
         # Resize for faster preview transfer (e.g., 500px width)
         w, h = img.size
         preview_w = 500
         preview_h = int(h * (preview_w / w))
         img = img.resize((preview_w, preview_h), Image.Resampling.LANCZOS)
-        
+
         # Convert to base64
         buffered = BytesIO()
         img.save(buffered, format="PNG")
         img_str = b64encode(buffered.getvalue()).decode("utf-8")
-        
+
         return {"success": True, "image_base64": img_str}
     except Exception as e:
         logger.error(f"Error generating preview: {e}")
@@ -12726,28 +12718,28 @@ async def save_created_overlay(options: OverlayCreatorRequest):
     try:
         if not options.filename:
             raise HTTPException(status_code=400, detail="Filename required")
-            
+
         safe_filename = "".join(c for c in options.filename if c.isalnum() or c in "._- ").strip()
         if not safe_filename.lower().endswith(".png"):
             safe_filename += ".png"
-            
+
         save_path = OVERLAYFILES_DIR / safe_filename
-        
+
         # Check existence only if overwrite is False
         if save_path.exists() and not options.overwrite:
             raise HTTPException(status_code=409, detail="File already exists")
-            
+
         # Generate
         img = generate_overlay_image(options.dict())
         img.save(save_path, "PNG")
-        
+
         return {"success": True, "message": f"Saved {safe_filename}", "filename": safe_filename}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error saving created overlay: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 # ============================================
 # STATIC FILE MOUNTS
 # ============================================
