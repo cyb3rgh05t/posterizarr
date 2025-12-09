@@ -2072,6 +2072,7 @@
     }
   },
   "plexExport": {
+    "updated": "Aggiornato",
     "pageTitle": "Cronologia esportazioni Plex",
     "description": "Traccia e interroga le esportazioni della tua libreria Plex nel tempo",
     "refresh": "Aggiorna",
@@ -2109,7 +2110,21 @@
     "resolutions": "Risoluzioni",
     "importedAt": "Importato il",
     "alreadyImported": "Dati già importati",
-    "importSuccess": "Importazione riuscita"
+    "importSuccess": "Importazione riuscita",
+    "addInfo": "Info Agg.",
+    "externalIds": "ID Esterni"
+  },
+  "plexActions": {
+    "refreshMetadata": "Aggiorna Metadati",
+    "analyzeItem": "Analizza Elemento",
+    "scanLibrary": "Scansiona Libreria",
+    "emptyTrash": "Svuota Cestino",
+    "actionStarted": "Invio comando a Plex..."
+  },
+  "jellyfinActions": {
+    "refreshMetadata": "Aggiorna Metadati",
+    "refreshImages": "Cerca Immagini",
+    "actionStarted": "Invio comando..."
   },
   "mediaServerExport": {
     "pageTitle": "Cronologia esportazioni server multimediale",

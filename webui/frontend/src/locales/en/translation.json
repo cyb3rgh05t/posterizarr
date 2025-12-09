@@ -2074,6 +2074,7 @@
     }
   },
   "plexExport": {
+    "updated": "Updated",
     "pageTitle": "Plex Export History",
     "description": "Track and query your Plex library exports over time",
     "refresh": "Refresh",
@@ -2111,7 +2112,21 @@
     "resolutions": "Resolutions",
     "importedAt": "Imported At",
     "alreadyImported": "Data already imported",
-    "importSuccess": "Import successful"
+    "importSuccess": "Import successful",
+    "addInfo": "Add. Info",
+    "externalIds": "External IDs"
+  },
+  "plexActions": {
+    "refreshMetadata": "Refresh Metadata",
+    "analyzeItem": "Analyze Item",
+    "scanLibrary": "Scan Library Files",
+    "emptyTrash": "Empty Trash",
+    "actionStarted": "Sending command to Plex..."
+  },
+  "jellyfinActions": {
+    "refreshMetadata": "Refresh Metadata",
+    "refreshImages": "Scan for Images",
+    "actionStarted": "Sending command..."
   },
   "mediaServerExport": {
     "pageTitle": "Media Server Export History",

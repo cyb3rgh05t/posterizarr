@@ -3778,6 +3778,220 @@ async def validate_uptimekuma(request: UptimeKumaValidationRequest):
 
 
 # ============================================================================
+# PLEX ACTIONS ENDPOINT
+# ============================================================================
+
+class PlexActionRequest(BaseModel):
+    action: str  # "refresh_item", "analyze_item", "scan_library"
+    rating_key: Optional[str] = None
+    library_name: Optional[str] = None
+
+@app.post("/api/plex/action")
+async def perform_plex_action(request: PlexActionRequest):
+    """
+    Perform actions on Plex Media Server (Refresh, Analyze, Scan, Empty Trash)
+    """
+    logger.info(f"Plex Action Request: {request.action} for key={request.rating_key}, lib={request.library_name}")
+
+    if not CONFIG_PATH.exists():
+        raise HTTPException(status_code=404, detail="Config file not found")
+
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        # Robust Config Loading
+        plex_url = config.get("PlexUrl")
+        plex_token = config.get("PlexToken")
+
+        if not plex_url or not plex_token:
+            plex_part = config.get("PlexPart")
+            if isinstance(plex_part, dict):
+                if not plex_url: plex_url = plex_part.get("PlexUrl")
+                if not plex_token: plex_token = plex_part.get("PlexToken")
+
+        if not plex_url or not plex_token:
+            raise HTTPException(status_code=400, detail="Plex URL or Token not configured")
+
+        plex_url = plex_url.rstrip("/")
+
+    except Exception as e:
+        logger.error(f"Error loading Plex config: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load configuration: {str(e)}")
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        headers = {"X-Plex-Token": plex_token, "Accept": "application/json"}
+
+        try:
+            # ACTION: Refresh Metadata (Item Level)
+            if request.action == "refresh_item":
+                if not request.rating_key:
+                    raise HTTPException(status_code=400, detail="Rating Key required")
+
+                url = f"{plex_url}/library/metadata/{request.rating_key}/refresh"
+                response = await client.put(url, headers=headers)
+
+                if response.status_code == 200:
+                    return {"success": True, "message": f"Refreshed metadata for item {request.rating_key}"}
+
+            # ACTION: Analyze Item
+            elif request.action == "analyze_item":
+                if not request.rating_key:
+                    raise HTTPException(status_code=400, detail="Rating Key required")
+
+                url = f"{plex_url}/library/metadata/{request.rating_key}/analyze"
+                response = await client.put(url, headers=headers)
+
+                if response.status_code == 200:
+                    return {"success": True, "message": f"Started analysis for item {request.rating_key}"}
+
+            # ACTIONS: Library Level (Scan & Empty Trash)
+            elif request.action in ["scan_library", "empty_trash"]:
+                if not request.library_name:
+                    raise HTTPException(status_code=400, detail="Library Name required")
+
+                # Find the section ID for this library name
+                sections_url = f"{plex_url}/library/sections"
+                sections_resp = await client.get(sections_url, headers=headers)
+
+                if sections_resp.status_code != 200:
+                    raise HTTPException(status_code=500, detail="Failed to fetch Plex libraries")
+
+                data = sections_resp.json()
+                section_id = None
+
+                # Check nested structure for directory list
+                directories = data.get("MediaContainer", {}).get("Directory", [])
+
+                for directory in directories:
+                    if directory.get("title") == request.library_name:
+                        section_id = directory.get("key")
+                        break
+
+                if not section_id:
+                    raise HTTPException(status_code=404, detail=f"Library '{request.library_name}' not found on Plex")
+
+                if request.action == "scan_library":
+                    # Trigger Scan: /library/sections/{id}/refresh
+                    scan_url = f"{plex_url}/library/sections/{section_id}/refresh"
+                    await client.get(scan_url, headers=headers)
+                    return {"success": True, "message": f"Started scan for library '{request.library_name}'"}
+
+                elif request.action == "empty_trash":
+                    # Trigger Empty Trash: /library/sections/{id}/emptyTrash
+                    trash_url = f"{plex_url}/library/sections/{section_id}/emptyTrash"
+                    await client.put(trash_url, headers=headers)
+                    return {"success": True, "message": f"Trash emptied for library '{request.library_name}'"}
+
+            else:
+                raise HTTPException(status_code=400, detail=f"Invalid action: {request.action}")
+
+            # Generic error handler for non-200 responses
+            if response.status_code != 200:
+                logger.error(f"Plex API Error ({response.status_code}): {response.text}")
+                raise HTTPException(status_code=response.status_code, detail=f"Plex API Error: {response.status_code}")
+
+        except httpx.RequestError as e:
+            logger.error(f"Plex Connection Error: {e}")
+            raise HTTPException(status_code=502, detail="Failed to connect to Plex Server")
+
+# ============================================================================
+# JELLYFIN/EMBY ACTIONS ENDPOINT
+# ============================================================================
+
+class JellyfinEmbyActionRequest(BaseModel):
+    action: str  # "refresh_item", "refresh_images"
+    media_id: str
+
+@app.post("/api/jellyfin-emby/action")
+async def perform_jellyfin_emby_action(request: JellyfinEmbyActionRequest):
+    """
+    Perform actions on Jellyfin/Emby Server
+    """
+    logger.info(f"Jellyfin/Emby Action Request: {request.action} for id={request.media_id}")
+
+    if not CONFIG_PATH.exists():
+        raise HTTPException(status_code=404, detail="Config file not found")
+
+    # 1. Load Config & Determine Server
+    server_url = None
+    api_key = None
+    server_type = None
+
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        # Helper to check nested dicts (flat vs grouped)
+        def get_val(key, section):
+            return config.get(key) or config.get(section, {}).get(key)
+
+        # Check enabled flags
+        use_jellyfin = get_val("UseJellyfin", "JellyfinPart")
+        use_emby = get_val("UseEmby", "EmbyPart")
+
+        if use_jellyfin:
+            server_type = "Jellyfin"
+            server_url = get_val("JellyfinUrl", "JellyfinPart")
+            api_key = get_val("JellyfinApiKey", "JellyfinPart")
+        elif use_emby:
+            server_type = "Emby"
+            server_url = get_val("EmbyUrl", "EmbyPart")
+            api_key = get_val("EmbyApiKey", "EmbyPart")
+
+        if not server_url or not api_key:
+            raise HTTPException(status_code=400, detail="Jellyfin/Emby not enabled or missing configuration")
+
+        server_url = server_url.rstrip("/")
+
+    except Exception as e:
+        logger.error(f"Error loading config: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load configuration")
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        # Jellyfin/Emby use similar endpoints for basic item refresh
+        # Endpoint: /Items/{Id}/Refresh
+
+        url = f"{server_url}/Items/{request.media_id}/Refresh?api_key={api_key}"
+
+        # Default params for general refresh
+        params = {
+            "Recursive": "true",
+            "ImageRefreshMode": "Default",
+            "MetadataRefreshMode": "Default",
+            "ReplaceAllImages": "false",
+            "ReplaceAllMetadata": "false"
+        }
+
+        if request.action == "refresh_item":
+            # Full metadata refresh
+            params["MetadataRefreshMode"] = "Full"
+
+        elif request.action == "refresh_images":
+            # Image specific refresh (look for new images)
+            params["ImageRefreshMode"] = "Full"
+            params["MetadataRefreshMode"] = "Default"
+
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action")
+
+        try:
+            response = await client.post(url, params=params)
+
+            if response.status_code == 204 or response.status_code == 200:
+                return {
+                    "success": True,
+                    "message": f"Triggered '{request.action}' on {server_type} for item {request.media_id}"
+                }
+            else:
+                logger.error(f"{server_type} API Error ({response.status_code}): {response.text}")
+                raise HTTPException(status_code=response.status_code, detail=f"{server_type} API Error")
+
+        except httpx.RequestError as e:
+            logger.error(f"{server_type} Connection Error: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to connect to {server_type}")
+
+# ============================================================================
 # LIBRARY FETCHING ENDPOINTS
 # ============================================================================
 

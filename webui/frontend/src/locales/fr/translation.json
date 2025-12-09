@@ -2072,6 +2072,7 @@
     }
   },
   "plexExport": {
+    "updated": "Mis à jour",
     "pageTitle": "Historique d'export Plex",
     "description": "Suivre et interroger vos exports de bibliothèque Plex au fil du temps",
     "refresh": "Actualiser",
@@ -2109,7 +2110,21 @@
     "resolutions": "Résolutions",
     "importedAt": "Importé le",
     "alreadyImported": "Données déjà importées",
-    "importSuccess": "Importation réussie"
+    "importSuccess": "Importation réussie",
+    "addInfo": "Info Add.",
+    "externalIds": "IDs Externes"
+  },
+  "plexActions": {
+    "refreshMetadata": "Actualiser métadonnées",
+    "analyzeItem": "Analyser l'élément",
+    "scanLibrary": "Scanner la bibliothèque",
+    "emptyTrash": "Vider la corbeille",
+    "actionStarted": "Envoi de la commande à Plex..."
+  },
+  "jellyfinActions": {
+    "refreshMetadata": "Actualiser métadonnées",
+    "refreshImages": "Rechercher des images",
+    "actionStarted": "Envoi de la commande..."
   },
   "mediaServerExport": {
     "pageTitle": "Historique d'exportation du serveur multimédia",

@@ -2124,6 +2124,7 @@
     }
   },
   "plexExport": {
+    "updated": "Aktualisiert",
     "pageTitle": "Plex Export-Verlauf",
     "description": "Verfolgen und Abfragen Ihrer Plex-Bibliotheksexporte im Zeitverlauf",
     "refresh": "Aktualisieren",
@@ -2161,7 +2162,21 @@
     "resolutions": "Auflösungen",
     "importedAt": "Importiert am",
     "alreadyImported": "Daten bereits importiert",
-    "importSuccess": "Import erfolgreich"
+    "importSuccess": "Import erfolgreich",
+    "addInfo": "Zus. Info",
+    "externalIds": "Externe IDs"
+  },
+  "plexActions": {
+    "refreshMetadata": "Metadaten aktualisieren",
+    "analyzeItem": "Element analysieren",
+    "scanLibrary": "Bibliothek scannen",
+    "emptyTrash": "Papierkorb leeren",
+    "actionStarted": "Sende Befehl an Plex..."
+  },
+  "jellyfinActions": {
+    "refreshMetadata": "Metadaten aktualisieren",
+    "refreshImages": "Nach Bildern suchen",
+    "actionStarted": "Sende Befehl..."
   },
   "mediaServerExport": {
     "pageTitle": "Medienserver-Exportverlauf",
