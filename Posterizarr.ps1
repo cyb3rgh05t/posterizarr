@@ -12379,7 +12379,7 @@ Elseif ($Tautulli) {
                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                             $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                            $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                         }
                         else {
                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -12392,7 +12392,7 @@ Elseif ($Tautulli) {
                             Else {
                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                             }
                         }
 
@@ -13117,7 +13117,7 @@ Elseif ($Tautulli) {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -13130,7 +13130,7 @@ Elseif ($Tautulli) {
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                            $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -13735,7 +13735,7 @@ Elseif ($Tautulli) {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -13748,7 +13748,7 @@ Elseif ($Tautulli) {
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                            $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -17281,7 +17281,7 @@ Elseif ($ArrTrigger) {
                                     $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                     $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                                     $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                    $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                    $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                 }
                                 else {
                                     $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -17294,7 +17294,7 @@ Elseif ($ArrTrigger) {
                                     Else {
                                         $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                         $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                        $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                        $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                     }
                                 }
 
@@ -17895,7 +17895,7 @@ Elseif ($ArrTrigger) {
                                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                             $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                            $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                         }
                                         else {
                                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -17908,7 +17908,7 @@ Elseif ($ArrTrigger) {
                                             Else {
                                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                                $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                         }
 
@@ -18391,7 +18391,7 @@ Elseif ($ArrTrigger) {
                                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                             $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                            $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                         }
                                         else {
                                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -18404,7 +18404,7 @@ Elseif ($ArrTrigger) {
                                             Else {
                                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                                $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                         }
 
@@ -21714,7 +21714,7 @@ Elseif ($ArrTrigger) {
                                 $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                 $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                                 $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                             }
                             else {
                                 $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -21727,7 +21727,7 @@ Elseif ($ArrTrigger) {
                                 Else {
                                     $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                     $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                    $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                    $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                 }
                             }
 
@@ -22451,7 +22451,7 @@ Elseif ($ArrTrigger) {
                                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                             $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                            $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                         }
                                         else {
                                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -22464,7 +22464,7 @@ Elseif ($ArrTrigger) {
                                             Else {
                                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                                $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                         }
 
@@ -23069,7 +23069,7 @@ Elseif ($ArrTrigger) {
                                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                             $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                            $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                         }
                                         else {
                                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -23082,7 +23082,7 @@ Elseif ($ArrTrigger) {
                                             Else {
                                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                                $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                             }
                                         }
 
@@ -27845,7 +27845,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                 $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                                 $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                 Write-Entry -Message "Platform is Docker/Linux. hashtestpath: $hashtestpath, SeasonImageoriginal: $SeasonImageoriginal, manualtestpath: $manualtestpath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Debug
                             }
                             else {
@@ -27860,7 +27860,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 Else {
                                     $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                     $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                    $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                    $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                     Write-Entry -Message "Windows path fallback. TestPath: $TestPath, ManualTestPath: $ManualTestPath" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Debug
                                 }
                             }
@@ -28464,7 +28464,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -28477,7 +28477,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                            $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -28960,7 +28960,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -28973,7 +28973,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                            $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -32907,7 +32907,7 @@ else {
                             $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                             $SeasonImageoriginal = ($SeasonImageoriginal).Replace('\', '/').Replace('./', '/')
                             $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                            $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                            $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                         }
                         else {
                             $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -32920,7 +32920,7 @@ else {
                             Else {
                                 $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                 $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                             }
                         }
 
@@ -33722,7 +33722,7 @@ else {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -33735,7 +33735,7 @@ else {
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                            $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
@@ -34404,7 +34404,7 @@ else {
                                         $hashtestpath = ($TestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
                                         $EpisodeImageoriginal = ($EpisodeImageoriginal).Replace('\', '/').Replace('./', '/')
                                         $manualtestpath = ($ManualTestPath + "/" + $Testfile).Replace('\', '/').Replace('./', '/')
-                                        $Templatetestpath = ($ManualTestPath + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
+                                        $Templatetestpath = ($ManualEntryDir + "/" + $TestfileTemplate).Replace('\', '/').Replace('./', '/')
                                     }
                                     else {
                                         $fullTestPath = Resolve-Path -Path $TestPath -ErrorAction SilentlyContinue
@@ -34417,7 +34417,7 @@ else {
                                         Else {
                                             $hashtestpath = ($TestPath + "\" + $Testfile).Replace('/', '\')
                                             $Manualtestpath = ($ManualTestPath + "\" + $Testfile).Replace('/', '\')
-                                            $Templatetestpath = ($ManualTestPath + "\" + $TestfileTemplate).Replace('/', '\')
+                                            $Templatetestpath = ($ManualEntryDir + "\" + $TestfileTemplate).Replace('/', '\')
                                         }
                                     }
 
