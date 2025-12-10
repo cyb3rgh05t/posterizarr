@@ -8,12 +8,6 @@ import {
 
 const API_URL = "/api";
 
-// 1. Clean Helper Logic
-const getImageUrl = (path) => {
-    if (!path) return null;
-    return `${API_URL}/image?path=${encodeURIComponent(path)}`;
-};
-
 // Helper to safely get values regardless of casing
 const getSafeValue = (data, key) => {
     if (!data) return 0;
@@ -210,9 +204,6 @@ function RuntimeHistory() {
 
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [createdItems, setCreatedItems] = useState([]);
-  const [loadingItems, setLoadingItems] = useState(false);
-  const [detailTab, setDetailTab] = useState("stats");
 
   const [modeFilterDropdownOpen, setModeFilterDropdownOpen] = useState(false);
   const modeFilterDropdownRef = useRef(null);
@@ -272,26 +263,6 @@ function RuntimeHistory() {
     } catch (e) {}
   };
 
-  const fetchRunItems = async (runId) => {
-      if (!runId) return;
-
-      setLoadingItems(true);
-      setCreatedItems([]);
-      try {
-          const response = await fetch(`${API_URL}/runtime-history/${runId}/items`);
-          if (response.ok) {
-              const data = await response.json();
-              if (data.success) {
-                  setCreatedItems(Array.isArray(data.items) ? data.items : []);
-              }
-          }
-      } catch (e) {
-          console.error("Error fetching run items:", e);
-      } finally {
-          setLoadingItems(false);
-      }
-  };
-
   useEffect(() => {
     fetchHistory(true);
     fetchSummary();
@@ -313,12 +284,7 @@ function RuntimeHistory() {
 
   const handleOpenDetail = (entry) => {
       setSelectedEntry(entry);
-      setDetailTab("stats");
-      setCreatedItems([]);
       setShowDetailModal(true);
-      if (entry.total_images > 0 && entry.id) {
-          fetchRunItems(entry.id);
-      }
   };
 
   const analyticsData = useMemo(() => {
@@ -517,109 +483,35 @@ function RuntimeHistory() {
                     <button onClick={() => setShowDetailModal(false)}><X className="w-6 h-6 text-theme-muted hover:text-theme-text" /></button>
                 </div>
 
-                <div className="flex border-b border-theme bg-theme-bg/50">
-                    <button
-                        onClick={() => setDetailTab("stats")}
-                        className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${detailTab === "stats" ? "border-theme-primary text-theme-primary bg-theme-primary/5" : "border-transparent text-theme-muted hover:text-theme-text"}`}
-                    >
-                        {t('runtime_history.details.tab_stats')}
-                    </button>
-                    <button
-                        onClick={() => setDetailTab("items")}
-                        className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${detailTab === "items" ? "border-theme-primary text-theme-primary bg-theme-primary/5" : "border-transparent text-theme-muted hover:text-theme-text"}`}
-                    >
-                        {t('runtime_history.details.tab_items')} ({selectedEntry.total_images})
-                    </button>
-                </div>
+                {/* Removed Tab Navigation */}
 
                 <div className="p-6 overflow-y-auto bg-theme-bg/20 h-full">
-                    {detailTab === "stats" ? (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatBox label={t('runtime_history.details.runtime')} value={selectedEntry.runtime_formatted} icon={Clock} color="text-blue-400" />
-                                <StatBox label={t('runtime_history.details.total_images')} value={selectedEntry.total_images} icon={Image} color="text-theme-primary" />
-                                <StatBox label={t('runtime_history.table.errors')} value={selectedEntry.errors} icon={AlertTriangle} color={selectedEntry.errors > 0 ? "text-red-400" : "text-green-500"} />
-                                <StatBox label={t('runtime_history.details.space_saved')} value={selectedEntry.space_saved || "0 KB"} icon={Database} color="text-green-400" />
-                            </div>
+                    {/* Only showing statistics now */}
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <StatBox label={t('runtime_history.details.runtime')} value={selectedEntry.runtime_formatted} icon={Clock} color="text-blue-400" />
+                            <StatBox label={t('runtime_history.details.total_images')} value={selectedEntry.total_images} icon={Image} color="text-theme-primary" />
+                            <StatBox label={t('runtime_history.table.errors')} value={selectedEntry.errors} icon={AlertTriangle} color={selectedEntry.errors > 0 ? "text-red-400" : "text-green-500"} />
+                            <StatBox label={t('runtime_history.details.space_saved')} value={selectedEntry.space_saved || "0 KB"} icon={Database} color="text-green-400" />
+                        </div>
 
-                            <h4 className="text-sm font-bold text-theme-muted uppercase tracking-wider mt-2">{t('runtime_history.details.breakdown')}</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                <MiniStat label={t('runtime_history.types.posters')} value={selectedEntry.posters} />
-                                <MiniStat label={t('runtime_history.types.backgrounds')} value={selectedEntry.backgrounds} />
-                                <MiniStat label={t('runtime_history.types.seasons')} value={selectedEntry.seasons} />
-                                <MiniStat label={t('runtime_history.types.title_cards')} value={selectedEntry.titlecards} />
-                                <MiniStat label={t('runtime_history.types.collections')} value={selectedEntry.collections} />
-                            </div>
+                        <h4 className="text-sm font-bold text-theme-muted uppercase tracking-wider mt-2">{t('runtime_history.details.breakdown')}</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            <MiniStat label={t('runtime_history.types.posters')} value={selectedEntry.posters} />
+                            <MiniStat label={t('runtime_history.types.backgrounds')} value={selectedEntry.backgrounds} />
+                            <MiniStat label={t('runtime_history.types.seasons')} value={selectedEntry.seasons} />
+                            <MiniStat label={t('runtime_history.types.title_cards')} value={selectedEntry.titlecards} />
+                            <MiniStat label={t('runtime_history.types.collections')} value={selectedEntry.collections} />
+                        </div>
 
-                            <div className="p-4 bg-theme-bg rounded-lg border border-theme mt-4">
-                                <h4 className="text-sm font-bold text-theme-text mb-2">{t('runtime_history.details.logs')}</h4>
-                                <div className="text-xs font-mono text-theme-muted bg-black/30 p-3 rounded overflow-x-auto">
-                                    {t('runtime_history.details.log_file')}: {selectedEntry.log_file} <br/>
-                                    {t('runtime_history.details.script_version')}: {selectedEntry.script_version || "N/A"}
-                                </div>
+                        <div className="p-4 bg-theme-bg rounded-lg border border-theme mt-4">
+                            <h4 className="text-sm font-bold text-theme-text mb-2">{t('runtime_history.details.logs')}</h4>
+                            <div className="text-xs font-mono text-theme-muted bg-black/30 p-3 rounded overflow-x-auto">
+                                {t('runtime_history.details.log_file')}: {selectedEntry.log_file} <br/>
+                                {t('runtime_history.details.script_version')}: {selectedEntry.script_version || "N/A"}
                             </div>
                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {loadingItems ? (
-                                <div className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-theme-primary" /><p className="mt-2 text-theme-muted">{t('runtime_history.items.loading')}</p></div>
-                            ) : createdItems.length === 0 ? (
-                                <div className="text-center py-20 text-theme-muted">
-                                    <p className="font-medium text-lg text-theme-text mb-2">{t('runtime_history.items.none_found')}</p>
-                                    <p className="text-sm">
-                                        {selectedEntry.total_images > 0
-                                            ? t('runtime_history.items.assets_no_records', { count: selectedEntry.total_images })
-                                            : t('runtime_history.items.no_new_assets')}
-                                    </p>
-                                    <p className="text-xs mt-4 opacity-70 bg-theme-bg p-2 rounded border border-theme inline-block">
-                                        {t('runtime_history.items.timestamp_warning', { id: selectedEntry.id })}
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {createdItems.map((item, idx) => {
-                                        // 2. Safe Path Extraction
-                                        // Try common keys for path. If keys are missing, we fall back to null.
-                                        const assetPath = item.Path || item.OutputPath || item.path || item.output_path || item.Rootfolder || item.poster_path;
-                                        const imageUrl = getImageUrl(assetPath) || item.poster_url;
-
-                                        return (
-                                        <div key={idx} className="flex items-center justify-between p-3 bg-theme-card border border-theme rounded-lg hover:border-theme-primary/50 transition-all">
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <div className="w-10 h-14 bg-theme-bg rounded overflow-hidden flex-shrink-0 border border-theme relative">
-                                                    {imageUrl ? (
-                                                        <img
-                                                            src={imageUrl}
-                                                            alt=""
-                                                            className="w-full h-full object-cover"
-                                                            loading="lazy"
-                                                            onError={(e) => {
-                                                                e.target.style.display = 'none';
-                                                                e.target.nextSibling.style.display = 'flex';
-                                                            }}
-                                                        />
-                                                    ) : null}
-                                                    {/* Fallback Icon */}
-                                                    <div className="w-full h-full flex items-center justify-center bg-gray-500/10 text-gray-400" style={{ display: imageUrl ? 'none' : 'flex' }}>
-                                                        {item.Type === "Poster" ? <Film className="w-4 h-4"/> : <Image className="w-4 h-4"/>}
-                                                    </div>
-                                                </div>
-
-                                                <div className="min-w-0">
-                                                    <div className="font-medium text-theme-text truncate">{item.Title}</div>
-                                                    <div className="text-xs text-theme-muted truncate">{item.LibraryName} • {item.Rootfolder}</div>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-end gap-1">
-                                                 <span className="text-xs font-mono bg-theme-bg px-2 py-0.5 rounded border border-theme">{item.Type}</span>
-                                                 {item.DownloadSource && <span className="text-[10px] text-theme-muted max-w-[150px] truncate" title={item.DownloadSource}>{item.DownloadSource}</span>}
-                                            </div>
-                                        </div>
-                                    )})}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    </div>
                 </div>
             </div>
         </div>
