@@ -31,7 +31,7 @@ import re
 import time
 import requests
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 import threading
 import xml.etree.ElementTree as ET
 import sys
@@ -392,6 +392,15 @@ def setup_backend_ui_logger():
 logger.info("Setting up backend UI logger...")
 setup_backend_ui_logger()
 
+# Import config tooltips
+try:
+    logger.debug("Attempting to import config_tooltips module")
+    from config_tooltips import CONFIG_TOOLTIPS
+    logger.info("Config tooltips loaded successfully")
+except ImportError as e:
+    CONFIG_TOOLTIPS = {}
+    logger.warning(f"Config tooltips not available: {e}")
+
 logger.info("Loading modules...")
 try:
     logger.debug("Attempting to import config_mapper module")
@@ -404,15 +413,11 @@ try:
         get_tooltip,
     )
 
-    # Tooltips are now handled in the frontend (ConfigEditor.jsx) with multi-language support
-    CONFIG_TOOLTIPS = {}
-
     CONFIG_MAPPER_AVAILABLE = True
     logger.info("Config mapper loaded successfully")
     logger.debug(f"UI_GROUPS available: {len(UI_GROUPS) if UI_GROUPS else 0}")
 except ImportError as e:
     CONFIG_MAPPER_AVAILABLE = False
-    CONFIG_TOOLTIPS = {}
     logger.warning(f"Config mapper not available: {e}. Using grouped config structure.")
     logger.debug(f"ImportError details: {type(e).__name__}: {str(e)}", exc_info=True)
 
@@ -2173,7 +2178,7 @@ async def get_config():
             return {
                 "success": True,
                 "config": grouped_config,
-                "tooltips": {},  # Empty object as fallback
+                "tooltips": CONFIG_TOOLTIPS,
                 "using_flat_structure": False,
             }
     except HTTPException:
@@ -3800,7 +3805,7 @@ async def perform_plex_action(request: PlexActionRequest):
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             config = json.load(f)
 
-        # --- FIX START: Robust Config Loading ---
+        # Robust Config Loading
         # 1. Try Root level (Flat structure)
         plex_url = config.get("PlexUrl")
         plex_token = config.get("PlexToken")
@@ -3819,7 +3824,7 @@ async def perform_plex_action(request: PlexActionRequest):
                     plex_url = plex_part.get("PlexUrl")
                 if not plex_token:
                     plex_token = plex_part.get("PlexToken")
-        # --- FIX END ---
+
 
         if not plex_url or not plex_token:
             # Log what we found to help debug if it still fails
@@ -3955,7 +3960,7 @@ async def perform_jellyfin_emby_action(request: JellyfinEmbyActionRequest):
             server_type = "Jellyfin"
             server_url = get_val("JellyfinUrl", "JellyfinPart")
 
-            # FIX: API Key is in ApiPart, not JellyfinPart
+            #  API Key is in ApiPart, not JellyfinPart
             api_key = config.get("JellyfinAPIKey") # Flat
             if not api_key:
                 api_key = config.get("ApiPart", {}).get("JellyfinAPIKey") # Correct Group
@@ -3966,7 +3971,7 @@ async def perform_jellyfin_emby_action(request: JellyfinEmbyActionRequest):
             server_type = "Emby"
             server_url = get_val("EmbyUrl", "EmbyPart")
 
-            # FIX: API Key is in ApiPart, not EmbyPart
+            #  API Key is in ApiPart, not EmbyPart
             api_key = config.get("EmbyAPIKey") # Flat
             if not api_key:
                 api_key = config.get("ApiPart", {}).get("EmbyAPIKey") # Correct Group
@@ -4089,7 +4094,7 @@ async def get_plex_libraries(request: PlexValidationRequest):
             if response.status_code == 200:
                 root = ET.fromstring(response.content)
                 libraries = []
-                # REMOVED: excluded_libraries = []
+                # excluded_libraries = []
 
                 for directory in root.findall(".//Directory"):
                     lib_title = directory.get("title", "")
@@ -4098,7 +4103,7 @@ async def get_plex_libraries(request: PlexValidationRequest):
 
                     lib_info = {"name": lib_title, "type": lib_type, "key": lib_key}
 
-                    # FIXED: Add ALL libraries to the main list
+                    # Add ALL libraries to the main list
                     libraries.append(lib_info)
 
                 logger.info(
@@ -4107,7 +4112,7 @@ async def get_plex_libraries(request: PlexValidationRequest):
 
                 # Save libraries to database
                 try:
-                    # FIXED: Pass an empty list for exclusions
+                    # Pass an empty list for exclusions
                     server_libraries_db.save_media_server_libraries(
                         "plex", libraries, []
                     )
@@ -4117,7 +4122,7 @@ async def get_plex_libraries(request: PlexValidationRequest):
                         f"Failed to save Plex libraries to database: {str(db_error)}"
                     )
 
-                # FIXED: Return all libraries in the main list
+                # Return all libraries in the main list
                 return {
                     "success": True,
                     "libraries": libraries,
@@ -4147,7 +4152,7 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
             if response.status_code == 200:
                 data = response.json()
                 libraries = []
-                # REMOVED: excluded_libraries = []
+                # excluded_libraries = []
 
                 for lib in data:
                     lib_name = lib.get("Name", "")
@@ -4159,7 +4164,7 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
                         "id": lib.get("ItemId", ""),
                     }
 
-                    # FIXED: Add ALL libraries to the main list
+                    # Add ALL libraries to the main list
                     libraries.append(lib_info)
 
                 logger.info(
@@ -4168,7 +4173,7 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
 
                 # Save libraries to database
                 try:
-                    # FIXED: Pass an empty list for exclusions
+                    # Pass an empty list for exclusions
                     server_libraries_db.save_media_server_libraries(
                         "jellyfin", libraries, []
                     )
@@ -4178,7 +4183,7 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
                         f"Failed to save Jellyfin libraries to database: {str(db_error)}"
                     )
 
-                # FIXED: Return all libraries in the main list
+                # Return all libraries in the main list
                 return {
                     "success": True,
                     "libraries": libraries,
@@ -4209,7 +4214,7 @@ async def get_emby_libraries(request: EmbyValidationRequest):
             if response.status_code == 200:
                 data = response.json()
                 libraries = []
-                # REMOVED: excluded_libraries = []
+                # excluded_libraries = []
 
                 for lib in data:
                     lib_name = lib.get("Name", "")
@@ -4221,7 +4226,7 @@ async def get_emby_libraries(request: EmbyValidationRequest):
                         "id": lib.get("ItemId", ""),
                     }
 
-                    # FIXED: Add ALL libraries to the main list
+                    # Add ALL libraries to the main list
                     libraries.append(lib_info)
 
                 logger.info(
@@ -4230,7 +4235,7 @@ async def get_emby_libraries(request: EmbyValidationRequest):
 
                 # Save libraries to database
                 try:
-                    # FIXED: Pass an empty list for exclusions
+                    # Pass an empty list for exclusions
                     server_libraries_db.save_media_server_libraries(
                         "emby", libraries, []
                     )
@@ -4240,7 +4245,7 @@ async def get_emby_libraries(request: EmbyValidationRequest):
                         f"Failed to save Emby libraries to database: {str(db_error)}"
                     )
 
-                # FIXED: Return all libraries in the main list
+                # Return all libraries in the main list
                 return {
                     "success": True,
                     "libraries": libraries,
@@ -5719,6 +5724,110 @@ async def import_json_runtime_data():
         logger.error(f"Error importing JSON runtime data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/runtime-history/{run_id}/items")
+async def get_runtime_items(run_id: int):
+    """
+    Get the specific assets created during a script run.
+    Correlates runtime_stats timestamps with imagechoices created_at timestamps.
+    Enriches with poster URLs from asset cache.
+    """
+    try:
+        if not RUNTIME_DB_AVAILABLE or not runtime_db:
+            return {"success": False, "error": "Runtime database not available"}
+
+        if not DATABASE_AVAILABLE or not db:
+            return {"success": False, "error": "ImageChoices database not available"}
+
+        # 1. Fetch the run details
+        run = runtime_db.get_run_by_id(run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+
+        start_time = run.get("start_time")
+        end_time = run.get("end_time")
+
+        # Fallback logic for legacy logs...
+        if not start_time or not end_time:
+            timestamp = run.get("timestamp")
+            duration = run.get("runtime_seconds", 0) or 0
+            if timestamp:
+                try:
+                    end_dt = datetime.fromisoformat(timestamp)
+                    start_dt = end_dt - timedelta(seconds=duration + 5)
+                    end_dt = end_dt + timedelta(seconds=5)
+                    end_time = end_dt.isoformat()
+                    start_time = start_dt.isoformat()
+                except ValueError:
+                    return {"success": True, "items": [], "message": "Could not determine time range"}
+            else:
+                return {"success": True, "items": [], "message": "No timestamp info available"}
+
+        # 2. Fetch assets created in this time range
+        records = db.get_assets_created_between(start_time, end_time)
+
+        # 3. Enrich with Image URLs from Cache
+        # (Reusing logic from get_recent_assets)
+        cache = get_fresh_assets()
+        all_cached_assets = cache["posters"] + cache["backgrounds"] + cache["seasons"] + cache["titlecards"]
+        # Fast lookup map
+        asset_map = {img["path"].replace("\\", "/"): img for img in all_cached_assets}
+
+        items = []
+        for r in records:
+            item = dict(r)
+
+            # Determine filename to look for
+            asset_type_lower = (item.get("Type") or "").lower()
+            title = item.get("Title", "")
+            rootfolder = item.get("Rootfolder", "")
+            library = item.get("LibraryName", "")
+
+            filename = "poster.jpg"
+            if "background" in asset_type_lower: filename = "background.jpg"
+            elif "season" in asset_type_lower:
+                m = re.search(r"season\s*(\d+)", title, re.IGNORECASE)
+                filename = f"Season{m.group(1).zfill(2)}.jpg" if m else "Season01.jpg"
+            elif "titlecard" in asset_type_lower or "episode" in asset_type_lower:
+                m = re.search(r"(S\d+E\d+)", title, re.IGNORECASE)
+                filename = f"{m.group(1).upper()}.jpg" if m else "S01E01.jpg"
+
+            # Look up in cache
+            key = f"{library}/{rootfolder}/{filename}"
+            cached_asset = asset_map.get(key)
+
+            if cached_asset:
+                item["poster_url"] = cached_asset["url"]
+                item["has_poster"] = True
+            else:
+                item["poster_url"] = None
+                item["has_poster"] = False
+
+            items.append(item)
+
+        return {
+            "success": True,
+            "items": items,
+            "count": len(items),
+            "time_range": {"start": start_time, "end": end_time}
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting runtime items: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/analytics/providers")
+async def get_provider_stats(days: int = Query(30, ge=7, le=365)):
+    """Get provider source statistics over time"""
+    try:
+        if not DATABASE_AVAILABLE or not db:
+             return {"success": False, "stats": [], "error": "Database not available"}
+
+        # Use the new method in database.py
+        stats = db.get_provider_stats_by_date(days)
+        return {"success": True, "stats": stats}
+    except Exception as e:
+        logger.error(f"Error getting provider stats: {e}")
+        return {"success": False, "error": str(e), "stats": []}
 
 # =========================================================================
 # Plex Export Database Endpoints

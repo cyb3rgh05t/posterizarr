@@ -387,7 +387,7 @@ const AssetRow = React.memo(
           {/* Action Buttons */}
           <div className="flex items-start gap-2">
             {isResolved ? (
-              // --- Resolved Asset Actions ---
+              // Resolved Asset Actions
               <>
                 <button
                   onClick={() => onUnresolve(asset)}
@@ -407,7 +407,7 @@ const AssetRow = React.memo(
                 </button>
               </>
             ) : (
-              // --- Unresolved Asset Actions ---
+              // Unresolved Asset Actions
               <>
                 <button
                   onClick={() => onNoEditsNeeded(asset)}
@@ -1429,7 +1429,7 @@ const AssetOverview = () => {
       }
     }
 
-    // --- UPDATED LANGUAGE LOGIC ---
+    // UPDATED LANGUAGE LOGIC
     const assetTypeRaw = (asset.Type || "").toLowerCase();
 
     // Determine the correct primary language based on asset type

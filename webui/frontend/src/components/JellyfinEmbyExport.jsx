@@ -22,11 +22,12 @@ import {
 import {
   formatDateToLocale,
 } from "../utils/timeUtils";
+import ScrollToButtons from "./ScrollToButtons"; // Added Import
 
 const API_URL = "/api";
 const API_PREFIX = "other-media-export";
 
-// --- Sub-components defined OUTSIDE ---
+// Sub-components defined OUTSIDE
 
 const SortIcon = ({ sortConfig, columnKey }) => {
   if (sortConfig.key !== columnKey) return <ArrowUpDown className="w-3 h-3 text-theme-muted opacity-30" />;
@@ -198,7 +199,7 @@ function DetailRow({ label, value, multiline = false, monospace = false, nested 
   );
 }
 
-// --- Main Component ---
+// Main Component
 
 function JellyfinEmbyExport() {
   const { t } = useTranslation();
@@ -524,6 +525,7 @@ function JellyfinEmbyExport() {
 
   return (
     <div className="space-y-6">
+      <ScrollToButtons />
       {/* Top Actions */}
       <div className="flex justify-end items-start gap-2">
         <button
@@ -623,8 +625,16 @@ function JellyfinEmbyExport() {
               placeholder={t("plexExport.searchPlaceholder", "Search all columns...")}
               value={globalSearch}
               onChange={(e) => { setGlobalSearch(e.target.value); setCurrentPage(0); }}
-              className="w-full pl-10 pr-4 py-2 bg-theme-hover border border-theme rounded-lg text-theme-text placeholder-theme-muted focus:outline-none focus:border-theme-primary"
+              className="w-full pl-10 pr-10 py-2 bg-theme-hover border border-theme rounded-lg text-theme-text placeholder-theme-muted focus:outline-none focus:border-theme-primary"
             />
+             {globalSearch && (
+              <button
+                onClick={() => { setGlobalSearch(""); setCurrentPage(0); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-primary"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 

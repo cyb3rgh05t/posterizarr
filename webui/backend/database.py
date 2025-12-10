@@ -8,6 +8,7 @@ from typing import List, Dict, Optional
 import logging
 import csv
 import threading
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,9 @@ class ImageChoicesDB:
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_title ON imagechoices(Title)"
                 )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_created_at ON imagechoices(created_at)"
+                )
 
                 conn.commit()
                 conn.close()
@@ -125,6 +129,87 @@ class ImageChoicesDB:
                 if 'conn' in locals():
                     conn.close()
                 return []
+
+    # NEW METHODS FOR RUNTIME HISTORY & ANALYTICS
+
+    def get_assets_created_between(self, start_date: str, end_date: str) -> List[sqlite3.Row]:
+        """Get assets created within a specific time range"""
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                # Use >= and <= to include the boundaries
+                cursor.execute(
+                    "SELECT * FROM imagechoices WHERE created_at >= ? AND created_at <= ? ORDER BY created_at DESC",
+                    (start_date, end_date)
+                )
+                rows = cursor.fetchall()
+                conn.close()
+                return rows
+            except sqlite3.Error as e:
+                logger.error(f"Error getting assets by date range: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                return []
+
+    def get_provider_stats_by_date(self, days: int = 30) -> List[Dict]:
+        """
+        Get daily statistics of asset providers (TMDB, TVDB, Fanart)
+        Returns list of {date: 'YYYY-MM-DD', TMDB: 5, TVDB: 2, ...}
+        """
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+
+                # Calculate cutoff date
+                cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+                # Use substr for reliable YYYY-MM-DD extraction across all SQLite versions
+                query = """
+                    SELECT
+                        substr(created_at, 1, 10) as day,
+                        CASE
+                            WHEN LOWER(DownloadSource) LIKE '%tmdb%' OR LOWER(DownloadSource) LIKE '%themoviedb%' THEN 'TMDB'
+                            WHEN LOWER(DownloadSource) LIKE '%tvdb%' OR LOWER(DownloadSource) LIKE '%thetvdb%' THEN 'TVDB'
+                            WHEN LOWER(DownloadSource) LIKE '%fanart%' THEN 'Fanart'
+                            ELSE 'Other'
+                        END as provider,
+                        COUNT(*) as count
+                    FROM imagechoices
+                    WHERE created_at >= ?
+                    GROUP BY day, provider
+                    ORDER BY day ASC
+                """
+
+                cursor.execute(query, (cutoff_date,))
+                rows = cursor.fetchall()
+                conn.close()
+
+                # Pivot data
+                stats_by_day = {}
+
+                for row in rows:
+                    day = row['day']
+                    if not day or len(day) != 10: continue
+
+                    provider = row['provider']
+                    count = row['count']
+
+                    if day not in stats_by_day:
+                        stats_by_day[day] = {"date": day, "TMDB": 0, "TVDB": 0, "Fanart": 0, "Other": 0}
+
+                    stats_by_day[day][provider] = count
+
+                # Sort by date
+                return sorted(list(stats_by_day.values()), key=lambda x: x['date'])
+
+            except sqlite3.Error as e:
+                logger.error(f"Error getting provider stats: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                return []
+    #-------------------------------------------------
 
     def get_choice_by_id(self, record_id: int) -> Optional[sqlite3.Row]:
         """Get a specific choice by its ID"""
@@ -225,7 +310,6 @@ class ImageChoicesDB:
         """
         Import data from ImageChoices.csv, inserting new records
         and updating existing ones based on the unique key.
-        (Title, Rootfolder, Type, LibraryName)
         """
         if not csv_path.exists():
             return {"added": 0, "updated": 0, "skipped": 0, "errors": 0, "error_details": []}
@@ -269,17 +353,13 @@ class ImageChoicesDB:
                             error_details.append(f"Row {i+1}: {str(e_row)}")
 
                 if records_to_upsert:
-                    # Store total rows before
                     cursor.execute("SELECT COUNT(*) FROM imagechoices")
                     rows_before = cursor.fetchone()[0]
 
-                    # Store total changes before
                     cursor.execute("SELECT total_changes()")
                     changes_before = cursor.fetchone()[0]
 
-                    # NEW UPSERT SQL
-                    # This attempts to INSERT. If a conflict on the unique key occurs,
-                    # it will UPDATE the existing row instead.
+                    # UPSERT Logic
                     sql_upsert = """
                         INSERT INTO imagechoices (
                             Title, Type, Rootfolder, LibraryName, Language,
@@ -305,24 +385,17 @@ class ImageChoicesDB:
                     cursor.executemany(sql_upsert, records_to_upsert)
                     conn.commit()
 
-                    # Get total changes after
                     cursor.execute("SELECT total_changes()")
                     changes_after = cursor.fetchone()[0]
 
-                    # Get total rows after
                     cursor.execute("SELECT COUNT(*) FROM imagechoices")
                     rows_after = cursor.fetchone()[0]
 
                     conn.close()
 
-                    # Calculate stats
                     total_changes = changes_after - changes_before
                     added_count = rows_after - rows_before
-
-                    # An INSERT counts as 1 change, an UPDATE counts as 1 change.
                     updated_count = total_changes - added_count
-
-                    # Skipped rows are those that were processed but caused no change (due to the WHERE clause)
                     skipped_count = len(records_to_upsert) - total_changes
 
                     return {
@@ -343,18 +416,8 @@ class ImageChoicesDB:
                     conn.close()
                 return {"added": 0, "updated": 0, "skipped": 0, "errors": errors + 1, "error_details": [str(e)]}
 
-    # Bulk update function
     def bulk_update_manual_status(self, record_ids: List[int], manual_status: str) -> int:
-        """
-        Update the 'Manual' status for a list of record IDs in a single transaction.
-
-        Args:
-            record_ids: A list of integer record IDs to update.
-            manual_status: The new status to set (e.g., "Yes" or "No").
-
-        Returns:
-            The number of rows updated.
-        """
+        """Update the 'Manual' status for a list of record IDs"""
         if not record_ids:
             return 0
 
@@ -362,29 +425,13 @@ class ImageChoicesDB:
             try:
                 conn = self._get_connection()
                 cursor = conn.cursor()
-
-                # Create placeholders for the IN clause
                 placeholders = ",".join("?" * len(record_ids))
-
-                # Prepare query
-                query = f"""
-                    UPDATE imagechoices
-                    SET
-                        Manual = ?,
-                        updated_at = (datetime('now', 'localtime'))
-                    WHERE id IN ({placeholders})
-                """
-
-                # Prepare values (status + all IDs)
+                query = f"UPDATE imagechoices SET Manual = ?, updated_at = (datetime('now', 'localtime')) WHERE id IN ({placeholders})"
                 values = [manual_status] + record_ids
-
                 cursor.execute(query, values)
                 updated_count = cursor.rowcount
-
                 conn.commit()
                 conn.close()
-
-                logger.info(f"Bulk updated {updated_count} records to Manual='{manual_status}'")
                 return updated_count
             except sqlite3.Error as e:
                 logger.error(f"Error bulk updating manual status: {e}")
@@ -392,7 +439,34 @@ class ImageChoicesDB:
                     conn.rollback()
                     conn.close()
                 raise
-    # END: New function
+
+    def search_assets(self, query: str, limit: int = 5) -> List[Dict]:
+        """Search for assets by title"""
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                sql = "SELECT * FROM imagechoices WHERE Title LIKE ? OR Rootfolder LIKE ? ORDER BY id DESC LIMIT ?"
+                cursor.execute(sql, (f"%{query}%", f"%{query}%", limit))
+                rows = cursor.fetchall()
+                conn.close()
+
+                results = []
+                for row in rows:
+                    r = dict(row)
+                    results.append({
+                        "id": r["id"],
+                        "title": r["Title"],
+                        "type": r["Type"],
+                        "year": "",
+                        "library": r["LibraryName"]
+                    })
+                return results
+            except sqlite3.Error as e:
+                logger.error(f"Error searching assets: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                return []
 
 def init_database(db_path: Path) -> ImageChoicesDB:
     """Initialize the database"""
