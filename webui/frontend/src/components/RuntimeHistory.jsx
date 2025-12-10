@@ -8,7 +8,7 @@ import {
 
 const API_URL = "/api";
 
-// 1. Clean Helper Logic (Matches FolderView.jsx)
+// 1. Clean Helper Logic
 const getImageUrl = (path) => {
     if (!path) return null;
     return `${API_URL}/image?path=${encodeURIComponent(path)}`;
@@ -40,10 +40,11 @@ const Tooltip = ({ x, y, data }) => (
 
 const InteractiveBarChart = ({ data, height = 250, onBarClick, color = "bg-theme-primary", valueKey = "value" }) => {
   const { t } = useTranslation();
+  // FIX: Hook must be called BEFORE any early returns
+  const [hoveredIndex, setHoveredIndex] = useState(null);
 
   if (!data || data.length === 0) return <div className="text-theme-muted text-sm text-center py-20 flex flex-col items-center justify-center h-full">{t('runtime_history.charts.no_data')}</div>;
 
-  const [hoveredIndex, setHoveredIndex] = useState(null);
   const maxVal = Math.max(...data.map(d => d[valueKey]), 5);
 
   return (
@@ -100,9 +101,10 @@ const InteractiveBarChart = ({ data, height = 250, onBarClick, color = "bg-theme
 
 const ProviderStackChart = ({ data, height = 250 }) => {
     const { t } = useTranslation();
-    if (!data || data.length === 0) return <div className="text-theme-muted text-sm text-center py-20">{t('runtime_history.charts.no_provider_data')}</div>;
-
+    // FIX: Hook must be called BEFORE any early returns
     const [hoveredIndex, setHoveredIndex] = useState(null);
+
+    if (!data || data.length === 0) return <div className="text-theme-muted text-sm text-center py-20">{t('runtime_history.charts.no_provider_data')}</div>;
 
     const maxTotal = Math.max(...data.map(d => (
         getSafeValue(d, "TMDB") +
