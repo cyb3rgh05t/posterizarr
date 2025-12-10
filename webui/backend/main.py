@@ -396,6 +396,10 @@ setup_backend_ui_logger()
 try:
     logger.debug("Attempting to import config_tooltips module")
     from config_tooltips import CONFIG_TOOLTIPS
+    try:
+        from .config_tooltips import CONFIG_TOOLTIPS
+    except ImportError:
+        from config_tooltips import CONFIG_TOOLTIPS
     logger.info("Config tooltips loaded successfully")
 except ImportError as e:
     CONFIG_TOOLTIPS = {}
@@ -5729,7 +5733,7 @@ async def get_runtime_items(run_id: int):
     """
     Get the specific assets created during a script run.
     Correlates runtime_stats timestamps with imagechoices created_at timestamps.
-    Enriches with poster URLs from asset cache.
+    Enriches with poster URLs AND local paths from asset cache.
     """
     try:
         if not RUNTIME_DB_AVAILABLE or not runtime_db:
@@ -5765,11 +5769,11 @@ async def get_runtime_items(run_id: int):
         # 2. Fetch assets created in this time range
         records = db.get_assets_created_between(start_time, end_time)
 
-        # 3. Enrich with Image URLs from Cache
-        # (Reusing logic from get_recent_assets)
+        # 3. Enrich with Image URLs AND Paths from Cache
         cache = get_fresh_assets()
         all_cached_assets = cache["posters"] + cache["backgrounds"] + cache["seasons"] + cache["titlecards"]
-        # Fast lookup map
+
+        # Fast lookup map - normalize keys to handle OS path differences
         asset_map = {img["path"].replace("\\", "/"): img for img in all_cached_assets}
 
         items = []
@@ -5782,6 +5786,7 @@ async def get_runtime_items(run_id: int):
             rootfolder = item.get("Rootfolder", "")
             library = item.get("LibraryName", "")
 
+            # Heuristic to guess the filename based on asset type
             filename = "poster.jpg"
             if "background" in asset_type_lower: filename = "background.jpg"
             elif "season" in asset_type_lower:
@@ -5791,15 +5796,22 @@ async def get_runtime_items(run_id: int):
                 m = re.search(r"(S\d+E\d+)", title, re.IGNORECASE)
                 filename = f"{m.group(1).upper()}.jpg" if m else "S01E01.jpg"
 
-            # Look up in cache
+            # Look up in cache using constructed key
             key = f"{library}/{rootfolder}/{filename}"
+            # Normalize key for lookup
+            key = key.replace("\\", "/")
+
             cached_asset = asset_map.get(key)
 
             if cached_asset:
                 item["poster_url"] = cached_asset["url"]
+                # CRITICAL UPDATE: Pass the real local path to the frontend
+                # The frontend will prioritize this 'output_path' for the proxy loader
+                item["output_path"] = cached_asset["path"]
                 item["has_poster"] = True
             else:
                 item["poster_url"] = None
+                item["output_path"] = None
                 item["has_poster"] = False
 
             items.append(item)
@@ -5814,7 +5826,6 @@ async def get_runtime_items(run_id: int):
     except Exception as e:
         logger.error(f"Error getting runtime items: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 @app.get("/api/analytics/providers")
 async def get_provider_stats(days: int = Query(30, ge=7, le=365)):
     """Get provider source statistics over time"""
