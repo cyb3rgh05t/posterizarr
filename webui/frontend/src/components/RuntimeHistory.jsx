@@ -8,8 +8,19 @@ import {
 
 const API_URL = "/api";
 
-// Interactive Chart Components
+// 1. Clean Helper Logic (Matches FolderView.jsx)
+const getImageUrl = (path) => {
+    if (!path) return null;
+    return `${API_URL}/image?path=${encodeURIComponent(path)}`;
+};
 
+// Helper to safely get values regardless of casing
+const getSafeValue = (data, key) => {
+    if (!data) return 0;
+    return data[key] || data[key.toLowerCase()] || data[key.toUpperCase()] || 0;
+};
+
+// Interactive Chart Components
 const Tooltip = ({ x, y, data }) => (
   <div
     className="absolute z-20 bg-gray-900 text-white text-xs rounded py-2 px-3 border border-gray-700 shadow-xl pointer-events-none transform -translate-x-1/2 -translate-y-full mb-2 whitespace-nowrap"
@@ -38,7 +49,6 @@ const InteractiveBarChart = ({ data, height = 250, onBarClick, color = "bg-theme
         <div className="flex items-end gap-[1px] w-full h-full pb-8 pt-4 px-2">
             {data.map((d, i) => {
             const heightPct = (d[valueKey] / maxVal) * 100;
-            // Only show labels if there is space (simple heuristic)
             const showLabel = data.length <= 15 || i % Math.ceil(data.length / 12) === 0;
 
             return (
@@ -48,7 +58,6 @@ const InteractiveBarChart = ({ data, height = 250, onBarClick, color = "bg-theme
                 onMouseEnter={() => setHoveredIndex(i)}
                 onClick={() => onBarClick && onBarClick(d.originalData)}
                 >
-                {/* Bar Container */}
                 <div className="w-full h-full flex items-end relative">
                     <div
                     className={`w-full ${color} opacity-80 group-hover:opacity-100 transition-all rounded-t-sm`}
@@ -57,14 +66,12 @@ const InteractiveBarChart = ({ data, height = 250, onBarClick, color = "bg-theme
                     <div className="absolute inset-0 bg-transparent z-10"></div>
                 </div>
 
-                {/* X-Axis Label */}
                 {showLabel && (
                     <div className="absolute top-full left-1/2 -translate-x-1/2 text-[10px] text-theme-muted mt-2 whitespace-nowrap">
                     {d.shortLabel}
                     </div>
                 )}
 
-                {/* Tooltip */}
                 {hoveredIndex === i && (
                     <Tooltip
                     x="50%"
@@ -79,8 +86,6 @@ const InteractiveBarChart = ({ data, height = 250, onBarClick, color = "bg-theme
             );
             })}
         </div>
-
-        {/* Y-Axis Lines (Background) */}
         <div className="absolute inset-0 pointer-events-none">
             <div className="border-b border-theme/20 absolute w-full top-0"></div>
             <div className="border-b border-theme/20 absolute w-full top-1/2"></div>
@@ -96,17 +101,17 @@ const ProviderStackChart = ({ data, height = 250 }) => {
 
     const [hoveredIndex, setHoveredIndex] = useState(null);
 
-    // 1. Add Plex to the calculation
     const maxTotal = Math.max(...data.map(d => (
-        (d.TMDB || 0) + (d.TVDB || 0) + (d.Fanart || 0) + (d.Plex || 0) + (d.Other || 0)
+        getSafeValue(d, "TMDB") +
+        getSafeValue(d, "TVDB") +
+        getSafeValue(d, "Fanart") +
+        getSafeValue(d, "Other")
     )), 5);
 
-    // 2. Add Plex color
     const colors = {
         TMDB: "bg-blue-500",
         TVDB: "bg-green-500",
         Fanart: "bg-orange-500",
-        Plex: "bg-yellow-500", // Distinct color for Plex
         Other: "bg-gray-500"
     };
 
@@ -114,19 +119,15 @@ const ProviderStackChart = ({ data, height = 250 }) => {
         <div className="w-full h-full relative select-none" onMouseLeave={() => setHoveredIndex(null)}>
             <div className="flex items-end gap-[1px] w-full h-full pb-8 pt-4 px-2">
                 {data.map((d, i) => {
-                    // Safety checks for undefined values
-                    const valTmdb = d.TMDB || 0;
-                    const valTvdb = d.TVDB || 0;
-                    const valFanart = d.Fanart || 0;
-                    const valPlex = d.Plex || 0;
-                    const valOther = d.Other || 0;
-
-                    const total = valTmdb + valTvdb + valFanart + valPlex + valOther;
+                    const valTmdb = getSafeValue(d, "TMDB");
+                    const valTvdb = getSafeValue(d, "TVDB");
+                    const valFanart = getSafeValue(d, "Fanart");
+                    const valOther = getSafeValue(d, "Other");
+                    const total = valTmdb + valTvdb + valFanart + valOther;
 
                     const hTmdb = (valTmdb / maxTotal) * 100;
                     const hTvdb = (valTvdb / maxTotal) * 100;
                     const hFanart = (valFanart / maxTotal) * 100;
-                    const hPlex = (valPlex / maxTotal) * 100;
                     const hOther = (valOther / maxTotal) * 100;
 
                     const showLabel = data.length <= 15 || i % Math.ceil(data.length / 12) === 0;
@@ -137,12 +138,10 @@ const ProviderStackChart = ({ data, height = 250 }) => {
                             className="flex-1 h-full flex flex-col justify-end group relative"
                             onMouseEnter={() => setHoveredIndex(i)}
                         >
-                            {/* FIX: Added 'h-full' here so percentage heights work */}
                             <div className="w-full h-full flex flex-col-reverse relative hover:brightness-110 transition-all z-10">
                                 {valTmdb > 0 && <div style={{ height: `${hTmdb}%` }} className={`${colors.TMDB} w-full`}></div>}
                                 {valTvdb > 0 && <div style={{ height: `${hTvdb}%` }} className={`${colors.TVDB} w-full`}></div>}
                                 {valFanart > 0 && <div style={{ height: `${hFanart}%` }} className={`${colors.Fanart} w-full`}></div>}
-                                {valPlex > 0 && <div style={{ height: `${hPlex}%` }} className={`${colors.Plex} w-full`}></div>}
                                 {valOther > 0 && <div style={{ height: `${hOther}%` }} className={`${colors.Other} w-full rounded-t-sm`}></div>}
                                 {total === 0 && <div className="h-px w-full bg-theme-muted/10"></div>}
                             </div>
@@ -163,7 +162,6 @@ const ProviderStackChart = ({ data, height = 250 }) => {
                                         { label: "TMDB", value: valTmdb },
                                         { label: "TVDB", value: valTvdb },
                                         { label: "Fanart", value: valFanart },
-                                        { label: "Plex", value: valPlex },
                                         { label: "Other", value: valOther },
                                         { label: "Total", value: total }
                                     ]
@@ -199,7 +197,6 @@ function RuntimeHistory() {
   const [viewMode, setViewMode] = useState("analytics");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [migrating, setMigrating] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(0);
   const [limit] = useState(20);
@@ -271,13 +268,17 @@ function RuntimeHistory() {
   };
 
   const fetchRunItems = async (runId) => {
+      if (!runId) return;
+
       setLoadingItems(true);
       setCreatedItems([]);
       try {
           const response = await fetch(`${API_URL}/runtime-history/${runId}/items`);
           if (response.ok) {
               const data = await response.json();
-              if (data.success) setCreatedItems(data.items);
+              if (data.success) {
+                  setCreatedItems(Array.isArray(data.items) ? data.items : []);
+              }
           }
       } catch (e) {
           console.error("Error fetching run items:", e);
@@ -310,7 +311,7 @@ function RuntimeHistory() {
       setDetailTab("stats");
       setCreatedItems([]);
       setShowDetailModal(true);
-      if (entry.total_images > 0) {
+      if (entry.total_images > 0 && entry.id) {
           fetchRunItems(entry.id);
       }
   };
@@ -559,27 +560,44 @@ function RuntimeHistory() {
                                 <div className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-theme-primary" /><p className="mt-2 text-theme-muted">Loading item details...</p></div>
                             ) : createdItems.length === 0 ? (
                                 <div className="text-center py-20 text-theme-muted">
-                                    <p>No items found for this run.</p>
-                                    <p className="text-xs mt-1 opacity-70">(Items are tracked based on timestamps. If this run is old, item data might not be available)</p>
+                                    <p className="font-medium text-lg text-theme-text mb-2">No item details found</p>
+                                    <p className="text-sm">
+                                        {selectedEntry.total_images > 0
+                                            ? `This run created ${selectedEntry.total_images} assets, but their detailed records could not be retrieved.`
+                                            : "This run did not create any new assets."}
+                                    </p>
+                                    <p className="text-xs mt-4 opacity-70 bg-theme-bg p-2 rounded border border-theme inline-block">
+                                        (Note: Items are often tracked by timestamp range. If the run logs are old or time-sync is off, specific items might not link to this History ID: {selectedEntry.id})
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
-                                    {createdItems.map((item, idx) => (
+                                    {createdItems.map((item, idx) => {
+                                        // 2. Safe Path Extraction
+                                        // Try common keys for path. If keys are missing, we fall back to null.
+                                        const assetPath = item.Path || item.OutputPath || item.path || item.output_path || item.Rootfolder || item.poster_path;
+                                        const imageUrl = getImageUrl(assetPath) || item.poster_url;
+
+                                        return (
                                         <div key={idx} className="flex items-center justify-between p-3 bg-theme-card border border-theme rounded-lg hover:border-theme-primary/50 transition-all">
                                             <div className="flex items-center gap-3 overflow-hidden">
                                                 <div className="w-10 h-14 bg-theme-bg rounded overflow-hidden flex-shrink-0 border border-theme relative">
-                                                    {item.poster_url ? (
+                                                    {imageUrl ? (
                                                         <img
-                                                            src={item.poster_url}
+                                                            src={imageUrl}
                                                             alt=""
                                                             className="w-full h-full object-cover"
                                                             loading="lazy"
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                e.target.nextSibling.style.display = 'flex';
+                                                            }}
                                                         />
-                                                    ) : (
-                                                        <div className={`w-full h-full flex items-center justify-center ${item.Type === "Poster" ? "bg-blue-500/10 text-blue-400" : "bg-gray-500/10 text-gray-400"}`}>
-                                                            {item.Type === "Poster" ? <Film className="w-4 h-4"/> : <Image className="w-4 h-4"/>}
-                                                        </div>
-                                                    )}
+                                                    ) : null}
+                                                    {/* Fallback Icon */}
+                                                    <div className="w-full h-full flex items-center justify-center bg-gray-500/10 text-gray-400" style={{ display: imageUrl ? 'none' : 'flex' }}>
+                                                        {item.Type === "Poster" ? <Film className="w-4 h-4"/> : <Image className="w-4 h-4"/>}
+                                                    </div>
                                                 </div>
 
                                                 <div className="min-w-0">
@@ -592,7 +610,7 @@ function RuntimeHistory() {
                                                  {item.DownloadSource && <span className="text-[10px] text-theme-muted max-w-[150px] truncate" title={item.DownloadSource}>{item.DownloadSource}</span>}
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                             )}
                         </div>
