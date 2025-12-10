@@ -2183,5 +2183,57 @@
     "description": "Verfolgen und Abfragen Ihrer Medienserver-Bibliotheksexporte im Zeitverlauf",
     "plex": "Plex",
     "jellyfinEmby": "Jellyfin / Emby"
+  },
+  "runtime_history": {
+    "analytics": "Statistiken",
+    "history_list": "Verlaufsliste",
+    "periods": {
+      "last_7_days": "Letzte 7 Tage",
+      "last_30_days": "Letzte 30 Tage",
+      "last_3_months": "Letzte 3 Monate",
+      "last_year": "Letztes Jahr"
+    },
+    "charts": {
+      "execution_time": "Ausführungszeit (Sekunden)",
+      "assets_created": "Erstellte Assets",
+      "errors_per_run": "Fehler pro Durchlauf",
+      "source_distribution": "Quellenverteilung (Täglich)",
+      "no_data": "Keine Daten für diesen Zeitraum verfügbar",
+      "no_provider_data": "Keine Anbieterdaten verfügbar"
+    },
+    "table": {
+      "start_time": "Startzeit",
+      "mode": "Modus",
+      "duration": "Dauer",
+      "created": "Erstellt",
+      "errors": "Fehler",
+      "page": "Seite"
+    },
+    "details": {
+      "title": "Ausführungsdetails",
+      "tab_stats": "Statistiken",
+      "tab_items": "Erstellte Elemente",
+      "runtime": "Laufzeit",
+      "total_images": "Gesamtbilder",
+      "space_saved": "Gesparter Speicherplatz",
+      "breakdown": "Aufschlüsselung",
+      "logs": "Protokolle",
+      "log_file": "Protokolldatei",
+      "script_version": "Skriptversion"
+    },
+    "items": {
+      "loading": "Lade Artikeldetails...",
+      "none_found": "Keine Artikeldetails gefunden",
+      "assets_no_records": "Dieser Lauf hat {{count}} Assets erstellt, aber ihre detaillierten Datensätze konnten nicht abgerufen werden.",
+      "no_new_assets": "Dieser Lauf hat keine neuen Assets erstellt.",
+      "timestamp_warning": "(Hinweis: Elemente werden oft nach Zeitstempelbereich verfolgt. Wenn die Protokolle alt sind oder die Zeitsynchronisation deaktiviert ist, werden bestimmte Elemente möglicherweise nicht mit dieser Verlaufs-ID verknüpft: {{id}})"
+    },
+    "types": {
+      "posters": "Poster",
+      "backgrounds": "Hintergründe",
+      "seasons": "Staffeln",
+      "title_cards": "Titelkarten",
+      "collections": "Sammlungen"
+    }
   }
 }

@@ -39,7 +39,9 @@ const Tooltip = ({ x, y, data }) => (
 );
 
 const InteractiveBarChart = ({ data, height = 250, onBarClick, color = "bg-theme-primary", valueKey = "value" }) => {
-  if (!data || data.length === 0) return <div className="text-theme-muted text-sm text-center py-20 flex flex-col items-center justify-center h-full">No data available for this period</div>;
+  const { t } = useTranslation();
+
+  if (!data || data.length === 0) return <div className="text-theme-muted text-sm text-center py-20 flex flex-col items-center justify-center h-full">{t('runtime_history.charts.no_data')}</div>;
 
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const maxVal = Math.max(...data.map(d => d[valueKey]), 5);
@@ -97,7 +99,8 @@ const InteractiveBarChart = ({ data, height = 250, onBarClick, color = "bg-theme
 };
 
 const ProviderStackChart = ({ data, height = 250 }) => {
-    if (!data || data.length === 0) return <div className="text-theme-muted text-sm text-center py-20">No provider data available</div>;
+    const { t } = useTranslation();
+    if (!data || data.length === 0) return <div className="text-theme-muted text-sm text-center py-20">{t('runtime_history.charts.no_provider_data')}</div>;
 
     const [hoveredIndex, setHoveredIndex] = useState(null);
 
@@ -369,10 +372,10 @@ function RuntimeHistory() {
           <div className="flex items-center gap-4">
               <div className="flex bg-theme-bg p-1 rounded-lg border border-theme">
                   <button onClick={() => setViewMode("analytics")} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === "analytics" ? "bg-theme-primary text-white shadow-sm" : "text-theme-muted hover:text-theme-text"}`}>
-                      <BarChart2 className="w-4 h-4" /> Analytics
+                      <BarChart2 className="w-4 h-4" /> {t('runtime_history.analytics')}
                   </button>
                   <button onClick={() => setViewMode("list")} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === "list" ? "bg-theme-primary text-white shadow-sm" : "text-theme-muted hover:text-theme-text"}`}>
-                      <ListIcon className="w-4 h-4" /> History List
+                      <ListIcon className="w-4 h-4" /> {t('runtime_history.history_list')}
                   </button>
               </div>
           </div>
@@ -386,10 +389,10 @@ function RuntimeHistory() {
                         onChange={(e) => setGraphDays(Number(e.target.value))}
                         className="bg-transparent text-sm text-theme-text outline-none cursor-pointer"
                     >
-                        <option value={7}>Last 7 Days</option>
-                        <option value={30}>Last 30 Days</option>
-                        <option value={90}>Last 3 Months</option>
-                        <option value={365}>Last Year</option>
+                        <option value={7}>{t('runtime_history.periods.last_7_days')}</option>
+                        <option value={30}>{t('runtime_history.periods.last_30_days')}</option>
+                        <option value={90}>{t('runtime_history.periods.last_3_months')}</option>
+                        <option value={365}>{t('runtime_history.periods.last_year')}</option>
                     </select>
                 </div>
              )}
@@ -405,7 +408,7 @@ function RuntimeHistory() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-theme-card p-6 rounded-xl border border-theme hover:border-theme-primary/30 transition-all">
                       <h3 className="text-lg font-bold text-theme-text mb-4 flex items-center gap-2">
-                          <Clock className="w-5 h-5 text-blue-400" /> Execution Time (Seconds)
+                          <Clock className="w-5 h-5 text-blue-400" /> {t('runtime_history.charts.execution_time')}
                       </h3>
                       <div className="h-64">
                           <InteractiveBarChart
@@ -418,7 +421,7 @@ function RuntimeHistory() {
 
                   <div className="bg-theme-card p-6 rounded-xl border border-theme hover:border-theme-primary/30 transition-all">
                       <h3 className="text-lg font-bold text-theme-text mb-4 flex items-center gap-2">
-                          <Image className="w-5 h-5 text-green-400" /> Assets Created
+                          <Image className="w-5 h-5 text-green-400" /> {t('runtime_history.charts.assets_created')}
                       </h3>
                       <div className="h-64">
                           <InteractiveBarChart
@@ -431,7 +434,7 @@ function RuntimeHistory() {
 
                   <div className="bg-theme-card p-6 rounded-xl border border-theme hover:border-theme-primary/30 transition-all">
                       <h3 className="text-lg font-bold text-theme-text mb-4 flex items-center gap-2">
-                          <AlertTriangle className="w-5 h-5 text-red-400" /> Errors per Run
+                          <AlertTriangle className="w-5 h-5 text-red-400" /> {t('runtime_history.charts.errors_per_run')}
                       </h3>
                       <div className="h-64">
                           <InteractiveBarChart
@@ -444,7 +447,7 @@ function RuntimeHistory() {
 
                   <div className="bg-theme-card p-6 rounded-xl border border-theme hover:border-theme-primary/30 transition-all">
                       <h3 className="text-lg font-bold text-theme-text mb-4 flex items-center gap-2">
-                          <Globe className="w-5 h-5 text-orange-400" /> Source Distribution (Daily)
+                          <Globe className="w-5 h-5 text-orange-400" /> {t('runtime_history.charts.source_distribution')}
                       </h3>
                       <div className="h-64">
                           <ProviderStackChart data={providerStats} />
@@ -460,11 +463,11 @@ function RuntimeHistory() {
                 <table className="w-full text-sm text-left">
                     <thead className="bg-theme-hover text-theme-muted font-medium border-b border-theme">
                         <tr>
-                            <th className="px-6 py-4">Start Time</th>
-                            <th className="px-6 py-4">Mode</th>
-                            <th className="px-6 py-4">Duration</th>
-                            <th className="px-6 py-4 text-right">Created</th>
-                            <th className="px-6 py-4 text-right">Errors</th>
+                            <th className="px-6 py-4">{t('runtime_history.table.start_time')}</th>
+                            <th className="px-6 py-4">{t('runtime_history.table.mode')}</th>
+                            <th className="px-6 py-4">{t('runtime_history.table.duration')}</th>
+                            <th className="px-6 py-4 text-right">{t('runtime_history.table.created')}</th>
+                            <th className="px-6 py-4 text-right">{t('runtime_history.table.errors')}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-theme">
@@ -487,7 +490,7 @@ function RuntimeHistory() {
                 </table>
             </div>
              <div className="p-4 border-t border-theme flex justify-between items-center text-sm text-theme-muted">
-                <span>Page {currentPage + 1}</span>
+                <span>{t('runtime_history.table.page')} {currentPage + 1}</span>
                 <div className="flex gap-2">
                     <button disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)} className="p-1 rounded bg-theme-bg border border-theme disabled:opacity-50"><ChevronLeft className="w-5 h-5" /></button>
                     <button disabled={history.length < limit} onClick={() => setCurrentPage(p => p + 1)} className="p-1 rounded bg-theme-bg border border-theme disabled:opacity-50"><ChevronRight className="w-5 h-5" /></button>
@@ -505,7 +508,7 @@ function RuntimeHistory() {
                     <div>
                         <h2 className="text-xl font-bold text-theme-text flex items-center gap-3">
                             <span className={`text-xs px-2 py-1 rounded border capitalize ${getModeColor(selectedEntry.mode)}`}>{selectedEntry.mode}</span>
-                            Run Details
+                            {t('runtime_history.details.title')}
                         </h2>
                         <p className="text-theme-muted text-sm mt-1">{new Date(selectedEntry.start_time || selectedEntry.timestamp).toLocaleString()}</p>
                     </div>
@@ -517,13 +520,13 @@ function RuntimeHistory() {
                         onClick={() => setDetailTab("stats")}
                         className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${detailTab === "stats" ? "border-theme-primary text-theme-primary bg-theme-primary/5" : "border-transparent text-theme-muted hover:text-theme-text"}`}
                     >
-                        Statistics
+                        {t('runtime_history.details.tab_stats')}
                     </button>
                     <button
                         onClick={() => setDetailTab("items")}
                         className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${detailTab === "items" ? "border-theme-primary text-theme-primary bg-theme-primary/5" : "border-transparent text-theme-muted hover:text-theme-text"}`}
                     >
-                        Items Created ({selectedEntry.total_images})
+                        {t('runtime_history.details.tab_items')} ({selectedEntry.total_images})
                     </button>
                 </div>
 
@@ -531,43 +534,43 @@ function RuntimeHistory() {
                     {detailTab === "stats" ? (
                         <div className="space-y-6">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatBox label="Runtime" value={selectedEntry.runtime_formatted} icon={Clock} color="text-blue-400" />
-                                <StatBox label="Total Images" value={selectedEntry.total_images} icon={Image} color="text-theme-primary" />
-                                <StatBox label="Errors" value={selectedEntry.errors} icon={AlertTriangle} color={selectedEntry.errors > 0 ? "text-red-400" : "text-green-500"} />
-                                <StatBox label="Space Saved" value={selectedEntry.space_saved || "0 KB"} icon={Database} color="text-green-400" />
+                                <StatBox label={t('runtime_history.details.runtime')} value={selectedEntry.runtime_formatted} icon={Clock} color="text-blue-400" />
+                                <StatBox label={t('runtime_history.details.total_images')} value={selectedEntry.total_images} icon={Image} color="text-theme-primary" />
+                                <StatBox label={t('runtime_history.table.errors')} value={selectedEntry.errors} icon={AlertTriangle} color={selectedEntry.errors > 0 ? "text-red-400" : "text-green-500"} />
+                                <StatBox label={t('runtime_history.details.space_saved')} value={selectedEntry.space_saved || "0 KB"} icon={Database} color="text-green-400" />
                             </div>
 
-                            <h4 className="text-sm font-bold text-theme-muted uppercase tracking-wider mt-2">Breakdown</h4>
+                            <h4 className="text-sm font-bold text-theme-muted uppercase tracking-wider mt-2">{t('runtime_history.details.breakdown')}</h4>
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                <MiniStat label="Posters" value={selectedEntry.posters} />
-                                <MiniStat label="Backgrounds" value={selectedEntry.backgrounds} />
-                                <MiniStat label="Seasons" value={selectedEntry.seasons} />
-                                <MiniStat label="Title Cards" value={selectedEntry.titlecards} />
-                                <MiniStat label="Collections" value={selectedEntry.collections} />
+                                <MiniStat label={t('runtime_history.types.posters')} value={selectedEntry.posters} />
+                                <MiniStat label={t('runtime_history.types.backgrounds')} value={selectedEntry.backgrounds} />
+                                <MiniStat label={t('runtime_history.types.seasons')} value={selectedEntry.seasons} />
+                                <MiniStat label={t('runtime_history.types.title_cards')} value={selectedEntry.titlecards} />
+                                <MiniStat label={t('runtime_history.types.collections')} value={selectedEntry.collections} />
                             </div>
 
                             <div className="p-4 bg-theme-bg rounded-lg border border-theme mt-4">
-                                <h4 className="text-sm font-bold text-theme-text mb-2">Logs</h4>
+                                <h4 className="text-sm font-bold text-theme-text mb-2">{t('runtime_history.details.logs')}</h4>
                                 <div className="text-xs font-mono text-theme-muted bg-black/30 p-3 rounded overflow-x-auto">
-                                    Log File: {selectedEntry.log_file} <br/>
-                                    Script Version: {selectedEntry.script_version || "N/A"}
+                                    {t('runtime_history.details.log_file')}: {selectedEntry.log_file} <br/>
+                                    {t('runtime_history.details.script_version')}: {selectedEntry.script_version || "N/A"}
                                 </div>
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-4">
                             {loadingItems ? (
-                                <div className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-theme-primary" /><p className="mt-2 text-theme-muted">Loading item details...</p></div>
+                                <div className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-theme-primary" /><p className="mt-2 text-theme-muted">{t('runtime_history.items.loading')}</p></div>
                             ) : createdItems.length === 0 ? (
                                 <div className="text-center py-20 text-theme-muted">
-                                    <p className="font-medium text-lg text-theme-text mb-2">No item details found</p>
+                                    <p className="font-medium text-lg text-theme-text mb-2">{t('runtime_history.items.none_found')}</p>
                                     <p className="text-sm">
                                         {selectedEntry.total_images > 0
-                                            ? `This run created ${selectedEntry.total_images} assets, but their detailed records could not be retrieved.`
-                                            : "This run did not create any new assets."}
+                                            ? t('runtime_history.items.assets_no_records', { count: selectedEntry.total_images })
+                                            : t('runtime_history.items.no_new_assets')}
                                     </p>
                                     <p className="text-xs mt-4 opacity-70 bg-theme-bg p-2 rounded border border-theme inline-block">
-                                        (Note: Items are often tracked by timestamp range. If the run logs are old or time-sync is off, specific items might not link to this History ID: {selectedEntry.id})
+                                        {t('runtime_history.items.timestamp_warning', { id: selectedEntry.id })}
                                     </p>
                                 </div>
                             ) : (
