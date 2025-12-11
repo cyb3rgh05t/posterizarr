@@ -472,7 +472,7 @@
   "nav": {
     "dashboard": "Painel",
     "runModes": "Modos de execução",
-    "runtimeHistory": "Histórico de execução",
+    "runtimeHistory": "Insights",
     "plexExport": "Exportação Plex",
     "mediaServerExport": "Histórico de exportação do servidor de mídia",
     "assets": "Gestão de Ativos",

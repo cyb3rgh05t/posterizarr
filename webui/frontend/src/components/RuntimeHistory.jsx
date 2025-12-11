@@ -1,540 +1,690 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import {
-  Clock, RefreshCw, Loader2, Image, AlertTriangle, Film, Tv,
-  ChevronLeft, ChevronRight, Database, TrendingUp, ChevronDown, X,
-  Info, ImageOff, Type, Scissors, FileText, Globe, BarChart2, List as ListIcon, Calendar
+  Clock, RefreshCw, Loader2, Image, AlertTriangle, Database,
+  BarChart2, List as ListIcon, ChevronDown, X, Globe,
+  PieChart, HardDrive, Cpu, Layers, FileType, FileImage, ExternalLink,
+  ChevronRight, Folder, File, Box
 } from "lucide-react";
 
 const API_URL = "/api";
 
-// Helper to safely get values regardless of casing
+// --- THEME CONSTANTS ---
+const THEME = {
+  orange: '#E5A00D',       // Primary / Focus
+  green: '#96C83C',        // Success
+  red: '#F06464',          // Errors
+  blue: '#19A0D7',         // Info
+  white: '#FFFFFF',
+
+  // Custom Provider Colors
+  tvdb: '#6cd591',
+  tmdb: '#03b4e3',
+  fanart: '#22b6e0',
+
+  // UI Colors
+  tableHeader: '#212121',
+};
+
+// --- HELPERS ---
 const getSafeValue = (data, key) => {
     if (!data) return 0;
     return data[key] || data[key.toLowerCase()] || data[key.toUpperCase()] || 0;
 };
 
-// Interactive Chart Components
+const formatBytes = (bytes, decimals = 2) => {
+    if (!bytes) return '0 Bytes';
+    const k = 1024;
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + ['Bytes', 'KB', 'MB', 'GB', 'TB'][i];
+};
+
+const parseAssetPath = (path) => {
+    if (!path) return { library: 'Unknown', folder: 'Unknown', filename: 'Unknown' };
+
+    // Normalize separators
+    const normalized = path.replace(/\\+/g, '/');
+    const parts = normalized.split('/');
+
+    if (parts.length >= 2) {
+        return {
+            library: parts[0],
+            folder: parts[1],
+            filename: parts[parts.length - 1]
+        };
+    }
+    return { library: 'Unknown', folder: parts[0] || 'Unknown', filename: path };
+};
+
+// --- CHART COMPONENTS ---
+
 const Tooltip = ({ x, y, data }) => (
   <div
-    className="absolute z-20 bg-gray-900 text-white text-xs rounded py-2 px-3 border border-gray-700 shadow-xl pointer-events-none transform -translate-x-1/2 -translate-y-full mb-2 whitespace-nowrap"
-    style={{ left: x, top: y }}
+    className="absolute z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full mb-2 whitespace-nowrap"
+    style={{
+        left: x,
+        top: y,
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        color: '#ffffff',
+        padding: '6px 10px',
+        borderRadius: '4px',
+        fontSize: '11px',
+        border: `1px solid #444`,
+        boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
+        fontFamily: 'sans-serif'
+    }}
   >
-    <div className="font-bold border-b border-gray-700 pb-1 mb-1">{data.label}</div>
+    <div className="font-bold mb-1 border-b border-gray-600 pb-1">{data.label}</div>
     {data.items.map((item, i) => (
-      <div key={i} className="flex justify-between gap-3 text-[11px]">
-        <span className="text-gray-400">{item.label}:</span>
-        <span className="font-mono font-medium">{item.value}</span>
+      <div key={i} className="flex justify-between items-center gap-4">
+        <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color || '#fff' }}></span>
+            <span className="text-gray-300">{item.label}:</span>
+        </div>
+        <span className="font-mono font-bold">{item.value}</span>
       </div>
     ))}
-    {/* Arrow */}
-    <div className="absolute left-1/2 -translate-x-1/2 bottom-[-4px] w-2 h-2 bg-gray-900 border-r border-b border-gray-700 transform rotate-45"></div>
+    <div className="absolute left-1/2 -translate-x-1/2 bottom-[-5px] w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-[#444]"></div>
   </div>
 );
 
-const InteractiveBarChart = ({ data, height = 250, onBarClick, color = "bg-theme-primary", valueKey = "value" }) => {
+const InteractiveBarChart = ({ data, onBarClick, color = THEME.orange, valueKey = "value", label }) => {
   const { t } = useTranslation();
-  // FIX: Hook must be called BEFORE any early returns
   const [hoveredIndex, setHoveredIndex] = useState(null);
 
-  if (!data || data.length === 0) return <div className="text-theme-muted text-sm text-center py-20 flex flex-col items-center justify-center h-full">{t('runtime_history.charts.no_data')}</div>;
+  if (!data || data.length === 0) return <div className="text-theme-muted text-xs text-center flex flex-col items-center justify-center h-full italic">{t('runtime_history.charts.no_data')}</div>;
 
-  const maxVal = Math.max(...data.map(d => d[valueKey]), 5);
+  const maxVal = Math.max(...data.map(d => d[valueKey]), 1);
 
   return (
-    <div className="w-full h-full relative select-none" onMouseLeave={() => setHoveredIndex(null)}>
-        <div className="flex items-end gap-[1px] w-full h-full pb-8 pt-4 px-2">
+    <div className="w-full h-full relative select-none font-sans" onMouseLeave={() => setHoveredIndex(null)}>
+        <div className="absolute inset-0 pointer-events-none flex flex-col justify-between pl-8 pb-6">
+             {[...Array(5)].map((_, i) => (
+                 <div key={i} className="w-full border-b border-theme/10 relative">
+                     {i % 2 === 0 && <span className="absolute -left-8 -top-2 text-[9px] text-theme-muted w-6 text-right">{Math.round(maxVal - (maxVal * (i/4)))}</span>}
+                 </div>
+             ))}
+        </div>
+        <div className="flex items-end gap-[1px] w-full h-full pb-6 pl-8 pt-2">
             {data.map((d, i) => {
             const heightPct = (d[valueKey] / maxVal) * 100;
-            const showLabel = data.length <= 15 || i % Math.ceil(data.length / 12) === 0;
-
+            const isHovered = hoveredIndex === i;
+            const opacity = hoveredIndex !== null && !isHovered ? 0.3 : 1;
             return (
-                <div
-                key={i}
-                className="flex-1 h-full flex flex-col justify-end group relative cursor-pointer"
-                onMouseEnter={() => setHoveredIndex(i)}
-                onClick={() => onBarClick && onBarClick(d.originalData)}
-                >
+                <div key={i} className="flex-1 h-full flex flex-col justify-end group relative cursor-pointer transition-all duration-200" style={{ opacity }} onMouseEnter={() => setHoveredIndex(i)} onClick={() => onBarClick && onBarClick(d.originalData)}>
                 <div className="w-full h-full flex items-end relative">
-                    <div
-                    className={`w-full ${color} opacity-80 group-hover:opacity-100 transition-all rounded-t-sm`}
-                    style={{ height: `${Math.max(heightPct, 2)}%` }}
-                    ></div>
+                    <div className="w-full transition-all min-h-[1px] rounded-t-[1px]" style={{ height: `${Math.max(heightPct, 0.5)}%`, backgroundColor: color }}></div>
                     <div className="absolute inset-0 bg-transparent z-10"></div>
                 </div>
-
-                {showLabel && (
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 text-[10px] text-theme-muted mt-2 whitespace-nowrap">
-                    {d.shortLabel}
-                    </div>
-                )}
-
-                {hoveredIndex === i && (
-                    <Tooltip
-                    x="50%"
-                    y="0%"
-                    data={{
-                        label: d.fullLabel,
-                        items: [{ label: "Value", value: d[valueKey] }]
-                    }}
-                    />
-                )}
+                {hoveredIndex === i && <Tooltip x="50%" y="10%" data={{ label: d.fullLabel, items: [{ label: label || "Value", value: d[valueKey], color: color }] }} />}
                 </div>
             );
             })}
         </div>
-        <div className="absolute inset-0 pointer-events-none">
-            <div className="border-b border-theme/20 absolute w-full top-0"></div>
-            <div className="border-b border-theme/20 absolute w-full top-1/2"></div>
-            <div className="border-b border-theme text-[10px] text-theme-muted absolute w-full bottom-8">0</div>
-            <div className="absolute right-0 top-0 text-[10px] text-theme-muted bg-theme-card/80 px-1 rounded">{Math.round(maxVal)}</div>
+        <div className="absolute bottom-1 left-8 right-0 flex justify-between text-[9px] text-theme-muted px-1">
+             <span>{data[0]?.shortLabel}</span>
+             <span>{data[Math.floor(data.length/2)]?.shortLabel}</span>
+             <span>{data[data.length-1]?.shortLabel}</span>
         </div>
     </div>
   );
 };
 
-const ProviderStackChart = ({ data, height = 250 }) => {
+const ProviderStackChart = ({ data }) => {
     const { t } = useTranslation();
-    // FIX: Hook must be called BEFORE any early returns
     const [hoveredIndex, setHoveredIndex] = useState(null);
 
-    if (!data || data.length === 0) return <div className="text-theme-muted text-sm text-center py-20">{t('runtime_history.charts.no_provider_data')}</div>;
+    if (!data || data.length === 0) return <div className="text-theme-muted text-xs text-center flex flex-col items-center justify-center h-full italic">{t('runtime_history.charts.no_provider_data')}</div>;
 
-    const maxTotal = Math.max(...data.map(d => (
-        getSafeValue(d, "TMDB") +
-        getSafeValue(d, "TVDB") +
-        getSafeValue(d, "Fanart") +
-        getSafeValue(d, "Other")
-    )), 5);
-
-    const colors = {
-        TMDB: "bg-blue-500",
-        TVDB: "bg-green-500",
-        Fanart: "bg-orange-500",
-        Other: "bg-gray-500"
-    };
+    const maxTotal = Math.max(...data.map(d => (getSafeValue(d, "TMDB") + getSafeValue(d, "TVDB") + getSafeValue(d, "Fanart") + getSafeValue(d, "Other"))), 1);
+    const colors = { TMDB: THEME.tmdb, TVDB: THEME.tvdb, Fanart: THEME.fanart, Other: THEME.white };
 
     return (
         <div className="w-full h-full relative select-none" onMouseLeave={() => setHoveredIndex(null)}>
-            <div className="flex items-end gap-[1px] w-full h-full pb-8 pt-4 px-2">
+             <div className="absolute right-0 -top-6 flex gap-3 text-[10px]">
+                {Object.entries(colors).map(([name, col]) => (
+                    <div key={name} className="flex items-center gap-1"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: col }}></div><span className="text-theme-muted">{name}</span></div>
+                ))}
+            </div>
+            <div className="absolute inset-0 pointer-events-none flex flex-col justify-between pl-8 pb-6">
+                {[...Array(5)].map((_, i) => <div key={i} className="w-full border-b border-theme/10 relative">{i % 2 === 0 && <span className="absolute -left-8 -top-2 text-[9px] text-theme-muted w-6 text-right">{Math.round(maxTotal - (maxTotal * (i/4)))}</span>}</div>)}
+            </div>
+            <div className="flex items-end gap-[1px] w-full h-full pb-6 pl-8 pt-2">
                 {data.map((d, i) => {
-                    const valTmdb = getSafeValue(d, "TMDB");
-                    const valTvdb = getSafeValue(d, "TVDB");
-                    const valFanart = getSafeValue(d, "Fanart");
-                    const valOther = getSafeValue(d, "Other");
-                    const total = valTmdb + valTvdb + valFanart + valOther;
-
-                    const hTmdb = (valTmdb / maxTotal) * 100;
-                    const hTvdb = (valTvdb / maxTotal) * 100;
-                    const hFanart = (valFanart / maxTotal) * 100;
-                    const hOther = (valOther / maxTotal) * 100;
-
-                    const showLabel = data.length <= 15 || i % Math.ceil(data.length / 12) === 0;
-
+                    const valTmdb = getSafeValue(d, "TMDB"); const valTvdb = getSafeValue(d, "TVDB"); const valFanart = getSafeValue(d, "Fanart"); const valOther = getSafeValue(d, "Other"); const total = valTmdb + valTvdb + valFanart + valOther;
+                    const opacity = hoveredIndex !== null && hoveredIndex !== i ? 0.3 : 1;
                     return (
-                        <div
-                            key={i}
-                            className="flex-1 h-full flex flex-col justify-end group relative"
-                            onMouseEnter={() => setHoveredIndex(i)}
-                        >
-                            <div className="w-full h-full flex flex-col-reverse relative hover:brightness-110 transition-all z-10">
-                                {valTmdb > 0 && <div style={{ height: `${hTmdb}%` }} className={`${colors.TMDB} w-full`}></div>}
-                                {valTvdb > 0 && <div style={{ height: `${hTvdb}%` }} className={`${colors.TVDB} w-full`}></div>}
-                                {valFanart > 0 && <div style={{ height: `${hFanart}%` }} className={`${colors.Fanart} w-full`}></div>}
-                                {valOther > 0 && <div style={{ height: `${hOther}%` }} className={`${colors.Other} w-full rounded-t-sm`}></div>}
-                                {total === 0 && <div className="h-px w-full bg-theme-muted/10"></div>}
+                        <div key={i} className="flex-1 h-full flex flex-col justify-end group relative transition-opacity duration-200" style={{ opacity }} onMouseEnter={() => setHoveredIndex(i)}>
+                            <div className="w-full h-full flex flex-col-reverse relative z-10">
+                                {valTmdb > 0 && <div style={{ height: `${(valTmdb / maxTotal) * 100}%`, backgroundColor: colors.TMDB }} className="w-full"></div>}
+                                {valTvdb > 0 && <div style={{ height: `${(valTvdb / maxTotal) * 100}%`, backgroundColor: colors.TVDB }} className="w-full"></div>}
+                                {valFanart > 0 && <div style={{ height: `${(valFanart / maxTotal) * 100}%`, backgroundColor: colors.Fanart }} className="w-full"></div>}
+                                {valOther > 0 && <div style={{ height: `${(valOther / maxTotal) * 100}%`, backgroundColor: colors.Other }} className="w-full"></div>}
                             </div>
-
-                            {showLabel && (
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 text-[10px] text-theme-muted mt-2 whitespace-nowrap">
-                                    {d.date.substring(5)}
-                                </div>
-                            )}
-
                             {hoveredIndex === i && total > 0 && (
-                                <Tooltip
-                                    x="50%"
-                                    y="0%"
-                                    data={{
-                                    label: d.date,
-                                    items: [
-                                        { label: "TMDB", value: valTmdb },
-                                        { label: "TVDB", value: valTvdb },
-                                        { label: "Fanart", value: valFanart },
-                                        { label: "Other", value: valOther },
-                                        { label: "Total", value: total }
-                                    ]
-                                    }}
-                                />
+                                <Tooltip x="50%" y="10%" data={{ label: d.date, items: [ { label: "TMDB", value: valTmdb, color: colors.TMDB }, { label: "TVDB", value: valTvdb, color: colors.TVDB }, { label: "Fanart", value: valFanart, color: colors.Fanart }, { label: "Other", value: valOther, color: colors.Other }, { label: "Total", value: total, color: '#ccc' } ] }} />
                             )}
                         </div>
                     );
                 })}
             </div>
-             <div className="absolute left-0 top-0 flex gap-3 text-[10px] bg-theme-card/90 p-1.5 rounded backdrop-blur-sm border border-theme/20 z-10 ml-2">
-                {Object.entries(colors).map(([name, cls]) => (
-                    <div key={name} className="flex items-center gap-1">
-                        <div className={`w-2 h-2 rounded-full ${cls}`}></div>
-                        <span className="text-theme-muted">{name}</span>
-                    </div>
-                ))}
+             <div className="absolute bottom-1 left-8 right-0 flex justify-between text-[9px] text-theme-muted px-1"><span>{data[0]?.date}</span><span>{data[data.length-1]?.date}</span></div>
+        </div>
+    );
+};
+
+const SimpleBarChart = ({ data, colorMap, valueKey = "value", labelKey = "label", height = 200 }) => {
+    if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-xs text-theme-muted italic">No Data</div>;
+    const maxVal = Math.max(...data.map(d => d[valueKey]), 1);
+    return (
+        <div className="w-full relative select-none" style={{ height }}>
+             <div className="absolute inset-0 pointer-events-none flex flex-col justify-between pl-0 pb-6">{[...Array(5)].map((_, i) => <div key={i} className="w-full border-b border-theme/10 relative h-full"></div>)}</div>
+            <div className="flex items-end gap-4 w-full h-full pb-6 pt-2">
+                {data.map((d, i) => {
+                    const barColor = colorMap ? colorMap[d[labelKey]] : THEME.orange;
+                    return (
+                        <div key={i} className="flex-1 h-full flex flex-col justify-end group relative">
+                            <div className="w-full flex justify-center mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-4 text-[10px] font-bold text-theme-text">{d[valueKey]}</div>
+                            <div className="w-full h-full flex items-end relative">
+                                <div className="w-full transition-all min-h-[1px] rounded-t-sm" style={{ height: `${Math.max((d[valueKey] / maxVal) * 100, 1)}%`, backgroundColor: barColor, opacity: 0.8 }}></div>
+                            </div>
+                            <div className="text-center mt-2 text-[10px] text-theme-muted truncate w-full uppercase tracking-wider">{d[labelKey]}</div>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
 };
 
-// Main Component
+const HorizontalBarChart = ({ data, color = THEME.blue }) => {
+    if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-xs text-theme-muted italic">No Data</div>;
+    const maxVal = Math.max(...data.map(d => d.value), 1);
+    return (
+        <div className="flex flex-col gap-3 w-full">
+            {data.map((d, i) => (
+                <div key={i} className="w-full">
+                    <div className="flex justify-between text-[11px] mb-1 text-theme-text"><span className="font-semibold">{d.label}</span><span className="font-mono text-theme-muted">{d.displayValue}</span></div>
+                    <div className="w-full h-2 bg-theme-bg rounded-full overflow-hidden border border-theme/20"><div className="h-full rounded-full" style={{ width: `${(d.value / maxVal) * 100}%`, backgroundColor: color }}></div></div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// --- MAIN COMPONENT ---
 
 function RuntimeHistory() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
+  // State
   const [history, setHistory] = useState([]);
   const [providerStats, setProviderStats] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [migrationStatus, setMigrationStatus] = useState(null);
+  const [assetOverview, setAssetOverview] = useState(null);
+  const [assetStats, setAssetStats] = useState(null);
+  const [exportStats, setExportStats] = useState(null);
+  const [overlayStats, setOverlayStats] = useState([]);
 
+  // UI State
   const [viewMode, setViewMode] = useState("analytics");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
   const [currentPage, setCurrentPage] = useState(0);
   const [limit] = useState(20);
-  const [modeFilter, setModeFilter] = useState(null);
   const [graphDays, setGraphDays] = useState(7);
 
+  // Modal State
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
 
-  const [modeFilterDropdownOpen, setModeFilterDropdownOpen] = useState(false);
-  const modeFilterDropdownRef = useRef(null);
-
-  // Data Fetching
-
-  const fetchHistory = async (silent = false) => {
+  // --- DATA FETCHING ---
+  const fetchAllData = async (silent = false) => {
     if (!silent) setRefreshing(true);
+    setLoading(true);
+
+    const fetchLimit = viewMode === "analytics" ? 365 : limit;
+    const offset = viewMode === "analytics" ? 0 : currentPage * limit;
+
     try {
-      const fetchLimit = viewMode === "analytics" ? 365 : limit;
-      const offset = viewMode === "analytics" ? 0 : currentPage * limit;
+        const configRes = await fetch(`${API_URL}/config`);
+        const configData = await configRes.json();
+        const usePlex = configData.success && configData.config?.UsePlex === "true";
 
-      const modeParam = modeFilter ? `&mode=${modeFilter}` : "";
-      const response = await fetch(`${API_URL}/runtime-history?limit=${fetchLimit}&offset=${offset}${modeParam}`);
+        const requests = [
+            fetch(`${API_URL}/runtime-history?limit=${fetchLimit}&offset=${offset}`).then(res => res.json()),
+            viewMode === "analytics" ? fetch(`${API_URL}/analytics/providers?days=${graphDays}`).then(res => res.json()) : null,
+            viewMode === "analytics" ? fetch(`${API_URL}/assets/overview`).then(res => res.json()) : null,
+            viewMode === "analytics" ? fetch(`${API_URL}/assets/stats`).then(res => res.json()) : null,
+            viewMode === "analytics" ? fetch(`${API_URL}/overlayfiles`).then(res => res.json()) : null,
+            viewMode === "analytics" ? fetch(usePlex ? `${API_URL}/plex-export/statistics` : `${API_URL}/other-media-export/statistics`).then(res => res.json()) : null
+        ];
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setHistory(data.history);
+        const [histData, provData, overData, statsData, overlayData, expData] = await Promise.all(requests);
+
+        if (histData?.success) setHistory(histData.history);
+        if (provData?.success) setProviderStats(provData.stats);
+        if (overData) setAssetOverview(overData);
+        if (statsData?.success) setAssetStats(statsData);
+
+        if (overlayData?.success) {
+            const fonts = overlayData.files.filter(f => f.type === 'font');
+            const images = overlayData.files.filter(f => f.type === 'image');
+            setOverlayStats([
+                { label: 'Fonts', value: fonts.length, size: fonts.reduce((acc, f) => acc + f.size, 0) },
+                { label: 'Overlays', value: images.length, size: images.reduce((acc, f) => acc + f.size, 0) }
+            ]);
         }
-      }
+
+        if (expData?.success) setExportStats(expData.statistics);
+
     } catch (error) {
-      console.error("Error fetching history:", error);
+        console.error("Failed to fetch dashboard data", error);
     } finally {
-      setLoading(false);
-      if (!silent) setTimeout(() => setRefreshing(false), 500);
+        setLoading(false);
+        if (!silent) setTimeout(() => setRefreshing(false), 500);
     }
   };
 
-  const fetchProviderStats = async () => {
-      try {
-          const response = await fetch(`${API_URL}/analytics/providers?days=${graphDays}`);
-          if (response.ok) {
-              const data = await response.json();
-              if (data.success) setProviderStats(data.stats);
-          }
-      } catch (e) { console.error("Provider stats error", e); }
-  };
-
-  const fetchSummary = async () => {
-    try {
-      const response = await fetch(`${API_URL}/runtime-summary?days=30`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) setSummary(data.summary);
-      }
-    } catch (e) { console.error(e); }
-  };
-
-  const fetchMigrationStatus = async () => {
-    try {
-        const response = await fetch(`${API_URL}/runtime-history/migration-status`);
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success) setMigrationStatus(data);
-        }
-    } catch (e) {}
-  };
-
   useEffect(() => {
-    fetchHistory(true);
-    fetchSummary();
-    fetchMigrationStatus();
-    if (viewMode === "analytics") {
-        fetchProviderStats();
-    }
-  }, [currentPage, modeFilter, viewMode, graphDays]);
+    fetchAllData(false);
+  }, [currentPage, viewMode, graphDays]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (modeFilterDropdownRef.current && !modeFilterDropdownRef.current.contains(event.target)) {
-        setModeFilterDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleOpenDetail = (entry) => {
+  // --- DETAIL MODAL LOGIC (GALLERY) ---
+  const handleOpenDetail = async (entry) => {
       setSelectedEntry(entry);
       setShowDetailModal(true);
+      setGalleryImages([]);
+      setGalleryLoading(true);
+
+      try {
+          const [postersRes, backgroundsRes, seasonsRes, titlecardsRes] = await Promise.all([
+              fetch(`${API_URL}/gallery`),
+              fetch(`${API_URL}/backgrounds-gallery`),
+              fetch(`${API_URL}/seasons-gallery`),
+              fetch(`${API_URL}/titlecards-gallery`)
+          ]);
+
+          const postersData = await postersRes.json();
+          const backgroundsData = await backgroundsRes.json();
+          const seasonsData = await seasonsRes.json();
+          const titlecardsData = await titlecardsRes.json();
+
+          const allImages = [
+              ...(postersData.images || []),
+              ...(backgroundsData.images || []),
+              ...(seasonsData.images || []),
+              ...(titlecardsData.images || [])
+          ];
+
+          if (allImages.length > 0) {
+              const startTime = new Date(entry.start_time || entry.timestamp).getTime() / 1000;
+              const duration = entry.runtime_seconds || 0;
+              const endTime = startTime + duration + 30;
+              const startTimeBuffer = startTime - 30;
+
+              const filtered = allImages
+                .filter(img => {
+                    const timestamp = img.modified || img.created || 0;
+                    return timestamp >= startTimeBuffer && timestamp <= endTime;
+                })
+                .map(img => {
+                    const meta = parseAssetPath(img.path);
+                    return { ...img, ...meta };
+                });
+
+              setGalleryImages(filtered);
+          }
+      } catch (e) {
+          console.error("Failed to load gallery for entry", e);
+      } finally {
+          setGalleryLoading(false);
+      }
   };
 
+  // --- DATA PREP ---
   const analyticsData = useMemo(() => {
       if (!history.length) return { duration: [], assets: [], errors: [] };
-
       let chronoHistory = [...history].reverse();
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - graphDays);
-
-      chronoHistory = chronoHistory.filter(h => {
-          const runDate = new Date(h.start_time || h.timestamp);
-          return runDate >= cutoffDate;
-      });
+      chronoHistory = chronoHistory.filter(h => new Date(h.start_time || h.timestamp) >= cutoffDate);
+      const formatShort = (d) => new Date(d).toLocaleDateString(undefined, {month:'short', day:'numeric'});
+      const formatFull = (d) => new Date(d).toDateString();
 
       return {
-          duration: chronoHistory.map(h => ({
-              shortLabel: new Date(h.start_time || h.timestamp).toLocaleDateString(undefined, {month:'short', day:'numeric'}),
-              fullLabel: new Date(h.start_time || h.timestamp).toLocaleString(),
-              value: h.runtime_seconds || 0,
-              originalData: h
-          })),
-          assets: chronoHistory.map(h => ({
-              shortLabel: new Date(h.start_time || h.timestamp).toLocaleDateString(undefined, {month:'short', day:'numeric'}),
-              fullLabel: new Date(h.start_time || h.timestamp).toLocaleString(),
-              value: h.total_images || 0,
-              originalData: h
-          })),
-          errors: chronoHistory.map(h => ({
-              shortLabel: new Date(h.start_time || h.timestamp).toLocaleDateString(undefined, {month:'short', day:'numeric'}),
-              fullLabel: new Date(h.start_time || h.timestamp).toLocaleString(),
-              value: h.errors || 0,
-              originalData: h
-          }))
+          duration: chronoHistory.map(h => ({ shortLabel: formatShort(h.start_time || h.timestamp), fullLabel: formatFull(h.start_time || h.timestamp), value: h.runtime_seconds || 0, originalData: h })),
+          assets: chronoHistory.map(h => ({ shortLabel: formatShort(h.start_time || h.timestamp), fullLabel: formatFull(h.start_time || h.timestamp), value: h.total_images || 0, originalData: h })),
+          errors: chronoHistory.map(h => ({ shortLabel: formatShort(h.start_time || h.timestamp), fullLabel: formatFull(h.start_time || h.timestamp), value: h.errors || 0, originalData: h }))
       };
   }, [history, graphDays]);
 
-  const getModeColor = (mode) => {
-    const colors = {
-      normal: "bg-blue-500/10 text-blue-400 border-blue-500/30",
-      testing: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-      manual: "bg-purple-500/10 text-purple-400 border-purple-500/30",
-      scheduled: "bg-green-500/10 text-green-400 border-green-500/30",
-    };
-    return colors[mode] || "bg-gray-500/10 text-gray-400 border-gray-500/30";
-  };
+  const healthData = assetOverview ? [
+      { label: "Resolved", value: assetOverview.categories?.resolved?.count || 0 },
+      { label: "Missing", value: assetOverview.categories?.missing_assets?.count || 0 },
+      { label: "Non-Primary", value: assetOverview.categories?.non_primary_lang?.count || 0 },
+  ] : [];
+  const healthColors = { "Resolved": THEME.green, "Missing": THEME.red, "Non-Primary": THEME.orange };
 
-  if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin w-10 h-10 text-theme-primary" /></div>;
+  const typesData = assetStats?.stats ? [
+      { label: "Posters", value: assetStats.stats.posters || 0 },
+      { label: "Title Cards", value: assetStats.stats.titlecards || 0 },
+      { label: "Seasons", value: assetStats.stats.seasons || 0 },
+      { label: "Backgrounds", value: assetStats.stats.backgrounds || 0 },
+  ] : [];
+  const typesColors = { "Posters": THEME.blue, "Title Cards": THEME.green, "Seasons": THEME.orange, "Backgrounds": '#aaa' };
+
+  // Calculate folder data with ITEM COUNT included, sorted by size, NO LIMIT
+  const folderData = assetStats?.stats?.folders ? assetStats.stats.folders.sort((a, b) => b.size - a.size).map(f => ({
+      label: f.name,
+      value: f.size,
+      displayValue: `${formatBytes(f.size)} (${f.files} items)`
+  })) : [];
+
+  if (loading && !refreshing && history.length === 0) return <div className="flex justify-center p-20"><Loader2 className="animate-spin w-10 h-10" style={{ color: THEME.orange }} /></div>;
 
   return (
     <div className="space-y-6">
-
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-theme-card p-4 rounded-xl border border-theme">
-          <div className="flex items-center gap-4">
-              <div className="flex bg-theme-bg p-1 rounded-lg border border-theme">
-                  <button onClick={() => setViewMode("analytics")} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === "analytics" ? "bg-theme-primary text-white shadow-sm" : "text-theme-muted hover:text-theme-text"}`}>
-                      <BarChart2 className="w-4 h-4" /> {t('runtime_history.analytics')}
-                  </button>
-                  <button onClick={() => setViewMode("list")} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === "list" ? "bg-theme-primary text-white shadow-sm" : "text-theme-muted hover:text-theme-text"}`}>
-                      <ListIcon className="w-4 h-4" /> {t('runtime_history.history_list')}
-                  </button>
-              </div>
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 pb-4 border-b border-theme/30">
+          <div className="flex items-center gap-2">
+             <h2 className="text-xl font-light flex items-center gap-2" style={{ color: THEME.orange }}>
+                 {viewMode === "analytics" ? <BarChart2 size={24}/> : <ListIcon size={24}/>}
+                 {t('runtime_history.title', 'Runtime History')}
+             </h2>
           </div>
-
           <div className="flex items-center gap-3">
-             {viewMode === "analytics" && (
-                <div className="flex items-center gap-2 bg-theme-bg px-3 py-2 rounded-lg border border-theme">
-                    <Calendar className="w-4 h-4 text-theme-muted" />
-                    <select
+              {viewMode === "analytics" && (
+                <div className="flex items-center">
+                    <span className="text-theme-muted text-sm mr-2 bg-theme-bg px-2 py-1.5 rounded-l border border-r-0 border-theme/30">Last</span>
+                    <input
+                        type="number"
+                        min="1"
                         value={graphDays}
                         onChange={(e) => setGraphDays(Number(e.target.value))}
-                        className="bg-transparent text-sm text-theme-text outline-none cursor-pointer"
-                    >
-                        <option value={7}>{t('runtime_history.periods.last_7_days')}</option>
-                        <option value={30}>{t('runtime_history.periods.last_30_days')}</option>
-                        <option value={90}>{t('runtime_history.periods.last_3_months')}</option>
-                        <option value={365}>{t('runtime_history.periods.last_year')}</option>
-                    </select>
+                        className="bg-theme-bg text-theme-text text-sm font-bold pl-3 pr-2 py-1.5 border border-theme/30 rounded-r outline-none w-16 text-center hover:bg-theme-hover transition-colors"
+                    />
+                    <span className="text-theme-muted text-sm ml-2">days</span>
                 </div>
-             )}
-
-             <button onClick={() => { fetchHistory(); if (viewMode==="analytics") fetchProviderStats(); }} disabled={refreshing} className="p-2 bg-theme-bg border border-theme rounded-lg text-theme-primary hover:bg-theme-hover">
-                 <RefreshCw className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`} />
-             </button>
+              )}
+              <div className="flex bg-theme-bg rounded p-0.5 border border-theme/30">
+                  <button onClick={() => setViewMode("analytics")} className={`px-4 py-1.5 text-sm rounded-sm transition-all ${viewMode === "analytics" ? "bg-theme-hover text-theme-text shadow" : "text-theme-muted hover:text-theme-text"}`}>Graphs</button>
+                  <button onClick={() => setViewMode("list")} className={`px-4 py-1.5 text-sm rounded-sm transition-all ${viewMode === "list" ? "bg-theme-hover text-theme-text shadow" : "text-theme-muted hover:text-theme-text"}`}>History List</button>
+              </div>
+              <button onClick={() => fetchAllData()} disabled={refreshing} className="p-2 text-theme-muted hover:text-theme-text transition-colors"><RefreshCw className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`} /></button>
           </div>
       </div>
 
+      {/* ANALYTICS VIEW */}
       {viewMode === "analytics" && (
           <div className="space-y-6">
+
+              {/* SECTION 1: ASSET & EXPORT STATS */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-theme-card p-6 rounded-xl border border-theme hover:border-theme-primary/30 transition-all">
-                      <h3 className="text-lg font-bold text-theme-text mb-4 flex items-center gap-2">
-                          <Clock className="w-5 h-5 text-blue-400" /> {t('runtime_history.charts.execution_time')}
-                      </h3>
-                      <div className="h-64">
-                          <InteractiveBarChart
-                            data={analyticsData.duration}
-                            color="bg-blue-500"
-                            onBarClick={handleOpenDetail}
-                          />
+                  {/* Asset Overview (Clickable) */}
+                  <div
+                    className="bg-theme-card p-5 rounded-lg border-t-4 shadow-sm cursor-pointer group hover:bg-theme-hover/20 transition-colors flex flex-col justify-between"
+                    style={{ borderTopColor: THEME.green }}
+                    onClick={() => navigate("/asset-overview")}
+                  >
+                      <div>
+                          <h3 className="text-lg font-light text-theme-text mb-2 flex items-center gap-2 group-hover:text-white transition-colors">
+                              <PieChart size={18} /> Asset Overview
+                              <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
+                          </h3>
+                          <p className="text-xs text-theme-muted mb-4 italic">Distribution of assets by status.</p>
                       </div>
+                      <div className="h-40 mt-auto"><SimpleBarChart data={healthData} colorMap={healthColors} height={160} /></div>
                   </div>
 
-                  <div className="bg-theme-card p-6 rounded-xl border border-theme hover:border-theme-primary/30 transition-all">
-                      <h3 className="text-lg font-bold text-theme-text mb-4 flex items-center gap-2">
-                          <Image className="w-5 h-5 text-green-400" /> {t('runtime_history.charts.assets_created')}
+                  {/* Export Stats (Auto height, aligned) */}
+                  <div className="bg-theme-card p-5 rounded-lg border-t-4 shadow-sm flex flex-col min-h-[16rem]" style={{ borderTopColor: THEME.orange }}>
+                      <h3 className="text-lg font-light text-theme-text mb-2 flex items-center gap-2"><Database size={18} /> Export Statistics</h3>
+                      <p className="text-xs text-theme-muted mb-4 italic">Latest export run details.</p>
+                      {exportStats ? (
+                          <div className="grid grid-cols-2 gap-4 flex-1 content-center">
+                              <StatBox label="Total Runs" value={exportStats.total_runs} color={THEME.orange} />
+                              <StatBox label="Records" value={exportStats.total_library_records} color={THEME.blue} />
+                              <StatBox label="Episodes" value={exportStats.total_episode_records} color={THEME.green} />
+                              <div className="flex flex-col justify-end">
+                                  <div className="bg-theme-bg p-3 rounded border border-theme/20 h-full flex flex-col justify-center text-right">
+                                      <span className="text-[10px] text-theme-muted uppercase mb-1">Latest Run</span>
+                                      <span className="text-xs font-mono text-theme-text">{new Date(exportStats.latest_run).toLocaleDateString()}</span>
+                                      <span className="text-[10px] text-theme-muted">{new Date(exportStats.latest_run).toLocaleTimeString()}</span>
+                                  </div>
+                              </div>
+                          </div>
+                      ) : <div className="text-center text-xs text-theme-muted py-10 my-auto">No Export Data</div>}
+                  </div>
+              </div>
+
+              {/* SECTION 2: RUN HISTORY */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-theme-card p-5 rounded-lg border-t-4 shadow-sm" style={{ borderTopColor: THEME.orange }}>
+                      <h3 className="text-lg font-light text-theme-text mb-1 flex items-center gap-2"><Clock size={18} /> {t('runtime_history.charts.execution_time')}</h3>
+                      <p className="text-xs text-theme-muted mb-6 italic">Total duration per run.</p>
+                      <div className="h-64"><InteractiveBarChart data={analyticsData.duration} color={THEME.orange} label="Seconds" onBarClick={handleOpenDetail} /></div>
+                  </div>
+                  <div className="bg-theme-card p-5 rounded-lg border-t-4 shadow-sm" style={{ borderTopColor: THEME.green }}>
+                      <h3 className="text-lg font-light text-theme-text mb-1 flex items-center gap-2"><Image size={18} /> {t('runtime_history.charts.assets_created')}</h3>
+                      <p className="text-xs text-theme-muted mb-6 italic">Total images generated.</p>
+                      <div className="h-64"><InteractiveBarChart data={analyticsData.assets} color={THEME.green} label="Images" onBarClick={handleOpenDetail} /></div>
+                  </div>
+                  <div className="bg-theme-card p-5 rounded-lg border-t-4 shadow-sm" style={{ borderTopColor: THEME.red }}>
+                      <h3 className="text-lg font-light text-theme-text mb-1 flex items-center gap-2"><AlertTriangle size={18} /> {t('runtime_history.charts.errors_per_run')}</h3>
+                      <p className="text-xs text-theme-muted mb-6 italic">Errors encountered.</p>
+                      <div className="h-64"><InteractiveBarChart data={analyticsData.errors} color={THEME.red} label="Errors" onBarClick={handleOpenDetail} /></div>
+                  </div>
+                   <div className="bg-theme-card p-5 rounded-lg border-t-4 shadow-sm" style={{ borderTopColor: THEME.blue }}>
+                      <h3 className="text-lg font-light text-theme-text mb-1 flex items-center gap-2"><Globe size={18} /> {t('runtime_history.charts.source_distribution')}</h3>
+                      <p className="text-xs text-theme-muted mb-6 italic">Metadata requests by provider.</p>
+                      <div className="h-64"><ProviderStackChart data={providerStats} /></div>
+                  </div>
+              </div>
+
+              {/* SECTION 3: LIBRARY & OVERLAYS */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Asset Types (Clickable) */}
+                  <div
+                    className="bg-theme-card p-5 rounded-lg border-t-4 shadow-sm cursor-pointer group hover:bg-theme-hover/20 transition-colors"
+                    style={{ borderTopColor: THEME.blue }}
+                    onClick={() => navigate("/gallery")}
+                  >
+                      <h3 className="text-lg font-light text-theme-text mb-2 flex items-center gap-2 group-hover:text-white transition-colors">
+                          <Layers size={18} /> Asset Types Chart
+                          <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
                       </h3>
-                      <div className="h-64">
-                          <InteractiveBarChart
-                            data={analyticsData.assets}
-                            color="bg-green-500"
-                            onBarClick={handleOpenDetail}
-                          />
-                      </div>
+                      <p className="text-xs text-theme-muted mb-4 italic">Total counts per image type.</p>
+                      <div className="h-48"><SimpleBarChart data={typesData} colorMap={typesColors} height={190} /></div>
                   </div>
 
-                  <div className="bg-theme-card p-6 rounded-xl border border-theme hover:border-theme-primary/30 transition-all">
-                      <h3 className="text-lg font-bold text-theme-text mb-4 flex items-center gap-2">
-                          <AlertTriangle className="w-5 h-5 text-red-400" /> {t('runtime_history.charts.errors_per_run')}
-                      </h3>
-                      <div className="h-64">
-                          <InteractiveBarChart
-                            data={analyticsData.errors}
-                            color="bg-red-500"
-                            onBarClick={handleOpenDetail}
-                          />
-                      </div>
+                  {/* Library Storage (Enhanced) */}
+                  <div className="bg-theme-card p-5 rounded-lg border-t-4 shadow-sm" style={{ borderTopColor: '#aaa' }}>
+                      <h3 className="text-lg font-light text-theme-text mb-2 flex items-center gap-2"><HardDrive size={18} /> Library Storage</h3>
+                      <p className="text-xs text-theme-muted mb-4 italic">Disk usage per library.</p>
+
+                      {/* INTEGRATED: Total Assets and Storage stats */}
+                      {assetStats && (
+                        <div className="flex gap-4 mb-4 p-3 bg-theme-bg/30 rounded-lg border border-theme/20">
+                             <div className="flex-1 text-center border-r border-theme/20">
+                                 <div className="text-2xl font-light text-theme-text">{assetStats.stats.posters + assetStats.stats.seasons + assetStats.stats.titlecards + assetStats.stats.backgrounds}</div>
+                                 <div className="text-[10px] text-theme-muted uppercase tracking-wider">Total Assets</div>
+                             </div>
+                             <div className="flex-1 text-center">
+                                 <div className="text-2xl font-light text-theme-text">{formatBytes(assetStats.stats.total_size)}</div>
+                                 <div className="text-[10px] text-theme-muted uppercase tracking-wider">Total Storage</div>
+                             </div>
+                        </div>
+                      )}
+
+                      <div className="h-48 overflow-y-auto pr-2 custom-scrollbar"><HorizontalBarChart data={folderData} color={THEME.blue} /></div>
                   </div>
 
-                  <div className="bg-theme-card p-6 rounded-xl border border-theme hover:border-theme-primary/30 transition-all">
-                      <h3 className="text-lg font-bold text-theme-text mb-4 flex items-center gap-2">
-                          <Globe className="w-5 h-5 text-orange-400" /> {t('runtime_history.charts.source_distribution')}
+                  {/* Overlays (Clickable) */}
+                  <div
+                    className="bg-theme-card p-5 rounded-lg border-t-4 shadow-sm cursor-pointer group hover:bg-theme-hover/20 transition-colors col-span-1 lg:col-span-2"
+                    style={{ borderTopColor: THEME.orange }}
+                    onClick={() => navigate("/assets-manager")}
+                  >
+                      <h3 className="text-lg font-light text-theme-text mb-2 flex items-center gap-2 group-hover:text-white transition-colors">
+                          <FileType size={18} /> Overlay Resources
+                          <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
                       </h3>
-                      <div className="h-64">
-                          <ProviderStackChart data={providerStats} />
+                      <p className="text-xs text-theme-muted mb-4 italic">Installed fonts and overlay images.</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {overlayStats.map((stat, i) => (
+                              <div key={i} className="flex items-center justify-between bg-theme-bg p-3 rounded border border-theme/20">
+                                  <div className="flex items-center gap-3">
+                                      {stat.label === 'Fonts' ? <FileType size={20} className="text-theme-muted"/> : <FileImage size={20} className="text-theme-muted"/>}
+                                      <div>
+                                          <div className="text-sm font-bold text-theme-text">{stat.label}</div>
+                                          <div className="text-[10px] text-theme-muted">{formatBytes(stat.size)}</div>
+                                      </div>
+                                  </div>
+                                  <div className="text-xl font-mono text-theme-text">{stat.value}</div>
+                              </div>
+                          ))}
+                          {overlayStats.length === 0 && <div className="text-center text-xs text-theme-muted py-4 w-full">No Overlays Found</div>}
                       </div>
                   </div>
               </div>
           </div>
       )}
 
+      {/* LIST VIEW */}
       {viewMode === "list" && (
-        <div className="bg-theme-card rounded-xl border border-theme overflow-hidden">
+        <div className="bg-theme-card rounded-lg shadow overflow-hidden border border-theme/30">
             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-theme-hover text-theme-muted font-medium border-b border-theme">
+                <table className="w-full text-xs text-left border-collapse">
+                    <thead className="bg-[#212121] border-b border-theme/30">
                         <tr>
-                            <th className="px-6 py-4">{t('runtime_history.table.start_time')}</th>
-                            <th className="px-6 py-4">{t('runtime_history.table.mode')}</th>
-                            <th className="px-6 py-4">{t('runtime_history.table.duration')}</th>
-                            <th className="px-6 py-4 text-right">{t('runtime_history.table.created')}</th>
-                            <th className="px-6 py-4 text-right">{t('runtime_history.table.errors')}</th>
+                            <th className="px-4 py-3 font-semibold text-gray-400 uppercase tracking-wider">{t('runtime_history.table.start_time')}</th>
+                            <th className="px-4 py-3 font-semibold text-gray-400 uppercase tracking-wider">{t('runtime_history.table.mode')}</th>
+                            <th className="px-4 py-3 font-semibold text-gray-400 uppercase tracking-wider">{t('runtime_history.table.duration')}</th>
+                            <th className="px-4 py-3 font-semibold text-gray-400 uppercase tracking-wider text-right">{t('runtime_history.table.created')}</th>
+                            <th className="px-4 py-3 font-semibold text-gray-400 uppercase tracking-wider text-right">{t('runtime_history.table.errors')}</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-theme">
-                        {history.map((entry) => (
-                            <tr key={entry.id} onClick={() => handleOpenDetail(entry)} className="hover:bg-theme-hover/50 cursor-pointer transition-colors">
-                                <td className="px-6 py-4 font-mono text-theme-text">
-                                    {new Date(entry.start_time || entry.timestamp).toLocaleString("sv-SE").replace("T", " ")}
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 rounded text-xs font-bold border capitalize ${getModeColor(entry.mode)}`}>
-                                        {entry.mode}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-theme-text font-mono">{entry.runtime_formatted}</td>
-                                <td className="px-6 py-4 text-right font-bold text-theme-primary">{entry.total_images}</td>
-                                <td className={`px-6 py-4 text-right font-bold ${entry.errors > 0 ? "text-red-400" : "text-green-500"}`}>{entry.errors}</td>
-                            </tr>
-                        ))}
+                    <tbody>
+                        {history.map((entry, index) => {
+                            const isEven = index % 2 !== 0;
+                            const bgClass = isEven ? 'bg-theme-text/[0.035]' : 'bg-transparent';
+                            return (
+                                <tr key={entry.id} onClick={() => handleOpenDetail(entry)} className={`${bgClass} cursor-pointer transition-colors hover:bg-theme-text/[0.075] border-t border-theme/10 group`}>
+                                    <td className="px-4 py-2.5 text-theme-text whitespace-nowrap">{new Date(entry.start_time || entry.timestamp).toLocaleString("sv-SE").replace("T", " ")}</td>
+                                    <td className="px-4 py-2.5 text-theme-text"><span className="px-1.5 py-0.5 rounded border border-theme/30 text-[10px] bg-theme-bg uppercase">{entry.mode}</span></td>
+                                    <td className="px-4 py-2.5 text-theme-text font-mono text-[11px]">{entry.runtime_formatted}</td>
+                                    <td className="px-4 py-2.5 text-right font-bold transition-colors" style={{ color: entry.total_images > 0 ? THEME.green : 'inherit' }}>{entry.total_images}</td>
+                                    <td className="px-4 py-2.5 text-right font-bold transition-colors" style={{ color: entry.errors > 0 ? THEME.red : 'inherit' }}>{entry.errors}</td>
+                                </tr>
+                            )
+                        })}
                     </tbody>
                 </table>
             </div>
-             <div className="p-4 border-t border-theme flex justify-between items-center text-sm text-theme-muted">
-                <span>{t('runtime_history.table.page')} {currentPage + 1}</span>
-                <div className="flex gap-2">
-                    <button disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)} className="p-1 rounded bg-theme-bg border border-theme disabled:opacity-50"><ChevronLeft className="w-5 h-5" /></button>
-                    <button disabled={history.length < limit} onClick={() => setCurrentPage(p => p + 1)} className="p-1 rounded bg-theme-bg border border-theme disabled:opacity-50"><ChevronRight className="w-5 h-5" /></button>
-                </div>
+             <div className="p-3 bg-theme-bg border-t border-theme/30 flex justify-between items-center text-xs text-theme-muted">
+                <span>Showing {currentPage * limit + 1} to {Math.min((currentPage + 1) * limit, history.length + (currentPage * limit))} entries</span>
+                <div className="flex gap-1"><button disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)} className="px-3 py-1 bg-theme-card border border-theme/30 rounded hover:bg-theme-hover disabled:opacity-50">Previous</button><button disabled={history.length < limit} onClick={() => setCurrentPage(p => p + 1)} className="px-3 py-1 bg-theme-card border border-theme/30 rounded hover:bg-theme-hover disabled:opacity-50">Next</button></div>
             </div>
         </div>
       )}
 
-      {/* DETAIL MODAL */}
+      {/* DETAIL MODAL WITH GALLERY */}
       {showDetailModal && selectedEntry && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDetailModal(false)}>
-            <div className="bg-theme-card border border-theme rounded-xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-
-                <div className="p-6 border-b border-theme bg-theme-card flex justify-between items-start">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
+            <div className="bg-theme-card border border-theme rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="px-6 py-4 border-b border-theme/30 flex justify-between items-center rounded-t-lg">
                     <div>
-                        <h2 className="text-xl font-bold text-theme-text flex items-center gap-3">
-                            <span className={`text-xs px-2 py-1 rounded border capitalize ${getModeColor(selectedEntry.mode)}`}>{selectedEntry.mode}</span>
-                            {t('runtime_history.details.title')}
-                        </h2>
-                        <p className="text-theme-muted text-sm mt-1">{new Date(selectedEntry.start_time || selectedEntry.timestamp).toLocaleString()}</p>
+                        <h2 className="text-xl font-light" style={{ color: THEME.orange }}>Run Details</h2>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[11px] px-1.5 py-0.5 bg-theme-bg border border-theme/30 rounded uppercase text-theme-muted">{selectedEntry.mode}</span>
+                            <span className="text-xs text-theme-muted font-mono">{new Date(selectedEntry.start_time || selectedEntry.timestamp).toLocaleString()}</span>
+                        </div>
                     </div>
-                    <button onClick={() => setShowDetailModal(false)}><X className="w-6 h-6 text-theme-muted hover:text-theme-text" /></button>
+                    <button onClick={() => setShowDetailModal(false)}><X className="text-theme-muted hover:text-theme-text transition-colors" /></button>
                 </div>
 
-                {/* Removed Tab Navigation */}
+                <div className="p-6 overflow-y-auto bg-theme-bg/30">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <StatBox label="Runtime" value={selectedEntry.runtime_formatted} color={THEME.orange} icon={Clock} />
+                        <StatBox label="Images Created" value={selectedEntry.total_images} color={THEME.green} icon={Image} />
+                        <StatBox label="Total Errors" value={selectedEntry.errors} color={selectedEntry.errors > 0 ? THEME.red : 'gray'} icon={AlertTriangle} />
+                        <StatBox label="Space Saved" value={selectedEntry.space_saved || "0 KB"} color={THEME.blue} icon={Database} />
+                    </div>
 
-                <div className="p-6 overflow-y-auto bg-theme-bg/20 h-full">
-                    {/* Only showing statistics now */}
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <StatBox label={t('runtime_history.details.runtime')} value={selectedEntry.runtime_formatted} icon={Clock} color="text-blue-400" />
-                            <StatBox label={t('runtime_history.details.total_images')} value={selectedEntry.total_images} icon={Image} color="text-theme-primary" />
-                            <StatBox label={t('runtime_history.table.errors')} value={selectedEntry.errors} icon={AlertTriangle} color={selectedEntry.errors > 0 ? "text-red-400" : "text-green-500"} />
-                            <StatBox label={t('runtime_history.details.space_saved')} value={selectedEntry.space_saved || "0 KB"} icon={Database} color="text-green-400" />
+                    {/* Created Images Gallery */}
+                    {selectedEntry.total_images > 0 && (
+                        <div className="mb-8">
+                            <h4 className="text-xs font-bold text-theme-muted uppercase border-b border-theme/20 pb-2 mb-4 flex justify-between items-center">
+                                <span>Created Assets ({galleryImages.length})</span>
+                                {galleryLoading && <Loader2 className="animate-spin w-3 h-3"/>}
+                            </h4>
+                            {galleryImages.length > 0 ? (
+                                <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                                    {galleryImages.map((img, idx) => (
+                                        <div key={idx} className="group relative aspect-[2/3] bg-theme-bg rounded overflow-hidden border border-theme/20 hover:border-theme/50 transition-colors">
+                                            <img src={img.url} alt={img.name} className="w-full h-full object-cover" loading="lazy" />
+                                            {/* Hover Overlay with Metadata */}
+                                            <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 text-center">
+                                                <a href={img.url} target="_blank" rel="noreferrer" className="p-2 bg-white/10 rounded-full hover:bg-white/20 text-white mb-2"><ExternalLink size={16}/></a>
+                                                <div className="text-[9px] text-gray-300 line-clamp-2 w-full">{img.folder}</div>
+                                                <div className="text-[8px] text-theme-primary mt-1">{img.library}</div>
+                                            </div>
+                                            {/* Static Footer Label */}
+                                            <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[9px] text-white p-1 truncate text-center pointer-events-none">
+                                                {img.type || 'Asset'}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-xs text-theme-muted italic text-center py-4">{galleryLoading ? 'Loading images...' : 'No matching images found for this timestamp.'}</div>
+                            )}
                         </div>
+                    )}
 
-                        <h4 className="text-sm font-bold text-theme-muted uppercase tracking-wider mt-2">{t('runtime_history.details.breakdown')}</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                            <MiniStat label={t('runtime_history.types.posters')} value={selectedEntry.posters} />
-                            <MiniStat label={t('runtime_history.types.backgrounds')} value={selectedEntry.backgrounds} />
-                            <MiniStat label={t('runtime_history.types.seasons')} value={selectedEntry.seasons} />
-                            <MiniStat label={t('runtime_history.types.title_cards')} value={selectedEntry.titlecards} />
-                            <MiniStat label={t('runtime_history.types.collections')} value={selectedEntry.collections} />
-                        </div>
+                    <h4 className="text-xs font-bold text-theme-muted uppercase border-b border-theme/20 pb-2 mb-4">Breakdown</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                        {['Posters', 'Backgrounds', 'Seasons', 'Title Cards', 'Collections'].map((type, i) => {
+                             const key = type.toLowerCase().replace(' ', '');
+                             const val = selectedEntry[key === 'titlecards' ? 'titlecards' : key] || 0;
+                             return (<div key={i} className="bg-theme-card p-3 rounded border border-theme/30 text-center"><div className="text-xl font-bold text-theme-text">{val}</div><div className="text-[10px] text-theme-muted uppercase tracking-wider">{type}</div></div>)
+                        })}
+                    </div>
 
-                        <div className="p-4 bg-theme-bg rounded-lg border border-theme mt-4">
-                            <h4 className="text-sm font-bold text-theme-text mb-2">{t('runtime_history.details.logs')}</h4>
-                            <div className="text-xs font-mono text-theme-muted bg-black/30 p-3 rounded overflow-x-auto">
-                                {t('runtime_history.details.log_file')}: {selectedEntry.log_file} <br/>
-                                {t('runtime_history.details.script_version')}: {selectedEntry.script_version || "N/A"}
-                            </div>
+                    <div className="bg-theme-card border border-theme/30 rounded p-4">
+                        <h4 className="text-xs font-bold text-theme-muted uppercase mb-2">System Info</h4>
+                        <div className="text-xs font-mono text-theme-text grid grid-cols-1 gap-1">
+                            <div><span className="text-theme-muted uppercase mr-2 w-24 inline-block">Log File:</span> {selectedEntry.log_file}</div>
+                            <div><span className="text-theme-muted uppercase mr-2 w-24 inline-block">Version:</span> {selectedEntry.script_version || "Unknown"}</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
       )}
-
     </div>
   );
 }
 
-// UI Helpers
+// UI Components
 const StatBox = ({ label, value, icon: Icon, color }) => (
-    <div className="bg-theme-card p-4 rounded-lg border border-theme flex flex-col justify-between">
-        <div className="flex justify-between items-start mb-2">
-            <span className="text-xs text-theme-muted font-bold uppercase">{label}</span>
-            {Icon && <Icon className={`w-4 h-4 ${color}`} />}
+    <div className="bg-theme-card p-4 rounded border-t-[4px] border-theme/20 shadow flex flex-col justify-between h-24 relative overflow-hidden" style={{ borderTopColor: color }}>
+        <div className="flex justify-between items-start z-10 relative">
+            <span className="text-[11px] font-bold text-theme-muted uppercase tracking-wide">{label}</span>
+            {Icon && <Icon size={16} style={{ color }} />}
         </div>
-        <div className={`text-2xl font-bold ${color}`}>{value}</div>
+        <div className="text-2xl font-light text-theme-text mt-auto z-10 relative">{value}</div>
+        {Icon && <Icon size={64} className="absolute -bottom-4 -right-4 opacity-5 pointer-events-none" style={{ color }} />}
     </div>
 );
 
-const MiniStat = ({ label, value }) => (
-    <div className="bg-theme-bg/50 p-3 rounded-lg border border-theme text-center">
-        <div className="text-xl font-bold text-theme-text">{value}</div>
+const CompactStat = ({ label, value }) => (
+    <div className="bg-theme-bg/30 p-2 rounded border border-theme/20 text-center">
+        <div className="text-lg font-bold text-theme-text">{value}</div>
         <div className="text-[10px] text-theme-muted uppercase">{label}</div>
     </div>
 );
