@@ -40,23 +40,6 @@ const formatBytes = (bytes, decimals = 2) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + ['Bytes', 'KB', 'MB', 'GB', 'TB'][i];
 };
 
-const parseAssetPath = (path) => {
-    if (!path) return { library: 'Unknown', folder: 'Unknown', filename: 'Unknown' };
-
-    // Normalize separators
-    const normalized = path.replace(/\\+/g, '/');
-    const parts = normalized.split('/');
-
-    if (parts.length >= 2) {
-        return {
-            library: parts[0],
-            folder: parts[1],
-            filename: parts[parts.length - 1]
-        };
-    }
-    return { library: 'Unknown', folder: parts[0] || 'Unknown', filename: path };
-};
-
 // --- CHART COMPONENTS ---
 
 const Tooltip = ({ x, y, data }) => (
@@ -238,8 +221,6 @@ function RuntimeHistory() {
   // Modal State
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [galleryImages, setGalleryImages] = useState([]);
-  const [galleryLoading, setGalleryLoading] = useState(false);
 
   // --- DATA FETCHING ---
   const fetchAllData = async (silent = false) => {
@@ -293,80 +274,10 @@ function RuntimeHistory() {
     fetchAllData(false);
   }, [currentPage, viewMode, graphDays]);
 
-  // --- DETAIL MODAL LOGIC (GALLERY) ---
-  const handleOpenDetail = async (entry) => {
+  // --- MODAL HANDLING (SIMPLE) ---
+  const handleOpenDetail = (entry) => {
       setSelectedEntry(entry);
       setShowDetailModal(true);
-      setGalleryImages([]);
-      setGalleryLoading(true);
-
-      try {
-          const [postersRes, backgroundsRes, seasonsRes, titlecardsRes] = await Promise.all([
-              fetch(`${API_URL}/gallery`),
-              fetch(`${API_URL}/backgrounds-gallery`),
-              fetch(`${API_URL}/seasons-gallery`),
-              fetch(`${API_URL}/titlecards-gallery`)
-          ]);
-
-          const postersData = await postersRes.json();
-          const backgroundsData = await backgroundsRes.json();
-          const seasonsData = await seasonsRes.json();
-          const titlecardsData = await titlecardsRes.json();
-
-          const allImages = [
-              ...(postersData.images || []),
-              ...(backgroundsData.images || []),
-              ...(seasonsData.images || []),
-              ...(titlecardsData.images || [])
-          ];
-
-          if (allImages.length > 0) {
-              // 1. Determine Start Time
-              // Priority: entry.start_time -> entry.timestamp
-              let startTimeEpoch = 0;
-              const duration = entry.runtime_seconds || 0;
-
-              if (entry.start_time) {
-                  // Modern JSON-based entry: has explicit start time
-                  startTimeEpoch = new Date(entry.start_time).getTime() / 1000;
-              } else if (entry.timestamp) {
-                  // Legacy/Log-based entry: timestamp is usually the insertion time (End of script)
-                  // So Start Time = End Time - Duration
-                  const endEpoch = new Date(entry.timestamp).getTime() / 1000;
-                  startTimeEpoch = endEpoch - duration;
-              } else {
-                  // Fallback
-                  startTimeEpoch = new Date().getTime() / 1000;
-              }
-
-              // 2. Define Window with generous buffer
-              // Files might be created slightly before start (setup) or slightly after (cleanup)
-              // Buffer: 5 minutes (300s) to be safe against clock skew / file system delays
-              const buffer = 300;
-              const windowStart = startTimeEpoch - buffer;
-              const windowEnd = startTimeEpoch + duration + buffer;
-
-              console.log(`[RunDetails] Searching assets between ${new Date(windowStart*1000).toLocaleTimeString()} and ${new Date(windowEnd*1000).toLocaleTimeString()}`);
-
-              const filtered = allImages
-                .filter(img => {
-                    // Use modification time preferably, fallback to creation
-                    // Note: file systems differ, mtime is usually more reliable for content creation
-                    const fileTime = img.modified || img.created || 0;
-                    return fileTime >= windowStart && fileTime <= windowEnd;
-                })
-                .map(img => {
-                    const meta = parseAssetPath(img.path);
-                    return { ...img, ...meta };
-                });
-
-              setGalleryImages(filtered);
-          }
-      } catch (e) {
-          console.error("Failed to load gallery for entry", e);
-      } finally {
-          setGalleryLoading(false);
-      }
   };
 
   // --- DATA PREP ---
@@ -616,7 +527,7 @@ function RuntimeHistory() {
         </div>
       )}
 
-      {/* DETAIL MODAL WITH GALLERY */}
+      {/* DETAIL MODAL */}
       {showDetailModal && selectedEntry && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
             <div className="bg-theme-card border border-theme rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -638,37 +549,6 @@ function RuntimeHistory() {
                         <StatBox label="Total Errors" value={selectedEntry.errors} color={selectedEntry.errors > 0 ? THEME.red : 'gray'} icon={AlertTriangle} />
                         <StatBox label="Space Saved" value={selectedEntry.space_saved || "0 KB"} color={THEME.blue} icon={Database} />
                     </div>
-
-                    {/* Created Images Gallery */}
-                    {(galleryImages.length > 0 || galleryLoading) && (
-                        <div className="mb-8">
-                            <h4 className="text-xs font-bold text-theme-muted uppercase border-b border-theme/20 pb-2 mb-4 flex justify-between items-center">
-                                <span>Created Assets ({galleryImages.length})</span>
-                                {galleryLoading && <Loader2 className="animate-spin w-3 h-3"/>}
-                            </h4>
-                            {galleryImages.length > 0 ? (
-                                <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
-                                    {galleryImages.map((img, idx) => (
-                                        <div key={idx} className="group relative aspect-[2/3] bg-theme-bg rounded overflow-hidden border border-theme/20 hover:border-theme/50 transition-colors">
-                                            <img src={img.url} alt={img.name} className="w-full h-full object-cover" loading="lazy" />
-                                            {/* Hover Overlay with Metadata */}
-                                            <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 text-center">
-                                                <a href={img.url} target="_blank" rel="noreferrer" className="p-2 bg-white/10 rounded-full hover:bg-white/20 text-white mb-2"><ExternalLink size={16}/></a>
-                                                <div className="text-[9px] text-gray-300 line-clamp-2 w-full">{img.folder}</div>
-                                                <div className="text-[8px] text-theme-primary mt-1">{img.library}</div>
-                                            </div>
-                                            {/* Static Footer Label */}
-                                            <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[9px] text-white p-1 truncate text-center pointer-events-none">
-                                                {img.type || 'Asset'}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-xs text-theme-muted italic text-center py-4">Loading images...</div>
-                            )}
-                        </div>
-                    )}
 
                     <h4 className="text-xs font-bold text-theme-muted uppercase border-b border-theme/20 pb-2 mb-4">Breakdown</h4>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
