@@ -472,7 +472,7 @@
   "nav": {
     "dashboard": "Painel",
     "runModes": "Modos de execução",
-    "runtimeHistory": "Histórico de execução",
+    "runtimeHistory": "Insights",
     "plexExport": "Exportação Plex",
     "mediaServerExport": "Histórico de exportação do servidor de mídia",
     "assets": "Gestão de Ativos",
@@ -2068,6 +2068,7 @@
     }
   },
   "plexExport": {
+    "updated": "Atualizado",
     "pageTitle": "Histórico de exportação Plex",
     "description": "Rastreie e consulte suas exportações de biblioteca Plex ao longo do tempo",
     "refresh": "Atualizar",
@@ -2105,12 +2106,78 @@
     "resolutions": "Resoluções",
     "importedAt": "Importado em",
     "alreadyImported": "Dados já importados",
-    "importSuccess": "Importação bem-sucedida"
+    "importSuccess": "Importação bem-sucedida",
+    "addInfo": "Info Adic.",
+    "externalIds": "IDs Externos"
+  },
+  "plexActions": {
+    "refreshMetadata": "Atualizar Metadados",
+    "analyzeItem": "Analisar Item",
+    "scanLibrary": "Verificar Biblioteca",
+    "emptyTrash": "Esvaziar Lixeira",
+    "actionStarted": "Enviando comando para o Plex..."
+  },
+  "jellyfinActions": {
+    "refreshMetadata": "Atualizar Metadados",
+    "refreshImages": "Procurar Imagens",
+    "actionStarted": "Enviando comando..."
   },
   "mediaServerExport": {
     "pageTitle": "Histórico de exportação do servidor de mídia",
     "description": "Rastreie e consulte suas exportações de biblioteca do servidor de mídia ao longo do tempo",
     "plex": "Plex",
     "jellyfinEmby": "Jellyfin / Emby"
+  },
+  "runtime_history": {
+    "analytics": "Estatísticas",
+    "history_list": "Lista de Histórico",
+    "periods": {
+      "last_7_days": "Últimos 7 dias",
+      "last_30_days": "Últimos 30 dias",
+      "last_3_months": "Últimos 3 meses",
+      "last_year": "Ano passado"
+    },
+    "charts": {
+      "execution_time": "Tempo de execução (Segundos)",
+      "assets_created": "Ativos criados",
+      "errors_per_run": "Erros por execução",
+      "source_distribution": "Distribuição da fonte (Diária)",
+      "no_data": "Nenhum dado disponível para este período",
+      "no_provider_data": "Nenhum dado do provedor disponível"
+    },
+    "table": {
+      "start_time": "Hora de início",
+      "mode": "Modo",
+      "duration": "Duração",
+      "created": "Criado",
+      "errors": "Erros",
+      "page": "Página"
+    },
+    "details": {
+      "title": "Detalhes da execução",
+      "tab_stats": "Estatísticas",
+      "tab_items": "Itens criados",
+      "runtime": "Tempo de execução",
+      "total_images": "Total de imagens",
+      "space_saved": "Espaço economizado",
+      "breakdown": "Detalhamento",
+      "logs": "Logs",
+      "log_file": "Arquivo de log",
+      "script_version": "Versão do script"
+    },
+    "items": {
+      "loading": "Carregando detalhes...",
+      "none_found": "Nenhum detalhe encontrado",
+      "assets_no_records": "Esta execução criou {{count}} ativos, mas seus registros detalhados não puderam ser recuperados.",
+      "no_new_assets": "Esta execução não criou nenhum ativo novo.",
+      "timestamp_warning": "(Nota: Os itens são frequentemente rastreados por intervalo de tempo. Se os logs forem antigos ou a sincronização estiver desativada, itens específicos podem não vincular a este ID de histórico: {{id}})"
+    },
+    "types": {
+      "posters": "Pôsteres",
+      "backgrounds": "Planos de fundo",
+      "seasons": "Temporadas",
+      "title_cards": "Cartões de título",
+      "collections": "Coleções"
+    }
   }
 }

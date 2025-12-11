@@ -472,7 +472,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "runModes": "Run Modes",
-    "runtimeHistory": "Runtime History",
+    "runtimeHistory": "Insights",
     "plexExport": "Plex Export",
     "mediaServerExport": "Media Server Export",
     "assets": "Asset Management",
@@ -2074,6 +2074,7 @@
     }
   },
   "plexExport": {
+    "updated": "Updated",
     "pageTitle": "Plex Export History",
     "description": "Track and query your Plex library exports over time",
     "refresh": "Refresh",
@@ -2111,12 +2112,78 @@
     "resolutions": "Resolutions",
     "importedAt": "Imported At",
     "alreadyImported": "Data already imported",
-    "importSuccess": "Import successful"
+    "importSuccess": "Import successful",
+    "addInfo": "Add. Info",
+    "externalIds": "External IDs"
+  },
+  "plexActions": {
+    "refreshMetadata": "Refresh Metadata",
+    "analyzeItem": "Analyze Item",
+    "scanLibrary": "Scan Library Files",
+    "emptyTrash": "Empty Trash",
+    "actionStarted": "Sending command to Plex..."
+  },
+  "jellyfinActions": {
+    "refreshMetadata": "Refresh Metadata",
+    "refreshImages": "Scan for Images",
+    "actionStarted": "Sending command..."
   },
   "mediaServerExport": {
     "pageTitle": "Media Server Export History",
     "description": "Track and query your media server library exports over time",
     "plex": "Plex",
     "jellyfinEmby": "Jellyfin / Emby"
+  },
+  "runtime_history": {
+    "analytics": "Analytics",
+    "history_list": "History List",
+    "periods": {
+      "last_7_days": "Last 7 Days",
+      "last_30_days": "Last 30 Days",
+      "last_3_months": "Last 3 Months",
+      "last_year": "Last Year"
+    },
+    "charts": {
+      "execution_time": "Execution Time (Seconds)",
+      "assets_created": "Assets Created",
+      "errors_per_run": "Errors per Run",
+      "source_distribution": "Source Distribution (Daily)",
+      "no_data": "No data available for this period",
+      "no_provider_data": "No provider data available"
+    },
+    "table": {
+      "start_time": "Start Time",
+      "mode": "Mode",
+      "duration": "Duration",
+      "created": "Created",
+      "errors": "Errors",
+      "page": "Page"
+    },
+    "details": {
+      "title": "Run Details",
+      "tab_stats": "Statistics",
+      "tab_items": "Items Created",
+      "runtime": "Runtime",
+      "total_images": "Total Images",
+      "space_saved": "Space Saved",
+      "breakdown": "Breakdown",
+      "logs": "Logs",
+      "log_file": "Log File",
+      "script_version": "Script Version"
+    },
+    "items": {
+      "loading": "Loading item details...",
+      "none_found": "No item details found",
+      "assets_no_records": "This run created {{count}} assets, but their detailed records could not be retrieved.",
+      "no_new_assets": "This run did not create any new assets.",
+      "timestamp_warning": "(Note: Items are often tracked by timestamp range. If the run logs are old or time-sync is off, specific items might not link to this History ID: {{id}})"
+    },
+    "types": {
+      "posters": "Posters",
+      "backgrounds": "Backgrounds",
+      "seasons": "Seasons",
+      "title_cards": "Title Cards",
+      "collections": "Collections"
+    }
   }
 }

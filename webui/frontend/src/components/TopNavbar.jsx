@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Palette, User, LogOut } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Palette, User, LogOut, Activity, Zap } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,31 @@ const TopNavbar = () => {
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
 
+  // Status State
+  const [systemStatus, setSystemStatus] = useState({ running: false, mode: null });
+
+  // Poll for running status
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("/api/status");
+        if (res.ok) {
+          const data = await res.json();
+          setSystemStatus({ running: data.running, mode: data.current_mode });
+        }
+      } catch (e) {
+        // Silent fail
+      }
+    };
+
+    // Initial fetch
+    fetchStatus();
+
+    // Poll every 5 seconds
+    const interval = setInterval(fetchStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const themeArray = Object.entries(themes).map(([id, config]) => ({
     id,
     name: config.name,
@@ -21,9 +46,28 @@ const TopNavbar = () => {
   return (
     <div className="hidden md:block fixed top-0 left-0 right-0 bg-theme-card border-b border-theme z-40 h-16 md:pl-64 shadow-lg">
       <div className="flex items-center justify-between h-full px-6">
-        <div className="flex items-center"></div>
 
+        {/* Left Side: Empty now */}
+        <div className="flex items-center flex-1">
+        </div>
+
+        {/* Right Side: Status, Lang, Theme, User */}
         <div className="flex items-center gap-3">
+
+          {/* Running Status Indicator */}
+          {systemStatus.running && (
+             <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full animate-pulse mr-2">
+                {systemStatus.mode === 'scheduled' ? (
+                    <Zap className="w-4 h-4 text-green-400" />
+                ) : (
+                    <Activity className="w-4 h-4 text-green-400 animate-spin-slow" />
+                )}
+                <span className="text-xs font-bold text-green-400 uppercase tracking-wider">
+                  {systemStatus.mode || "Running"}
+                </span>
+             </div>
+          )}
+
           {/* Language Switcher */}
           <LanguageSwitcher compact={true} />
 
@@ -37,7 +81,6 @@ const TopNavbar = () => {
               <Palette className="w-5 h-5" />
             </button>
 
-            {/* Theme Dropdown */}
             {isThemeDropdownOpen && (
               <>
                 <div
@@ -75,7 +118,7 @@ const TopNavbar = () => {
             )}
           </div>
 
-          {/* User Icon with Dropdown (only if auth is enabled) */}
+          {/* User Icon */}
           {isAuthEnabled && (
             <div className="relative">
               <button
@@ -86,7 +129,6 @@ const TopNavbar = () => {
                 <User className="w-5 h-5" />
               </button>
 
-              {/* User Dropdown */}
               {isUserDropdownOpen && (
                 <>
                   <div

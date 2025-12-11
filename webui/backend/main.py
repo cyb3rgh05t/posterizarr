@@ -31,7 +31,7 @@ import re
 import time
 import requests
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 import threading
 import xml.etree.ElementTree as ET
 import sys
@@ -392,6 +392,19 @@ def setup_backend_ui_logger():
 logger.info("Setting up backend UI logger...")
 setup_backend_ui_logger()
 
+# Import config tooltips
+try:
+    logger.debug("Attempting to import config_tooltips module")
+    from config_tooltips import CONFIG_TOOLTIPS
+    try:
+        from .config_tooltips import CONFIG_TOOLTIPS
+    except ImportError:
+        from config_tooltips import CONFIG_TOOLTIPS
+    logger.info("Config tooltips loaded successfully")
+except ImportError as e:
+    CONFIG_TOOLTIPS = {}
+    logger.warning(f"Config tooltips not available: {e}")
+
 logger.info("Loading modules...")
 try:
     logger.debug("Attempting to import config_mapper module")
@@ -404,15 +417,11 @@ try:
         get_tooltip,
     )
 
-    # Tooltips are now handled in the frontend (ConfigEditor.jsx) with multi-language support
-    CONFIG_TOOLTIPS = {}
-
     CONFIG_MAPPER_AVAILABLE = True
     logger.info("Config mapper loaded successfully")
     logger.debug(f"UI_GROUPS available: {len(UI_GROUPS) if UI_GROUPS else 0}")
 except ImportError as e:
     CONFIG_MAPPER_AVAILABLE = False
-    CONFIG_TOOLTIPS = {}
     logger.warning(f"Config mapper not available: {e}. Using grouped config structure.")
     logger.debug(f"ImportError details: {type(e).__name__}: {str(e)}", exc_info=True)
 
@@ -2173,7 +2182,7 @@ async def get_config():
             return {
                 "success": True,
                 "config": grouped_config,
-                "tooltips": {},  # Empty object as fallback
+                "tooltips": CONFIG_TOOLTIPS,
                 "using_flat_structure": False,
             }
     except HTTPException:
@@ -3778,6 +3787,258 @@ async def validate_uptimekuma(request: UptimeKumaValidationRequest):
 
 
 # ============================================================================
+# PLEX ACTIONS ENDPOINT
+# ============================================================================
+
+class PlexActionRequest(BaseModel):
+    action: str  # "refresh_item", "analyze_item", "scan_library"
+    rating_key: Optional[str] = None
+    library_name: Optional[str] = None
+
+@app.post("/api/plex/action")
+async def perform_plex_action(request: PlexActionRequest):
+    """
+    Perform actions on Plex Media Server (Refresh, Analyze, Scan, Empty Trash)
+    """
+    logger.info(f"Plex Action Request: {request.action} for key={request.rating_key}, lib={request.library_name}")
+
+    if not CONFIG_PATH.exists():
+        raise HTTPException(status_code=404, detail="Config file not found")
+
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        # Robust Config Loading
+        # 1. Try Root level (Flat structure)
+        plex_url = config.get("PlexUrl")
+        plex_token = config.get("PlexToken")
+
+        # 2. Try ApiPart (PlexToken is defined here in config_mapper.py)
+        if not plex_token:
+            api_part = config.get("ApiPart")
+            if isinstance(api_part, dict):
+                plex_token = api_part.get("PlexToken")
+
+        # 3. Try PlexPart (PlexUrl is defined here, Token might be here in older configs)
+        if not plex_url or not plex_token:
+            plex_part = config.get("PlexPart")
+            if isinstance(plex_part, dict):
+                if not plex_url:
+                    plex_url = plex_part.get("PlexUrl")
+                if not plex_token:
+                    plex_token = plex_part.get("PlexToken")
+
+
+        if not plex_url or not plex_token:
+            # Log what we found to help debug if it still fails
+            logger.error(f"Config Check Failed - URL found: {bool(plex_url)}, Token found: {bool(plex_token)}")
+            raise HTTPException(status_code=400, detail="Plex URL or Token not configured")
+
+        plex_url = plex_url.rstrip("/")
+
+    except Exception as e:
+        logger.error(f"Error loading Plex config: {e}")
+        # Only return detailed error if it wasn't the HTTPException raised above
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Failed to load configuration: {str(e)}")
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        headers = {"X-Plex-Token": plex_token, "Accept": "application/json"}
+
+        try:
+            # ACTION: Refresh Metadata (Item Level)
+            if request.action == "refresh_item":
+                if not request.rating_key:
+                    raise HTTPException(status_code=400, detail="Rating Key required")
+
+                url = f"{plex_url}/library/metadata/{request.rating_key}/refresh"
+                response = await client.put(url, headers=headers)
+
+                if response.status_code == 200:
+                    return {"success": True, "message": f"Refreshed metadata for item {request.rating_key}"}
+
+            # ACTION: Analyze Item
+            elif request.action == "analyze_item":
+                if not request.rating_key:
+                    raise HTTPException(status_code=400, detail="Rating Key required")
+
+                url = f"{plex_url}/library/metadata/{request.rating_key}/analyze"
+                response = await client.put(url, headers=headers)
+
+                if response.status_code == 200:
+                    return {"success": True, "message": f"Started analysis for item {request.rating_key}"}
+
+            # ACTIONS: Library Level (Scan & Empty Trash)
+            elif request.action in ["scan_library", "empty_trash"]:
+                if not request.library_name:
+                    raise HTTPException(status_code=400, detail="Library Name required")
+
+                # Find the section ID for this library name
+                sections_url = f"{plex_url}/library/sections"
+                sections_resp = await client.get(sections_url, headers=headers)
+
+                if sections_resp.status_code != 200:
+                    raise HTTPException(status_code=500, detail="Failed to fetch Plex libraries")
+
+                data = sections_resp.json()
+                section_id = None
+
+                # Check nested structure for directory list
+                directories = data.get("MediaContainer", {}).get("Directory", [])
+
+                for directory in directories:
+                    if directory.get("title") == request.library_name:
+                        section_id = directory.get("key")
+                        break
+
+                if not section_id:
+                    raise HTTPException(status_code=404, detail=f"Library '{request.library_name}' not found on Plex")
+
+                if request.action == "scan_library":
+                    # Trigger Scan: /library/sections/{id}/refresh
+                    scan_url = f"{plex_url}/library/sections/{section_id}/refresh"
+                    await client.get(scan_url, headers=headers)
+                    return {"success": True, "message": f"Started scan for library '{request.library_name}'"}
+
+                elif request.action == "empty_trash":
+                    # Trigger Empty Trash: /library/sections/{id}/emptyTrash
+                    trash_url = f"{plex_url}/library/sections/{section_id}/emptyTrash"
+                    await client.put(trash_url, headers=headers)
+                    return {"success": True, "message": f"Trash emptied for library '{request.library_name}'"}
+
+            else:
+                raise HTTPException(status_code=400, detail=f"Invalid action: {request.action}")
+
+            # Generic error handler for non-200 responses
+            if response.status_code != 200:
+                logger.error(f"Plex API Error ({response.status_code}): {response.text}")
+                raise HTTPException(status_code=response.status_code, detail=f"Plex API Error: {response.status_code}")
+
+        except httpx.RequestError as e:
+            logger.error(f"Plex Connection Error: {e}")
+            raise HTTPException(status_code=502, detail="Failed to connect to Plex Server")
+
+# ============================================================================
+# JELLYFIN/EMBY ACTIONS ENDPOINT
+# ============================================================================
+
+class JellyfinEmbyActionRequest(BaseModel):
+    action: str  # "refresh_item", "refresh_images"
+    media_id: str
+
+@app.post("/api/jellyfin-emby/action")
+async def perform_jellyfin_emby_action(request: JellyfinEmbyActionRequest):
+    """
+    Perform actions on Jellyfin/Emby Server
+    """
+    logger.info(f"Jellyfin/Emby Action Request: {request.action} for id={request.media_id}")
+
+    if not CONFIG_PATH.exists():
+        raise HTTPException(status_code=404, detail="Config file not found")
+
+    # 1. Load Config & Determine Server
+    server_url = None
+    api_key = None
+    server_type = None
+
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        # Helper to check nested dicts safely
+        def get_val(key, section_name):
+            # 1. Try Root (Flat)
+            val = config.get(key)
+            # 2. Try Section (Grouped)
+            if not val:
+                val = config.get(section_name, {}).get(key)
+            return val
+
+        # Check enabled flags
+        use_jellyfin = get_val("UseJellyfin", "JellyfinPart")
+        use_emby = get_val("UseEmby", "EmbyPart")
+
+        if use_jellyfin:
+            server_type = "Jellyfin"
+            server_url = get_val("JellyfinUrl", "JellyfinPart")
+
+            #  API Key is in ApiPart, not JellyfinPart
+            api_key = config.get("JellyfinAPIKey") # Flat
+            if not api_key:
+                api_key = config.get("ApiPart", {}).get("JellyfinAPIKey") # Correct Group
+            if not api_key:
+                api_key = config.get("JellyfinPart", {}).get("JellyfinAPIKey") # Legacy Group fallback
+
+        elif use_emby:
+            server_type = "Emby"
+            server_url = get_val("EmbyUrl", "EmbyPart")
+
+            #  API Key is in ApiPart, not EmbyPart
+            api_key = config.get("EmbyAPIKey") # Flat
+            if not api_key:
+                api_key = config.get("ApiPart", {}).get("EmbyAPIKey") # Correct Group
+            if not api_key:
+                api_key = config.get("EmbyPart", {}).get("EmbyAPIKey") # Legacy Group fallback
+
+        if not server_url or not api_key:
+            # Log specific missing items for debugging
+            logger.error(f"{server_type} Config Check Failed - URL found: {bool(server_url)}, Key found: {bool(api_key)}")
+            raise HTTPException(status_code=400, detail="Jellyfin/Emby not enabled or missing configuration")
+
+        server_url = server_url.rstrip("/")
+
+    except Exception as e:
+        logger.error(f"Error loading config: {e}")
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail="Failed to load configuration")
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        # Jellyfin/Emby use similar endpoints for basic item refresh
+        # Endpoint: /Items/{Id}/Refresh
+
+        url = f"{server_url}/Items/{request.media_id}/Refresh?api_key={api_key}"
+
+        # Default params for general refresh
+        params = {
+            "Recursive": "true",
+            "ImageRefreshMode": "Default",
+            "MetadataRefreshMode": "Default",
+            "ReplaceAllImages": "false",
+            "ReplaceAllMetadata": "false"
+        }
+
+        if request.action == "refresh_item":
+            # Full metadata refresh
+            params["MetadataRefreshMode"] = "Full"
+
+        elif request.action == "refresh_images":
+            # Image specific refresh (look for new images)
+            params["ImageRefreshMode"] = "Full"
+            params["MetadataRefreshMode"] = "Default"
+
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action")
+
+        try:
+            response = await client.post(url, params=params)
+
+            if response.status_code == 204 or response.status_code == 200:
+                return {
+                    "success": True,
+                    "message": f"Triggered '{request.action}' on {server_type} for item {request.media_id}"
+                }
+            else:
+                logger.error(f"{server_type} API Error ({response.status_code}): {response.text}")
+                raise HTTPException(status_code=response.status_code, detail=f"{server_type} API Error")
+
+        except httpx.RequestError as e:
+            logger.error(f"{server_type} Connection Error: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to connect to {server_type}")
+
+# ============================================================================
 # LIBRARY FETCHING ENDPOINTS
 # ============================================================================
 
@@ -3837,7 +4098,7 @@ async def get_plex_libraries(request: PlexValidationRequest):
             if response.status_code == 200:
                 root = ET.fromstring(response.content)
                 libraries = []
-                # REMOVED: excluded_libraries = []
+                # excluded_libraries = []
 
                 for directory in root.findall(".//Directory"):
                     lib_title = directory.get("title", "")
@@ -3846,7 +4107,7 @@ async def get_plex_libraries(request: PlexValidationRequest):
 
                     lib_info = {"name": lib_title, "type": lib_type, "key": lib_key}
 
-                    # FIXED: Add ALL libraries to the main list
+                    # Add ALL libraries to the main list
                     libraries.append(lib_info)
 
                 logger.info(
@@ -3855,7 +4116,7 @@ async def get_plex_libraries(request: PlexValidationRequest):
 
                 # Save libraries to database
                 try:
-                    # FIXED: Pass an empty list for exclusions
+                    # Pass an empty list for exclusions
                     server_libraries_db.save_media_server_libraries(
                         "plex", libraries, []
                     )
@@ -3865,7 +4126,7 @@ async def get_plex_libraries(request: PlexValidationRequest):
                         f"Failed to save Plex libraries to database: {str(db_error)}"
                     )
 
-                # FIXED: Return all libraries in the main list
+                # Return all libraries in the main list
                 return {
                     "success": True,
                     "libraries": libraries,
@@ -3895,7 +4156,7 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
             if response.status_code == 200:
                 data = response.json()
                 libraries = []
-                # REMOVED: excluded_libraries = []
+                # excluded_libraries = []
 
                 for lib in data:
                     lib_name = lib.get("Name", "")
@@ -3907,7 +4168,7 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
                         "id": lib.get("ItemId", ""),
                     }
 
-                    # FIXED: Add ALL libraries to the main list
+                    # Add ALL libraries to the main list
                     libraries.append(lib_info)
 
                 logger.info(
@@ -3916,7 +4177,7 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
 
                 # Save libraries to database
                 try:
-                    # FIXED: Pass an empty list for exclusions
+                    # Pass an empty list for exclusions
                     server_libraries_db.save_media_server_libraries(
                         "jellyfin", libraries, []
                     )
@@ -3926,7 +4187,7 @@ async def get_jellyfin_libraries(request: JellyfinValidationRequest):
                         f"Failed to save Jellyfin libraries to database: {str(db_error)}"
                     )
 
-                # FIXED: Return all libraries in the main list
+                # Return all libraries in the main list
                 return {
                     "success": True,
                     "libraries": libraries,
@@ -3957,7 +4218,7 @@ async def get_emby_libraries(request: EmbyValidationRequest):
             if response.status_code == 200:
                 data = response.json()
                 libraries = []
-                # REMOVED: excluded_libraries = []
+                # excluded_libraries = []
 
                 for lib in data:
                     lib_name = lib.get("Name", "")
@@ -3969,7 +4230,7 @@ async def get_emby_libraries(request: EmbyValidationRequest):
                         "id": lib.get("ItemId", ""),
                     }
 
-                    # FIXED: Add ALL libraries to the main list
+                    # Add ALL libraries to the main list
                     libraries.append(lib_info)
 
                 logger.info(
@@ -3978,7 +4239,7 @@ async def get_emby_libraries(request: EmbyValidationRequest):
 
                 # Save libraries to database
                 try:
-                    # FIXED: Pass an empty list for exclusions
+                    # Pass an empty list for exclusions
                     server_libraries_db.save_media_server_libraries(
                         "emby", libraries, []
                     )
@@ -3988,7 +4249,7 @@ async def get_emby_libraries(request: EmbyValidationRequest):
                         f"Failed to save Emby libraries to database: {str(db_error)}"
                     )
 
-                # FIXED: Return all libraries in the main list
+                # Return all libraries in the main list
                 return {
                     "success": True,
                     "libraries": libraries,
@@ -5467,6 +5728,19 @@ async def import_json_runtime_data():
         logger.error(f"Error importing JSON runtime data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/analytics/providers")
+async def get_provider_stats(days: int = Query(30, ge=7, le=365)):
+    """Get provider source statistics over time"""
+    try:
+        if not DATABASE_AVAILABLE or not db:
+             return {"success": False, "stats": [], "error": "Database not available"}
+
+        # Use the new method in database.py
+        stats = db.get_provider_stats_by_date(days)
+        return {"success": True, "stats": stats}
+    except Exception as e:
+        logger.error(f"Error getting provider stats: {e}")
+        return {"success": False, "error": str(e), "stats": []}
 
 # =========================================================================
 # Plex Export Database Endpoints

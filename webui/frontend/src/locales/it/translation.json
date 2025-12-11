@@ -472,7 +472,7 @@
   "nav": {
     "dashboard": "Pannello di controllo",
     "runModes": "Modalità di esecuzione",
-    "runtimeHistory": "Cronologia esecuzioni",
+    "runtimeHistory": "Approfondimenti",
     "plexExport": "Esportazione Plex",
     "mediaServerExport": "Cronologia esportazioni server multimediale",
     "assets": "Gestione asset",
@@ -2072,6 +2072,7 @@
     }
   },
   "plexExport": {
+    "updated": "Aggiornato",
     "pageTitle": "Cronologia esportazioni Plex",
     "description": "Traccia e interroga le esportazioni della tua libreria Plex nel tempo",
     "refresh": "Aggiorna",
@@ -2109,12 +2110,78 @@
     "resolutions": "Risoluzioni",
     "importedAt": "Importato il",
     "alreadyImported": "Dati già importati",
-    "importSuccess": "Importazione riuscita"
+    "importSuccess": "Importazione riuscita",
+    "addInfo": "Info Agg.",
+    "externalIds": "ID Esterni"
+  },
+  "plexActions": {
+    "refreshMetadata": "Aggiorna Metadati",
+    "analyzeItem": "Analizza Elemento",
+    "scanLibrary": "Scansiona Libreria",
+    "emptyTrash": "Svuota Cestino",
+    "actionStarted": "Invio comando a Plex..."
+  },
+  "jellyfinActions": {
+    "refreshMetadata": "Aggiorna Metadati",
+    "refreshImages": "Cerca Immagini",
+    "actionStarted": "Invio comando..."
   },
   "mediaServerExport": {
     "pageTitle": "Cronologia esportazioni server multimediale",
     "description": "Traccia e interroga le esportazioni della tua libreria del server multimediale nel tempo",
     "plex": "Plex",
     "jellyfinEmby": "Jellyfin / Emby"
+  },
+  "runtime_history": {
+    "analytics": "Analitica",
+    "history_list": "Cronologia",
+    "periods": {
+      "last_7_days": "Ultimi 7 giorni",
+      "last_30_days": "Ultimi 30 giorni",
+      "last_3_months": "Ultimi 3 mesi",
+      "last_year": "L'anno scorso"
+    },
+    "charts": {
+      "execution_time": "Tempo di esecuzione (Secondi)",
+      "assets_created": "Risorse create",
+      "errors_per_run": "Errori per esecuzione",
+      "source_distribution": "Distribuzione sorgente (Giornaliera)",
+      "no_data": "Nessun dato disponibile per questo periodo",
+      "no_provider_data": "Nessun dato fornitore disponibile"
+    },
+    "table": {
+      "start_time": "Ora di inizio",
+      "mode": "Modalità",
+      "duration": "Durata",
+      "created": "Creato",
+      "errors": "Errori",
+      "page": "Pagina"
+    },
+    "details": {
+      "title": "Dettagli esecuzione",
+      "tab_stats": "Statistiche",
+      "tab_items": "Elementi creati",
+      "runtime": "Tempo esecuzione",
+      "total_images": "Immagini totali",
+      "space_saved": "Spazio risparmiato",
+      "breakdown": "Ripartizione",
+      "logs": "Registri",
+      "log_file": "File di registro",
+      "script_version": "Versione script"
+    },
+    "items": {
+      "loading": "Caricamento dettagli...",
+      "none_found": "Nessun dettaglio trovato",
+      "assets_no_records": "Questa esecuzione ha creato {{count}} risorse, ma non è stato possibile recuperare i record dettagliati.",
+      "no_new_assets": "Questa esecuzione non ha creato nuove risorse.",
+      "timestamp_warning": "(Nota: Gli elementi sono spesso tracciati per intervallo temporale. Se i registri sono vecchi o la sincronizzazione è disattivata, alcuni elementi potrebbero non collegarsi a questo ID cronologia: {{id}})"
+    },
+    "types": {
+      "posters": "Poster",
+      "backgrounds": "Sfondi",
+      "seasons": "Stagioni",
+      "title_cards": "Schede titolo",
+      "collections": "Collezioni"
+    }
   }
 }
