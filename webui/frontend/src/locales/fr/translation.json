@@ -516,7 +516,11 @@
     "selectTheme": "Sélectionner un thème",
     "userMenu": "Menu utilisateur",
     "signOut": "Se déconnecter",
-    "userProfile": "Profil utilisateur"
+    "userProfile": "Profil utilisateur",
+    "stopSystem": "Arrêter le système",
+    "deleteLockfile": "Supprimer le fichier d'exécution",
+    "confirmStop": "Êtes-vous sûr de vouloir forcer l'arrêt ?",
+    "confirmDeleteLock": "Êtes-vous sûr de vouloir supprimer le fichier d'exécution ?"
   },
   "dashboard": {
     "controlDeck": {

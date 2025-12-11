@@ -515,8 +515,12 @@
     "changeTheme": "Cambia tema",
     "selectTheme": "Seleziona tema",
     "userMenu": "Menu utente",
-    "signOut": "Esci",
-    "userProfile": "Profilo utente"
+    "signOut": "Disconnetti",
+    "userProfile": "Profilo utente",
+    "stopSystem": "Arresta sistema",
+    "deleteLockfile": "Elimina file di esecuzione",
+    "confirmStop": "Sei sicuro di voler forzare l'arresto?",
+    "confirmDeleteLock": "Sei sicuro di voler eliminare il file di esecuzione?"
   },
   "dashboard": {
     "controlDeck": {

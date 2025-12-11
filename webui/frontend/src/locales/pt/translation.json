@@ -512,11 +512,15 @@
     "currentVersion": "✓ Versão atual instalada"
   },
   "topNavbar": {
-    "changeTheme": "Mudar tema",
-    "selectTheme": "Selecionar tema",
-    "userMenu": "Menu do usuário",
+    "changeTheme": "Alterar Tema",
+    "selectTheme": "Selecionar Tema",
+    "userMenu": "Menu do Usuário",
     "signOut": "Sair",
-    "userProfile": "Perfil do usuário"
+    "userProfile": "Perfil do Usuário",
+    "stopSystem": "Parar Sistema",
+    "deleteLockfile": "Excluir Arquivo de Execução",
+    "confirmStop": "Tem certeza de que deseja forçar a parada?",
+    "confirmDeleteLock": "Tem certeza de que deseja excluir o arquivo de execução?"
   },
   "dashboard": {
     "controlDeck": {

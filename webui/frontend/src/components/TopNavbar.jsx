@@ -4,6 +4,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "./LanguageSwitcher";
+import ConfirmDialog from "./ConfirmDialog";
 
 const TopNavbar = () => {
   const { t } = useTranslation();
@@ -11,6 +12,10 @@ const TopNavbar = () => {
   const { isAuthEnabled, logout } = useAuth();
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+
+  // Dialog States
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [showLockConfirm, setShowLockConfirm] = useState(false);
 
   // Status State
   const [systemStatus, setSystemStatus] = useState({
@@ -39,10 +44,7 @@ const TopNavbar = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // UPDATED: Matches DangerZone.jsx logic (parses JSON response)
   const handleStopSystem = async () => {
-    if (!window.confirm(t("topNavbar.confirmStop", "Are you sure you want to force stop?"))) return;
-
     try {
       const response = await fetch("/api/stop", { method: "POST" });
       const data = await response.json();
@@ -54,18 +56,18 @@ const TopNavbar = () => {
       }
     } catch (error) {
       console.error("Failed to stop system", error);
+    } finally {
+      setShowStopConfirm(false);
     }
   };
 
-  // UPDATED: Matches DangerZone.jsx logic
   const handleDeleteLockfile = async () => {
-    if (!window.confirm(t("topNavbar.confirmDeleteLock", "Are you sure you want to delete the running file?"))) return;
-
     try {
       const response = await fetch("/api/running-file", { method: "DELETE" });
 
       if (!response.ok) {
         console.error(`HTTP Error ${response.status}: ${response.statusText}`);
+        setShowLockConfirm(false);
         return;
       }
 
@@ -78,6 +80,8 @@ const TopNavbar = () => {
       }
     } catch (error) {
       console.error("Failed to delete lockfile", error);
+    } finally {
+      setShowLockConfirm(false);
     }
   };
 
@@ -107,7 +111,7 @@ const TopNavbar = () => {
                     </div>
 
                     <button
-                      onClick={handleStopSystem}
+                      onClick={() => setShowStopConfirm(true)}
                       className="group flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 hover:border-red-500/30 text-red-400 hover:text-red-500 transition-all"
                       title={t("topNavbar.stopSystem", "Stop System")}
                     >
@@ -128,7 +132,7 @@ const TopNavbar = () => {
                    </div>
 
                    <button
-                      onClick={handleDeleteLockfile}
+                      onClick={() => setShowLockConfirm(true)}
                       className="group flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/5 hover:bg-orange-500/10 border border-orange-500/10 hover:border-orange-500/30 text-orange-400 hover:text-orange-500 transition-all"
                       title={t("topNavbar.deleteLockfile", "Delete Running File")}
                     >
@@ -215,6 +219,27 @@ const TopNavbar = () => {
           )}
         </div>
       </div>
+
+      {/* Confirmation Dialogs */}
+      <ConfirmDialog
+        isOpen={showStopConfirm}
+        onClose={() => setShowStopConfirm(false)}
+        onConfirm={handleStopSystem}
+        title={t("topNavbar.stopSystem", "Stop System")}
+        message={t("topNavbar.confirmStop", "Are you sure you want to force stop?")}
+        confirmText={t("common.stop", "Stop")}
+        type="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={showLockConfirm}
+        onClose={() => setShowLockConfirm(false)}
+        onConfirm={handleDeleteLockfile}
+        title={t("topNavbar.deleteLockfile", "Delete Running File")}
+        message={t("topNavbar.confirmDeleteLock", "Are you sure you want to delete the running file?")}
+        confirmText={t("common.delete", "Delete")}
+        type="warning"
+      />
     </div>
   );
 };
