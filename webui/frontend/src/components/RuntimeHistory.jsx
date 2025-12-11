@@ -321,15 +321,39 @@ function RuntimeHistory() {
           ];
 
           if (allImages.length > 0) {
-              const startTime = new Date(entry.start_time || entry.timestamp).getTime() / 1000;
+              // 1. Determine Start Time
+              // Priority: entry.start_time -> entry.timestamp
+              let startTimeEpoch = 0;
               const duration = entry.runtime_seconds || 0;
-              const endTime = startTime + duration + 30;
-              const startTimeBuffer = startTime - 30;
+
+              if (entry.start_time) {
+                  // Modern JSON-based entry: has explicit start time
+                  startTimeEpoch = new Date(entry.start_time).getTime() / 1000;
+              } else if (entry.timestamp) {
+                  // Legacy/Log-based entry: timestamp is usually the insertion time (End of script)
+                  // So Start Time = End Time - Duration
+                  const endEpoch = new Date(entry.timestamp).getTime() / 1000;
+                  startTimeEpoch = endEpoch - duration;
+              } else {
+                  // Fallback
+                  startTimeEpoch = new Date().getTime() / 1000;
+              }
+
+              // 2. Define Window with generous buffer
+              // Files might be created slightly before start (setup) or slightly after (cleanup)
+              // Buffer: 5 minutes (300s) to be safe against clock skew / file system delays
+              const buffer = 300;
+              const windowStart = startTimeEpoch - buffer;
+              const windowEnd = startTimeEpoch + duration + buffer;
+
+              console.log(`[RunDetails] Searching assets between ${new Date(windowStart*1000).toLocaleTimeString()} and ${new Date(windowEnd*1000).toLocaleTimeString()}`);
 
               const filtered = allImages
                 .filter(img => {
-                    const timestamp = img.modified || img.created || 0;
-                    return timestamp >= startTimeBuffer && timestamp <= endTime;
+                    // Use modification time preferably, fallback to creation
+                    // Note: file systems differ, mtime is usually more reliable for content creation
+                    const fileTime = img.modified || img.created || 0;
+                    return fileTime >= windowStart && fileTime <= windowEnd;
                 })
                 .map(img => {
                     const meta = parseAssetPath(img.path);
@@ -616,7 +640,7 @@ function RuntimeHistory() {
                     </div>
 
                     {/* Created Images Gallery */}
-                    {selectedEntry.total_images > 0 && (
+                    {(galleryImages.length > 0 || galleryLoading) && (
                         <div className="mb-8">
                             <h4 className="text-xs font-bold text-theme-muted uppercase border-b border-theme/20 pb-2 mb-4 flex justify-between items-center">
                                 <span>Created Assets ({galleryImages.length})</span>
@@ -641,7 +665,7 @@ function RuntimeHistory() {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-xs text-theme-muted italic text-center py-4">{galleryLoading ? 'Loading images...' : 'No matching images found for this timestamp.'}</div>
+                                <div className="text-xs text-theme-muted italic text-center py-4">Loading images...</div>
                             )}
                         </div>
                     )}
