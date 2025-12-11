@@ -1,10 +1,3 @@
-// - CompactImageSizeSlider (5-10 Assets)
-// - Dynamic poster sizing with CSS Grid
-// - Single horizontal row, all posters visible
-// - Theme-compatible
-// - All badges at bottom (no overlay)
-// - Cached data with silent background refresh (every 2 minutes)
-
 import React, { useState, useEffect, useRef } from "react";
 import {
   FileImage,
@@ -34,29 +27,28 @@ function RecentAssets({ refreshTrigger = 0 }) {
   const { startLoading, finishLoading } = useDashboardLoading();
   const hasInitiallyLoaded = useRef(false);
   const [assets, setAssets] = useState(cachedAssets || []);
-  const [loading, setLoading] = useState(false); // No initial loading if cached
-  const [error, setError] = useState(null); // Error state
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState(null); // For modal
+  const [selectedAsset, setSelectedAsset] = useState(null);
 
-  // Tab filter state with localStorage
+  // Tab filter state
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem("recent-assets-tab");
     return saved || "All";
   });
 
-  // Pagination offset state with localStorage per tab
+  // Pagination offset state
   const [pageOffset, setPageOffset] = useState(() => {
     const saved = localStorage.getItem(`recent-assets-offset-${activeTab}`);
     return saved ? parseInt(saved) : 0;
   });
 
-  // Asset count state with localStorage (5-10 range, default 10)
+  // Asset count state
   const [assetCount, setAssetCount] = useState(() => {
     const saved = localStorage.getItem("recent-assets-count");
     const count = saved ? parseInt(saved) : 10;
-    // Ensure count is between 5 and 10
     return Math.min(Math.max(count, 5), 10);
   });
 
@@ -72,11 +64,10 @@ function RecentAssets({ refreshTrigger = 0 }) {
       const data = await response.json();
 
       if (data.success) {
-        cachedAssets = data.assets; // Save to persistent cache
+        cachedAssets = data.assets;
         setAssets(data.assets);
         setError(null);
 
-        // Mark as loaded after first successful fetch
         if (!hasInitiallyLoaded.current) {
           hasInitiallyLoaded.current = true;
           finishLoading("recent-assets");
@@ -102,10 +93,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
   };
 
   useEffect(() => {
-    // Register as loading and fetch on mount (silent mode = no loading spinner)
     startLoading("recent-assets");
-
-    // Check cache first
     if (cachedAssets) {
       setAssets(cachedAssets);
       setLoading(false);
@@ -117,51 +105,34 @@ function RecentAssets({ refreshTrigger = 0 }) {
       fetchRecentAssets(true);
     }
 
-    // Background refresh every 2 minutes (silent)
     const interval = setInterval(() => {
-      console.log("Auto-refreshing recent assets...");
       fetchRecentAssets(true);
     }, 2 * 60 * 1000);
 
-    return () => {
-      clearInterval(interval);
-      // Don't finish loading on unmount - that happens when data is fetched
-    };
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Watch for external refresh triggers (e.g., when a run finishes)
   useEffect(() => {
     if (refreshTrigger > 0) {
-      console.log(
-        "External refresh trigger received, updating recent assets..."
-      );
       fetchRecentAssets(true);
     }
   }, [refreshTrigger]);
 
-  // Listen for assetReplaced events (when assets are marked as resolved/unresolved)
   useEffect(() => {
     const handleAssetReplaced = () => {
-      console.log(
-        "Asset replaced/unresolve event received, refreshing recent assets..."
-      );
       fetchRecentAssets(true);
     };
-
     window.addEventListener("assetReplaced", handleAssetReplaced);
-
     return () => {
       window.removeEventListener("assetReplaced", handleAssetReplaced);
     };
   }, []);
 
   const handleAssetCountChange = (newCount) => {
-    // Ensure count is between 5 and 10
     const validCount = Math.min(Math.max(newCount, 5), 10);
     setAssetCount(validCount);
     localStorage.setItem("recent-assets-count", validCount.toString());
-    // Reset offset when changing count
     setPageOffset(0);
     localStorage.setItem(`recent-assets-offset-${activeTab}`, "0");
   };
@@ -169,7 +140,6 @@ function RecentAssets({ refreshTrigger = 0 }) {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     localStorage.setItem("recent-assets-tab", tab);
-    // Load offset for this tab or reset to 0
     const savedOffset = localStorage.getItem(`recent-assets-offset-${tab}`);
     setPageOffset(savedOffset ? parseInt(savedOffset) : 0);
   };
@@ -192,7 +162,6 @@ function RecentAssets({ refreshTrigger = 0 }) {
     );
   };
 
-  // Filter assets based on active tab
   const filterAssetsByTab = (assetList) => {
     if (activeTab === "All") {
       return assetList;
@@ -224,21 +193,21 @@ function RecentAssets({ refreshTrigger = 0 }) {
     switch (type?.toLowerCase()) {
       case "movie":
       case "poster":
-        return "bg-blue-500/20 text-blue-400 border-blue-500/50";
+        return "bg-blue-500/10 text-blue-400 border-blue-500/20";
       case "collection":
-        return "bg-blue-500/20 text-blue-400 border-blue-500/50";
+        return "bg-blue-500/10 text-blue-400 border-blue-500/20";
       case "show":
-        return "bg-purple-500/20 text-purple-400 border-purple-500/50";
+        return "bg-purple-500/10 text-purple-400 border-purple-500/20";
       case "season":
-        return "bg-indigo-500/20 text-indigo-400 border-indigo-500/50";
+        return "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
       case "episode":
       case "titlecard":
       case "title_card":
-        return "bg-cyan-500/20 text-cyan-400 border-cyan-500/50";
+        return "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
       case "background":
-        return "bg-pink-500/20 text-pink-400 border-pink-500/50";
+        return "bg-pink-500/10 text-pink-400 border-pink-500/20";
       default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/50";
+        return "bg-gray-500/10 text-gray-400 border-gray-500/20";
     }
   };
 
@@ -253,7 +222,6 @@ function RecentAssets({ refreshTrigger = 0 }) {
     }
   };
 
-  // Get the media type label (Movie, Show, Season, Episode, Background)
   const getMediaTypeLabel = (asset) => {
     const type = asset.type?.toLowerCase() || "";
 
@@ -278,10 +246,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
     }
   };
 
-  // Determine if asset should use landscape aspect ratio
   const isLandscapeAsset = (type) => {
     const typeStr = type?.toLowerCase() || "";
-    // Check for any background or titlecard/episode types
     const landscapeTypes = ["background", "episode", "titlecard", "title_card"];
     const isLandscape =
       landscapeTypes.some((t) => typeStr.includes(t)) ||
@@ -291,25 +257,22 @@ function RecentAssets({ refreshTrigger = 0 }) {
 
   const getLanguageColor = (language) => {
     if (language === "Textless") {
-      return "bg-green-500/20 text-green-400 border-green-500/50";
+      return "bg-green-500/10 text-green-400 border-green-500/20";
     }
-    return "bg-yellow-500/20 text-yellow-400 border-yellow-500/50";
+    return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
   };
 
-  // Get the assets to display based on slider value, active tab, and pagination
   const filteredAssets = filterAssetsByTab(assets);
   const displayedAssets = filteredAssets.slice(
     pageOffset,
     pageOffset + assetCount
   );
 
-  // Calculate pagination info
   const totalPages = Math.ceil(filteredAssets.length / assetCount);
   const currentPage = Math.floor(pageOffset / assetCount) + 1;
   const hasPrevPage = pageOffset > 0;
   const hasNextPage = pageOffset + assetCount < filteredAssets.length;
 
-  // Tab configuration - dynamically filter tabs based on available assets
   const allTabs = [
     { id: "All", label: "All" },
     { id: "Posters", label: "Posters" },
@@ -319,12 +282,10 @@ function RecentAssets({ refreshTrigger = 0 }) {
     { id: "TitleCards", label: "TitleCards" },
   ];
 
-  // Filter tabs to only show those with assets
   const tabs = allTabs.filter((tab) => {
     if (tab.id === "All") {
-      return assets.length > 0; // Always show "All" if there are any assets
+      return assets.length > 0;
     }
-    // Count how many assets match this tab
     const tabAssets = assets.filter((asset) => {
       const type = asset.type?.toLowerCase() || "";
       switch (tab.id) {
@@ -344,27 +305,25 @@ function RecentAssets({ refreshTrigger = 0 }) {
           return false;
       }
     });
-    return tabAssets.length > 0; // Only show tab if it has assets
+    return tabAssets.length > 0;
   });
 
-  // Don't render the card if there are no assets and not loading
   if (!loading && assets.length === 0) {
     return null;
   }
 
   return (
-    <div className="bg-theme-card rounded-xl p-6 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+    <div className="bg-theme-card rounded-3xl p-6 border border-theme hover:border-theme-primary/30 transition-all shadow-lg">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-theme-text flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-theme-primary/10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <h2 className="text-lg font-bold text-theme-text flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-theme-primary/10">
             <FileImage className="w-5 h-5 text-theme-primary" />
           </div>
           {t("dashboard.recentAssets")}
         </h2>
 
         <div className="flex items-center gap-3">
-          {/* Compact Image Size Slider */}
           <CompactImageSizeSlider
             value={assetCount}
             onChange={handleAssetCountChange}
@@ -373,25 +332,24 @@ function RecentAssets({ refreshTrigger = 0 }) {
             max={10}
           />
 
-          {/* Refresh Button - SystemInfo Style */}
           <button
             onClick={() => fetchRecentAssets()}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+            className="flex items-center gap-2 px-3 py-1.5 bg-theme-hover border border-theme rounded-lg text-xs font-medium transition-all hover:bg-theme-hover/80"
             title={t("recentAssets.refreshTooltip")}
           >
             <RefreshCw
-              className={`w-5 h-5 text-theme-primary ${
+              className={`w-3.5 h-3.5 text-theme-primary ${
                 refreshing ? "animate-spin" : ""
               }`}
             />
-            <span className="text-sm font-medium">{t("common.refresh")}</span>
+            <span>{t("common.refresh")}</span>
           </button>
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-theme-border scrollbar-track-transparent">
+      {/* Modern Tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-none mask-fade-right">
         {tabs.map((tab) => {
           const tabFilteredCount = filterAssetsByTab(assets).length;
           const isActive = activeTab === tab.id;
@@ -401,17 +359,17 @@ function RecentAssets({ refreshTrigger = 0 }) {
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
               className={`
-                flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all whitespace-nowrap
+                flex items-center gap-2 px-4 py-2 rounded-full font-medium text-xs transition-all whitespace-nowrap
                 ${
                   isActive
-                    ? "bg-theme-primary text-white shadow-lg"
-                    : "bg-theme-bg text-theme-muted hover:text-theme-text hover:bg-theme-hover border border-theme"
+                    ? "bg-theme-primary text-white shadow-md shadow-theme-primary/20"
+                    : "bg-theme-hover/50 text-theme-muted hover:text-theme-text hover:bg-theme-hover border border-theme/50"
                 }
               `}
             >
               <span>{tab.label}</span>
               {isActive && (
-                <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs font-semibold">
+                <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-bold">
                   {tab.id === "All"
                     ? assets.length
                     : filterAssetsByTab(assets).length}
@@ -428,24 +386,24 @@ function RecentAssets({ refreshTrigger = 0 }) {
           <Loader2 className="w-8 h-8 animate-spin text-theme-primary" />
         </div>
       ) : error && assets.length === 0 ? (
-        <div className="text-center py-8 text-red-400">
-          <p>Error: {error}</p>
+        <div className="text-center py-8 text-red-400 bg-red-500/5 rounded-xl border border-red-500/10">
+          <p className="text-sm font-medium">Error: {error}</p>
           <button
             onClick={() => fetchRecentAssets()}
-            className="mt-4 px-4 py-2 bg-theme-primary/20 hover:bg-theme-primary/30 rounded-lg transition-colors"
+            className="mt-3 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs transition-colors"
           >
             Retry
           </button>
         </div>
       ) : displayedAssets.length === 0 ? (
-        <div className="text-center py-8 text-theme-muted">
-          <FileImage className="w-16 h-16 mx-auto mb-4 opacity-50" />
-          <p>{t("recentAssets.noAssets")}</p>
+        <div className="text-center py-12 text-theme-muted bg-theme-hover/30 rounded-2xl border border-theme border-dashed">
+          <FileImage className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">{t("recentAssets.noAssets")}</p>
         </div>
       ) : (
         <>
-          {/* Flexible Grid - All posters visible in one row, responsive */}
-          <div className="w-full overflow-x-auto">
+          {/* Asset Grid */}
+          <div className="w-full overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-theme-border scrollbar-track-transparent">
             <div
               className="poster-grid"
               style={{
@@ -456,11 +414,11 @@ function RecentAssets({ refreshTrigger = 0 }) {
                 <div
                   key={index}
                   onClick={() => setSelectedAsset(asset)}
-                  className="bg-theme-bg rounded-lg overflow-hidden border border-theme hover:border-theme-primary transition-all group flex flex-col cursor-pointer"
+                  className="bg-theme-card rounded-xl overflow-hidden border border-theme hover:border-theme-primary/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group flex flex-col cursor-pointer h-full"
                 >
-                  {/* Poster/Background Image - Dynamic Aspect Ratio */}
+                  {/* Poster/Background Image */}
                   <div
-                    className={`relative bg-theme-dark flex-shrink-0 ${
+                    className={`relative bg-black/40 flex-shrink-0 overflow-hidden ${
                       isLandscapeAsset(asset.type)
                         ? "aspect-[16/9]"
                         : "aspect-[2/3]"
@@ -470,11 +428,11 @@ function RecentAssets({ refreshTrigger = 0 }) {
                       <img
                         src={asset.poster_url}
                         alt={asset.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         onError={(e) => {
                           e.target.parentElement.innerHTML = `
-                            <div class="w-full h-full flex items-center justify-center bg-theme-dark">
-                              <svg class="w-12 h-12 text-theme-muted opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="w-full h-full flex items-center justify-center bg-theme-hover">
+                              <svg class="w-8 h-8 text-theme-muted opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
                             </div>
@@ -483,40 +441,40 @@ function RecentAssets({ refreshTrigger = 0 }) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <ImageOff className="w-12 h-12 text-theme-muted opacity-50" />
+                        <ImageOff className="w-8 h-8 text-theme-muted opacity-30" />
                       </div>
                     )}
 
-                    {/* Provider Link - shows on hover */}
+                    {/* Hover Overlay Gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
                     {asset.provider_link && (
                       <a
                         href={asset.provider_link}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="absolute top-2 right-2 p-2 rounded-lg bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 backdrop-blur-md hover:bg-theme-primary text-white transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
                         title="View on provider"
                       >
-                        <ExternalLink className="w-4 h-4 text-white" />
+                        <ExternalLink className="w-3.5 h-3.5" />
                       </a>
                     )}
                   </div>
 
                   {/* Asset Info */}
-                  <div className="p-3 bg-theme-card flex-1 flex flex-col justify-between">
+                  <div className="p-3 flex-1 flex flex-col justify-between bg-theme-hover/10">
                     <h3
-                      className="font-semibold text-theme-text text-sm truncate mb-2"
+                      className="font-medium text-theme-text text-xs truncate mb-2 group-hover:text-theme-primary transition-colors"
                       title={asset.title}
                     >
                       {asset.title}
                     </h3>
 
-                    {/* All Badges in one row */}
                     <div className="flex flex-wrap gap-1 mt-auto">
-                      {/* Type Badge (Poster/Show/Season/Episode/Background) */}
                       {asset.type && (
                         <span
-                          className={`px-1.5 py-0.5 rounded text-xs font-medium border ${getTypeColor(
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border ${getTypeColor(
                             asset.type
                           )}`}
                         >
@@ -524,26 +482,23 @@ function RecentAssets({ refreshTrigger = 0 }) {
                         </span>
                       )}
 
-                      {/* Library Badge */}
                       {asset.library && (
-                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-500/20 text-gray-300 border border-gray-500/50">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20">
                           {asset.library}
                         </span>
                       )}
 
-                      {/* Manual Badge (replaces N/A) */}
                       {asset.is_manually_created && (
-                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/50">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
                           Manual
                         </span>
                       )}
 
-                      {/* Language Badge (only if not manually created) */}
                       {!asset.is_manually_created &&
                         asset.language &&
                         asset.language !== "N/A" && (
                           <span
-                            className={`px-1.5 py-0.5 rounded text-xs font-medium border ${getLanguageColor(
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getLanguageColor(
                               asset.language
                             )}`}
                           >
@@ -551,69 +506,52 @@ function RecentAssets({ refreshTrigger = 0 }) {
                           </span>
                         )}
 
-                      {/* Fallback Badge */}
                       {asset.fallback && (
-                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/50">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-500/10 text-orange-400 border border-orange-500/20">
                           FB
                         </span>
                       )}
                     </div>
-
-                    {/* Source Folder (if from RotatedLogs)
-                    {asset.source_folder && (
-                      <p
-                        className="text-xs text-theme-muted mt-2 truncate"
-                        title={asset.source_folder}
-                      >
-                        📂 {asset.source_folder}
-                      </p>
-                    )} */}
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Footer with count and pagination */}
-          <div className="mt-4 pt-4 border-t border-theme">
-            <div className="flex items-center justify-between">
-              {/* Left: Count info */}
-              <div className="text-sm text-theme-muted">
-                Showing {pageOffset + 1}-
-                {Math.min(pageOffset + assetCount, filteredAssets.length)} of{" "}
-                {filteredAssets.length}{" "}
-                {activeTab !== "All" && `${activeTab.toLowerCase()} `}
-                {filteredAssets.length === 1 ? "asset" : "assets"}
-                {activeTab !== "All" && ` (${assets.length} total)`}
-              </div>
-
-              {/* Right: Pagination controls */}
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handlePageChange("prev")}
-                    disabled={!hasPrevPage}
-                    className="p-2 rounded-lg bg-theme-bg hover:bg-theme-hover border border-theme disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                    title="Previous page"
-                  >
-                    <ChevronLeft className="w-4 h-4 text-theme-text" />
-                  </button>
-
-                  <span className="text-sm text-theme-muted px-3">
-                    Page {currentPage} / {totalPages}
-                  </span>
-
-                  <button
-                    onClick={() => handlePageChange("next")}
-                    disabled={!hasNextPage}
-                    className="p-2 rounded-lg bg-theme-bg hover:bg-theme-hover border border-theme disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                    title="Next page"
-                  >
-                    <ChevronRight className="w-4 h-4 text-theme-text" />
-                  </button>
-                </div>
-              )}
+          {/* Modern Footer */}
+          <div className="mt-2 pt-4 border-t border-theme/50 flex items-center justify-between">
+            <div className="text-xs text-theme-muted font-medium">
+              Showing <span className="text-theme-text">{pageOffset + 1}-{Math.min(pageOffset + assetCount, filteredAssets.length)}</span> of{" "}
+              <span className="text-theme-text">{filteredAssets.length}</span>{" "}
+              {activeTab !== "All" && `${activeTab.toLowerCase()} `}
+              {filteredAssets.length === 1 ? "asset" : "assets"}
             </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handlePageChange("prev")}
+                  disabled={!hasPrevPage}
+                  className="p-1.5 rounded-lg hover:bg-theme-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Previous"
+                >
+                  <ChevronLeft className="w-4 h-4 text-theme-text" />
+                </button>
+
+                <span className="text-xs text-theme-muted font-medium px-2">
+                  Page <span className="text-theme-text">{currentPage}</span> / {totalPages}
+                </span>
+
+                <button
+                  onClick={() => handlePageChange("next")}
+                  disabled={!hasNextPage}
+                  className="p-1.5 rounded-lg hover:bg-theme-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Next"
+                >
+                  <ChevronRight className="w-4 h-4 text-theme-text" />
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -621,28 +559,28 @@ function RecentAssets({ refreshTrigger = 0 }) {
       {/* Asset Details Modal */}
       {selectedAsset && (
         <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setSelectedAsset(null)}
         >
           <div
-            className="relative max-w-7xl max-h-[90vh] bg-theme-card rounded-lg overflow-hidden"
+            className="relative max-w-6xl w-full max-h-[90vh] bg-theme-card rounded-2xl overflow-hidden shadow-2xl border border-theme"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setSelectedAsset(null)}
-              className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
+              className="absolute top-4 right-4 z-20 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors backdrop-blur-md"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
 
-            <div className="flex flex-col md:flex-row max-h-[90vh]">
-              {/* Image */}
-              <div className="flex-1 flex items-center justify-center bg-black p-4">
+            <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
+              {/* Image Side */}
+              <div className="flex-1 flex items-center justify-center bg-[#050505] p-6 relative">
                 {selectedAsset.has_poster ? (
                   <img
                     src={selectedAsset.poster_url}
                     alt={selectedAsset.title}
-                    className="max-w-full max-h-[80vh] object-contain"
+                    className="max-w-full max-h-[80vh] object-contain shadow-2xl rounded-lg"
                     onError={(e) => {
                       e.target.style.display = "none";
                       e.target.nextSibling.style.display = "flex";
@@ -655,237 +593,201 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     display: selectedAsset.has_poster ? "none" : "flex",
                   }}
                 >
-                  <div className="p-4 rounded-full bg-theme-primary/20 inline-block mb-4">
-                    <ImageOff className="w-16 h-16 text-theme-primary" />
+                  <div className="p-6 rounded-full bg-theme-hover mb-4">
+                    <ImageOff className="w-12 h-12 text-theme-muted" />
                   </div>
-                  <p className="text-white text-lg font-semibold mb-2">
-                    Preview Not Available
+                  <p className="text-theme-text text-lg font-bold mb-1">
+                    Preview Unavailable
                   </p>
-                  <p className="text-gray-400 text-sm">
-                    The image could not be loaded
+                  <p className="text-theme-muted text-sm">
+                    Image source could not be loaded
                   </p>
                 </div>
               </div>
 
-              {/* Info Panel */}
-              <div className="md:w-80 p-6 bg-theme-card overflow-y-auto">
-                <h3 className="text-xl font-bold text-theme-text mb-4">
-                  Asset Details
-                </h3>
+              {/* Info Side */}
+              <div className="md:w-[400px] bg-theme-card border-l border-theme flex flex-col h-full">
+                <div className="p-6 border-b border-theme bg-theme-hover/10">
+                    <h3 className="text-xl font-bold text-theme-text leading-tight">
+                    Asset Details
+                    </h3>
+                    <p className="text-xs text-theme-muted mt-1 uppercase tracking-wider font-semibold">Metadata & Properties</p>
+                </div>
 
-                <div className="space-y-4">
-                  {/* Media Type */}
+                <div className="p-6 overflow-y-auto space-y-6 flex-1">
                   <div>
-                    <label className="text-sm text-theme-muted">
+                    <label className="text-xs font-bold text-theme-muted uppercase tracking-wider block mb-2">
                       {t("common.mediaType")}
                     </label>
-                    <div className="mt-1">
-                      <span
-                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded border text-sm font-medium ${getTypeColor(
-                          selectedAsset.type
-                        )}`}
-                      >
-                        {getTypeLabel(selectedAsset.type)}
-                      </span>
-                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-bold uppercase ${getTypeColor(
+                        selectedAsset.type
+                      )}`}
+                    >
+                      {getTypeLabel(selectedAsset.type)}
+                    </span>
                   </div>
 
-                  {/* Title/Name */}
                   <div>
-                    <label className="text-sm text-theme-muted">
+                    <label className="text-xs font-bold text-theme-muted uppercase tracking-wider block mb-1">
                       {getMediaTypeLabel(selectedAsset) === "Episode"
                         ? "Episode Title"
                         : "Title"}
                     </label>
-                    <p className="text-theme-text break-all mt-1">
+                    <p className="text-theme-text text-sm font-medium break-words leading-relaxed">
                       {selectedAsset.title}
                     </p>
                   </div>
 
-                  {/* Timestamps */}
-                  <div>
-                    <label className="text-sm text-theme-muted flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {t("common.created")}
-                    </label>
-                    <p className="text-theme-text mt-1 text-sm">
-                      {selectedAsset.created
-						  ? new Date(selectedAsset.created * 1000).toLocaleString("sv-SE").replace("T", " ")
-						  : "Unknown"}
-                    </p>
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-theme-muted uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {t("common.created")}
+                        </label>
+                        <p className="text-theme-text text-sm">
+                          {selectedAsset.created
+                            ? new Date(selectedAsset.created * 1000).toLocaleString("sv-SE").replace("T", " ")
+                            : "Unknown"}
+                        </p>
+                      </div>
+
+                      {selectedAsset.modified && (
+                        <div>
+                          <label className="text-xs font-bold text-theme-muted uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {t("common.modified")}
+                          </label>
+                          <p className="text-theme-text text-sm">
+                            {selectedAsset.modified
+                              ? new Date(selectedAsset.modified * 1000).toLocaleString("sv-SE").replace("T", " ")
+                              : "Unknown"}
+                          </p>
+                        </div>
+                      )}
                   </div>
 
-                  {selectedAsset.modified && (
-                    <div>
-                      <label className="text-sm text-theme-muted flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {t("common.modified")}
-                      </label>
-                      <p className="text-theme-text mt-1 text-sm">
-                        {selectedAsset.modified
-                      ? new Date(selectedAsset.modified * 1000).toLocaleString("sv-SE").replace("T", " ")
-                      : "Unknown"}
-                      </p>
-                    </div>
-                  )}
-
                   <div>
-                    <label className="text-sm text-theme-muted flex items-center gap-1">
+                    <label className="text-xs font-bold text-theme-muted uppercase tracking-wider flex items-center gap-1.5 mb-1">
                       <Calendar className="w-3.5 h-3.5" />
                       {t("common.lastViewed")}
                     </label>
-                    <p className="text-theme-text mt-1 text-sm">
-                      {/* This now shows the current time in the correct format */}
+                    <p className="text-theme-text text-sm font-mono bg-theme-hover/50 px-2 py-1 rounded inline-block">
                       {new Date().toLocaleString("sv-SE").replace("T", " ")}
                     </p>
                   </div>
 
-                  {/* Library */}
                   {selectedAsset.library && (
                     <div>
-                      <label className="text-sm text-theme-muted flex items-center gap-1">
+                      <label className="text-xs font-bold text-theme-muted uppercase tracking-wider flex items-center gap-1.5 mb-1">
                         <Folder className="w-3.5 h-3.5" />
                         Library
                       </label>
-                      <p className="text-theme-text mt-1">
+                      <p className="text-theme-text text-sm">
                         {selectedAsset.library}
                       </p>
                     </div>
                   )}
 
-                  {/* Path */}
                   <div>
-                    <label className="text-sm text-theme-muted flex items-center gap-1">
+                    <label className="text-xs font-bold text-theme-muted uppercase tracking-wider flex items-center gap-1.5 mb-2">
                       <HardDrive className="w-3.5 h-3.5" />
                       {t("common.path")}
                     </label>
-                    <p className="text-theme-text text-sm break-all mt-1 font-mono bg-theme-bg p-2 rounded border border-theme">
+                    <p className="text-theme-text text-xs break-all font-mono bg-theme-bg p-3 rounded-lg border border-theme leading-relaxed">
                       {selectedAsset.rootfolder}
                     </p>
                   </div>
 
-                  {/* Language Badge */}
-                  {selectedAsset.language &&
-                    selectedAsset.language !== "N/A" && (
+                  {selectedAsset.language && selectedAsset.language !== "N/A" && (
                       <div>
-                        <label className="text-sm text-theme-muted">
+                        <label className="text-xs font-bold text-theme-muted uppercase tracking-wider block mb-2">
                           Language
                         </label>
-                        <div className="mt-1">
-                          <span
-                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded border text-sm font-medium ${getLanguageColor(
-                              selectedAsset.language
-                            )}`}
-                          >
-                            {selectedAsset.language}
-                          </span>
-                        </div>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded border text-xs font-bold ${getLanguageColor(
+                            selectedAsset.language
+                          )}`}
+                        >
+                          {selectedAsset.language}
+                        </span>
                       </div>
-                    )}
+                  )}
 
-                  {/* Additional Badges */}
                   {(selectedAsset.is_manually_created ||
                     selectedAsset.fallback ||
                     selectedAsset.text_truncated) && (
                     <div>
-                      <label className="text-sm text-theme-muted">
+                      <label className="text-xs font-bold text-theme-muted uppercase tracking-wider block mb-2">
                         Properties
                       </label>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {/* Manual Badge */}
+                      <div className="flex flex-wrap gap-2">
                         {selectedAsset.is_manually_created && (
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/50">
+                          <span className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20">
                             Manual
                           </span>
                         )}
-
-                        {/* Fallback Badge */}
                         {selectedAsset.fallback && (
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/50">
+                          <span className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-orange-500/10 text-orange-400 border border-orange-500/20">
                             Fallback
                           </span>
                         )}
-
-                        {/* Text Truncated Badge */}
                         {selectedAsset.text_truncated && (
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/50">
-                            Text Truncated
+                          <span className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                            Truncated
                           </span>
                         )}
                       </div>
                     </div>
                   )}
+                </div>
 
-                  {/* Provider Link Button */}
-                  {selectedAsset.provider_link && (
-                    <div className="pt-4 border-t border-theme">
+                {selectedAsset.provider_link && (
+                    <div className="p-6 border-t border-theme bg-theme-hover/5 mt-auto">
                       <a
                         href={selectedAsset.provider_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-theme-primary hover:bg-theme-primary/80 text-white rounded-lg transition-all"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-theme-primary hover:bg-theme-primary/90 text-white rounded-xl font-bold transition-all shadow-lg shadow-theme-primary/20 hover:-translate-y-0.5"
                       >
                         <ExternalLink className="w-4 h-4" />
                         View on Provider
                       </a>
                     </div>
                   )}
-                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Poster Grid Styles */}
+      {/* Grid CSS */}
       <style jsx>{`
         .poster-grid {
           display: flex;
           gap: 1rem;
-          align-items: flex-end;
+          align-items: stretch;
         }
 
-        /* Cards maintain their natural size */
         .poster-grid > div {
           display: flex;
           flex-direction: column;
-          flex: 0 0
-            calc(
-              (100% - (var(--poster-count) - 1) * 1rem) / var(--poster-count)
-            );
+          flex: 0 0 calc((100% - (var(--poster-count) - 1) * 1rem) / var(--poster-count));
           min-width: 0;
         }
 
-        /* Image container maintains aspect ratio */
-        .poster-grid > div > div:first-child {
-          flex-shrink: 0;
-          width: 100%;
-        }
-
-        /* Info section */
-        .poster-grid > div > div:last-child {
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-        }
-
-        /* Responsive: Tablet */
+        /* Responsive Breakpoints */
         @media (max-width: 1024px) {
-          .poster-grid {
-            flex-wrap: wrap;
-            align-items: flex-start;
-          }
           .poster-grid > div {
             flex: 0 0 calc((100% - 3rem) / 4);
-            min-width: 180px;
+            min-width: 160px;
           }
         }
 
-        /* Responsive: Mobile */
         @media (max-width: 640px) {
           .poster-grid > div {
             flex: 0 0 calc((100% - 1rem) / 2);
-            min-width: 140px;
+            min-width: 130px;
           }
         }
       `}</style>

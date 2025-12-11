@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Palette, User, LogOut, Activity, Zap } from "lucide-react";
+import { Palette, User, LogOut, Activity, Zap, Square, Trash2, ChevronDown } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -13,103 +13,146 @@ const TopNavbar = () => {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
 
   // Status State
-  const [systemStatus, setSystemStatus] = useState({ running: false, mode: null });
+  const [systemStatus, setSystemStatus] = useState({
+    running: false,
+    mode: null,
+    runningFileExists: false
+  });
 
-  // Poll for running status
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const res = await fetch("/api/status");
-        if (res.ok) {
-          const data = await res.json();
-          setSystemStatus({ running: data.running, mode: data.current_mode });
-        }
-      } catch (e) {
-        // Silent fail
+  const fetchStatus = async () => {
+    try {
+      const res = await fetch("/api/status");
+      if (res.ok) {
+        const data = await res.json();
+        setSystemStatus({
+          running: data.running,
+          mode: data.current_mode,
+          runningFileExists: data.already_running_detected || data.running_file_exists
+        });
       }
-    };
+    } catch (e) { /* Silent fail */ }
+  };
 
-    // Initial fetch
+  useEffect(() => {
     fetchStatus();
-
-    // Poll every 5 seconds
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  const handleStopSystem = async () => {
+    if (!window.confirm(t("topNavbar.confirmStop", "Are you sure you want to force stop?"))) return;
+    try {
+      await fetch("/api/stop", { method: "POST" });
+      fetchStatus();
+    } catch (error) { console.error("Failed to stop system", error); }
+  };
+
+  const handleDeleteLockfile = async () => {
+    if (!window.confirm(t("topNavbar.confirmDeleteLock", "Are you sure you want to delete the running file?"))) return;
+    try {
+      const response = await fetch("/api/running-file", { method: "DELETE" });
+      if (response.ok) fetchStatus();
+    } catch (error) { console.error("Failed to delete lockfile", error); }
+  };
+
   const themeArray = Object.entries(themes).map(([id, config]) => ({
-    id,
-    name: config.name,
-    color: config.variables["--theme-primary"],
+    id, name: config.name, color: config.variables["--theme-primary"],
   }));
 
   return (
-    <div className="hidden md:block fixed top-0 left-0 right-0 bg-theme-card border-b border-theme z-40 h-16 md:pl-64 shadow-lg">
-      <div className="flex items-center justify-between h-full px-6">
+    // REMOVED border-b and border-theme/50
+    <div className="hidden md:block fixed top-0 left-0 right-0 bg-theme-card/90 backdrop-blur-md z-40 h-20 md:pl-80 shadow-sm transition-all duration-300">
+      <div className="flex items-center justify-between h-full px-8">
 
-        {/* Left Side: Empty now */}
-        <div className="flex items-center flex-1">
+        {/* Left Side: System Status Indicators (Control Deck Mini) */}
+        <div className="flex items-center gap-4">
+             {/* 1. System Running Status */}
+             {systemStatus.running && (
+                 <div className="flex items-center gap-3 animate-in slide-in-from-left-5 duration-500">
+                    <div className="flex items-center gap-2.5 px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                        </span>
+                        <span className="text-xs font-bold text-green-500 uppercase tracking-widest">
+                             {systemStatus.mode || "Running"}
+                        </span>
+                    </div>
+
+                    <button
+                      onClick={handleStopSystem}
+                      className="group flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 hover:border-red-500/30 text-red-400 hover:text-red-500 transition-all"
+                      title={t("topNavbar.stopSystem", "Stop System")}
+                    >
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                      <span className="text-xs font-semibold">Stop</span>
+                    </button>
+                 </div>
+             )}
+
+             {/* 2. Lock File / Zombie State */}
+             {!systemStatus.running && systemStatus.runningFileExists && (
+                <div className="flex items-center gap-3 animate-in slide-in-from-left-5 duration-500">
+                   <div className="flex items-center gap-2 px-4 py-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-full">
+                      <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
+                      <span className="text-xs font-bold text-yellow-500 uppercase tracking-widest">
+                        LOCKED
+                      </span>
+                   </div>
+
+                   <button
+                      onClick={handleDeleteLockfile}
+                      className="group flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/5 hover:bg-orange-500/10 border border-orange-500/10 hover:border-orange-500/30 text-orange-400 hover:text-orange-500 transition-all"
+                      title={t("topNavbar.deleteLockfile", "Delete Running File")}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span className="text-xs font-semibold">Clear Lock</span>
+                    </button>
+                </div>
+             )}
         </div>
 
-        {/* Right Side: Status, Lang, Theme, User */}
-        <div className="flex items-center gap-3">
-
-          {/* Running Status Indicator */}
-          {systemStatus.running && (
-             <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full animate-pulse mr-2">
-                {systemStatus.mode === 'scheduled' ? (
-                    <Zap className="w-4 h-4 text-green-400" />
-                ) : (
-                    <Activity className="w-4 h-4 text-green-400 animate-spin-slow" />
-                )}
-                <span className="text-xs font-bold text-green-400 uppercase tracking-wider">
-                  {systemStatus.mode || "Running"}
-                </span>
-             </div>
-          )}
+        {/* Right Side: Tools */}
+        <div className="flex items-center gap-4">
 
           {/* Language Switcher */}
-          <LanguageSwitcher compact={true} />
+          <div className="bg-theme-hover/30 rounded-xl p-1">
+             <LanguageSwitcher compact={true} />
+          </div>
+
+          <div className="h-6 w-px bg-theme-border"></div>
 
           {/* Theme Switcher */}
           <div className="relative">
             <button
               onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-              className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-theme-hover transition-colors text-theme-text"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-theme-hover transition-colors text-theme-muted hover:text-theme-text group"
               title={t("topNavbar.changeTheme")}
             >
-              <Palette className="w-5 h-5" />
+              <Palette className="w-5 h-5 group-hover:text-theme-primary transition-colors" />
+              <ChevronDown className={`w-3 h-3 transition-transform ${isThemeDropdownOpen ? "rotate-180" : ""}`} />
             </button>
 
             {isThemeDropdownOpen && (
               <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsThemeDropdownOpen(false)}
-                />
-                <div className="absolute right-0 top-full mt-2 w-48 rounded-lg bg-theme-card border border-theme shadow-lg z-50">
-                  <div className="p-2">
-                    <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                <div className="fixed inset-0 z-40" onClick={() => setIsThemeDropdownOpen(false)} />
+                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-theme-card border border-theme shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  <div className="p-2 space-y-0.5">
+                    <div className="px-3 py-2 text-[10px] font-bold text-theme-muted uppercase tracking-widest opacity-70">
                       {t("topNavbar.selectTheme")}
                     </div>
                     {themeArray.map((t) => (
                       <button
                         key={t.id}
-                        onClick={() => {
-                          setTheme(t.id);
-                          setIsThemeDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
+                        onClick={() => { setTheme(t.id); setIsThemeDropdownOpen(false); }}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                           theme === t.id
-                            ? "bg-theme-primary text-white"
-                            : "text-gray-300 hover:bg-theme-hover"
+                            ? "bg-theme-primary text-white shadow-md"
+                            : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"
                         }`}
                       >
                         <span>{t.name}</span>
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: t.color }}
-                        />
+                        <div className={`w-2.5 h-2.5 rounded-full ring-2 ring-offset-2 ring-offset-theme-card ${theme === t.id ? "ring-white" : "ring-transparent"}`} style={{ backgroundColor: t.color }} />
                       </button>
                     ))}
                   </div>
@@ -118,12 +161,12 @@ const TopNavbar = () => {
             )}
           </div>
 
-          {/* User Icon */}
+          {/* User Menu */}
           {isAuthEnabled && (
             <div className="relative">
               <button
                 onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-theme-hover transition-colors text-theme-text"
+                className="flex items-center justify-center w-10 h-10 rounded-xl bg-theme-hover/50 hover:bg-theme-hover transition-colors text-theme-text border border-theme"
                 title={t("topNavbar.userMenu")}
               >
                 <User className="w-5 h-5" />
@@ -131,18 +174,12 @@ const TopNavbar = () => {
 
               {isUserDropdownOpen && (
                 <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsUserDropdownOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-2 w-48 rounded-lg bg-theme-card border border-theme shadow-lg z-50">
+                  <div className="fixed inset-0 z-40" onClick={() => setIsUserDropdownOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl bg-theme-card border border-theme shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                     <div className="p-2">
                       <button
-                        onClick={() => {
-                          logout();
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                        onClick={() => { logout(); setIsUserDropdownOpen(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-colors"
                       >
                         <LogOut className="w-4 h-4" />
                         <span>{t("topNavbar.signOut")}</span>

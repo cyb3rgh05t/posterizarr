@@ -7,7 +7,7 @@ const REPO_URL = "https://github.com/fscorrupt/posterizarr/releases/latest";
 
 let cachedVersionData = { version: null, isOutOfDate: false };
 
-function VersionBadge() {
+function VersionBadge({ compact = false }) {
   const { t } = useTranslation();
   const [isOutOfDate, setIsOutOfDate] = useState(cachedVersionData.isOutOfDate);
   const [version, setVersion] = useState(cachedVersionData.version);
@@ -15,8 +15,6 @@ function VersionBadge() {
 
   useEffect(() => {
     checkVersion();
-    // Check version on every component mount (dashboard view load)
-    // Also check in background every hour
     const interval = setInterval(checkVersion, 1 * 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
@@ -27,7 +25,6 @@ function VersionBadge() {
       const data = await response.json();
 
       if (data.local) {
-        // Save to persistent cache
         cachedVersionData = {
           version: data.local,
           isOutOfDate: data.is_update_available || false,
@@ -42,6 +39,23 @@ function VersionBadge() {
 
   if (!version) return null;
 
+  // COMPACT MODE (For Collapsed Sidebar)
+  if (compact) {
+    return (
+      <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="block" title={`v${version}${isOutOfDate ? ' (Update Available)' : ''}`}>
+        <div className={`flex justify-center items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest transition-colors ${
+            isOutOfDate
+            ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+            : "bg-theme-hover text-theme-muted"
+        }`}>
+           v{version}
+           {isOutOfDate && <div className="ml-1 w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />}
+        </div>
+      </a>
+    );
+  }
+
+  // FULL MODE
   return (
     <div className="relative">
       <a

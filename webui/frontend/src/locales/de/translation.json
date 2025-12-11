@@ -519,6 +519,48 @@
     "userProfile": "Benutzerprofil"
   },
   "dashboard": {
+    "controlDeck": {
+      "engineStatus": "Engine Status",
+      "running": "LÄUFT",
+      "stopped": "GESTOPPT",
+      "mode": "Modus",
+      "idle": "Leerlauf",
+      "pid": "PID",
+      "scheduler": "Zeitplaner",
+      "active": "Aktiv",
+      "standby": "Standby",
+      "disabled": "Deaktiviert",
+      "nextRun": "Nächster Lauf",
+      "noSchedules": "Keine aktiven Zeitpläne",
+      "systemInfo": "Systeminformationen",
+      "docker": "DOCKER",
+      "cpu": "CPU",
+      "cores": "Kerne",
+      "genericCpu": "Standard CPU",
+      "memory": "Speicher",
+      "free": "Frei",
+      "config": "Konfig",
+      "loaded": "Geladen",
+      "missing": "Fehlt",
+      "versionAbbr": "Ver.",
+      "editConfig": "Konfig. bearbeiten",
+      "createConfig": "Konfig. erstellen"
+    },
+    "banners": {
+      "executionInProgress": "Skriptausführung läuft",
+      "reviewLogs": "Überprüfen Sie die Logs unten für Echtzeit-Fortschritt."
+    },
+    "cards": {
+      "systemControlDeck": "System-Kontrollfeld"
+    },
+    "logViewerLabel": {
+        "reading": "Lese:",
+        "autoScrollOn": "Auto-Scroll An",
+        "autoScrollOff": "Auto-Scroll Aus",
+        "entries": "Einträge:",
+        "refreshesEvery": "Aktualisiert alle",
+        "event": "Event"
+    },
     "title": "Dashboard",
     "welcome": "Überwachen Sie Ihre Posterizarr-Instanz",
     "status": "Status",
@@ -591,6 +633,8 @@
     "nextRun": "Nächster",
     "configureNow": "Konfigurieren",
     "noSchedulesRegistered": "Keine Zeitpläne registriert",
+    "run": "Starten",
+    "stopSuccess": "Skript wird gestoppt...",
     "cores": "Kerne",
     "free": "Frei"
   },
@@ -689,7 +733,12 @@
     "gatherSupport": "Support-Protokolle sammeln",
     "gatheringSupport": "Sammle Support-Dateien... Dies kann einen Moment dauern.",
     "gatheringSupportSuccess": "Support-Dateien heruntergeladen.",
-    "gatheringSupportFailed": "Fehler beim Sammeln der Support-Dateien: {{message}}"
+    "gatheringSupportFailed": "Fehler beim Sammeln der Support-Dateien: {{message}}",
+    "scriptlogMissing": "Scriptlog.log nicht gefunden, weiche auf {{fallback}} aus",
+    "noLogsFound": "Keine Protokolldateien auf dem Server gefunden",
+    "noLogSelected": "Bitte wählen Sie zuerst eine Protokolldatei aus",
+    "pleaseSelectLog": "Bitte wählen Sie eine Protokolldatei zur Ansicht aus",
+    "noLogsAvailable": "Keine Protokolle verfügbar"
   },
   "libraryExclusion": {
     "configNotFound": "Medienserver-Konfiguration nicht gefunden",

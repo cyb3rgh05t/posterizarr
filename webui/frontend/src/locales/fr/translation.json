@@ -519,6 +519,48 @@
     "userProfile": "Profil utilisateur"
   },
   "dashboard": {
+    "controlDeck": {
+      "engineStatus": "Statut du Moteur",
+      "running": "EN COURS",
+      "stopped": "ARRÊTÉ",
+      "mode": "Mode",
+      "idle": "Inactif",
+      "pid": "PID",
+      "scheduler": "Planificateur",
+      "active": "Actif",
+      "standby": "Veille",
+      "disabled": "Désactivé",
+      "nextRun": "Prochaine Exécution",
+      "noSchedules": "Aucun planning actif",
+      "systemInfo": "Informations Système",
+      "docker": "DOCKER",
+      "cpu": "CPU",
+      "cores": "Cœurs",
+      "genericCpu": "CPU Générique",
+      "memory": "Mémoire",
+      "free": "Libre",
+      "config": "Config",
+      "loaded": "Chargé",
+      "missing": "Manquant",
+      "versionAbbr": "Ver.",
+      "editConfig": "Modifier Config",
+      "createConfig": "Créer Config"
+    },
+    "banners": {
+      "executionInProgress": "Exécution du Script en Cours",
+      "reviewLogs": "Consultez les journaux ci-dessous pour la progression en temps réel."
+    },
+    "cards": {
+      "systemControlDeck": "Panneau de Contrôle Système"
+    },
+    "logViewerLabel": {
+        "reading": "Lecture:",
+        "autoScrollOn": "Défilement Auto Activé",
+        "autoScrollOff": "Défilement Auto Désactivé",
+        "entries": "Entrées:",
+        "refreshesEvery": "Actualise chaque",
+        "event": "Événement"
+    },
     "title": "Tableau de bord",
     "welcome": "Surveillez votre instance Posterizarr",
     "status": "Statut",
@@ -539,6 +581,8 @@
     "nextRun": "Prochaine exécution",
     "configureNow": "Configurer",
     "noSchedulesRegistered": "Aucun horaire enregistré",
+    "run": "Lancer",
+    "stopSuccess": "Arrêt du script...",
     "scriptFile": "Fichier script",
     "configFile": "Fichier de config",
     "cores": "Cœurs",
@@ -688,7 +732,12 @@
     "gatherSupport": "Collecter les journaux de support",
     "gatheringSupport": "Collecte des fichiers de support... Veuillez patienter.",
     "gatheringSupportSuccess": "Fichiers de support téléchargés.",
-    "gatheringSupportFailed": "Échec de la collecte des fichiers de support : {{message}}"
+    "gatheringSupportFailed": "Échec de la collecte des fichiers de support : {{message}}",
+    "scriptlogMissing": "Scriptlog.log introuvable, utilisation de {{fallback}}",
+    "noLogsFound": "Aucun fichier journal trouvé sur le serveur",
+    "noLogSelected": "Veuillez d'abord sélectionner un fichier journal",
+    "pleaseSelectLog": "Veuillez sélectionner un fichier journal à afficher",
+    "noLogsAvailable": "Aucun journal disponible"
   },
   "libraryExclusion": {
     "configNotFound": "Configuration du serveur multimédia non trouvée",
