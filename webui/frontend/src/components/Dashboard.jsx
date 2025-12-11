@@ -319,6 +319,34 @@ function Dashboard() {
     });
   }, [allLogs, autoScroll]);
 
+   // Handle manual scroll detection to disable autoscroll
+  useEffect(() => {
+    const logContainer = logContainerRef.current;
+    if (!logContainer) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = logContainer;
+      const currentScrollTop = scrollTop;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 20;
+
+      // Detect upward scroll (user scrolling up manually)
+      if (currentScrollTop < lastScrollTop.current - 5) {
+        userHasScrolled.current = true;
+        if (autoScroll) setAutoScroll(false);
+      }
+
+      // If user scrolls to bottom manually, enable autoScroll again
+      if (isAtBottom && !autoScroll) {
+        setAutoScroll(true);
+        userHasScrolled.current = false;
+      }
+      lastScrollTop.current = currentScrollTop;
+    };
+
+    logContainer.addEventListener("scroll", handleScroll);
+    return () => logContainer.removeEventListener("scroll", handleScroll);
+  }, [autoScroll]);
+
   const deleteRunningFile = async () => {
     setLoading(true);
     try {
@@ -375,15 +403,35 @@ function Dashboard() {
     return { raw: cleanedLine };
   };
 
+  // Restored helper from Old Dashboard
+  const LogLevel = ({ level }) => {
+    const levelLower = (level || "").toLowerCase().trim();
+    const colors = {
+      error: "#f87171",
+      warning: "#fbbf24",
+      warn: "#fbbf24",
+      info: "#22d3ee",
+      success: "#4ade80",
+      debug: "#c084fc",
+      default: "#9ca3af",
+    };
+    const color = colors[levelLower] || colors.default;
+    return <span style={{ color: color, fontWeight: "bold" }}>[{level}]</span>;
+  };
+
   const getLogColor = (level) => {
-      const l = (level || "").toLowerCase().trim();
-      if (l === 'error') return "#ef4444";
-      if (l === 'warning' || l === 'warn') return "#f59e0b";
-      if (l === 'info') return "#3b82f6";
-      if (l === 'success') return "#10b981";
-      if (l === 'debug') return "#a855f7";
-      return "#9ca3af";
-  }
+    const levelLower = (level || "").toLowerCase().trim();
+    const colors = {
+      error: "#f87171",
+      warning: "#fbbf24",
+      warn: "#fbbf24",
+      info: "#22d3ee",
+      success: "#4ade80",
+      debug: "#c084fc",
+      default: "#d1d5db",
+    };
+    return colors[levelLower] || colors.default;
+  };
 
   // --- UNIFIED CONTROL DECK COMPONENT ---
   const UnifiedControlDeck = () => {
@@ -584,77 +632,164 @@ function Dashboard() {
         <RecentAssets key="recentAssets" refreshTrigger={runtimeStatsRefreshTrigger} />
       ),
 
+      // --- RESTORED OLD LOG VIEWER ---
       logViewer: visibleCards.logViewer && (
-        <div key="logViewer" className="bg-theme-card rounded-3xl border border-theme shadow-lg overflow-hidden flex flex-col h-[500px]">
-          {/* Log Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-theme bg-theme-hover/30 backdrop-blur-sm">
-             <div className="flex items-center gap-3">
-                <div className="p-1.5 rounded bg-gray-800 border border-gray-700">
-                   <Terminal className="w-4 h-4 text-gray-300" />
-                </div>
-                <h2 className="text-sm font-bold text-theme-text tracking-wide uppercase">{t("dashboard.liveLogFeed")}</h2>
-                {wsConnected && (
-                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/20">
-                      <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-                      <span className="text-[10px] font-bold text-green-400 uppercase tracking-wider">Live</span>
-                   </div>
-                )}
-             </div>
-
-             <div className="flex items-center gap-4">
-               {status.running && (
-                  <div className="hidden sm:flex items-center text-xs text-theme-muted">
-                    <span>{t("dashboard.logViewerLabel.reading")}</span>
-                    <span className="ml-1.5 font-mono text-theme-primary">{status.current_mode ? getLogFileForMode(status.current_mode) : status.active_log}</span>
+        <div
+          key="logViewer"
+          className="bg-theme-card rounded-xl p-6 border border-theme hover:border-theme-primary/50 transition-all shadow-sm"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold text-theme-text flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-theme-primary/10">
+                    <FileText className="w-5 h-5 text-theme-primary" />
                   </div>
-               )}
-               <button
+                  {t("dashboard.liveLogFeed")}
+                </h2>
+
+                {wsConnected && (
+                  <span className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <Wifi className="w-3 h-3" />
+                    Live
+                  </span>
+                )}
+              </div>
+
+              {status.running && status.active_log && allLogs.length > 0 && (
+                <p
+                  className="text-xs text-theme-muted mt-2"
+                  style={{ marginLeft: "calc(2.25rem + 0.75rem)" }}
+                >
+                  {t("dashboard.readingFrom")}:{" "}
+                  <span className="font-mono text-theme-primary">
+                    {status.current_mode
+                      ? getLogFileForMode(status.current_mode)
+                      : status.active_log}
+                  </span>
+                  <span className="ml-3 text-xs text-theme-muted/70">
+                    ({allLogs.length} {t("dashboard.linesLoaded")})
+                  </span>
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-sm font-medium text-theme-text">
+                  {t("dashboard.autoScroll")}
+                </span>
+                <button
                   onClick={() => {
-                    const newAuto = !autoScroll;
-                    setAutoScroll(newAuto);
+                    const newAutoScrollState = !autoScroll;
+                    setAutoScroll(newAutoScrollState);
                     userHasScrolled.current = false;
-                    if (newAuto && logContainerRef.current) {
-                      setTimeout(() => { if(logContainerRef.current) logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight; }, 100);
+
+                    if (newAutoScrollState && logContainerRef.current) {
+                      setTimeout(() => {
+                        if (logContainerRef.current) {
+                          logContainerRef.current.scrollTop =
+                            logContainerRef.current.scrollHeight;
+                        }
+                      }, 100);
                     }
                   }}
-                  className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-all ${autoScroll ? "bg-theme-primary/10 border-theme-primary/30 text-theme-primary" : "bg-transparent border-theme text-theme-muted hover:text-theme-text"}`}
-               >
-                  {autoScroll ? t("dashboard.logViewerLabel.autoScrollOn") : t("dashboard.logViewerLabel.autoScrollOff")}
-               </button>
-             </div>
-          </div>
-
-          {/* Log Terminal Area */}
-          <div className="flex-1 bg-[#0f1115] relative">
-            <div ref={logContainerRef} className="absolute inset-0 overflow-y-auto font-mono text-[11px] leading-relaxed p-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
-               {status.running && allLogs && allLogs.length > 0 ? (
-                  allLogs.map((line, index) => {
-                     const parsed = parseLogLine(line);
-                     if (parsed.raw === null) return null;
-                     if (parsed.raw) return <div key={index} className="text-gray-400 py-0.5 hover:bg-white/5 px-2 rounded">{parsed.raw}</div>;
-
-                     return (
-                       <div key={index} className="flex py-0.5 hover:bg-white/5 px-2 rounded transition-colors group">
-                          <span className="text-gray-600 mr-3 select-none w-28 shrink-0">[{parsed.timestamp}]</span>
-                          <span className="font-bold mr-3 w-16 shrink-0 uppercase tracking-wider text-[10px]" style={{color: getLogColor(parsed.level)}}>{parsed.level}</span>
-                          <span className="text-gray-300 break-all">{parsed.message}</span>
-                       </div>
-                     )
-                  })
-               ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-gray-600">
-                     <Terminal className="w-12 h-12 mb-4 opacity-20" />
-                     <p className="text-sm font-medium">{t("dashboard.noLogs")}</p>
-                     <p className="text-xs mt-1 opacity-60">{status.running ? t("dashboard.waitingForLogs") : t("dashboard.startRunToSeeLogs")}</p>
-                  </div>
-               )}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    autoScroll ? "bg-theme-primary" : "bg-theme-hover"
+                  }`}
+                  title={
+                    autoScroll
+                      ? t("dashboard.autoScrollEnabled")
+                      : t("dashboard.autoScrollDisabled")
+                  }
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      autoScroll ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </label>
             </div>
           </div>
 
-          {/* Footer Info */}
-          <div className="px-4 py-2 bg-theme-card border-t border-theme flex justify-between text-[10px] text-theme-muted uppercase tracking-wider">
-             <span>{t("dashboard.logViewerLabel.entries")} {allLogs.length}</span>
-             <span>{t("dashboard.logViewerLabel.refreshesEvery")} {wsConnected ? t("dashboard.logViewerLabel.event") : "3s"}</span>
+          <div className="bg-black rounded-lg overflow-hidden border-2 border-theme shadow-sm">
+            {status.running && allLogs && allLogs.length > 0 ? (
+              <div
+                ref={logContainerRef}
+                className="font-mono text-[11px] leading-relaxed max-h-96 overflow-y-auto"
+              >
+                {allLogs.map((line, index) => {
+                  const parsed = parseLogLine(line);
+
+                  if (parsed.raw === null) {
+                    return null;
+                  }
+
+                  if (parsed.raw) {
+                    return (
+                      <div
+                        key={`log-${index}`}
+                        className="px-3 py-1.5 hover:bg-gray-900/50 transition-colors border-l-2 border-transparent hover:border-theme-primary/50"
+                        style={{ color: "#9ca3af" }}
+                      >
+                        {parsed.raw}
+                      </div>
+                    );
+                  }
+
+                  const logColor = getLogColor(parsed.level);
+
+                  return (
+                    <div
+                      key={`log-${index}`}
+                      className="px-3 py-1.5 hover:bg-gray-900/50 transition-colors flex items-center gap-2 border-l-2 border-transparent hover:border-theme-primary/50"
+                    >
+                      <span
+                        style={{ color: "#6b7280" }}
+                        className="text-[10px]"
+                      >
+                        [{parsed.timestamp}]
+                      </span>
+                      <LogLevel level={parsed.level} />
+                      <span
+                        style={{ color: "#4b5563" }}
+                        className="text-[10px]"
+                      >
+                        |L.{parsed.lineNum}|
+                      </span>
+                      <span style={{ color: logColor }}>{parsed.message}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-4 py-12 text-center">
+                <FileText className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm font-medium">
+                  {t("dashboard.noLogs")}
+                </p>
+                <p className="text-gray-600 text-xs mt-1">
+                  {status.running
+                    ? t("dashboard.waitingForLogs")
+                    : t("dashboard.startRunToSeeLogs")}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
+            <span className="flex items-center gap-2">
+              <Clock className="w-3 h-3" />
+              {t("dashboard.autoRefresh")}:{" "}
+              {wsConnected ? t("dashboard.live") : "1.5s"}
+            </span>
+            <span className="text-gray-500">
+              {t("dashboard.lastEntries", { count: 25 })} •{" "}
+              {status.current_mode
+                ? getLogFileForMode(status.current_mode)
+                : status.active_log || t("dashboard.noActiveLog")}
+            </span>
           </div>
         </div>
       )
@@ -667,7 +802,7 @@ function Dashboard() {
            return (
              <React.Fragment key={key}>
                 {component}
-                {/* Active Run Banner */}
+                {/* Active Run Banner - Placed specifically after statusCards so it appears above the logs in standard order */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 p-6 flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
                    <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
                    <div className="flex items-center gap-4 relative z-10">

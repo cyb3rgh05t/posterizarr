@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Palette, User, LogOut, Activity, Zap, Square, Trash2, ChevronDown } from "lucide-react";
+import { Palette, User, LogOut, Activity, Zap, Square, Trash2, ChevronDown, AlertTriangle } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -39,20 +39,46 @@ const TopNavbar = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // UPDATED: Matches DangerZone.jsx logic (parses JSON response)
   const handleStopSystem = async () => {
     if (!window.confirm(t("topNavbar.confirmStop", "Are you sure you want to force stop?"))) return;
+
     try {
-      await fetch("/api/stop", { method: "POST" });
-      fetchStatus();
-    } catch (error) { console.error("Failed to stop system", error); }
+      const response = await fetch("/api/stop", { method: "POST" });
+      const data = await response.json();
+
+      if (data.success) {
+        fetchStatus();
+      } else {
+        console.error("Stop failed:", data.message);
+      }
+    } catch (error) {
+      console.error("Failed to stop system", error);
+    }
   };
 
+  // UPDATED: Matches DangerZone.jsx logic
   const handleDeleteLockfile = async () => {
     if (!window.confirm(t("topNavbar.confirmDeleteLock", "Are you sure you want to delete the running file?"))) return;
+
     try {
       const response = await fetch("/api/running-file", { method: "DELETE" });
-      if (response.ok) fetchStatus();
-    } catch (error) { console.error("Failed to delete lockfile", error); }
+
+      if (!response.ok) {
+        console.error(`HTTP Error ${response.status}: ${response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        fetchStatus();
+      } else {
+        console.error("Delete failed:", data.message);
+      }
+    } catch (error) {
+      console.error("Failed to delete lockfile", error);
+    }
   };
 
   const themeArray = Object.entries(themes).map(([id, config]) => ({
@@ -60,15 +86,16 @@ const TopNavbar = () => {
   }));
 
   return (
-    // REMOVED border-b and border-theme/50
     <div className="hidden md:block fixed top-0 left-0 right-0 bg-theme-card/90 backdrop-blur-md z-40 h-20 md:pl-80 shadow-sm transition-all duration-300">
-      <div className="flex items-center justify-between h-full px-8">
+      <div className="flex items-center justify-end h-full px-8">
 
-        {/* Left Side: System Status Indicators (Control Deck Mini) */}
+        {/* Right Side: Tools & Status */}
         <div className="flex items-center gap-4">
+
+           {/* System Status Indicators */}
              {/* 1. System Running Status */}
              {systemStatus.running && (
-                 <div className="flex items-center gap-3 animate-in slide-in-from-left-5 duration-500">
+                 <div className="flex items-center gap-3 animate-in slide-in-from-left-5 duration-500 mr-2">
                     <div className="flex items-center gap-2.5 px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full">
                         <span className="relative flex h-2.5 w-2.5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -92,7 +119,7 @@ const TopNavbar = () => {
 
              {/* 2. Lock File / Zombie State */}
              {!systemStatus.running && systemStatus.runningFileExists && (
-                <div className="flex items-center gap-3 animate-in slide-in-from-left-5 duration-500">
+                <div className="flex items-center gap-3 animate-in slide-in-from-left-5 duration-500 mr-2">
                    <div className="flex items-center gap-2 px-4 py-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-full">
                       <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
                       <span className="text-xs font-bold text-yellow-500 uppercase tracking-widest">
@@ -110,10 +137,6 @@ const TopNavbar = () => {
                     </button>
                 </div>
              )}
-        </div>
-
-        {/* Right Side: Tools */}
-        <div className="flex items-center gap-4">
 
           {/* Language Switcher */}
           <div className="bg-theme-hover/30 rounded-xl p-1">

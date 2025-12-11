@@ -414,7 +414,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
                 <div
                   key={index}
                   onClick={() => setSelectedAsset(asset)}
-                  className="bg-theme-card rounded-xl overflow-hidden border border-theme hover:border-theme-primary/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group flex flex-col cursor-pointer h-full"
+                  // REMOVED "h-full" from className to allow bottom alignment to work naturally
+                  className="bg-theme-card rounded-xl overflow-hidden border border-theme hover:border-theme-primary/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group flex flex-col cursor-pointer"
                 >
                   {/* Poster/Background Image */}
                   <div
@@ -766,7 +767,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
         .poster-grid {
           display: flex;
           gap: 1rem;
-          align-items: stretch;
+          align-items: flex-end; /* Changed from stretch to flex-end */
         }
 
         .poster-grid > div {
