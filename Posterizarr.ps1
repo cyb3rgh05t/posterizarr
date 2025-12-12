@@ -565,32 +565,62 @@ function New-TextSizeCacheKey {
 function Get-TextSizeFromCache {
     param([Parameter(Mandatory)][string]$Key, [string]$Path = $Global:TextSizeCachePath)
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
-    $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
-    if (-not $raw) { return $null }
-    try { $db = $raw | ConvertFrom-Json -ErrorAction Stop } catch { return $null }
-    if ($db.PSObject.Properties.Name -contains $Key) { return $db.$Key }
+    
+    try {
+        $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
+        if (-not $raw) { return $null }
+        
+        $db = $raw | ConvertFrom-Json -ErrorAction Stop
+        if ($db.PSObject.Properties.Name -contains $Key) { return $db.$Key }
+    }
+    catch {
+        # If any file read or json parse error occurs, return null (miss)
+        return $null 
+    }
     return $null
 }
 function Set-TextSizeCacheEntry {
     param([Parameter(Mandatory)][string]$Key, [Parameter(Mandatory)]$Result, [string]$Path = $Global:TextSizeCachePath)
+    
+    # Ensure directory exists
     if (-not (Test-Path -LiteralPath $Path)) {
         try { '{}' | Set-Content -LiteralPath $Path -Encoding UTF8 } catch {}
     }
+
     $lockPath = "$Path.lock"
     $sw = [Diagnostics.Stopwatch]::StartNew()
+    
+    # Wait for lock
     while (Test-Path -LiteralPath $lockPath) {
         Start-Sleep -Milliseconds 50
         if ($sw.ElapsedMilliseconds -gt 5000) { break }
     }
+    
+    # Create lock
     New-Item -ItemType File -Path $lockPath -Force | Out-Null
+    
     try {
         $raw = if (Test-Path -LiteralPath $Path) { Get-Content -LiteralPath $Path -Raw -Encoding UTF8 } else { '{}' }
         if (-not $raw) { $raw = '{}' }
-        $db = $raw | ConvertFrom-Json
+        
+        try {
+            $db = $raw | ConvertFrom-Json -ErrorAction Stop
+        }
+        catch {
+            # If JSON is corrupt, log it and reset DB so we don't crash next time
+            Write-Entry -Message "TextSizeCache JSON is corrupt. Resetting cache." -Path $global:configLogging -Color Yellow -log Warning
+            $db = @{} 
+        }
+
         if ($null -eq $db) { $db = @{ } }
+        
         $db | Add-Member -NotePropertyName $Key -NotePropertyValue $Result -Force
         ($db | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $Path -Encoding UTF8
-    } finally {
+    } 
+    catch {
+        Write-Entry -Message "Failed to write to TextSizeCache: $_" -Path $global:configLogging -Color Red -log Error
+    }
+    finally {
         Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
     }
 }
@@ -1432,25 +1462,35 @@ function Get-OptimalPointSize {
         [int]$lineSpacing  # New parameter for line height
     )
 
-    # ----- Text size cache: try hit -----
     try {
         if (-not $script:IMVersion) { $script:IMVersion = (& $magick -version | Select-Object -First 1) }
-    } catch {}
-    $__tsc_Params = @{
-        font=$fontImagemagick; w=$box_width; h=$box_height;
-        min=$min_pointsize; max=$max_pointsize; line=$lineSpacing;
-        imv=$script:IMVersion; algo='Get-OptimalPointSize-v1'
+        
+        $__tsc_Params = @{
+            font=$fontImagemagick; w=$box_width; h=$box_height;
+            min=$min_pointsize; max=$max_pointsize; line=$lineSpacing;
+            imv=$script:IMVersion; algo='Get-OptimalPointSize-v1'
+        }
+        
+        $__tsc_Key  = New-TextSizeCacheKey -Text $text -Params $__tsc_Params
+        $__tsc_Path = if ($Global:TextSizeCachePath) { $Global:TextSizeCachePath } else { Join-Path $global:ScriptRoot 'Cache\text_size_cache.json' }
+        
+        # Wrapped in try/catch to ensure corruption doesn't stop flow
+        try {
+            $__tsc_Hit = Get-TextSizeFromCache -Key $__tsc_Key -Path $__tsc_Path
+        } catch {
+            $__tsc_Hit = $null
+        }
+
+        if ($__tsc_Hit) {
+            if ($__tsc_Hit.PSObject.Properties.Name -contains 'isTruncated') { $global:IsTruncated = [bool]$__tsc_Hit.isTruncated } else { $global:IsTruncated = $null }
+            $script:CurrentTextSizeSource = 'cache'
+            $script:tsHits++   # [stats] count cache hits
+            return [int]$__tsc_Hit.pointSize
+        }
+    } catch {
+        # If cache logic fails entirely, ignore and proceed to calculate
+        Write-Entry -Message "Cache lookup failed, proceeding with calculation. Error: $_" -Path $global:configLogging -Color Yellow -log Debug
     }
-    $__tsc_Key  = New-TextSizeCacheKey -Text $text -Params $__tsc_Params
-    $__tsc_Path = if ($Global:TextSizeCachePath) { $Global:TextSizeCachePath } else { Join-Path $global:ScriptRoot 'Cache\text_size_cache.json' }
-    $__tsc_Hit  = Get-TextSizeFromCache -Key $__tsc_Key -Path $__tsc_Path
-    if ($__tsc_Hit) {
-        if ($__tsc_Hit.PSObject.Properties.Name -contains 'isTruncated') { $global:IsTruncated = [bool]$__tsc_Hit.isTruncated } else { $global:IsTruncated = $null }
-        $script:CurrentTextSizeSource = 'cache'
-        $script:tsHits++   # [stats] count cache hits
-        return [int]$__tsc_Hit.pointSize
-    }
-    # ----- /cache hit -----
 
     $global:IsTruncated = $null
 
@@ -1482,10 +1522,13 @@ function Get-OptimalPointSize {
     $script:tsRuns++
     $script:tsMs += $tsc_sw.ElapsedMilliseconds
 
-    # ----- cache store -----
-    $__tsc_Save = [PSCustomObject]@{ pointSize = [int]$current_pointsize; isTruncated = [bool]$global:IsTruncated }
-    Set-TextSizeCacheEntry -Key $__tsc_Key -Result $__tsc_Save -Path $__tsc_Path
-    # ----- /cache store -----
+    # Wrapped in try/catch to ensure saving errors don't crash script
+    try {
+        $__tsc_Save = [PSCustomObject]@{ pointSize = [int]$current_pointsize; isTruncated = [bool]$global:IsTruncated }
+        Set-TextSizeCacheEntry -Key $__tsc_Key -Result $__tsc_Save -Path $__tsc_Path
+    } catch {
+        Write-Entry -Message "Failed to save to text size cache: $_" -Path $global:configLogging -Color Yellow -log Debug
+    }
 
     $script:CurrentTextSizeSource = 'calculated'
     return $current_pointsize
