@@ -939,6 +939,10 @@ def unflatten_config(flat_config):
         ):
             storage_key = remove_prefix_with_original_case(key)
 
+        # Convert booleans to strings "true"/"false" for PowerShell script compatibility
+        if isinstance(value, bool):
+            value = "true" if value else "false"
+
         grouped[group_name][storage_key] = value
 
     return grouped
