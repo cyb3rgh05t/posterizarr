@@ -512,13 +512,59 @@
     "currentVersion": "✓ Versão atual instalada"
   },
   "topNavbar": {
-    "changeTheme": "Mudar tema",
-    "selectTheme": "Selecionar tema",
-    "userMenu": "Menu do usuário",
+    "changeTheme": "Alterar Tema",
+    "selectTheme": "Selecionar Tema",
+    "userMenu": "Menu do Usuário",
     "signOut": "Sair",
-    "userProfile": "Perfil do usuário"
+    "userProfile": "Perfil do Usuário",
+    "stopSystem": "Parar Sistema",
+    "deleteLockfile": "Excluir Arquivo de Execução",
+    "confirmStop": "Tem certeza de que deseja forçar a parada?",
+    "confirmDeleteLock": "Tem certeza de que deseja excluir o arquivo de execução?"
   },
   "dashboard": {
+    "controlDeck": {
+      "engineStatus": "Estado do Motor",
+      "running": "A EXECUTAR",
+      "stopped": "PARADO",
+      "mode": "Modo",
+      "idle": "Inativo",
+      "pid": "PID",
+      "scheduler": "Agendador",
+      "active": "Ativo",
+      "standby": "Espera",
+      "disabled": "Desativado",
+      "nextRun": "Próxima Execução",
+      "noSchedules": "Sem agendamentos ativos",
+      "systemInfo": "Informação do Sistema",
+      "docker": "DOCKER",
+      "cpu": "CPU",
+      "cores": "Núcleos",
+      "genericCpu": "CPU Genérico",
+      "memory": "Memória",
+      "free": "Livre",
+      "config": "Config",
+      "loaded": "Carregado",
+      "missing": "Em Falta",
+      "versionAbbr": "Ver.",
+      "editConfig": "Editar Config",
+      "createConfig": "Criar Config"
+    },
+    "banners": {
+      "executionInProgress": "Execução de Script em Progresso",
+      "reviewLogs": "Verifique os logs abaixo para o progresso em tempo real."
+    },
+    "cards": {
+      "systemControlDeck": "Painel de Controlo do Sistema"
+    },
+    "logViewerLabel": {
+        "reading": "A ler:",
+        "autoScrollOn": "Auto-Scroll Ligado",
+        "autoScrollOff": "Auto-Scroll Desligado",
+        "entries": "Entradas:",
+        "refreshesEvery": "Atualiza a cada",
+        "event": "Evento"
+    },
     "title": "Painel",
     "welcome": "Monitore sua instância do Posterizarr",
     "status": "Status",
@@ -539,6 +585,8 @@
     "nextRun": "Próxima execução",
     "configureNow": "Configurar",
     "noSchedulesRegistered": "Nenhum horário registrado",
+    "run": "Iniciar",
+    "stopSuccess": "Parando o script...",
     "scriptFile": "Arquivo do script",
     "configFile": "Arquivo de configuração",
     "cores": "Núcleos",
@@ -688,7 +736,12 @@
     "gatherSupport": "Coletar logs de suporte",
     "gatheringSupport": "Coletando arquivos de suporte... Isso pode levar um momento.",
     "gatheringSupportSuccess": "Arquivos de suporte baixados.",
-    "gatheringSupportFailed": "Falha ao coletar arquivos de suporte: {{message}}"
+    "gatheringSupportFailed": "Falha ao coletar arquivos de suporte: {{message}}",
+    "scriptlogMissing": "Scriptlog.log não encontrado, usando {{fallback}}",
+    "noLogsFound": "Nenhum arquivo de log encontrado no servidor",
+    "noLogSelected": "Por favor, selecione um arquivo de log primeiro",
+    "pleaseSelectLog": "Por favor, selecione um arquivo de log para visualizar",
+    "noLogsAvailable": "Nenhum log disponível"
   },
   "libraryExclusion": {
     "configNotFound": "Configuração do servidor de mídia não encontrada",

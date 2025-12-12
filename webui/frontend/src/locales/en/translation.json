@@ -512,13 +512,59 @@
     "currentVersion": "✓ Current version installed"
   },
   "topNavbar": {
-    "changeTheme": "Change Theme",
-    "selectTheme": "Select Theme",
-    "userMenu": "User Menu",
-    "signOut": "Sign Out",
-    "userProfile": "User Profile"
+    "changeTheme": "Design ändern",
+    "selectTheme": "Design wählen",
+    "userMenu": "Benutzermenü",
+    "signOut": "Abmelden",
+    "userProfile": "Benutzerprofil",
+    "stopSystem": "System stoppen",
+    "deleteLockfile": "Running-Datei löschen",
+    "confirmStop": "Sind Sie sicher, dass Sie den Stopp erzwingen wollen?",
+    "confirmDeleteLock": "Sind Sie sicher, dass Sie die Running-Datei löschen wollen?"
   },
   "dashboard": {
+    "controlDeck": {
+      "engineStatus": "Engine Status",
+      "running": "RUNNING",
+      "stopped": "STOPPED",
+      "mode": "Mode",
+      "idle": "Idle",
+      "pid": "PID",
+      "scheduler": "Scheduler",
+      "active": "Active",
+      "standby": "Standby",
+      "disabled": "Disabled",
+      "nextRun": "Next Run",
+      "noSchedules": "No schedules active",
+      "systemInfo": "System Information",
+      "docker": "DOCKER",
+      "cpu": "CPU",
+      "cores": "Cores",
+      "genericCpu": "Generic CPU",
+      "memory": "Memory",
+      "free": "Free",
+      "config": "Config",
+      "loaded": "Loaded",
+      "missing": "Missing",
+      "versionAbbr": "Ver.",
+      "editConfig": "Edit Config",
+      "createConfig": "Create Config"
+    },
+    "banners": {
+      "executionInProgress": "Script Execution in Progress",
+      "reviewLogs": "Review the logs below for real-time progress."
+    },
+    "cards": {
+      "systemControlDeck": "System Control Deck"
+    },
+    "logViewerLabel": {
+        "reading": "Reading:",
+        "autoScrollOn": "Auto-Scroll On",
+        "autoScrollOff": "Auto-Scroll Off",
+        "entries": "Entries:",
+        "refreshesEvery": "Refreshes every",
+        "event": "Event"
+    },
     "title": "Dashboard",
     "welcome": "Monitor your Posterizarr instance",
     "status": "Status",
@@ -591,6 +637,8 @@
     "nextRun": "Next",
     "configureNow": "Configure",
     "noSchedulesRegistered": "No schedules registered",
+    "run": "Run",
+    "stopSuccess": "Script stopping...",
     "cores": "Cores",
     "free": "Free"
   },
@@ -696,7 +744,12 @@
     "gatherSupport": "Gather Support Logs",
     "gatheringSupport": "Gathering support files... This may take a moment.",
     "gatheringSupportSuccess": "Support files downloaded.",
-    "gatheringSupportFailed": "Failed to gather support files: {{message}}"
+    "gatheringSupportFailed": "Failed to gather support files: {{message}}",
+    "scriptlogMissing": "Scriptlog.log not found, falling back to {{fallback}}",
+    "noLogsFound": "No log files found on server",
+    "noLogSelected": "Please select a log file first",
+    "pleaseSelectLog": "Please select a log file to view",
+    "noLogsAvailable": "No logs available"
   },
   "libraryExclusion": {
     "configNotFound": "Media server configuration not found",

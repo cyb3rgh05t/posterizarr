@@ -515,10 +515,56 @@
     "changeTheme": "Cambia tema",
     "selectTheme": "Seleziona tema",
     "userMenu": "Menu utente",
-    "signOut": "Esci",
-    "userProfile": "Profilo utente"
+    "signOut": "Disconnetti",
+    "userProfile": "Profilo utente",
+    "stopSystem": "Arresta sistema",
+    "deleteLockfile": "Elimina file di esecuzione",
+    "confirmStop": "Sei sicuro di voler forzare l'arresto?",
+    "confirmDeleteLock": "Sei sicuro di voler eliminare il file di esecuzione?"
   },
   "dashboard": {
+    "controlDeck": {
+      "engineStatus": "Stato Motore",
+      "running": "IN ESECUZIONE",
+      "stopped": "FERMO",
+      "mode": "Modalità",
+      "idle": "Inattivo",
+      "pid": "PID",
+      "scheduler": "Pianificatore",
+      "active": "Attivo",
+      "standby": "Standby",
+      "disabled": "Disabilitato",
+      "nextRun": "Prossima Esecuzione",
+      "noSchedules": "Nessuna pianificazione attiva",
+      "systemInfo": "Informazioni Sistema",
+      "docker": "DOCKER",
+      "cpu": "CPU",
+      "cores": "Core",
+      "genericCpu": "CPU Generica",
+      "memory": "Memoria",
+      "free": "Libera",
+      "config": "Config",
+      "loaded": "Caricata",
+      "missing": "Mancante",
+      "versionAbbr": "Ver.",
+      "editConfig": "Modifica Config",
+      "createConfig": "Crea Config"
+    },
+    "banners": {
+      "executionInProgress": "Esecuzione Script in Corso",
+      "reviewLogs": "Controlla i log qui sotto per il progresso in tempo reale."
+    },
+    "cards": {
+      "systemControlDeck": "Pannello di Controllo Sistema"
+    },
+    "logViewerLabel": {
+        "reading": "Lettura:",
+        "autoScrollOn": "Auto-Scroll Attivo",
+        "autoScrollOff": "Auto-Scroll Spento",
+        "entries": "Voci:",
+        "refreshesEvery": "Aggiorna ogni",
+        "event": "Evento"
+    },
     "title": "Pannello di controllo",
     "welcome": "Monitora la tua istanza Posterizarr",
     "status": "Stato",
@@ -539,6 +585,8 @@
     "nextRun": "Prossima esecuzione",
     "configureNow": "Configura",
     "noSchedulesRegistered": "Nessun orario registrato",
+    "run": "Avvia",
+    "stopSuccess": "Arresto dello script...",
     "scriptFile": "File script",
     "configFile": "File di configurazione",
     "cores": "Core",
@@ -688,7 +736,12 @@
     "gatherSupport": "Raccogli log di supporto",
     "gatheringSupport": "Raccolta file di supporto in corso... Potrebbe volerci un momento.",
     "gatheringSupportSuccess": "File di supporto scaricati.",
-    "gatheringSupportFailed": "Impossibile raccogliere i file di supporto: {{message}}"
+    "gatheringSupportFailed": "Impossibile raccogliere i file di supporto: {{message}}",
+    "scriptlogMissing": "Scriptlog.log non trovato, passaggio a {{fallback}}",
+    "noLogsFound": "Nessun file di log trovato sul server",
+    "noLogSelected": "Seleziona prima un file di log",
+    "pleaseSelectLog": "Seleziona un file di log da visualizzare",
+    "noLogsAvailable": "Nessun log disponibile"
   },
   "libraryExclusion": {
     "configNotFound": "Configurazione del media server non trovata",

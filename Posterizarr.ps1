@@ -14495,35 +14495,7 @@ Elseif ($ArrTrigger) {
             if ($UseJellyfin -eq 'true') {
                 Write-Entry -Message "Using Jellyfin media server" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                 $seriesSearch = Invoke-RestMethod -Uri "$OtherMediaServerUrl/Items?IncludeItemTypes=Series&Fields=ProviderIds,SeasonUserData,OriginalTitle,Path,Overview,ProductionYear,Tags,Width,Height&Recursive=true&SearchTerm=$seriesTitle&api_key=$OtherMediaServerApiKey"
-                $seriesItem = $seriesSearch.Items | Where-Object { $_.ProductionYear -eq $seriesYear } | Select-Object -First 1
-                if (-not $seriesItem) {
-                    Write-Entry -Message "Series '$seriesTitle' ($seriesYear) not found in Jellyfin" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                }
-                Write-Entry -Message "Found series: $($seriesItem.Name)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
-                $seriesId = $seriesItem.Id
-
-                $seasons = Invoke-RestMethod -Uri "$OtherMediaServerUrl/Items?ParentId=$seriesId&Fields=ProviderIds,SeasonUserData,OriginalTitle,Path,Overview,ProductionYear,Tags,Width,Height&IncludeItemTypes=Season&api_key=$OtherMediaServerApiKey"
-                $seasonItem = $seasons.Items | Where-Object { $_.IndexNumber -eq $seasonIndex }
-                if (-not $seasonItem) {
-                    Write-Entry -Message "Season $seasonIndex not found for series $($seriesItem.Name)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                }
-                Write-Entry -Message "Found season $seasonIndex" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
-                $seasonId = $seasonItem.Id
-
-                $episodes = Invoke-RestMethod -Uri "$OtherMediaServerUrl/Items?ParentId=$seasonId&Recursive=true&Fields=ProviderIds,SeasonUserData,OriginalTitle,Path,Overview,Settings,Tags,Width,Height&IncludeItemTypes=Episode&api_key=$OtherMediaServerApiKey"
-                $episodeItem = $episodes.Items | Where-Object { $_.IndexNumber -eq $episodeIndex }
-                if (-not $episodeItem) {
-                    Write-Entry -Message "Episode $episodeIndex not found in season $seasonIndex of series $($seriesItem.Name)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
-                }
-                Write-Entry -Message "Found episode $($episodeIndex): $($episodeItem.Name)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
-
-                $AllShows = [PSCustomObject]@{ Items = @($seriesItem) }
-                $AllEpisodes = [PSCustomObject]@{ Items = @($episodeItem) }
-            }
-            elseif ($UseEmby -eq 'true') {
-                Write-Entry -Message "Using Emby media server" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
-                $seriesSearch = Invoke-RestMethod -Uri "$OtherMediaServerUrl/Items?IncludeItemTypes=Series&Fields=ProviderIds,SeasonUserData,OriginalTitle,Path,Overview,ProductionYear,Tags,Width,Height&Recursive=true&SearchTerm=$seriesTitle&api_key=$OtherMediaServerApiKey"
-                $seriesItem = $seriesSearch.Items | Where-Object { $_.ProductionYear -eq $seriesYear } | Select-Object -First 1
+                $seriesItem = $seriesSearch.Items | Where-Object { ([string]::IsNullOrWhiteSpace($seriesYear)) -or ($_.ProductionYear -eq $seriesYear) } | Select-Object -First 1
                 if (-not $seriesItem) {
                     Write-Entry -Message "Series '$seriesTitle' ($seriesYear) not found in Jellyfin" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                     # Clear Running File
@@ -14539,6 +14511,79 @@ Elseif ($ArrTrigger) {
                     }
                     if ($global:UptimeKumaUrl) {
                         Send-UptimeKumaWebhook -status "down" -msg "Series '$seriesTitle' ($seriesYear) not found in Jellyfin"
+                    }
+                    Exit
+                }
+                Write-Entry -Message "Found series: $($seriesItem.Name)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                $seriesId = $seriesItem.Id
+
+                $seasons = Invoke-RestMethod -Uri "$OtherMediaServerUrl/Items?ParentId=$seriesId&Fields=ProviderIds,SeasonUserData,OriginalTitle,Path,Overview,ProductionYear,Tags,Width,Height&IncludeItemTypes=Season&api_key=$OtherMediaServerApiKey"
+                $seasonItem = $seasons.Items | Where-Object { $_.IndexNumber -eq $seasonIndex }
+                if (-not $seasonItem) {
+                    Write-Entry -Message "Season $seasonIndex not found for series $($seriesItem.Name)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                    # Clear Running File
+                    if (Test-Path $CurrentlyRunning) {
+                        try {
+                            Remove-Item -LiteralPath $CurrentlyRunning -ErrorAction Stop | Out-Null
+                        }
+                        catch {
+                            Write-Entry -Message "Failed to delete '$CurrentlyRunning'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                            Write-Entry -Subtext "Reason: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Error
+                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                        }
+                    }
+                    if ($global:UptimeKumaUrl) {
+                        Send-UptimeKumaWebhook -status "down" -msg "Season $seasonIndex not found for series $($seriesItem.Name)"
+                    }
+                    Exit
+                }
+                Write-Entry -Message "Found season $seasonIndex" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                $seasonId = $seasonItem.Id
+
+                $episodes = Invoke-RestMethod -Uri "$OtherMediaServerUrl/Items?ParentId=$seasonId&Recursive=true&Fields=ProviderIds,SeasonUserData,OriginalTitle,Path,Overview,Settings,Tags,Width,Height&IncludeItemTypes=Episode&api_key=$OtherMediaServerApiKey"
+                $episodeItem = $episodes.Items | Where-Object { $_.IndexNumber -eq $episodeIndex }
+                if (-not $episodeItem) {
+                    Write-Entry -Message "Episode $episodeIndex not found in season $seasonIndex of series $($seriesItem.Name)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                    # Clear Running File
+                    if (Test-Path $CurrentlyRunning) {
+                        try {
+                            Remove-Item -LiteralPath $CurrentlyRunning -ErrorAction Stop | Out-Null
+                        }
+                        catch {
+                            Write-Entry -Message "Failed to delete '$CurrentlyRunning'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                            Write-Entry -Subtext "Reason: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Error
+                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                        }
+                    }
+                    if ($global:UptimeKumaUrl) {
+                        Send-UptimeKumaWebhook -status "down" -msg "Episode $episodeIndex not found in season $seasonIndex of series $($seriesItem.Name)"
+                    }
+                    Exit
+                }
+                Write-Entry -Message "Found episode $($episodeIndex): $($episodeItem.Name)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+
+                $AllShows = [PSCustomObject]@{ Items = @($seriesItem) }
+                $AllEpisodes = [PSCustomObject]@{ Items = @($episodeItem) }
+            }
+            elseif ($UseEmby -eq 'true') {
+                Write-Entry -Message "Using Emby media server" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
+                $seriesSearch = Invoke-RestMethod -Uri "$OtherMediaServerUrl/Items?IncludeItemTypes=Series&Fields=ProviderIds,SeasonUserData,OriginalTitle,Path,Overview,ProductionYear,Tags,Width,Height&Recursive=true&SearchTerm=$seriesTitle&api_key=$OtherMediaServerApiKey"
+                $seriesItem = $seriesSearch.Items | Where-Object { ([string]::IsNullOrWhiteSpace($seriesYear)) -or ($_.ProductionYear -eq $seriesYear) } | Select-Object -First 1
+                if (-not $seriesItem) {
+                    Write-Entry -Message "Series '$seriesTitle' ($seriesYear) not found in Emby" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                    # Clear Running File
+                    if (Test-Path $CurrentlyRunning) {
+                        try {
+                            Remove-Item -LiteralPath $CurrentlyRunning -ErrorAction Stop | Out-Null
+                        }
+                        catch {
+                            Write-Entry -Message "Failed to delete '$CurrentlyRunning'." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                            Write-Entry -Subtext "Reason: $($_.Exception.Message)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Error
+                            $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
+                        }
+                    }
+                    if ($global:UptimeKumaUrl) {
+                        Send-UptimeKumaWebhook -status "down" -msg "Series '$seriesTitle' ($seriesYear) not found in Emby"
                     }
                     Exit
                 }
@@ -14620,12 +14665,26 @@ Elseif ($ArrTrigger) {
                 }
 
                 Write-Entry -Message "Found $($shows.Count) show(s) matching '$seriesTitle'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-                if ($shows.Count -gt 1) { $shows = $shows | Where-Object { $_.year -eq $seriesYear } }
+                if ($shows.Count -gt 1 -and -not [string]::IsNullOrWhiteSpace($seriesYear)) {
+                    $filteredShows = $shows | Where-Object { $_.year -eq $seriesYear }
+
+                    if ($filteredShows) {
+                        $shows = $filteredShows
+                    } else {
+                        Write-Entry -Message "Year mismatch ignored: Could not find '$seriesTitle' with year $seriesYear. Defaulting to first result." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                    }
+                }
+
+                if ($shows -is [array]) {
+                    $shows = $shows | Select-Object -First 1
+                }
+
                 if ($shows.type -eq 'show') {
                     Write-Entry -Message "Selected show: $($shows.title)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                     $contentquery = "Directory"
                     $queryKey = $shows.RatingKey
                 }
+
                 $metadataUrl = "$PlexUrl/library/metadata/$($queryKey)"
                 $seasonUrl = "$PlexUrl/library/metadata/$($queryKey)/children?"
                 if ($PlexToken) {
@@ -14647,7 +14706,7 @@ Elseif ($ArrTrigger) {
             if ($UseJellyfin -eq 'true') {
                 Write-Entry -Message "Using Jellyfin media server" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                 $movieSearch = Invoke-RestMethod -Uri "$OtherMediaServerUrl/Items?IncludeItemTypes=Movie&Recursive=true&Fields=ProviderIds,OriginalTitle,Settings,Path,Overview,ProductionYear,Tags,Width,Height&SearchTerm=$movieTitle&api_key=$OtherMediaServerApiKey"
-                $movieItem = $movieSearch.Items | Where-Object { $_.ProductionYear -eq $movieYear } | Select-Object -First 1
+                $movieItem = $movieSearch.Items | Where-Object { ([string]::IsNullOrWhiteSpace($movieYear)) -or ($_.ProductionYear -eq $movieYear) } | Select-Object -First 1
                 if (-not $movieItem) {
                     Write-Entry -Message "Movie '$movieTitle' ($movieYear) not found in Jellyfin" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                     # Clear Running File
@@ -14672,7 +14731,7 @@ Elseif ($ArrTrigger) {
             elseif ($UseEmby -eq 'true') {
                 Write-Entry -Message "Using Emby media server" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                 $movieSearch = Invoke-RestMethod -Uri "$OtherMediaServerUrl/Items?IncludeItemTypes=Movie&Recursive=true&Fields=ProviderIds,OriginalTitle,Settings,Path,Overview,ProductionYear,Tags,Width,Height&SearchTerm=$movieTitle&api_key=$OtherMediaServerApiKey"
-                $movieItem = $movieSearch.Items | Where-Object { $_.ProductionYear -eq $movieYear } | Select-Object -First 1
+                $movieItem = $movieSearch.Items | Where-Object { ([string]::IsNullOrWhiteSpace($movieYear)) -or ($_.ProductionYear -eq $movieYear) } | Select-Object -First 1
                 if (-not $movieItem) {
                     Write-Entry -Message "Movie '$movieTitle' ($movieYear) not found in Jellyfin" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Red -log Error
                     # Clear Running File
@@ -14721,7 +14780,18 @@ Elseif ($ArrTrigger) {
                 }
 
                 Write-Entry -Message "Found $($movies.Count) movie(s) matching '$movieTitle'" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Cyan -log Info
-                if ($movies.Count -gt 1) { $movies = $movies | Where-Object { $_.year -eq $movieYear } }
+                if ($movies.Count -gt 1 -and -not [string]::IsNullOrWhiteSpace($movieYear)) {
+                    $filteredmovies = $movies | Where-Object { $_.year -eq $movieYear }
+
+                    if ($filteredmovies) {
+                        $movies = $filteredmovies
+                    } else {
+                        Write-Entry -Message "Year mismatch ignored: Could not find '$movieTitle' with year $movieYear. Defaulting to first result." -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Yellow -log Warning
+                    }
+                }
+                if ($movies -is [array]) {
+                    $movies = $movies | Select-Object -First 1
+                }
                 if ($movies.type -eq 'movie') {
                     Write-Entry -Message "Selected movie: $($movies.title)" -Path $global:ScriptRoot\Logs\Scriptlog.log -Color Green -log Info
                     $contentquery = "video"

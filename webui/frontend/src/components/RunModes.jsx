@@ -646,11 +646,11 @@ function RunModes() {
     setManualForm((prevForm) => ({
       ...prevForm,
       folderName,
-      titletext: prevForm.titletext && prevForm.titletext.trim() !== "" 
-        ? prevForm.titletext 
+      titletext: prevForm.titletext && prevForm.titletext.trim() !== ""
+        ? prevForm.titletext
         : title
     }));
-    
+
     setShowFolderSelector(false);
     setFolderSearchQuery("");
     showSuccess(`Folder "${folderName}" selected`);
@@ -2174,7 +2174,6 @@ function RunModes() {
                 : t("runModes.manual.tmdbHintStandard")}
             </p>
 
-            {/* Hauptsuche */}
             <div className="space-y-3 mb-3">
               {/* Title/ID Search Input with Toggle */}
               <div>
@@ -2223,23 +2222,35 @@ function RunModes() {
                     </div>
                   )}
                 </div>
-                <input
-                  type="text"
-                  value={tmdbSearch.query}
-                  onChange={(e) =>
-                    setTmdbSearch({ ...tmdbSearch, query: e.target.value })
-                  }
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") searchTMDBPosters();
-                  }}
-                  placeholder={
-                    tmdbSearch.searchByID
-                      ? t("runModes.manual.tmdbIdPlaceholder")
-                      : t("runModes.manual.tmdbSearchPlaceholder")
-                  }
-                  disabled={loading || status.running || tmdbSearch.searching}
-                  className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={tmdbSearch.query}
+                    onChange={(e) =>
+                      setTmdbSearch({ ...tmdbSearch, query: e.target.value })
+                    }
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") searchTMDBPosters();
+                    }}
+                    placeholder={
+                      tmdbSearch.searchByID
+                        ? t("runModes.manual.tmdbIdPlaceholder")
+                        : t("runModes.manual.tmdbSearchPlaceholder")
+                    }
+                    disabled={loading || status.running || tmdbSearch.searching}
+                    // Added pr-10 for the X button space
+                    className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {tmdbSearch.query && !loading && !status.running && !tmdbSearch.searching && (
+                    <button
+                      type="button"
+                      onClick={() => setTmdbSearch({ ...tmdbSearch, query: "" })}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 {/* Search Hint Box */}
                 <div className="mt-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                   <div className="font-semibold text-blue-800 dark:text-blue-300 mb-1">
@@ -2482,19 +2493,30 @@ function RunModes() {
               </div>
 
               {/* URL/Path Input */}
-              <input
-                type="text"
-                value={manualForm.picturePath}
-                onChange={(e) => {
-                  setManualForm({ ...manualForm, picturePath: e.target.value });
-                  if (e.target.value.trim()) {
-                    clearUploadedFile();
-                  }
-                }}
-                placeholder={t("runModes.manual.urlPlaceholder")}
-                disabled={loading || status.running || uploadedFile}
-                className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={manualForm.picturePath}
+                  onChange={(e) => {
+                    setManualForm({ ...manualForm, picturePath: e.target.value });
+                    if (e.target.value.trim()) {
+                      clearUploadedFile();
+                    }
+                  }}
+                  placeholder={t("runModes.manual.urlPlaceholder")}
+                  disabled={loading || status.running || uploadedFile}
+                  className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {manualForm.picturePath && !loading && !status.running && !uploadedFile && (
+                  <button
+                    type="button"
+                    onClick={() => setManualForm({ ...manualForm, picturePath: "" })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <p className="text-xs text-theme-muted mt-2">
@@ -2509,16 +2531,27 @@ function RunModes() {
                 {t("runModes.manual.titleText")}
               </label>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={manualForm.titletext}
-                  onChange={(e) =>
-                    setManualForm({ ...manualForm, titletext: e.target.value })
-                  }
-                  placeholder={t("runModes.manual.titlePlaceholder")}
-                  disabled={loading || status.running}
-                  className="flex-1 px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={manualForm.titletext}
+                    onChange={(e) =>
+                      setManualForm({ ...manualForm, titletext: e.target.value })
+                    }
+                    placeholder={t("runModes.manual.titlePlaceholder")}
+                    disabled={loading || status.running}
+                    className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {manualForm.titletext && !loading && !status.running && (
+                    <button
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, titletext: "" })}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 {(manualForm.posterType === "standard" || manualForm.posterType === "background") && (
                   <button
                     type="button"
@@ -2549,16 +2582,27 @@ function RunModes() {
               <span className="text-red-400">*</span>
             </label>
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={manualForm.libraryName}
-                onChange={(e) =>
-                  setManualForm({ ...manualForm, libraryName: e.target.value })
-                }
-                placeholder={hints.libraryName.placeholder}
-                disabled={loading || status.running}
-                className="flex-1 px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={manualForm.libraryName}
+                  onChange={(e) =>
+                    setManualForm({ ...manualForm, libraryName: e.target.value })
+                  }
+                  placeholder={hints.libraryName.placeholder}
+                  disabled={loading || status.running}
+                  className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {manualForm.libraryName && !loading && !status.running && (
+                  <button
+                    type="button"
+                    onClick={() => setManualForm({ ...manualForm, libraryName: "" })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={loadLibraryItems}
@@ -2581,16 +2625,27 @@ function RunModes() {
               {hints.folderName.label} <span className="text-red-400">*</span>
             </label>
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={manualForm.folderName}
-                onChange={(e) =>
-                  setManualForm({ ...manualForm, folderName: e.target.value })
-                }
-                placeholder={hints.folderName.placeholder}
-                disabled={loading || status.running}
-                className="flex-1 px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={manualForm.folderName}
+                  onChange={(e) =>
+                    setManualForm({ ...manualForm, folderName: e.target.value })
+                  }
+                  placeholder={hints.folderName.placeholder}
+                  disabled={loading || status.running}
+                  className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {manualForm.folderName && !loading && !status.running && (
+                  <button
+                    type="button"
+                    onClick={() => setManualForm({ ...manualForm, folderName: "" })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               {/* Hide 'Select Folder' button for collections */}
               {manualForm.posterType !== "collection" && (
                 <button
@@ -2624,19 +2679,30 @@ function RunModes() {
                 {t("runModes.manual.seasonPosterName")}{" "}
                 <span className="text-red-400">*</span>
               </label>
-              <input
-                type="text"
-                value={manualForm.seasonPosterName}
-                onChange={(e) =>
-                  setManualForm({
-                    ...manualForm,
-                    seasonPosterName: e.target.value,
-                  })
-                }
-                placeholder={t("runModes.manual.seasonPlaceholder")}
-                disabled={loading || status.running}
-                className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={manualForm.seasonPosterName}
+                  onChange={(e) =>
+                    setManualForm({
+                      ...manualForm,
+                      seasonPosterName: e.target.value,
+                    })
+                  }
+                  placeholder={t("runModes.manual.seasonPlaceholder")}
+                  disabled={loading || status.running}
+                  className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {manualForm.seasonPosterName && !loading && !status.running && (
+                  <button
+                    type="button"
+                    onClick={() => setManualForm({ ...manualForm, seasonPosterName: "" })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-theme-muted mt-1">
                 {t("runModes.manual.seasonHint")}
               </p>
@@ -2651,19 +2717,30 @@ function RunModes() {
                   {t("runModes.manual.episodeTitle")}{" "}
                   <span className="text-red-400">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={manualForm.epTitleName}
-                  onChange={(e) =>
-                    setManualForm({
-                      ...manualForm,
-                      epTitleName: e.target.value,
-                    })
-                  }
-                  placeholder={t("runModes.manual.episodeTitlePlaceholder")}
-                  disabled={loading || status.running}
-                  className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={manualForm.epTitleName}
+                    onChange={(e) =>
+                      setManualForm({
+                        ...manualForm,
+                        epTitleName: e.target.value,
+                      })
+                    }
+                    placeholder={t("runModes.manual.episodeTitlePlaceholder")}
+                    disabled={loading || status.running}
+                    className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {manualForm.epTitleName && !loading && !status.running && (
+                    <button
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, epTitleName: "" })}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 <p className="text-xs text-theme-muted mt-1">
                   {t("runModes.manual.episodeTitleHint")}
                 </p>
@@ -2673,19 +2750,30 @@ function RunModes() {
                   {t("runModes.manual.seasonName")}{" "}
                   <span className="text-red-400">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={manualForm.seasonPosterName}
-                  onChange={(e) =>
-                    setManualForm({
-                      ...manualForm,
-                      seasonPosterName: e.target.value,
-                    })
-                  }
-                  placeholder={t("runModes.manual.seasonNamePlaceholder")}
-                  disabled={loading || status.running}
-                  className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={manualForm.seasonPosterName}
+                    onChange={(e) =>
+                      setManualForm({
+                        ...manualForm,
+                        seasonPosterName: e.target.value,
+                      })
+                    }
+                    placeholder={t("runModes.manual.seasonNamePlaceholder")}
+                    disabled={loading || status.running}
+                    className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {manualForm.seasonPosterName && !loading && !status.running && (
+                    <button
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, seasonPosterName: "" })}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 <p className="text-xs text-theme-muted mt-1">
                   {t("runModes.manual.seasonNameHint")}
                 </p>
@@ -2695,19 +2783,30 @@ function RunModes() {
                   {t("runModes.manual.episodeNumber")}{" "}
                   <span className="text-red-400">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={manualForm.episodeNumber}
-                  onChange={(e) =>
-                    setManualForm({
-                      ...manualForm,
-                      episodeNumber: e.target.value,
-                    })
-                  }
-                  placeholder={t("runModes.manual.episodeNumberPlaceholder")}
-                  disabled={loading || status.running}
-                  className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={manualForm.episodeNumber}
+                    onChange={(e) =>
+                      setManualForm({
+                        ...manualForm,
+                        episodeNumber: e.target.value,
+                      })
+                    }
+                    placeholder={t("runModes.manual.episodeNumberPlaceholder")}
+                    disabled={loading || status.running}
+                    className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {manualForm.episodeNumber && !loading && !status.running && (
+                    <button
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, episodeNumber: "" })}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 <p className="text-xs text-theme-muted mt-1">
                   {t("runModes.manual.episodeNumberHint")}
                 </p>
@@ -2796,14 +2895,25 @@ function RunModes() {
         </div>
 
         <div className="flex flex-col md:flex-row gap-4">
-          <input
-            type="text"
-            value={resetLibrary}
-            onChange={(e) => setResetLibrary(e.target.value)}
-            placeholder={t("runModes.reset.placeholder")}
-            disabled={loading || status.running}
-            className="flex-1 px-4 py-3 bg-theme-card border border-red-500/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-          />
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={resetLibrary}
+              onChange={(e) => setResetLibrary(e.target.value)}
+              placeholder={t("runModes.reset.placeholder")}
+              disabled={loading || status.running}
+              className="w-full px-4 py-3 pr-10 bg-theme-card border border-red-500/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+            />
+            {resetLibrary && !loading && !status.running && (
+              <button
+                type="button"
+                onClick={() => setResetLibrary("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-red-300 hover:text-white p-1 hover:bg-red-500/20 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
           <button
             onClick={resetPosters}
             disabled={loading || status.running || !resetLibrary.trim()}
@@ -2848,13 +2958,24 @@ function RunModes() {
 
           {/* Search Bar */}
           <div className="px-6 py-4 border-b border-theme-primary/30">
-            <input
-              type="text"
-              value={folderSearchQuery}
-              onChange={(e) => setFolderSearchQuery(e.target.value)}
-              placeholder={t('runModes.folderSelector.searchPlaceholder')}
-              className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={folderSearchQuery}
+                onChange={(e) => setFolderSearchQuery(e.target.value)}
+                placeholder={t('runModes.folderSelector.searchPlaceholder')}
+                className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
+              />
+              {folderSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setFolderSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Content */}
@@ -2962,13 +3083,24 @@ function RunModes() {
 
           {/* Search Bar */}
           <div className="px-6 py-4 border-b border-theme-primary/30">
-            <input
-              type="text"
-              value={librarySearchQuery}
-              onChange={(e) => setLibrarySearchQuery(e.target.value)}
-              placeholder={t('runModes.librarySelector.searchPlaceholder')}
-              className="w-full px-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={librarySearchQuery}
+                onChange={(e) => setLibrarySearchQuery(e.target.value)}
+                placeholder={t('runModes.librarySelector.searchPlaceholder')}
+                className="w-full px-4 py-2 pr-10 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
+              />
+              {librarySearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setLibrarySearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-text p-1 hover:bg-theme-hover rounded-full transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Content */}
