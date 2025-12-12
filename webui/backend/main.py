@@ -8,6 +8,7 @@ from fastapi import (
     UploadFile,
     File,
     Form,
+    BackgroundTasks,
 )
 from contextlib import asynccontextmanager
 try:
@@ -40,7 +41,6 @@ import zipfile
 import tempfile
 import shutil
 import sqlite3
-from fastapi import BackgroundTasks
 from starlette.responses import FileResponse
 from PIL import Image, ImageDraw, ImageChops
 from io import BytesIO
@@ -12595,12 +12595,29 @@ async def get_support_zip(background_tasks: BackgroundTasks):
 # ============================================================================
 # WEBHOOK ENDPOINTS (ARR & TAUTULLI)
 # ============================================================================
+async def delayed_trigger_writer(file_path, data_map, delay_seconds: int = 0):
+    """
+    Waits for a specified delay, then writes the .posterizarr file.
+    Run this as a BackgroundTask to avoid timing out the Webhook client.
+    """
+    if delay_seconds > 0:
+        logger.info(f"Waiting {delay_seconds}s before creating trigger: {file_path.name}")
+        await asyncio.sleep(delay_seconds)
+
+    try:
+        logger.info(f"Writing Arr trigger file: {file_path}")
+        with open(file_path, "w", encoding="utf-8") as f:
+            for key, value in data_map.items():
+                # Write in the format: [key]: value
+                f.write(f"[{key}]: {value}\n")
+    except Exception as e:
+        logger.error(f"Failed to write background trigger file {file_path}: {e}")
 
 @app.post("/api/webhook/arr")
-async def arr_webhook(request: Request):
+async def arr_webhook(request: Request, background_tasks: BackgroundTasks):
     """
-    Accepts Webhooks from Sonarr/Radarr (at /api/webhook/arr),
-    converts them to .posterizarr files, and drops them in the watcher folder.
+    Accepts Webhooks from Sonarr/Radarr, returns 200 OK immediately,
+    and schedules the .posterizarr file creation after a 10-minute delay.
     """
     try:
         payload = await request.json()
@@ -12608,12 +12625,12 @@ async def arr_webhook(request: Request):
         # Determine Event and Platform
         event_type = payload.get("eventType", "Unknown")
 
-        # Handle "Test" event from the Arr settings page
+        # Handle "Test" event
         if event_type == "Test":
             logger.info("Received Test Webhook from Arr instance")
             return {"success": True, "message": "Test successful"}
 
-        # We typically only care about Import/Download/Grab/Delete events
+        # Filter events
         if event_type not in ["Download", "Import", "Grab", "MovieFileDelete", "EpisodeFileDelete"]:
             return {"success": True, "message": f"Ignored event type: {event_type}"}
 
@@ -12683,16 +12700,11 @@ async def arr_webhook(request: Request):
         filename = f"recently_added_{timestamp}_{rand_str}.posterizarr"
         file_path = watcher_dir / filename
 
-        logger.info(f"Creating Arr trigger file for {platform}: {file_path}")
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            for key, value in data_map.items():
-                # Write in the format: [key]: value
-                f.write(f"[{key}]: {value}\n")
+        background_tasks.add_task(delayed_trigger_writer, file_path, data_map, delay_seconds=600)
 
         return {
             "success": True,
-            "message": f"Trigger queued for {platform}",
+            "message": f"Trigger queued for {platform} (Background 10m delay)",
             "file": str(file_path)
         }
 
@@ -12700,9 +12712,48 @@ async def arr_webhook(request: Request):
         logger.error(f"Error processing Arr webhook: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/api/webhook/tautulli")
 async def tautulli_webhook(request: Request):
+    """
+    Accepts Webhooks from Tautulli (at /api/webhook/tautulli).
+    Maps JSON keys directly to .posterizarr trigger file format.
+    """
+    try:
+        payload = await request.json()
+
+        # Filter out empty payloads
+        if not payload:
+            return {"success": False, "message": "Empty payload"}
+
+        # Define the Watcher Directory
+        watcher_dir = BASE_DIR / "watcher"
+        watcher_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create unique filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+        rand_str = os.urandom(3).hex()
+
+        filename = f"tautulli_trigger_{timestamp}_{rand_str}.posterizarr"
+        file_path = watcher_dir / filename
+
+        logger.info(f"Creating Tautulli trigger file: {file_path}")
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            for key, value in payload.items():
+                # Only write keys that have values.
+                if value:
+                    f.write(f"[{key}]: {value}\n")
+
+        return {
+            "success": True,
+            "message": "Tautulli trigger queued",
+            "file": str(file_path)
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing Tautulli webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
     """
     Accepts Webhooks from Tautulli (at /api/webhook/tautulli).
     Maps JSON keys directly to .posterizarr trigger file format.
