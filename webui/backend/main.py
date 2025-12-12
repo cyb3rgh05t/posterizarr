@@ -41,6 +41,7 @@ import zipfile
 import tempfile
 import shutil
 import sqlite3
+import bcrypt
 from starlette.responses import FileResponse
 from PIL import Image, ImageDraw, ImageChops
 from io import BytesIO
@@ -2216,8 +2217,16 @@ async def update_config(data: ConfigUpdate):
         else:
             current_flat = current_config
 
+        # Check if basicAuthPassword is being updated
+        if "basicAuthPassword" in data.config:
+            new_pass = data.config["basicAuthPassword"]
+            # Only hash if it's not already a hash (user entered a new plain password)
+            if new_pass and not new_pass.startswith(("$2b$", "$2a$", "$2y$")):
+                logger.info("Hashing new password provided in config update...")
+                hashed = bcrypt.hashpw(new_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                data.config["basicAuthPassword"] = hashed
+
         # Preserve library exclusions if database hasn't been populated yet
-        # This prevents losing exclusions on autosave before libraries are fetched
         logger.debug("Checking if library exclusions need to be preserved...")
         for server_config in [
             ("plex", "PlexLibstoExclude"),
@@ -2225,44 +2234,25 @@ async def update_config(data: ConfigUpdate):
             ("emby", "EmbyLibstoExclude"),
         ]:
             server_type, exclusion_key = server_config
-
-            # Check if the database has libraries for this server type
             try:
                 db_result = server_libraries_db.get_media_server_libraries(server_type)
                 has_db_libraries = len(db_result.get("libraries", [])) > 0
 
-                # If database is empty but config.json has exclusions, preserve them
                 if not has_db_libraries and current_flat.get(exclusion_key):
                     current_exclusions = current_flat.get(exclusion_key)
                     new_exclusions = data.config.get(exclusion_key, [])
 
-                    # Only preserve if the new value is empty/different
-                    # (user might be intentionally clearing it)
                     if not new_exclusions and current_exclusions:
-                        logger.info(
-                            f"Preserving {exclusion_key} from config.json "
-                            f"(database not yet populated): {current_exclusions}"
-                        )
+                        logger.info(f"Preserving {exclusion_key} from config.json (DB empty)")
                         data.config[exclusion_key] = current_exclusions
                     elif new_exclusions != current_exclusions:
-                        logger.debug(
-                            f"{exclusion_key} changed by user, using new value: {new_exclusions}"
-                        )
+                        logger.debug(f"{exclusion_key} changed by user")
                 else:
                     if has_db_libraries:
-                        logger.debug(
-                            f"Database has libraries for {server_type}, "
-                            f"using value from config update"
-                        )
+                        logger.debug(f"Database has libraries for {server_type}, using value from update")
             except Exception as db_error:
-                logger.warning(
-                    f"Could not check database for {server_type} libraries: {db_error}"
-                )
-                # On error, preserve existing exclusions to be safe
+                logger.warning(f"Could not check database for {server_type} libraries: {db_error}")
                 if current_flat.get(exclusion_key):
-                    logger.info(
-                        f"Preserving {exclusion_key} due to database check error"
-                    )
                     data.config[exclusion_key] = current_flat.get(exclusion_key)
 
         # Detect and log changes
@@ -2270,73 +2260,44 @@ async def update_config(data: ConfigUpdate):
         for key, new_value in data.config.items():
             old_value = current_flat.get(key)
             if old_value != new_value:
-                # Mask sensitive values in logs
-                if any(
-                    sensitive in key.lower()
-                    for sensitive in ["password", "token", "key", "api"]
-                ):
+                if any(sensitive in key.lower() for sensitive in ["password", "token", "key", "api"]):
                     old_display = "***" if old_value else None
                     new_display = "***" if new_value else None
                 else:
                     old_display = old_value
                     new_display = new_value
 
-                changes_detected.append(
-                    {"key": key, "old": old_display, "new": new_display}
-                )
+                changes_detected.append({"key": key, "old": old_display, "new": new_display})
                 logger.info(f"CONFIG CHANGE: {key}")
                 logger.info(f"  Old value: {old_display}")
                 logger.info(f"  New value: {new_display}")
 
         if changes_detected:
             logger.info(f"Total changes detected: {len(changes_detected)}")
-            logger.debug(f"Changed keys: {[c['key'] for c in changes_detected]}")
         else:
             logger.info("No changes detected in config")
 
         logger.info("Saving config changes to config.json...")
 
-        # If config_mapper is available, transform flat config back to grouped structure
         if CONFIG_MAPPER_AVAILABLE:
             logger.debug("Transforming flat config back to grouped structure...")
             grouped_config = unflatten_config(data.config)
-            logger.debug(f"Grouped config: {len(grouped_config)} sections")
-
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
                 json.dump(grouped_config, f, indent=2, ensure_ascii=False)
-
-            file_size = CONFIG_PATH.stat().st_size
-            logger.info(f"Config saved successfully to config.json (flat -> grouped)")
-            logger.debug(f"File size: {file_size} bytes")
         else:
-            # Fallback: save as-is (assuming grouped structure)
             logger.debug("Saving config as grouped structure (no mapper)...")
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
                 json.dump(data.config, f, indent=2, ensure_ascii=False)
 
-            file_size = CONFIG_PATH.stat().st_size
-            logger.info("Config saved successfully to config.json (grouped structure)")
-            logger.debug(f"File size: {file_size} bytes")
-
-        # Also update config database if available
+        # Update config database
         if CONFIG_DATABASE_AVAILABLE and config_db:
             try:
                 logger.info("Syncing config changes to database...")
-                # Sync the updated config to database
                 config_db.import_from_json()
                 logger.info("Config database synced successfully with config.json")
-
-                # Log changes to database as well
-                if changes_detected:
-                    logger.debug(
-                        f"Database now contains {len(changes_detected)} updated values"
-                    )
             except Exception as db_error:
                 logger.warning(f"Could not sync config database: {db_error}")
-                logger.debug(f"Database sync error details: {str(db_error)}")
-        else:
-            logger.info("Config database not available, skipping database sync")
-
+        
         logger.info("=" * 60)
         return {
             "success": True,
@@ -2348,7 +2309,6 @@ async def update_config(data: ConfigUpdate):
         logger.exception("Full traceback:")
         logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=str(e))
-
 
 # ============================================================================
 # CONFIG DATABASE ENDPOINTS
