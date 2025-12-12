@@ -109,7 +109,7 @@
         ```bash
         cd Posterizarr
         ```
-1. Copy the `config.example.json` to `config.json` and adjust the settings.
+1. Rename the `config.example.json` to `config.json` and adjust the settings.
 
     - Enter all the api keys and tokens from **Getting Started - Step 1** under the `ApiPart` [Detailed Config Description](configuration.md)
         - tvdbapi
