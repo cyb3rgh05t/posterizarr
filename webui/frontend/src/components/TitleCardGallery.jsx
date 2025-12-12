@@ -1056,7 +1056,7 @@ function TitleCardGallery() {
           </div>
 
           {/* Pagination and Items Per Page Controls */}
-          {filteredImages.length > 0 && (
+          {(filteredImages.length > 25) && (
             <div className="mt-8 space-y-6">
               {/* Items per page selector */}
               <div className="flex justify-center">

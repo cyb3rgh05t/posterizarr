@@ -1063,7 +1063,7 @@ function SeasonGallery() {
           </div>
 
           {/* --- PAGINATION AND ITEMS PER PAGE --- */}
-          {(totalPages > 1 || filteredImages.length > itemsPerPage) && (
+          {(filteredImages.length > 25) && (
              <div className="mt-8 space-y-6">
              {/* Items per page selector */}
              <div className="flex justify-center">

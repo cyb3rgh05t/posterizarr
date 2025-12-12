@@ -1046,7 +1046,7 @@ function ManualAssets() {
             </div>
 
             {/* Pagination for Grid View */}
-            {(totalGridPages > 1 || allGridAssets.length > itemsPerPage) && (
+            {(allGridAssets.length > 25) && (
               <div className="mt-8 space-y-6">
                 <div className="flex justify-center">
                   <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
@@ -1571,7 +1571,7 @@ function ManualAssets() {
                   </div>
 
                   {/* Pagination for Folder View Assets */}
-                  {(totalFolderPages > 1 || allFolderAssets.length > itemsPerPage) && (
+                  {(allFolderAssets.length > 25) && (
                     <div className="mt-8 space-y-6">
                       <div className="flex justify-center">
                         <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
