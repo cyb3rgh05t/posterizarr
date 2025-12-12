@@ -9148,7 +9148,7 @@ Elseif ($Testing) {
             [string]$ImageSize,
             [string]$MagickPath,
             [string]$CommandLogPath,
-            [string]$global:configLoggingPath,
+            [string]$TestingLogPath,
             [string]$Message
         )
 
@@ -9157,7 +9157,7 @@ Elseif ($Testing) {
             $logEntry = "`"$MagickPath`" $arguments"
             $logEntry | Out-File $CommandLogPath -Append
             InvokeMagickCommand -Command $MagickPath -Arguments $arguments
-            Write-Entry -Subtext $Message -Path $global:configLoggingPath -Color Cyan -log Info
+            Write-Entry -Subtext $Message -Path $TestingLogPath -Color Cyan -log Info
         }
     }
     # Helper to build the Border/Overlay argument string
