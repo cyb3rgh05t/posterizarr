@@ -12754,46 +12754,6 @@ async def tautulli_webhook(request: Request):
         logger.error(f"Error processing Tautulli webhook: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    """
-    Accepts Webhooks from Tautulli (at /api/webhook/tautulli).
-    Maps JSON keys directly to .posterizarr trigger file format.
-    """
-    try:
-        payload = await request.json()
-
-        # Filter out empty payloads
-        if not payload:
-            return {"success": False, "message": "Empty payload"}
-
-        # Define the Watcher Directory
-        watcher_dir = BASE_DIR / "watcher"
-        watcher_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create unique filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
-        rand_str = os.urandom(3).hex()
-
-        filename = f"tautulli_trigger_{timestamp}_{rand_str}.posterizarr"
-        file_path = watcher_dir / filename
-
-        logger.info(f"Creating Tautulli trigger file: {file_path}")
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            for key, value in payload.items():
-                # Only write keys that have values.
-                if value:
-                    f.write(f"[{key}]: {value}\n")
-
-        return {
-            "success": True,
-            "message": "Tautulli trigger queued",
-            "file": str(file_path)
-        }
-
-    except Exception as e:
-        logger.error(f"Error processing Tautulli webhook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 # ============================================================================
 # OVERLAY CREATOR ENDPOINTS
 # ============================================================================
