@@ -2174,11 +2174,11 @@ async def revoke_api_key(key_id: int):
 
 @app.get("/api/config")
 async def get_config(request: Request):
-    """Get config.json - SECURED: Masks secrets & blocks CLI tools when auth is off"""
+    """Get current config.json - SECURED: Blocks CLI tools when auth is off"""
     logger.info("=" * 60)
     logger.info("CONFIG READ REQUEST")
 
-    # Even if Middleware fails, this block prevents unauthorized CLI access
+    # This block prevents unauthorized CLI access even if Middleware fails
     try:
         # Check if Auth is enabled in the file directly
         auth_enabled = False
@@ -2188,7 +2188,7 @@ async def get_config(request: Request):
                 webui = c.get("WebUI", {})
                 auth_enabled = str(webui.get("basicAuthEnabled", False)).lower() in ["true", "1", "yes"]
 
-        # If Auth is DISABLED, we must enforce Browser-Only access
+        # If Auth is DISABLED, we enforce Browser-Only access (Referer/Origin)
         if not auth_enabled:
             referer = request.headers.get("referer", "")
             origin = request.headers.get("origin", "")
@@ -2214,32 +2214,8 @@ async def get_config(request: Request):
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             grouped_config = json.load(f)
 
-        # Helper to mask sensitive strings
-        def mask_data(data):
-            if isinstance(data, dict):
-                return {k: mask_data(v) if not any(s in k.lower() for s in ['password', 'token', 'key', 'secret', 'api']) else "********" for k, v in data.items()}
-            elif isinstance(data, list):
-                return [mask_data(i) for i in data]
-            return data
-
-        # Helper for flat config masking
-        def mask_flat(flat_data):
-            masked = {}
-            for k, v in flat_data.items():
-                # Check for sensitive keys
-                if any(s in k.lower() for s in ['password', 'token', 'key', 'secret', 'api']) and v:
-                    # Allow "Enabled" keys (like basicAuthEnabled) to remain visible
-                    if "enabled" not in k.lower():
-                        masked[k] = "********"
-                    else:
-                        masked[k] = v
-                else:
-                    masked[k] = v
-            return masked
-
         if CONFIG_MAPPER_AVAILABLE:
             flat_config = flatten_config(grouped_config)
-            secure_config = mask_flat(flat_config)
             
             display_names_dict = {}
             for key in flat_config.keys():
@@ -2247,17 +2223,16 @@ async def get_config(request: Request):
 
             return {
                 "success": True,
-                "config": secure_config,
+                "config": flat_config,  # Actual values returned
                 "ui_groups": UI_GROUPS,
                 "display_names": display_names_dict,
                 "tooltips": CONFIG_TOOLTIPS,
                 "using_flat_structure": True,
             }
         else:
-            secure_config = mask_data(grouped_config)
             return {
                 "success": True,
-                "config": secure_config,
+                "config": grouped_config,  # Actual values returned
                 "tooltips": CONFIG_TOOLTIPS,
                 "using_flat_structure": False,
             }
@@ -2267,7 +2242,6 @@ async def get_config(request: Request):
         logger.error(f"Error reading config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
-
 @app.post("/api/config")
 async def update_config(data: ConfigUpdate):
     """Update config.json - accepts FLAT structure and saves as GROUPED when config_mapper available"""
