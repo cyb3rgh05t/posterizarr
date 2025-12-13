@@ -2188,8 +2188,11 @@ async def get_config(request: Request):
                 webui = c.get("WebUI", {})
                 auth_enabled = str(webui.get("basicAuthEnabled", False)).lower() in ["true", "1", "yes"]
 
-        # If Auth is DISABLED, we enforce Browser-Only access (Referer/Origin)
-        if not auth_enabled:
+        # Check for API Key presence (Middleware handles validity, this bypasses the browser check)
+        api_key_present = request.query_params.get("api_key") or request.headers.get("X-API-Key")
+
+        # If Auth is DISABLED and NO API Key is present, we enforce Browser-Only access
+        if not auth_enabled and not api_key_present:
             referer = request.headers.get("referer", "")
             origin = request.headers.get("origin", "")
             host = request.headers.get("host", "")
