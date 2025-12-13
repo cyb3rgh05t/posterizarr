@@ -92,7 +92,13 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         if path.startswith("/api/webhook/"):
             return self._unauthorized_response()
 
-        # 3. Public Access Logic (When Basic Auth is DISABLED)
+        # 3. Whitelist Static Files & Frontend (CRITICAL FIX)
+        # If the request is NOT for the API, let it pass so the UI can load.
+        # The UI will then make API calls which WILL be caught by step 4.
+        if not path.startswith("/api/"):
+             return await call_next(request)
+
+        # 4. Public Access Logic (When Basic Auth is DISABLED)
         if not self.enabled:
             # Prevent direct API access to sensitive endpoints without browser headers
             if path.startswith("/api/config") or path.startswith("/api/auth/keys"):
@@ -110,7 +116,7 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
 
             return await call_next(request)
 
-        # 4. Basic Auth Logic (When Basic Auth is ENABLED)
+        # 5. Basic Auth Logic (When Basic Auth is ENABLED)
         # Allow pre-flight OPTIONS requests for CORS and auth check
         if request.method == "OPTIONS" or path == "/api/auth/check":
             return await call_next(request)
