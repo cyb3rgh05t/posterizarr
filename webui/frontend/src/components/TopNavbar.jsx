@@ -64,7 +64,6 @@ const TopNavbar = () => {
   const handleDeleteLockfile = async () => {
     try {
       const response = await fetch("/api/running-file", { method: "DELETE" });
-
       if (!response.ok) {
         console.error(`HTTP Error ${response.status}: ${response.statusText}`);
         setShowLockConfirm(false);
@@ -72,7 +71,6 @@ const TopNavbar = () => {
       }
 
       const data = await response.json();
-
       if (data.success) {
         fetchStatus();
       } else {
@@ -205,7 +203,27 @@ const TopNavbar = () => {
                   <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl bg-theme-card border border-theme shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                     <div className="p-2">
                       <button
-                        onClick={() => { logout(); setIsUserDropdownOpen(false); }}
+                        onClick={async () => {
+                            // 1. Close the menu
+                            setIsUserDropdownOpen(false);
+
+                            // 2. Clear local React state
+                            logout();
+
+                            // 3. The Basic Auth "Logout Trick"
+                            // We send a request with INTENTIONALLY BAD credentials ("logout:logout").
+                            // This overwrites the valid cached credentials in the browser for this domain.
+                            try {
+                              await fetch("/api/auth/check", {
+                                headers: { "Authorization": "Basic " + btoa("logout:logout") }
+                              });
+                            } catch (e) {
+                              // We expect this to fail or throw 401, which is good.
+                            }
+
+                            // 4. Force a hard reload to ensure the browser prompts for login again
+                            window.location.reload();
+                        }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-colors"
                       >
                         <LogOut className="w-4 h-4" />
