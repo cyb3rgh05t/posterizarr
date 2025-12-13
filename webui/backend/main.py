@@ -148,7 +148,6 @@ FONTPREVIEWS_DIR = BASE_DIR / "fontpreviews"
 DATABASE_DIR = BASE_DIR / "database"
 RUNNING_FILE = TEMP_DIR / "Posterizarr.Running"
 IMAGECHOICES_DB_PATH = DATABASE_DIR / "imagechoices.db"
-CONFIG_DB_PATH = DATABASE_DIR / "config.db"
 
 # Global lock for process management
 process_lock = threading.RLock()
@@ -1959,11 +1958,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # Basic Auth Middleware
 if AUTH_MIDDLEWARE_AVAILABLE:
     try:
-        # The middleware now loads the config dynamically with every request!
+        # Ensure path is correct by using DATABASE_DIR directly
+        auth_db_path = DATABASE_DIR / "config.db"
+
         app.add_middleware(
             BasicAuthMiddleware,
             config_path=CONFIG_PATH,
-            db_path=CONFIG_DB_PATH,
+            db_path=auth_db_path, # Use the local variable
         )
         logger.info("Basic Auth middleware registered with dynamic config reload")
     except Exception as e:
@@ -2172,62 +2173,91 @@ async def revoke_api_key(key_id: int):
 
 
 @app.get("/api/config")
-async def get_config():
-    """Get current config.json - returns FLAT structure for UI when config_mapper available"""
+async def get_config(request: Request):
+    """Get config.json - SECURED: Masks secrets & blocks CLI tools when auth is off"""
     logger.info("=" * 60)
     logger.info("CONFIG READ REQUEST")
-    logger.debug(f"Config path: {CONFIG_PATH}")
-    logger.debug(f"Config mapper available: {CONFIG_MAPPER_AVAILABLE}")
+
+    # Even if Middleware fails, this block prevents unauthorized CLI access
+    try:
+        # Check if Auth is enabled in the file directly
+        auth_enabled = False
+        if CONFIG_PATH.exists():
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                c = json.load(f)
+                webui = c.get("WebUI", {})
+                auth_enabled = str(webui.get("basicAuthEnabled", False)).lower() in ["true", "1", "yes"]
+
+        # If Auth is DISABLED, we must enforce Browser-Only access
+        if not auth_enabled:
+            referer = request.headers.get("referer", "")
+            origin = request.headers.get("origin", "")
+            host = request.headers.get("host", "")
+            
+            is_valid_ui = False
+            if host:
+                if referer and host in referer: is_valid_ui = True
+                if origin and host in origin: is_valid_ui = True
+            
+            if not is_valid_ui:
+                logger.warning(f"SECURITY: Blocking direct non-browser access to config from {request.client.host}")
+                raise HTTPException(status_code=403, detail="Direct API access denied. Use the Web UI.")
+    except HTTPException:
+        raise
+    except Exception as sec_err:
+        logger.error(f"Security check error: {sec_err}")
 
     try:
         if not CONFIG_PATH.exists():
-            logger.error(f"Config file not found at: {CONFIG_PATH}")
-            logger.debug(f"Base directory: {BASE_DIR}")
-            error_msg = f"Config file not found at: {CONFIG_PATH}\n"
-            error_msg += f"Base directory: {BASE_DIR}\n"
-            error_msg += "Please create config.json from config.example.json"
-            raise HTTPException(status_code=404, detail=error_msg)
+            raise HTTPException(status_code=404, detail="Config file not found")
 
-        logger.debug("Reading config file...")
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             grouped_config = json.load(f)
 
-        logger.debug(f"Config loaded: {len(grouped_config)} top-level keys")
-        logger.debug(f"Top-level keys: {list(grouped_config.keys())}")
+        # Helper to mask sensitive strings
+        def mask_data(data):
+            if isinstance(data, dict):
+                return {k: mask_data(v) if not any(s in k.lower() for s in ['password', 'token', 'key', 'secret', 'api']) else "********" for k, v in data.items()}
+            elif isinstance(data, list):
+                return [mask_data(i) for i in data]
+            return data
 
-        # If config_mapper is available, transform to flat structure
+        # Helper for flat config masking
+        def mask_flat(flat_data):
+            masked = {}
+            for k, v in flat_data.items():
+                # Check for sensitive keys
+                if any(s in k.lower() for s in ['password', 'token', 'key', 'secret', 'api']) and v:
+                    # Allow "Enabled" keys (like basicAuthEnabled) to remain visible
+                    if "enabled" not in k.lower():
+                        masked[k] = "********"
+                    else:
+                        masked[k] = v
+                else:
+                    masked[k] = v
+            return masked
+
         if CONFIG_MAPPER_AVAILABLE:
-            logger.debug("Flattening config structure...")
-            logger.debug("Flattening config structure...")
             flat_config = flatten_config(grouped_config)
-            logger.debug(f"Flat config: {len(flat_config)} keys")
-
-            # Build display names for all keys in the config
-            logger.debug("Building display names dictionary...")
+            secure_config = mask_flat(flat_config)
+            
             display_names_dict = {}
             for key in flat_config.keys():
                 display_names_dict[key] = get_display_name(key)
 
-            logger.info(f"Config read successful: {len(flat_config)} settings")
-            logger.info("=" * 60)
-
             return {
                 "success": True,
-                "config": flat_config,
-                "ui_groups": UI_GROUPS,  # Helps frontend organize fields
-                "display_names": display_names_dict,  # Send display names to frontend
-                "tooltips": CONFIG_TOOLTIPS,  # Send tooltips to frontend
+                "config": secure_config,
+                "ui_groups": UI_GROUPS,
+                "display_names": display_names_dict,
+                "tooltips": CONFIG_TOOLTIPS,
                 "using_flat_structure": True,
             }
         else:
-            # Fallback: return grouped structure as-is
-            logger.info(
-                f"Config read successful (grouped): {len(grouped_config)} sections"
-            )
-            logger.info("=" * 60)
+            secure_config = mask_data(grouped_config)
             return {
                 "success": True,
-                "config": grouped_config,
+                "config": secure_config,
                 "tooltips": CONFIG_TOOLTIPS,
                 "using_flat_structure": False,
             }
@@ -2235,10 +2265,8 @@ async def get_config():
         raise
     except Exception as e:
         logger.error(f"Error reading config: {e}")
-        logger.exception("Full traceback:")
-        logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=str(e))
-
+    
 
 @app.post("/api/config")
 async def update_config(data: ConfigUpdate):
@@ -7585,7 +7613,7 @@ async def delete_poster(path: str):
         # Construct the full file path
         file_path = ASSETS_DIR / path
 
-        # Security check: Ensure the path is within ASSETS_DIR
+        # Ensure the path is within ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(ASSETS_DIR.resolve())
@@ -7873,7 +7901,7 @@ async def bulk_delete_posters(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = ASSETS_DIR / path
 
-                # Security check: Ensure the path is within ASSETS_DIR
+                # Ensure the path is within ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(ASSETS_DIR.resolve())
@@ -7936,7 +7964,7 @@ async def delete_background(path: str):
         # Construct the full file path
         file_path = ASSETS_DIR / path
 
-        # Security check: Ensure the path is within ASSETS_DIR
+        # Ensure the path is within ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(ASSETS_DIR.resolve())
@@ -7981,7 +8009,7 @@ async def bulk_delete_backgrounds(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = ASSETS_DIR / path
 
-                # Security check: Ensure the path is within ASSETS_DIR
+                # Ensure the path is within ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(ASSETS_DIR.resolve())
@@ -8044,7 +8072,7 @@ async def delete_season(path: str):
         # Construct the full file path
         file_path = ASSETS_DIR / path
 
-        # Security check: Ensure the path is within ASSETS_DIR
+        # Ensure the path is within ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(ASSETS_DIR.resolve())
@@ -8089,7 +8117,7 @@ async def bulk_delete_seasons(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = ASSETS_DIR / path
 
-                # Security check: Ensure the path is within ASSETS_DIR
+                # Ensure the path is within ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(ASSETS_DIR.resolve())
@@ -8152,7 +8180,7 @@ async def delete_titlecard(path: str):
         # Construct the full file path
         file_path = ASSETS_DIR / path
 
-        # Security check: Ensure the path is within ASSETS_DIR
+        # Ensure the path is within ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(ASSETS_DIR.resolve())
@@ -8197,7 +8225,7 @@ async def bulk_delete_titlecards(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = ASSETS_DIR / path
 
-                # Security check: Ensure the path is within ASSETS_DIR
+                # Ensure the path is within ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(ASSETS_DIR.resolve())
@@ -8274,7 +8302,7 @@ async def delete_manual_asset(path: str):
         # Construct the full file path
         file_path = MANUAL_ASSETS_DIR / path
 
-        # Security check: Ensure the path is within MANUAL_ASSETS_DIR
+        # Ensure the path is within MANUAL_ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(MANUAL_ASSETS_DIR.resolve())
@@ -8316,7 +8344,7 @@ async def bulk_delete_manual_assets(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = MANUAL_ASSETS_DIR / path
 
-                # Security check: Ensure the path is within MANUAL_ASSETS_DIR
+                # Ensure the path is within MANUAL_ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(MANUAL_ASSETS_DIR.resolve())
@@ -8421,7 +8449,7 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
 
             full_path = (ASSETS_DIR / path).resolve()
 
-            # Security check: Ensure the path is within ASSETS_DIR
+            # Ensure the path is within ASSETS_DIR
             if not str(full_path).startswith(str(ASSETS_DIR.resolve())):
                 raise HTTPException(status_code=403, detail="Access denied: Invalid path")
 
