@@ -49,15 +49,31 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
             with open(self.config_path, "r", encoding="utf-8") as f: 
                 config = json.load(f)
             
+            # CHECK 1: Try reading from root (Flat structure)
+            enabled_root = config.get("basicAuthEnabled")
+            user_root = config.get("basicAuthUsername")
+            pass_root = config.get("basicAuthPassword")
+
+            # CHECK 2: Try reading from WebUI group (Grouped structure)
             webui = config.get("WebUI", {})
-            # Handle string or boolean values for enabled flag
-            enabled_val = webui.get("basicAuthEnabled", False)
+            enabled_nested = webui.get("basicAuthEnabled")
+            user_nested = webui.get("basicAuthUsername")
+            pass_nested = webui.get("basicAuthPassword")
+
+            # PRIORITIZE: Use root value if present, otherwise nested
+            # This handles cases where config is flat OR grouped
+            enabled_val = enabled_root if enabled_root is not None else enabled_nested
+            user_val = user_root if user_root is not None else (user_nested or "admin")
+            pass_val = pass_root if pass_root is not None else (pass_nested or "posterizarr")
+
             self.enabled = str(enabled_val).lower() in ["true", "1", "yes"]
-            self.username = webui.get("basicAuthUsername", "admin")
-            self.password_hash = webui.get("basicAuthPassword", "posterizarr")
+            self.username = user_val
+            self.password_hash = pass_val
+            
         except Exception as e:
             logger.error(f"AUTH: Error loading config: {e}")
             self.enabled = False
+
 
     async def dispatch(self, request: Request, call_next):
         # Reload config on every request to support dynamic changes
