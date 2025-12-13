@@ -41,6 +41,8 @@ import zipfile
 import tempfile
 import shutil
 import sqlite3
+import bcrypt
+import secrets
 from starlette.responses import FileResponse
 from PIL import Image, ImageDraw, ImageChops
 from io import BytesIO
@@ -1956,10 +1958,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # Basic Auth Middleware
 if AUTH_MIDDLEWARE_AVAILABLE:
     try:
-        # The middleware now loads the config dynamically with every request!
+        # Ensure path is correct by using DATABASE_DIR directly
+        auth_db_path = DATABASE_DIR / "config.db"
+
         app.add_middleware(
             BasicAuthMiddleware,
-            config_path=CONFIG_PATH,  #  CHANGED: Only pass config_path
+            config_path=CONFIG_PATH,
+            db_path=auth_db_path, # Use the local variable
         )
         logger.info("Basic Auth middleware registered with dynamic config reload")
     except Exception as e:
@@ -2124,64 +2129,132 @@ async def check_auth():
     else:
         return {"enabled": False, "authenticated": True}
 
+class ApiKeyCreate(BaseModel):
+    name: str
+
+@app.get("/api/auth/keys")
+async def list_api_keys():
+    """List all active API keys"""
+    if not CONFIG_DATABASE_AVAILABLE or not config_db:
+        raise HTTPException(status_code=503, detail="Config DB not available")
+    return {"success": True, "keys": config_db.list_api_keys()}
+
+@app.post("/api/auth/keys")
+async def create_api_key(data: ApiKeyCreate):
+    """Generate a new API key"""
+    if not CONFIG_DATABASE_AVAILABLE or not config_db:
+        raise HTTPException(status_code=503, detail="Config DB not available")
+    
+    # Generate a secure random key (32 chars)
+    raw_key = secrets.token_urlsafe(32)
+    
+    key_id = config_db.add_api_key(data.name, raw_key)
+    
+    if key_id != -1:
+        return {
+            "success": True, 
+            "key": raw_key, 
+            "message": "Key generated. Save it now, it won't be shown again!",
+            "id": key_id
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to create key")
+
+@app.delete("/api/auth/keys/{key_id}")
+async def revoke_api_key(key_id: int):
+    """Revoke an API key"""
+    if not CONFIG_DATABASE_AVAILABLE or not config_db:
+        raise HTTPException(status_code=503, detail="Config DB not available")
+        
+    if config_db.delete_api_key(key_id):
+        return {"success": True, "message": "Key revoked"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to revoke key")
+
 
 @app.get("/api/config")
-async def get_config():
-    """Get current config.json - returns FLAT structure for UI when config_mapper available"""
+async def get_config(request: Request):
+    """Get current config.json - SECURED: Blocks CLI tools when auth is off"""
     logger.info("=" * 60)
     logger.info("CONFIG READ REQUEST")
-    logger.debug(f"Config path: {CONFIG_PATH}")
-    logger.debug(f"Config mapper available: {CONFIG_MAPPER_AVAILABLE}")
+
+    # This block prevents unauthorized CLI access even if Middleware fails
+    try:
+        # Check if Auth is enabled in the file directly
+        auth_enabled = False
+        if CONFIG_PATH.exists():
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                c = json.load(f)
+                webui = c.get("WebUI", {})
+                auth_enabled = str(webui.get("basicAuthEnabled", False)).lower() in ["true", "1", "yes"]
+
+        # 1. Check for API Key presence
+        api_key = request.query_params.get("api_key") or request.headers.get("X-API-Key")
+        
+        # 2. Validate API Key if present
+        is_key_valid = False
+        if api_key and config_db:
+            # Validate against the database
+            is_key_valid = config_db.validate_api_key(api_key)
+            if is_key_valid:
+                logger.info("Access granted via valid API Key (Script/CLI access)")
+            else:
+                logger.warning(f"Invalid API Key provided: {api_key[:5]}...")
+
+        # 3. Security Logic
+        # If Auth is OFF, we enforce Browser-Only access...
+        # UNLESS a VALID API key is provided (bypasses browser check)
+        if not auth_enabled and not is_key_valid:
+            referer = request.headers.get("referer", "")
+            origin = request.headers.get("origin", "")
+            host = request.headers.get("host", "")
+            
+            is_valid_ui = False
+            if host:
+                if referer and host in referer: is_valid_ui = True
+                if origin and host in origin: is_valid_ui = True
+            
+            if not is_valid_ui:
+                # If they provided a key but it was wrong, give a specific error
+                if api_key:
+                    logger.warning("Blocking request: Invalid API Key")
+                    raise HTTPException(status_code=403, detail="Invalid API Key")
+                
+                # Otherwise, give the standard "Browser Only" error
+                logger.warning(f"SECURITY: Blocking direct non-browser access to config from {request.client.host}")
+                raise HTTPException(status_code=403, detail="Direct API access denied. Use the Web UI.")
+                
+    except HTTPException:
+        raise
+    except Exception as sec_err:
+        logger.error(f"Security check error: {sec_err}")
 
     try:
         if not CONFIG_PATH.exists():
-            logger.error(f"Config file not found at: {CONFIG_PATH}")
-            logger.debug(f"Base directory: {BASE_DIR}")
-            error_msg = f"Config file not found at: {CONFIG_PATH}\n"
-            error_msg += f"Base directory: {BASE_DIR}\n"
-            error_msg += "Please create config.json from config.example.json"
-            raise HTTPException(status_code=404, detail=error_msg)
+            raise HTTPException(status_code=404, detail="Config file not found")
 
-        logger.debug("Reading config file...")
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             grouped_config = json.load(f)
 
-        logger.debug(f"Config loaded: {len(grouped_config)} top-level keys")
-        logger.debug(f"Top-level keys: {list(grouped_config.keys())}")
-
-        # If config_mapper is available, transform to flat structure
         if CONFIG_MAPPER_AVAILABLE:
-            logger.debug("Flattening config structure...")
-            logger.debug("Flattening config structure...")
             flat_config = flatten_config(grouped_config)
-            logger.debug(f"Flat config: {len(flat_config)} keys")
-
-            # Build display names for all keys in the config
-            logger.debug("Building display names dictionary...")
+            
             display_names_dict = {}
             for key in flat_config.keys():
                 display_names_dict[key] = get_display_name(key)
 
-            logger.info(f"Config read successful: {len(flat_config)} settings")
-            logger.info("=" * 60)
-
             return {
                 "success": True,
-                "config": flat_config,
-                "ui_groups": UI_GROUPS,  # Helps frontend organize fields
-                "display_names": display_names_dict,  # Send display names to frontend
-                "tooltips": CONFIG_TOOLTIPS,  # Send tooltips to frontend
+                "config": flat_config,  # Actual values returned
+                "ui_groups": UI_GROUPS,
+                "display_names": display_names_dict,
+                "tooltips": CONFIG_TOOLTIPS,
                 "using_flat_structure": True,
             }
         else:
-            # Fallback: return grouped structure as-is
-            logger.info(
-                f"Config read successful (grouped): {len(grouped_config)} sections"
-            )
-            logger.info("=" * 60)
             return {
                 "success": True,
-                "config": grouped_config,
+                "config": grouped_config,  # Actual values returned
                 "tooltips": CONFIG_TOOLTIPS,
                 "using_flat_structure": False,
             }
@@ -2189,11 +2262,8 @@ async def get_config():
         raise
     except Exception as e:
         logger.error(f"Error reading config: {e}")
-        logger.exception("Full traceback:")
-        logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=str(e))
-
-
+    
 @app.post("/api/config")
 async def update_config(data: ConfigUpdate):
     """Update config.json - accepts FLAT structure and saves as GROUPED when config_mapper available"""
@@ -2216,8 +2286,16 @@ async def update_config(data: ConfigUpdate):
         else:
             current_flat = current_config
 
+        # Check if basicAuthPassword is being updated
+        if "basicAuthPassword" in data.config:
+            new_pass = data.config["basicAuthPassword"]
+            # Only hash if it's not already a hash (user entered a new plain password)
+            if new_pass and not new_pass.startswith(("$2b$", "$2a$", "$2y$")):
+                logger.info("Hashing new password provided in config update...")
+                hashed = bcrypt.hashpw(new_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                data.config["basicAuthPassword"] = hashed
+
         # Preserve library exclusions if database hasn't been populated yet
-        # This prevents losing exclusions on autosave before libraries are fetched
         logger.debug("Checking if library exclusions need to be preserved...")
         for server_config in [
             ("plex", "PlexLibstoExclude"),
@@ -2225,44 +2303,25 @@ async def update_config(data: ConfigUpdate):
             ("emby", "EmbyLibstoExclude"),
         ]:
             server_type, exclusion_key = server_config
-
-            # Check if the database has libraries for this server type
             try:
                 db_result = server_libraries_db.get_media_server_libraries(server_type)
                 has_db_libraries = len(db_result.get("libraries", [])) > 0
 
-                # If database is empty but config.json has exclusions, preserve them
                 if not has_db_libraries and current_flat.get(exclusion_key):
                     current_exclusions = current_flat.get(exclusion_key)
                     new_exclusions = data.config.get(exclusion_key, [])
 
-                    # Only preserve if the new value is empty/different
-                    # (user might be intentionally clearing it)
                     if not new_exclusions and current_exclusions:
-                        logger.info(
-                            f"Preserving {exclusion_key} from config.json "
-                            f"(database not yet populated): {current_exclusions}"
-                        )
+                        logger.info(f"Preserving {exclusion_key} from config.json (DB empty)")
                         data.config[exclusion_key] = current_exclusions
                     elif new_exclusions != current_exclusions:
-                        logger.debug(
-                            f"{exclusion_key} changed by user, using new value: {new_exclusions}"
-                        )
+                        logger.debug(f"{exclusion_key} changed by user")
                 else:
                     if has_db_libraries:
-                        logger.debug(
-                            f"Database has libraries for {server_type}, "
-                            f"using value from config update"
-                        )
+                        logger.debug(f"Database has libraries for {server_type}, using value from update")
             except Exception as db_error:
-                logger.warning(
-                    f"Could not check database for {server_type} libraries: {db_error}"
-                )
-                # On error, preserve existing exclusions to be safe
+                logger.warning(f"Could not check database for {server_type} libraries: {db_error}")
                 if current_flat.get(exclusion_key):
-                    logger.info(
-                        f"Preserving {exclusion_key} due to database check error"
-                    )
                     data.config[exclusion_key] = current_flat.get(exclusion_key)
 
         # Detect and log changes
@@ -2270,73 +2329,44 @@ async def update_config(data: ConfigUpdate):
         for key, new_value in data.config.items():
             old_value = current_flat.get(key)
             if old_value != new_value:
-                # Mask sensitive values in logs
-                if any(
-                    sensitive in key.lower()
-                    for sensitive in ["password", "token", "key", "api"]
-                ):
+                if any(sensitive in key.lower() for sensitive in ["password", "token", "key", "api"]):
                     old_display = "***" if old_value else None
                     new_display = "***" if new_value else None
                 else:
                     old_display = old_value
                     new_display = new_value
 
-                changes_detected.append(
-                    {"key": key, "old": old_display, "new": new_display}
-                )
+                changes_detected.append({"key": key, "old": old_display, "new": new_display})
                 logger.info(f"CONFIG CHANGE: {key}")
                 logger.info(f"  Old value: {old_display}")
                 logger.info(f"  New value: {new_display}")
 
         if changes_detected:
             logger.info(f"Total changes detected: {len(changes_detected)}")
-            logger.debug(f"Changed keys: {[c['key'] for c in changes_detected]}")
         else:
             logger.info("No changes detected in config")
 
         logger.info("Saving config changes to config.json...")
 
-        # If config_mapper is available, transform flat config back to grouped structure
         if CONFIG_MAPPER_AVAILABLE:
             logger.debug("Transforming flat config back to grouped structure...")
             grouped_config = unflatten_config(data.config)
-            logger.debug(f"Grouped config: {len(grouped_config)} sections")
-
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
                 json.dump(grouped_config, f, indent=2, ensure_ascii=False)
-
-            file_size = CONFIG_PATH.stat().st_size
-            logger.info(f"Config saved successfully to config.json (flat -> grouped)")
-            logger.debug(f"File size: {file_size} bytes")
         else:
-            # Fallback: save as-is (assuming grouped structure)
             logger.debug("Saving config as grouped structure (no mapper)...")
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
                 json.dump(data.config, f, indent=2, ensure_ascii=False)
 
-            file_size = CONFIG_PATH.stat().st_size
-            logger.info("Config saved successfully to config.json (grouped structure)")
-            logger.debug(f"File size: {file_size} bytes")
-
-        # Also update config database if available
+        # Update config database
         if CONFIG_DATABASE_AVAILABLE and config_db:
             try:
                 logger.info("Syncing config changes to database...")
-                # Sync the updated config to database
                 config_db.import_from_json()
                 logger.info("Config database synced successfully with config.json")
-
-                # Log changes to database as well
-                if changes_detected:
-                    logger.debug(
-                        f"Database now contains {len(changes_detected)} updated values"
-                    )
             except Exception as db_error:
                 logger.warning(f"Could not sync config database: {db_error}")
-                logger.debug(f"Database sync error details: {str(db_error)}")
-        else:
-            logger.info("Config database not available, skipping database sync")
-
+        
         logger.info("=" * 60)
         return {
             "success": True,
@@ -2348,7 +2378,6 @@ async def update_config(data: ConfigUpdate):
         logger.exception("Full traceback:")
         logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=str(e))
-
 
 # ============================================================================
 # CONFIG DATABASE ENDPOINTS
@@ -7580,7 +7609,7 @@ async def delete_poster(path: str):
         # Construct the full file path
         file_path = ASSETS_DIR / path
 
-        # Security check: Ensure the path is within ASSETS_DIR
+        # Ensure the path is within ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(ASSETS_DIR.resolve())
@@ -7868,7 +7897,7 @@ async def bulk_delete_posters(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = ASSETS_DIR / path
 
-                # Security check: Ensure the path is within ASSETS_DIR
+                # Ensure the path is within ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(ASSETS_DIR.resolve())
@@ -7931,7 +7960,7 @@ async def delete_background(path: str):
         # Construct the full file path
         file_path = ASSETS_DIR / path
 
-        # Security check: Ensure the path is within ASSETS_DIR
+        # Ensure the path is within ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(ASSETS_DIR.resolve())
@@ -7976,7 +8005,7 @@ async def bulk_delete_backgrounds(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = ASSETS_DIR / path
 
-                # Security check: Ensure the path is within ASSETS_DIR
+                # Ensure the path is within ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(ASSETS_DIR.resolve())
@@ -8039,7 +8068,7 @@ async def delete_season(path: str):
         # Construct the full file path
         file_path = ASSETS_DIR / path
 
-        # Security check: Ensure the path is within ASSETS_DIR
+        # Ensure the path is within ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(ASSETS_DIR.resolve())
@@ -8084,7 +8113,7 @@ async def bulk_delete_seasons(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = ASSETS_DIR / path
 
-                # Security check: Ensure the path is within ASSETS_DIR
+                # Ensure the path is within ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(ASSETS_DIR.resolve())
@@ -8147,7 +8176,7 @@ async def delete_titlecard(path: str):
         # Construct the full file path
         file_path = ASSETS_DIR / path
 
-        # Security check: Ensure the path is within ASSETS_DIR
+        # Ensure the path is within ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(ASSETS_DIR.resolve())
@@ -8192,7 +8221,7 @@ async def bulk_delete_titlecards(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = ASSETS_DIR / path
 
-                # Security check: Ensure the path is within ASSETS_DIR
+                # Ensure the path is within ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(ASSETS_DIR.resolve())
@@ -8269,7 +8298,7 @@ async def delete_manual_asset(path: str):
         # Construct the full file path
         file_path = MANUAL_ASSETS_DIR / path
 
-        # Security check: Ensure the path is within MANUAL_ASSETS_DIR
+        # Ensure the path is within MANUAL_ASSETS_DIR
         try:
             file_path = file_path.resolve()
             file_path.relative_to(MANUAL_ASSETS_DIR.resolve())
@@ -8311,7 +8340,7 @@ async def bulk_delete_manual_assets(request: BulkDeleteRequest):
                 # Construct the full file path
                 file_path = MANUAL_ASSETS_DIR / path
 
-                # Security check: Ensure the path is within MANUAL_ASSETS_DIR
+                # Ensure the path is within MANUAL_ASSETS_DIR
                 try:
                     file_path = file_path.resolve()
                     file_path.relative_to(MANUAL_ASSETS_DIR.resolve())
@@ -8416,7 +8445,7 @@ async def get_folder_view_browse(path: Optional[str] = Query(None)):
 
             full_path = (ASSETS_DIR / path).resolve()
 
-            # Security check: Ensure the path is within ASSETS_DIR
+            # Ensure the path is within ASSETS_DIR
             if not str(full_path).startswith(str(ASSETS_DIR.resolve())):
                 raise HTTPException(status_code=403, detail="Access denied: Invalid path")
 

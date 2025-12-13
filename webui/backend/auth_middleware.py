@@ -1,285 +1,135 @@
 """
 Basic Authentication Middleware for Posterizarr Web UI
-Version 2 - Blocks EVERYTHING including static files
 """
 
 from fastapi import Request, HTTPException, status
-from fastapi.responses import Response, HTMLResponse
+from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
 import base64
 import secrets
 import logging
+import bcrypt
 from pathlib import Path
 import json
 
-# ============================================================================
-# LOGGER SETUP
-# ============================================================================
+# Use the root logger so output appears in console/BackendServer.log
 logger = logging.getLogger(__name__)
 
-auth_logger = logging.getLogger("posterizarr.auth")
-auth_logger.setLevel(logging.INFO)
-
-if not auth_logger.handlers:
-    try:
-        if Path("/.dockerenv").exists():
-            LOGS_DIR = Path("/config/UILogs")
-        else:
-            LOGS_DIR = Path(__file__).parent.parent.parent / "UILogs"
-
-        LOGS_DIR.mkdir(exist_ok=True)
-
-        # Handler 1: AuthServer.log (separate auth log)
-        auth_log_path = LOGS_DIR / "AuthServer.log"
-        if auth_log_path.exists():
-            auth_log_path.unlink()
-            logger.info(f"Cleared old AuthServer.log")
-
-        auth_handler = logging.FileHandler(auth_log_path, encoding="utf-8", mode="w")
-        auth_handler.setFormatter(
-            logging.Formatter(
-                "[%(asctime)s] [%(levelname)-8s] |AUTH| %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
-        )
-        auth_logger.addHandler(auth_handler)
-
-        # Handler 2: FrontendUI.log (combined log with backend and UI)
-        frontend_log_path = LOGS_DIR / "FrontendUI.log"
-        frontend_handler = logging.FileHandler(
-            frontend_log_path, encoding="utf-8", mode="a"
-        )
-        frontend_handler.setFormatter(
-            logging.Formatter(
-                "[%(asctime)s] [%(levelname)-8s] |AUTH| %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
-        )
-        auth_logger.addHandler(frontend_handler)
-
-        logger.info(f"Auth logger initialized: {auth_log_path}")
-
-    except Exception as e:
-        logger.warning(f"Could not initialize auth logger: {e}")
-
-logger = auth_logger
-
-
 class BasicAuthMiddleware(BaseHTTPMiddleware):
-    """
-    Basic Authentication Middleware with dynamic config reload
-    Blocks ALL requests including static files when enabled
-    """
-
-    def __init__(self, app, config_path: Path):
+    def __init__(self, app, config_path: Path, db_path: Path):
         super().__init__(app)
         self.config_path = config_path
+        self.db_path = db_path
+        
+        # Try to load ConfigDB
+        try:
+            from config_database import ConfigDB
+            self.auth_db = ConfigDB(db_path, config_path)
+            logger.info("AUTH: Database connection established")
+        except Exception as e:
+            logger.error(f"AUTH: Database error: {e}")
+            self.auth_db = None
 
-        # Load initial config
-        auth_config = self._load_config()
-        self.username = auth_config["username"]
-        self.password = auth_config["password"]
-        self.enabled = auth_config["enabled"]
+        self._load_config()
+        logger.info(f"AUTH: Middleware Initialized (Enabled: {self.enabled})")
 
-        if self.enabled:
-            auth_logger.info("Basic Auth ENABLED on startup (Full blocking mode)")
-            auth_logger.info(f"Username: {self.username}")
-        else:
-            auth_logger.info("Basic Auth DISABLED on startup")
+    def _verify_password(self, plain_password: str, hashed_password: str) -> bool:
+        try:
+            return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        except ValueError:
+            return False
 
     def _load_config(self) -> dict:
-        """
-        Loads the auth config dynamically from config.json
-        """
+        default_config = {"enabled": False, "username": "admin", "password": ""}
         try:
-            if not self.config_path.exists():
-                auth_logger.warning(
-                    "Config file not found, using default auth settings"
-                )
-                return {
-                    "enabled": False,
-                    "username": "admin",
-                    "password": "posterizarr",
-                }
-
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            if not self.config_path.exists(): 
+                self.enabled = False
+                return default_config
+                
+            with open(self.config_path, "r", encoding="utf-8") as f: 
                 config = json.load(f)
-
-            webui_config = config.get("WebUI", {})
-            enabled_value = webui_config.get("basicAuthEnabled", False)
-
-            if isinstance(enabled_value, str):
-                enabled = enabled_value.lower() in ["true", "1", "yes"]
-            else:
-                enabled = bool(enabled_value)
-
-            return {
-                "enabled": enabled,
-                "username": webui_config.get("basicAuthUsername", "admin"),
-                "password": webui_config.get("basicAuthPassword", "posterizarr"),
-            }
-
+            
+            webui = config.get("WebUI", {})
+            # Handle string or boolean values for enabled flag
+            enabled_val = webui.get("basicAuthEnabled", False)
+            self.enabled = str(enabled_val).lower() in ["true", "1", "yes"]
+            self.username = webui.get("basicAuthUsername", "admin")
+            self.password_hash = webui.get("basicAuthPassword", "posterizarr")
         except Exception as e:
-            auth_logger.error(f"Error loading auth config: {e}")
-            return {"enabled": False, "username": "admin", "password": "posterizarr"}
+            logger.error(f"AUTH: Error loading config: {e}")
+            self.enabled = False
 
     async def dispatch(self, request: Request, call_next):
-        # Load config dynamically on every request
-        current_config = self._load_config()
-        current_enabled = current_config["enabled"]
-        current_username = current_config["username"]
-        current_password = current_config["password"]
+        # Reload config on every request to support dynamic changes
+        self._load_config()
+        
+        path = request.url.path
+        
+        # 1. API Key Check (Always check this first to allow scripts/webhooks with keys)
+        # Allows legitimate automated access if a valid key is provided
+        api_key_candidate = request.query_params.get("api_key") or request.query_params.get("secret") or request.headers.get("X-API-Key")
+        if api_key_candidate and self.auth_db:
+            if self.auth_db.validate_api_key(api_key_candidate):
+                return await call_next(request)
 
-        # Update internal variables if something has changed
-        if current_enabled != self.enabled:
-            self.enabled = current_enabled
-            self.username = current_username
-            self.password = current_password
+        # 2. Webhook Hard Block
+        # These endpoints require specific handling logic and shouldn't be accessed generically
+        if path.startswith("/api/webhook/"):
+            return self._unauthorized_response()
 
-            if self.enabled:
-                auth_logger.info("Auth Status Changed: ENABLED (Full blocking mode)")
-                auth_logger.info(f"   Username: {self.username}")
-            else:
-                auth_logger.info("Auth Status Changed: DISABLED")
-
-        # If Basic Auth is disabled, allow through
+        # 3. Public Access Logic (When Basic Auth is DISABLED)
         if not self.enabled:
+            # STRICT SECURITY CHECK:
+            # Even if auth is disabled, sensitive endpoints must NOT be accessible 
+            # via direct script calls that lack browser headers (Referer/Origin).
+            # This prevents information disclosure (like passwords in config) to simple GET requests.
+            if path.startswith("/api/config") or path.startswith("/api/auth/keys"):
+                referer = request.headers.get("referer", "")
+                origin = request.headers.get("origin", "")
+                host = request.headers.get("host", "")
+
+                # Valid UI request must have Host AND (Referer matching Host OR Origin matching Host)
+                # CLI tools send Host but typically no Referer/Origin
+                is_valid_source = False
+                if host:
+                    if referer and host in referer: is_valid_source = True
+                    if origin and host in origin: is_valid_source = True
+                
+                if not is_valid_source:
+                    logger.warning(f"AUTH: Blocking direct access to {path} (No valid Referer/Origin)")
+                    return self._unauthorized_response()
+
+            # For all other endpoints (gallery, logs, etc.) when auth is disabled,
+            # we allow access to support the UI and standard functionality.
+            
+            # Whitelist specific endpoints if needed (e.g. status checks)
+            if path in ["/api/auth/check"]:
+                return await call_next(request)
+
             return await call_next(request)
 
-        #  Always allow auth-check endpoint (for frontend status check)
-        if request.url.path == "/api/auth/check":
-            return await call_next(request)
-
-        # Allow root path (/) to load index.html - MUST BE FIRST
-        if request.url.path == "/" or request.url.path == "/index.html":
-            return await call_next(request)
-
-        #  Allow ALL paths that might be React Router routes (no file extension)
-        # This ensures React Router can handle /config, /logs, etc.
-        # Only block if it looks like an API call
-        if (
-            not request.url.path.startswith("/api/")
-            and "." not in request.url.path.split("/")[-1]
-        ):
-            return await call_next(request)
-
-        #  Allow frontend static files (HTML, JS, CSS) so login screen can load
-        # The frontend will show the login screen if auth is required
-        frontend_static_extensions = [
-            ".html",
-            ".js",
-            ".css",
-            ".map",
-            ".ico",
-            ".svg",
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".woff",
-            ".woff2",
-            ".ttf",
-        ]
-        if any(request.url.path.endswith(ext) for ext in frontend_static_extensions):
-            return await call_next(request)
-
-        #  Allow static asset paths (images, posters, etc.)
-        # These cannot send Authorization headers via <img> tags
-        static_paths = [
-            "/poster_assets/",  # Poster images
-            "/test/",  # Test images
-            "/assets/",  # General assets
-        ]
-        if any(request.url.path.startswith(path) for path in static_paths):
-            return await call_next(request)
-
-        #  Block API endpoints and other resources without auth
-        # Only API calls need authentication, frontend loads freely to show login
-        client_ip = request.client.host if request.client else "unknown"
-
-        # Check Authorization Header
+        # 4. Basic Auth Logic (When Basic Auth is ENABLED)
         auth_header = request.headers.get("Authorization")
-
         if not auth_header or not auth_header.startswith("Basic "):
-            auth_logger.warning(
-                f"Unauthorized access | IP: {client_ip} | Path: {request.url.path}"
-            )
+            # Allow pre-flight OPTIONS requests for CORS
+            if request.method == "OPTIONS":
+                return await call_next(request)
             return self._unauthorized_response()
 
         try:
-            # Decode Base64 credentials
-            credentials = base64.b64decode(auth_header[6:]).decode("utf-8")
-            username, password = credentials.split(":", 1)
-
-            # Use secrets.compare_digest for timing-safe comparison
-            username_match = secrets.compare_digest(username, current_username)
-            password_match = secrets.compare_digest(password, current_password)
-
-            if username_match and password_match:
-                # Auth successful - only log on first successful login
-                if request.url.path == "/":
-                    auth_logger.info(
-                        f"Successful login | User: {username} | IP: {client_ip}"
-                    )
-                response = await call_next(request)
-                return response
-            else:
-                # Auth failed
-                auth_logger.warning(
-                    f"Failed login attempt | User: {username} | IP: {client_ip}"
-                )
-                return self._unauthorized_response()
-
-        except Exception as e:
-            auth_logger.error(f"Auth error: {e}")
-            return self._unauthorized_response()
+            creds = base64.b64decode(auth_header[6:]).decode("utf-8")
+            u, p = creds.split(":", 1)
+            # Verify username and password
+            if secrets.compare_digest(u, self.username) and self._verify_password(p, self.password_hash):
+                return await call_next(request)
+        except Exception:
+            pass
+            
+        return self._unauthorized_response()
 
     def _unauthorized_response(self):
-        """
-        Returns 401 Unauthorized Response WITHOUT triggering browser popup
-        We removed WWW-Authenticate header to prevent browser's built-in login dialog
-        Our custom login screen in the frontend handles authentication instead
-        """
         return Response(
-            content="Unauthorized - Authentication required",
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            headers={
-                # REMOVED: "WWW-Authenticate" header to prevent browser popup
-                # The frontend will show our custom login screen instead
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-            },
+            content="Unauthorized", 
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            headers={"WWW-Authenticate": "Basic", "Cache-Control": "no-cache"}
         )
-
-
-def load_auth_config(config_path) -> dict:
-    """
-    Legacy function for backward compatibility
-    """
-    try:
-        config_file = Path(config_path)
-        if not config_file.exists():
-            auth_logger.warning("Config file not found, using default auth settings")
-            return {"enabled": False, "username": "admin", "password": "posterizarr"}
-
-        with open(config_file, "r", encoding="utf-8") as f:
-            config = json.load(f)
-
-        webui_config = config.get("WebUI", {})
-        enabled_value = webui_config.get("basicAuthEnabled", False)
-
-        if isinstance(enabled_value, str):
-            enabled = enabled_value.lower() in ["true", "1", "yes"]
-            auth_logger.info(
-                f"Converted string value '{enabled_value}' to boolean: {enabled}"
-            )
-        else:
-            enabled = bool(enabled_value)
-
-        return {
-            "enabled": enabled,
-            "username": webui_config.get("basicAuthUsername", "admin"),
-            "password": webui_config.get("basicAuthPassword", "posterizarr"),
-        }
-
-    except Exception as e:
-        auth_logger.error(f"Error loading auth config: {e}")
-        return {"enabled": False, "username": "admin", "password": "posterizarr"}
