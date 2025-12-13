@@ -2,6 +2,12 @@
 
 The following API endpoints are available.
 
+**Authentication:**
+- **Option 1 (Recommended):** Add `?api_key=YOUR_KEY` to the URL.
+- **Option 2:** Use the `X-API-Key: YOUR_KEY` header.
+- **Option 3:** Use Basic Authentication (username/password).
+  - `http://admin:posterizarr@YOUR_IP:8000/api/webhook/tautulli`
+
 ---
 
 ## ⚙️ System

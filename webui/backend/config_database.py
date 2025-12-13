@@ -1,6 +1,6 @@
 """
 Config Database Module
-Manages configuration data in SQLite database
+Manages configuration data and API keys in SQLite database
 Automatically syncs with config.json on startup
 """
 
@@ -11,12 +11,13 @@ from pathlib import Path
 from typing import Any, Dict, Optional, List, Tuple
 from datetime import datetime
 import threading
+import bcrypt 
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigDB:
-    """Database class for managing configuration in SQLite"""
+    """Database class for managing configuration and API keys in SQLite"""
 
     def __init__(self, db_path: Path, config_json_path: Path):
         """
@@ -28,7 +29,6 @@ class ConfigDB:
         """
         self.db_path = db_path
         self.config_json_path = config_json_path
-        # REMOVED: self.connection
         self.lock = threading.RLock()  # Thread-safety lock
 
     def _get_connection(self):
@@ -43,11 +43,11 @@ class ConfigDB:
         self.create_tables()
 
     def close(self):
-        """Close connection - No longer needed."""
+        """Close connection - No longer needed as we use per-request connections."""
         pass
 
     def create_tables(self):
-        """Create the config tables if they don't exist"""
+        """Create the config and api_keys tables if they don't exist"""
         with self.lock:
             try:
                 conn = self._get_connection()
@@ -67,21 +67,21 @@ class ConfigDB:
                         updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                         UNIQUE(section, key)
                     )
-                """
+                    """
                 )
 
-                # Indexes
+                # Indexes for config
                 cursor.execute(
                     """
                     CREATE INDEX IF NOT EXISTS idx_config_section
                     ON config(section)
-                """
+                    """
                 )
                 cursor.execute(
                     """
                     CREATE INDEX IF NOT EXISTS idx_config_key
                     ON config(section, key)
-                """
+                    """
                 )
 
                 # Metadata table
@@ -94,12 +94,26 @@ class ConfigDB:
                         sync_status TEXT,
                         sync_message TEXT
                     )
-                """
+                    """
+                )
+
+                # NEW: API Keys Table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS api_keys (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        prefix TEXT NOT NULL,
+                        key_hash TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                        last_used_at TIMESTAMP
+                    )
+                    """
                 )
 
                 conn.commit()
                 conn.close()
-                logger.info("Config database tables created successfully")
+                logger.info("Config database tables verified/created successfully")
             except sqlite3.Error as e:
                 logger.error(f"Error creating config tables: {e}")
                 if 'conn' in locals():
@@ -113,10 +127,8 @@ class ConfigDB:
             return "boolean"
         elif isinstance(value, str):
             lower_value = value.lower()
-            # Recognize lowercase string booleans
             if lower_value == "true" or lower_value == "false":
                 return "boolean"
-            # Optional: Recognize capitalized string booleans (like "True"/"False")
             elif value == "True" or value == "False":
                 return "boolean"
             else:
@@ -158,7 +170,7 @@ class ConfigDB:
                 return value_str
         except (json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Error deserializing value '{value_str}' as type '{value_type}': {e}")
-            return value_str # Fallback to string
+            return value_str
 
     def import_from_json(self, config_data: Dict = None):
         """
@@ -178,7 +190,7 @@ class ConfigDB:
                 conn = self._get_connection()
                 cursor = conn.cursor()
                 entries_to_upsert: List[Tuple] = []
-                now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S') # Use local time string
+                now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
                 for section, section_data in config_data.items():
                     if not isinstance(section_data, dict):
@@ -209,7 +221,7 @@ class ConfigDB:
                         entries_to_upsert,
                     )
                     imported_count = cursor.rowcount
-                    logger.info(f"Config sync complete: {imported_count} rows affected (inserted or updated)")
+                    logger.info(f"Config sync complete: {imported_count} rows affected")
                 else:
                     imported_count = 0
                     logger.info("Config sync: No entries found in config.json")
@@ -218,10 +230,8 @@ class ConfigDB:
                     """
                     INSERT INTO config_metadata (last_sync_time, config_file_path, sync_status, sync_message)
                     VALUES (?, ?, ?, ?)
-                """,
-                    (
-                        now_str, str(self.config_json_path), "success", f"Synced {imported_count} entries",
-                    ),
+                    """,
+                    (now_str, str(self.config_json_path), "success", f"Synced {imported_count} entries"),
                 )
                 conn.commit()
                 conn.close()
@@ -254,7 +264,7 @@ class ConfigDB:
                     SELECT section, key, value, value_type
                     FROM config
                     ORDER BY section, key
-                """
+                    """
                 )
 
                 config_data = {}
@@ -302,7 +312,7 @@ class ConfigDB:
                     """
                     SELECT value, value_type FROM config
                     WHERE section = ? AND key = ?
-                """,
+                    """,
                     (section, key),
                 )
                 row = cursor.fetchone()
@@ -335,7 +345,7 @@ class ConfigDB:
                         value = excluded.value,
                         value_type = excluded.value_type,
                         updated_at = (datetime('now', 'localtime'))
-                """,
+                    """,
                     (section, key, value_str, value_type),
                 )
                 conn.commit()
@@ -359,7 +369,7 @@ class ConfigDB:
                     SELECT key, value, value_type FROM config
                     WHERE section = ?
                     ORDER BY key
-                """,
+                    """,
                     (section,),
                 )
 
@@ -388,7 +398,7 @@ class ConfigDB:
                     SELECT DISTINCT section FROM config
                     WHERE section != '_root'
                     ORDER BY section
-                """
+                    """
                 )
                 sections = [row["section"] for row in cursor.fetchall()]
                 conn.close()
@@ -408,7 +418,7 @@ class ConfigDB:
         else:
             logger.info(f"Creating new config database: {self.db_path}")
 
-        self.connect()  # This now just creates tables
+        self.connect()  # This creates tables
 
         logger.info(f"Syncing config database with config.json...")
         success = self.import_from_json()
@@ -435,6 +445,9 @@ class ConfigDB:
                 cursor.execute("SELECT COUNT(*) FROM config")
                 total_entries = cursor.fetchone()[0]
 
+                cursor.execute("SELECT COUNT(*) FROM api_keys")
+                api_key_count = cursor.fetchone()[0]
+
                 cursor.execute("SELECT DISTINCT section FROM config WHERE section != '_root' ORDER BY section")
                 sections = [row["section"] for row in cursor.fetchall()]
 
@@ -444,6 +457,7 @@ class ConfigDB:
                     "sections": sections,
                     "section_count": len(sections),
                     "total_entries": total_entries,
+                    "api_key_count": api_key_count,
                     "metadata": metadata,
                 }
             except Exception as e:
@@ -451,3 +465,108 @@ class ConfigDB:
                 if 'conn' in locals():
                     conn.close()
                 return {"error": str(e)}
+
+    # ==========================================
+    # API Key Management Methods
+    # ==========================================
+
+    def add_api_key(self, name: str, raw_key: str) -> int:
+        """Hash and store a new API key"""
+        with self.lock:
+            try:
+                # Hash the key
+                key_hash = bcrypt.hashpw(raw_key.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                # Store first 8 chars as prefix for display identification
+                prefix = raw_key[:8]
+
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO api_keys (name, prefix, key_hash) VALUES (?, ?, ?)",
+                    (name, prefix, key_hash)
+                )
+                new_id = cursor.lastrowid
+                conn.commit()
+                conn.close()
+                return new_id
+            except Exception as e:
+                logger.error(f"Error adding API key: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                return -1
+
+    def list_api_keys(self) -> List[Dict]:
+        """List all API keys (excluding the actual hash)"""
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, name, prefix, created_at, last_used_at FROM api_keys ORDER BY created_at DESC")
+                rows = cursor.fetchall()
+                conn.close()
+                return [dict(row) for row in rows]
+            except Exception as e:
+                logger.error(f"Error listing API keys: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                return []
+
+    def delete_api_key(self, key_id: int) -> bool:
+        """Delete an API key by ID"""
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM api_keys WHERE id = ?", (key_id,))
+                conn.commit()
+                conn.close()
+                return True
+            except Exception as e:
+                logger.error(f"Error deleting API key: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                return False
+
+    def validate_api_key(self, raw_key: str) -> bool:
+        """
+        Validate a raw API key against stored hashes in the database.
+        Returns True if a match is found, False otherwise.
+        Updates last_used_at timestamp on match.
+        """
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                # Get all hashes to check against (bcrypt comparison must be done in Python)
+                cursor.execute("SELECT id, key_hash FROM api_keys")
+                rows = cursor.fetchall()
+                
+                matched_id = None
+                
+                for row in rows:
+                    stored_hash = row['key_hash']
+                    try:
+                        # Verify the provided key against the stored hash
+                        if bcrypt.checkpw(raw_key.encode('utf-8'), stored_hash.encode('utf-8')):
+                            matched_id = row['id']
+                            break
+                    except ValueError:
+                        continue # Skip invalid/malformed hashes
+
+                if matched_id:
+                    # Update last used time
+                    cursor.execute(
+                        "UPDATE api_keys SET last_used_at = datetime('now', 'localtime') WHERE id = ?", 
+                        (matched_id,)
+                    )
+                    conn.commit()
+                    conn.close()
+                    return True
+                
+                conn.close()
+                return False
+            except Exception as e:
+                logger.error(f"Error validating API key: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                return False

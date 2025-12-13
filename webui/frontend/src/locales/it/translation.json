@@ -1415,6 +1415,26 @@
     "autoSaved": "{{count}} modifica(he) salvata(e) automaticamente",
     "savedSuccessfully": "Configurazione salvata con successo! ({{count}} modifica(he))"
   },
+    "apiKeys": {
+    "title": "Chiavi API & Webhook",
+    "generateTitle": "Genera Nuova Chiave",
+    "namePlaceholder": "Nome Chiave (es. Tautulli)",
+    "generateButton": "Genera",
+    "generatedSuccess": "Chiave Generata! Copiala ora (non verrà mostrata di nuovo):",
+    "authUrl": "Autenticazione via URL:",
+    "authHeader": "Autenticazione via Header:",
+    "activeKeys": "Chiavi Attive",
+    "lastUsed": "Ultimo utilizzo",
+    "never": "Mai",
+    "noKeys": "Nessuna chiave API attiva trovata",
+    "revokeTitle": "Revocare Chiave API?",
+    "revokeMessage": "Revocare questa chiave? Le app che la utilizzano smetteranno di funzionare immediatamente.",
+    "revokeConfirm": "Revoca Chiave",
+    "toastGenerated": "Chiave API Generata",
+    "toastFailed": "Impossibile generare la chiave",
+    "toastRevoked": "Chiave revocata",
+    "toastRevokeError": "Errore durante la revoca della chiave"
+  },
   "assetsStats": {
     "title": "Panoramica asset",
     "fetchError": "Recupero statistiche asset non riuscito",

@@ -1415,6 +1415,26 @@
     "autoSaved": "{{count}} modification(s) enregistrée(s) automatiquement",
     "savedSuccessfully": "Configuration enregistrée avec succès ! ({{count}} modification(s))"
   },
+    "apiKeys": {
+    "title": "Clés API et Webhooks",
+    "generateTitle": "Générer une nouvelle clé",
+    "namePlaceholder": "Nom de la clé (ex: Tautulli)",
+    "generateButton": "Générer",
+    "generatedSuccess": "Clé générée ! Copiez-la maintenant (elle ne sera plus affichée) :",
+    "authUrl": "S'authentifier via URL :",
+    "authHeader": "S'authentifier via l'en-tête :",
+    "activeKeys": "Clés actives",
+    "lastUsed": "Dernière utilisation",
+    "never": "Jamais",
+    "noKeys": "Aucune clé API active trouvée",
+    "revokeTitle": "Révoquer la clé API ?",
+    "revokeMessage": "Révoquer cette clé ? Les applications l'utilisant cesseront de fonctionner immédiatement.",
+    "revokeConfirm": "Révoquer la clé",
+    "toastGenerated": "Clé API générée",
+    "toastFailed": "Échec de la génération de la clé",
+    "toastRevoked": "Clé révoquée",
+    "toastRevokeError": "Erreur lors de la révocation de la clé"
+  },
   "assetsStats": {
     "title": "Aperçu des ressources",
     "fetchError": "Échec de la récupération des statistiques des ressources",

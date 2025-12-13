@@ -28,13 +28,18 @@ import {
   Maximize2,
   Folder,
   Zap,
-  Sliders
+  Sliders,
+  Trash2,
+  Plus,
+  Copy,
+  CheckCircle2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ValidateButton from "./ValidateButton";
 import LanguageOrderSelector from "./LanguageOrderSelector";
 import LibraryExclusionSelector from "./LibraryExclusionSelector";
 import { useToast } from "../context/ToastContext";
+import ConfirmDialog from "./ConfirmDialog";
 
 const API_URL = "/api";
 
@@ -770,6 +775,13 @@ function ConfigEditor() {
                                         {searchQuery ? (
                                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                                                 {fields.map(key => <SettingCard key={key} settingKey={key} groupName={groupName} config={config} usingFlatStructure={usingFlatStructure} webuiLogLevel={webuiLogLevel} updateWebuiLogLevel={updateWebuiLogLevel} useJellySync={useJellySync} setUseJellySync={setUseJellySync} useEmbySync={useEmbySync} setUseEmbySync={setUseEmbySync} updateValue={updateValue} getDisplayName={getDisplayName} tooltips={tooltips} commonInputClass={commonInputClass} handleJumpToSetting={handleJumpToSetting} searchQuery={searchQuery} isFieldDisabled={isFieldDisabled} overlayFiles={overlayFiles} fontFiles={fontFiles} uploadingOverlay={uploadingOverlay} uploadingFont={uploadingFont} handleOverlayFileUpload={handleOverlayFileUpload} handleFontFileUpload={handleFontFileUpload} setPreviewOverlay={setPreviewOverlay} setPreviewFont={setPreviewFont} showSuccess={showSuccess} showError={showError} setConfig={setConfig} setHasUnsavedChanges={setHasUnsavedChanges} />)}
+                                                
+                                                {/* API Key Manager (In Search) */}
+                                                {groupName === "WebUI Settings" && (
+                                                    <div className="col-span-1 xl:col-span-2">
+                                                        <ApiKeyManager />
+                                                    </div>
+                                                )}
                                             </div>
                                         ) : (
                                             /* If Not Searching: Visual Groups */
@@ -788,6 +800,11 @@ function ConfigEditor() {
                                                         </div>
                                                     </div>
                                                 ))}
+
+                                                {/* API Key Manager (Standard View) */}
+                                                {groupName === "WebUI Settings" && (
+                                                    <ApiKeyManager />
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -1069,4 +1086,179 @@ const Tooltip = ({ text, children }) => {
     );
 };
 
+const ApiKeyManager = () => {
+    const [keys, setKeys] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [newKeyName, setNewKeyName] = useState("");
+    const [generatedKey, setGeneratedKey] = useState(null);
+    
+    const [deleteId, setDeleteId] = useState(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    const { showSuccess, showError } = useToast();
+    const { t } = useTranslation();
+
+    // Get current origin (e.g., http://192.168.1.50:8000)
+    const origin = window.location.origin;
+    const displayKey = generatedKey || "YOUR_KEY";
+
+    const fetchKeys = async () => {
+        try {
+            const res = await fetch("/api/auth/keys");
+            if (res.ok) {
+                const data = await res.json();
+                setKeys(data.keys || []);
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    useEffect(() => { fetchKeys(); }, []);
+
+    const handleCreate = async () => {
+        if (!newKeyName) return;
+        setLoading(true);
+        try {
+            const res = await fetch("/api/auth/keys", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: newKeyName })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setGeneratedKey(data.key);
+                setNewKeyName("");
+                fetchKeys();
+                showSuccess(t("apiKeys.toastGenerated"));
+            }
+        } catch (e) { showError(t("apiKeys.toastFailed")); }
+        setLoading(false);
+    };
+
+    const requestDelete = (id) => {
+        setDeleteId(id);
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteId) return;
+        try {
+            await fetch(`/api/auth/keys/${deleteId}`, { method: "DELETE" });
+            fetchKeys();
+            showSuccess(t("apiKeys.toastRevoked"));
+        } catch (e) { 
+            showError(t("apiKeys.toastRevokeError")); 
+        } finally {
+            setShowDeleteConfirm(false);
+            setDeleteId(null);
+        }
+    };
+
+    return (
+        <div className="mt-8 pt-6 border-t border-theme/30">
+            <h3 className="text-lg font-semibold text-theme-text flex items-center gap-2 mb-4">
+                <Key className="w-5 h-5 text-theme-primary" /> {t("apiKeys.title")}
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Generator Section */}
+                <div className="bg-theme-bg/50 p-4 rounded-xl border border-theme/50">
+                    <h4 className="text-sm font-medium text-theme-text mb-3">{t("apiKeys.generateTitle")}</h4>
+                    <div className="flex gap-2 mb-4">
+                        <input 
+                            type="text" 
+                            value={newKeyName}
+                            onChange={(e) => setNewKeyName(e.target.value)}
+                            placeholder={t("apiKeys.namePlaceholder")}
+                            className="bg-theme-card border border-theme/50 text-theme-text rounded-lg px-3 py-2 flex-1 text-sm focus:outline-none focus:border-theme-primary focus:ring-1 focus:ring-theme-primary"
+                        />
+                        <button 
+                            onClick={handleCreate} 
+                            disabled={!newKeyName || loading}
+                            className="bg-theme-primary hover:bg-theme-primary/90 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? <Loader2 className="animate-spin w-4 h-4"/> : <Plus className="w-4 h-4"/>} {t("apiKeys.generateButton")}
+                        </button>
+                    </div>
+
+                    {generatedKey && (
+                        <div className="p-3 bg-green-900/20 border border-green-500/30 rounded-lg animate-in fade-in slide-in-from-top-2 mb-4">
+                            <p className="text-green-400 text-xs font-bold mb-2">{t("apiKeys.generatedSuccess")}</p>
+                            <div className="flex items-center gap-2 bg-black/40 p-2 rounded border border-green-500/20">
+                                <code className="flex-1 text-green-300 font-mono text-sm break-all">{generatedKey}</code>
+                                <button onClick={() => navigator.clipboard.writeText(generatedKey)} className="text-gray-400 hover:text-white transition-colors" title="Copy Key">
+                                    <Copy className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Dynamic URL Helpers */}
+                    <div className="space-y-3 pt-2 border-t border-theme/20">
+                        <div>
+                            <span className="text-[10px] text-theme-muted uppercase tracking-wider font-bold block mb-1">Radarr / Sonarr Webhook</span>
+                            <div className="flex items-center gap-2 bg-theme-bg/50 p-1.5 rounded border border-theme/30">
+                                <code className="flex-1 text-[10px] text-theme-text font-mono truncate">
+                                    {origin}/api/webhook/arr?api_key={displayKey}
+                                </code>
+                                <button onClick={() => navigator.clipboard.writeText(`${origin}/api/webhook/arr?api_key=${displayKey}`)} className="text-theme-muted hover:text-theme-primary transition-colors">
+                                    <Copy className="w-3 h-3" />
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <span className="text-[10px] text-theme-muted uppercase tracking-wider font-bold block mb-1">Tautulli Webhook</span>
+                            <div className="flex items-center gap-2 bg-theme-bg/50 p-1.5 rounded border border-theme/30">
+                                <code className="flex-1 text-[10px] text-theme-text font-mono truncate">
+                                    {origin}/api/webhook/tautulli?api_key={displayKey}
+                                </code>
+                                <button onClick={() => navigator.clipboard.writeText(`${origin}/api/webhook/tautulli?api_key=${displayKey}`)} className="text-theme-muted hover:text-theme-primary transition-colors">
+                                    <Copy className="w-3 h-3" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* List Section */}
+                <div className="bg-theme-bg/30 p-4 rounded-xl border border-theme/30 flex flex-col">
+                    <h4 className="text-sm font-medium text-theme-text mb-3">{t("apiKeys.activeKeys")}</h4>
+                    <div className="space-y-2 flex-1 overflow-y-auto max-h-[200px] pr-1 custom-scrollbar">
+                        {keys.map(k => (
+                            <div key={k.id} className="flex items-center justify-between bg-theme-card p-3 rounded-lg border border-theme/50 hover:border-theme-primary/30 transition-colors group">
+                                <div className="min-w-0">
+                                    <div className="font-medium text-theme-text text-sm truncate flex items-center gap-2">
+                                        {k.name}
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-theme-bg border border-theme/30 font-mono text-theme-muted">{k.prefix}***</span>
+                                    </div>
+                                    <div className="text-[11px] text-theme-muted mt-0.5">
+                                        {t("apiKeys.lastUsed")}: {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : t("apiKeys.never")}
+                                    </div>
+                                </div>
+                                <button onClick={() => requestDelete(k.id)} className="text-theme-muted hover:text-red-400 p-2 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
+                        {keys.length === 0 && (
+                            <div className="flex flex-col items-center justify-center h-full text-theme-muted py-4">
+                                <Key className="w-8 h-8 mb-2 opacity-20" />
+                                <span className="text-xs italic">{t("apiKeys.noKeys")}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <ConfirmDialog
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={confirmDelete}
+                title={t("apiKeys.revokeTitle")}
+                message={t("apiKeys.revokeMessage")}
+                confirmText={t("apiKeys.revokeConfirm")}
+                type="danger"
+            />
+        </div>
+    );
+};
 export default ConfigEditor;

@@ -345,6 +345,8 @@ In this mode we use Tautulli to trigger Posterizarr for an specific item in Plex
 2. Click `Add a new notification agent` and select **Webhook**.
 3. **Configuration Tab:**
     * **Webhook URL:** `http://YOUR_POSTERIZARR_IP:8000/api/webhook/tautulli`
+    * **Auth Webhook URL:** `http://YOUR_POSTERIZARR_IP:8000/api/webhook/tautulli?api_key=YOUR_API_KEY`
+      - *(Generate an API Key in Posterizarr settings under WebUI)*
     * **Webhook Method:** `POST`
 4. **Triggers Tab:**
     * Check `Recently Added`.
@@ -406,6 +408,8 @@ To use it we need to configure a script in Sonarr/Radarr, please follow these in
 5. **On Import:** Yes
 6. **On Upgrade:** Yes
 7. **URL:** `http://YOUR_POSTERIZARR_IP:8000/api/webhook/arr`
+8. **Auth Webhook URL:** `http://YOUR_POSTERIZARR_IP:8000/api/webhook/tautulli?api_key=YOUR_API_KEY`
+    - *(Generate an API Key in Posterizarr settings under WebUI)*
 8. **Method:** POST
 9. Click **Save**.
 

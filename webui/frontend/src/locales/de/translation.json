@@ -1412,6 +1412,26 @@
     "autoSaved": "{{count}} Änderung(en) automatisch gespeichert",
     "savedSuccessfully": "Konfiguration erfolgreich gespeichert! ({{count}} Änderung(en))"
   },
+    "apiKeys": {
+    "title": "API-Schlüssel & Webhooks",
+    "generateTitle": "Neuen Schlüssel generieren",
+    "namePlaceholder": "Schlüsselname (z.B. Tautulli)",
+    "generateButton": "Generieren",
+    "generatedSuccess": "Schlüssel generiert! Jetzt kopieren (er wird nicht erneut angezeigt):",
+    "authUrl": "Authentifizierung über URL:",
+    "authHeader": "Authentifizierung über Header:",
+    "activeKeys": "Aktive Schlüssel",
+    "lastUsed": "Zuletzt verwendet",
+    "never": "Nie",
+    "noKeys": "Keine aktiven API-Schlüssel gefunden",
+    "revokeTitle": "API-Schlüssel widerrufen?",
+    "revokeMessage": "Diesen Schlüssel widerrufen? Apps, die ihn verwenden, werden sofort nicht mehr funktionieren.",
+    "revokeConfirm": "Schlüssel widerrufen",
+    "toastGenerated": "API-Schlüssel generiert",
+    "toastFailed": "Fehler beim Generieren des Schlüssels",
+    "toastRevoked": "Schlüssel widerrufen",
+    "toastRevokeError": "Fehler beim Widerrufen des Schlüssels"
+  },
   "assetsStats": {
     "title": "Assets-Übersicht",
     "fetchError": "Fehler beim Abrufen der Assets-Statistiken",

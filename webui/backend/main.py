@@ -42,6 +42,7 @@ import tempfile
 import shutil
 import sqlite3
 import bcrypt
+import secrets
 from starlette.responses import FileResponse
 from PIL import Image, ImageDraw, ImageChops
 from io import BytesIO
@@ -147,6 +148,7 @@ FONTPREVIEWS_DIR = BASE_DIR / "fontpreviews"
 DATABASE_DIR = BASE_DIR / "database"
 RUNNING_FILE = TEMP_DIR / "Posterizarr.Running"
 IMAGECHOICES_DB_PATH = DATABASE_DIR / "imagechoices.db"
+CONFIG_DB_PATH = DATABASE_DIR / "config.db"
 
 # Global lock for process management
 process_lock = threading.RLock()
@@ -1960,7 +1962,8 @@ if AUTH_MIDDLEWARE_AVAILABLE:
         # The middleware now loads the config dynamically with every request!
         app.add_middleware(
             BasicAuthMiddleware,
-            config_path=CONFIG_PATH,  #  CHANGED: Only pass config_path
+            config_path=CONFIG_PATH,
+            db_path=CONFIG_DB_PATH,
         )
         logger.info("Basic Auth middleware registered with dynamic config reload")
     except Exception as e:
@@ -2124,6 +2127,48 @@ async def check_auth():
             return {"enabled": False, "authenticated": True, "error": str(e)}
     else:
         return {"enabled": False, "authenticated": True}
+
+class ApiKeyCreate(BaseModel):
+    name: str
+
+@app.get("/api/auth/keys")
+async def list_api_keys():
+    """List all active API keys"""
+    if not CONFIG_DATABASE_AVAILABLE or not config_db:
+        raise HTTPException(status_code=503, detail="Config DB not available")
+    return {"success": True, "keys": config_db.list_api_keys()}
+
+@app.post("/api/auth/keys")
+async def create_api_key(data: ApiKeyCreate):
+    """Generate a new API key"""
+    if not CONFIG_DATABASE_AVAILABLE or not config_db:
+        raise HTTPException(status_code=503, detail="Config DB not available")
+    
+    # Generate a secure random key (32 chars)
+    raw_key = secrets.token_urlsafe(32)
+    
+    key_id = config_db.add_api_key(data.name, raw_key)
+    
+    if key_id != -1:
+        return {
+            "success": True, 
+            "key": raw_key, 
+            "message": "Key generated. Save it now, it won't be shown again!",
+            "id": key_id
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to create key")
+
+@app.delete("/api/auth/keys/{key_id}")
+async def revoke_api_key(key_id: int):
+    """Revoke an API key"""
+    if not CONFIG_DATABASE_AVAILABLE or not config_db:
+        raise HTTPException(status_code=503, detail="Config DB not available")
+        
+    if config_db.delete_api_key(key_id):
+        return {"success": True, "message": "Key revoked"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to revoke key")
 
 
 @app.get("/api/config")

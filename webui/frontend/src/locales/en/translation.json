@@ -1423,6 +1423,26 @@
     "autoSaved": "Auto-saved {{count}} change(s)",
     "savedSuccessfully": "Configuration saved successfully! ({{count}} change(s))"
   },
+    "apiKeys": {
+    "title": "API Keys & Webhooks",
+    "generateTitle": "Generate New Key",
+    "namePlaceholder": "Key Name (e.g. Tautulli)",
+    "generateButton": "Generate",
+    "generatedSuccess": "Key Generated! Copy it now (it won't be shown again):",
+    "authUrl": "Authenticate via URL:",
+    "authHeader": "Authenticate via Header:",
+    "activeKeys": "Active Keys",
+    "lastUsed": "Last used",
+    "never": "Never",
+    "noKeys": "No active API keys found",
+    "revokeTitle": "Revoke API Key?",
+    "revokeMessage": "Revoke this key? Apps using it will stop working immediately.",
+    "revokeConfirm": "Revoke Key",
+    "toastGenerated": "API Key Generated",
+    "toastFailed": "Failed to generate key",
+    "toastRevoked": "Key revoked",
+    "toastRevokeError": "Error revoking key"
+  },
   "assetsStats": {
     "title": "Assets Overview",
     "fetchError": "Failed to fetch assets stats",
