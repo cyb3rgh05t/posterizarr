@@ -512,15 +512,15 @@
     "currentVersion": "✓ Versão atual instalada"
   },
   "topNavbar": {
-    "changeTheme": "Alterar Tema",
-    "selectTheme": "Selecionar Tema",
-    "userMenu": "Menu do Usuário",
+    "changeTheme": "Alterar tema",
+    "selectTheme": "Selecionar tema",
+    "userMenu": "Menu do usuário",
     "signOut": "Sair",
-    "userProfile": "Perfil do Usuário",
-    "stopSystem": "Parar Sistema",
-    "deleteLockfile": "Excluir Arquivo de Execução",
+    "userProfile": "Perfil do usuário",
+    "stopSystem": "Parar sistema",
+    "deleteLockfile": "Excluir arquivo de bloqueio",
     "confirmStop": "Tem certeza de que deseja forçar a parada?",
-    "confirmDeleteLock": "Tem certeza de que deseja excluir o arquivo de execução?"
+    "confirmDeleteLock": "Tem certeza de que deseja excluir o arquivo de bloqueio?"
   },
   "dashboard": {
     "controlDeck": {

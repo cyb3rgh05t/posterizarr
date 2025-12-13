@@ -512,11 +512,15 @@
     "currentVersion": "✓ Aktuelle Version installiert"
   },
   "topNavbar": {
-    "changeTheme": "Theme wechseln",
-    "selectTheme": "Theme auswählen",
+    "changeTheme": "Design ändern",
+    "selectTheme": "Design wählen",
     "userMenu": "Benutzermenü",
     "signOut": "Abmelden",
-    "userProfile": "Benutzerprofil"
+    "userProfile": "Benutzerprofil",
+    "stopSystem": "System stoppen",
+    "deleteLockfile": "Running-Datei löschen",
+    "confirmStop": "Sind Sie sicher, dass Sie den Stopp erzwingen wollen?",
+    "confirmDeleteLock": "Sind Sie sicher, dass Sie die Running-Datei löschen wollen?"
   },
   "dashboard": {
     "controlDeck": {

@@ -20,6 +20,7 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.config_path = config_path
         self.db_path = db_path
+        self.auth_db = None
         
         # Try to load ConfigDB
         try:
@@ -28,10 +29,10 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
             logger.info("AUTH: Database connection established")
         except Exception as e:
             logger.error(f"AUTH: Database error: {e}")
-            self.auth_db = None
 
+        # Initial config load
         self._load_config()
-        logger.info(f"AUTH: Middleware Initialized (Enabled: {self.enabled})")
+        logger.info(f"AUTH: Middleware Initialized (Enabled: {self.enabled}, User: {self.username})")
 
     def _verify_password(self, plain_password: str, hashed_password: str) -> bool:
         try:
@@ -49,12 +50,28 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
             with open(self.config_path, "r", encoding="utf-8") as f: 
                 config = json.load(f)
             
+            # --- ROBUST CONFIG LOADING ---
+            # 1. Look for settings in the "WebUI" group (Nested)
             webui = config.get("WebUI", {})
-            # Handle string or boolean values for enabled flag
-            enabled_val = webui.get("basicAuthEnabled", False)
+            enabled_nested = webui.get("basicAuthEnabled")
+            user_nested = webui.get("basicAuthUsername")
+            pass_nested = webui.get("basicAuthPassword")
+
+            # 2. Look for settings at the Root (Flat)
+            enabled_root = config.get("basicAuthEnabled")
+            user_root = config.get("basicAuthUsername")
+            pass_root = config.get("basicAuthPassword")
+
+            # 3. Prioritize: Use Root if present, otherwise Nested
+            enabled_val = enabled_root if enabled_root is not None else enabled_nested
+            user_val = user_root if user_root is not None else (user_nested or "admin")
+            pass_val = pass_root if pass_root is not None else (pass_nested or "posterizarr")
+
+            # Convert to boolean safely
             self.enabled = str(enabled_val).lower() in ["true", "1", "yes"]
-            self.username = webui.get("basicAuthUsername", "admin")
-            self.password_hash = webui.get("basicAuthPassword", "posterizarr")
+            self.username = user_val
+            self.password_hash = pass_val
+            
         except Exception as e:
             logger.error(f"AUTH: Error loading config: {e}")
             self.enabled = False
@@ -65,55 +82,41 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         
         path = request.url.path
         
-        # 1. API Key Check (Always check this first to allow scripts/webhooks with keys)
-        # Allows legitimate automated access if a valid key is provided
+        # 1. API Key Check (Always check this first)
         api_key_candidate = request.query_params.get("api_key") or request.query_params.get("secret") or request.headers.get("X-API-Key")
         if api_key_candidate and self.auth_db:
             if self.auth_db.validate_api_key(api_key_candidate):
                 return await call_next(request)
 
         # 2. Webhook Hard Block
-        # These endpoints require specific handling logic and shouldn't be accessed generically
         if path.startswith("/api/webhook/"):
             return self._unauthorized_response()
 
         # 3. Public Access Logic (When Basic Auth is DISABLED)
         if not self.enabled:
-            # STRICT SECURITY CHECK:
-            # Even if auth is disabled, sensitive endpoints must NOT be accessible 
-            # via direct script calls that lack browser headers (Referer/Origin).
-            # This prevents information disclosure (like passwords in config) to simple GET requests.
+            # Prevent direct API access to sensitive endpoints without browser headers
             if path.startswith("/api/config") or path.startswith("/api/auth/keys"):
                 referer = request.headers.get("referer", "")
                 origin = request.headers.get("origin", "")
                 host = request.headers.get("host", "")
 
-                # Valid UI request must have Host AND (Referer matching Host OR Origin matching Host)
-                # CLI tools send Host but typically no Referer/Origin
                 is_valid_source = False
                 if host:
                     if referer and host in referer: is_valid_source = True
                     if origin and host in origin: is_valid_source = True
                 
                 if not is_valid_source:
-                    logger.warning(f"AUTH: Blocking direct access to {path} (No valid Referer/Origin)")
                     return self._unauthorized_response()
-
-            # For all other endpoints (gallery, logs, etc.) when auth is disabled,
-            # we allow access to support the UI and standard functionality.
-            
-            # Whitelist specific endpoints if needed (e.g. status checks)
-            if path in ["/api/auth/check"]:
-                return await call_next(request)
 
             return await call_next(request)
 
         # 4. Basic Auth Logic (When Basic Auth is ENABLED)
+        # Allow pre-flight OPTIONS requests for CORS and auth check
+        if request.method == "OPTIONS" or path == "/api/auth/check":
+            return await call_next(request)
+
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Basic "):
-            # Allow pre-flight OPTIONS requests for CORS
-            if request.method == "OPTIONS":
-                return await call_next(request)
             return self._unauthorized_response()
 
         try:
@@ -128,8 +131,35 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         return self._unauthorized_response()
 
     def _unauthorized_response(self):
+        """
+        Returns 401 Unauthorized Response WITHOUT triggering browser popup.
+        Crucial for custom frontend login screens.
+        """
         return Response(
             content="Unauthorized", 
             status_code=status.HTTP_401_UNAUTHORIZED, 
-            headers={"WWW-Authenticate": "Basic", "Cache-Control": "no-cache"}
+            headers={
+                # DO NOT ADD "WWW-Authenticate" here! It causes the double prompt.
+                "Cache-Control": "no-cache, no-store, must-revalidate"
+            }
         )
+
+# Helper function for main.py (Standalone)
+def load_auth_config(config_path: Path) -> dict:
+    """Helper for main.py to check auth status without instantiating middleware"""
+    default_config = {"enabled": False}
+    try:
+        if not config_path.exists():
+            return default_config
+            
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+            
+        # Check both locations
+        val_root = config.get("basicAuthEnabled")
+        val_nested = config.get("WebUI", {}).get("basicAuthEnabled")
+        
+        enabled = val_root if val_root is not None else val_nested
+        return {"enabled": str(enabled).lower() in ["true", "1", "yes"]}
+    except Exception:
+        return default_config
