@@ -2188,11 +2188,23 @@ async def get_config(request: Request):
                 webui = c.get("WebUI", {})
                 auth_enabled = str(webui.get("basicAuthEnabled", False)).lower() in ["true", "1", "yes"]
 
-        # Check for API Key presence (Middleware handles validity, this bypasses the browser check)
-        api_key_present = request.query_params.get("api_key") or request.headers.get("X-API-Key")
+        # 1. Check for API Key presence
+        api_key = request.query_params.get("api_key") or request.headers.get("X-API-Key")
+        
+        # 2. Validate API Key if present
+        is_key_valid = False
+        if api_key and config_db:
+            # Validate against the database
+            is_key_valid = config_db.validate_api_key(api_key)
+            if is_key_valid:
+                logger.info("Access granted via valid API Key (Script/CLI access)")
+            else:
+                logger.warning(f"Invalid API Key provided: {api_key[:5]}...")
 
-        # If Auth is DISABLED and NO API Key is present, we enforce Browser-Only access
-        if not auth_enabled and not api_key_present:
+        # 3. Security Logic
+        # If Auth is OFF, we enforce Browser-Only access...
+        # UNLESS a VALID API key is provided (bypasses browser check)
+        if not auth_enabled and not is_key_valid:
             referer = request.headers.get("referer", "")
             origin = request.headers.get("origin", "")
             host = request.headers.get("host", "")
@@ -2203,8 +2215,15 @@ async def get_config(request: Request):
                 if origin and host in origin: is_valid_ui = True
             
             if not is_valid_ui:
+                # If they provided a key but it was wrong, give a specific error
+                if api_key:
+                    logger.warning("Blocking request: Invalid API Key")
+                    raise HTTPException(status_code=403, detail="Invalid API Key")
+                
+                # Otherwise, give the standard "Browser Only" error
                 logger.warning(f"SECURITY: Blocking direct non-browser access to config from {request.client.host}")
                 raise HTTPException(status_code=403, detail="Direct API access denied. Use the Web UI.")
+                
     except HTTPException:
         raise
     except Exception as sec_err:
