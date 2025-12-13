@@ -204,24 +204,16 @@ const TopNavbar = () => {
                     <div className="p-2">
                       <button
                         onClick={async () => {
-                            // 1. Close the menu
                             setIsUserDropdownOpen(false);
-
-                            // 2. Clear local React state
                             logout();
-
-                            // 3. The Basic Auth "Logout Trick"
-                            // We send a request with INTENTIONALLY BAD credentials ("logout:logout").
-                            // This overwrites the valid cached credentials in the browser for this domain.
                             try {
                               await fetch("/api/auth/check", {
                                 headers: { "Authorization": "Basic " + btoa("logout:logout") }
                               });
                             } catch (e) {
-                              // We expect this to fail or throw 401, which is good.
+                              // We expect this to fail
                             }
 
-                            // 4. Force a hard reload to ensure the browser prompts for login again
                             window.location.reload();
                         }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-colors"

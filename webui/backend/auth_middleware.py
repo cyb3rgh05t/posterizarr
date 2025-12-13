@@ -63,7 +63,6 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
             pass_root = config.get("basicAuthPassword")
 
             # 3. Prioritize: Use Root if present, otherwise Nested
-            # We check 'is not None' to respect explicit 'False' values
             enabled_val = enabled_root if enabled_root is not None else enabled_nested
             user_val = user_root if user_root is not None else (user_nested or "admin")
             pass_val = pass_root if pass_root is not None else (pass_nested or "posterizarr")
@@ -132,10 +131,17 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         return self._unauthorized_response()
 
     def _unauthorized_response(self):
+        """
+        Returns 401 Unauthorized Response WITHOUT triggering browser popup.
+        Crucial for custom frontend login screens.
+        """
         return Response(
             content="Unauthorized", 
             status_code=status.HTTP_401_UNAUTHORIZED, 
-            headers={"WWW-Authenticate": "Basic", "Cache-Control": "no-cache"}
+            headers={
+                # DO NOT ADD "WWW-Authenticate" here! It causes the double prompt.
+                "Cache-Control": "no-cache, no-store, must-revalidate"
+            }
         )
 
 # Helper function for main.py (Standalone)
@@ -157,4 +163,3 @@ def load_auth_config(config_path: Path) -> dict:
         return {"enabled": str(enabled).lower() in ["true", "1", "yes"]}
     except Exception:
         return default_config
-        
