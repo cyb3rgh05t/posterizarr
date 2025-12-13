@@ -518,9 +518,9 @@
     "signOut": "Disconnetti",
     "userProfile": "Profilo utente",
     "stopSystem": "Arresta sistema",
-    "deleteLockfile": "Elimina file di esecuzione",
+    "deleteLockfile": "Elimina lockfile",
     "confirmStop": "Sei sicuro di voler forzare l'arresto?",
-    "confirmDeleteLock": "Sei sicuro di voler eliminare il file di esecuzione?"
+    "confirmDeleteLock": "Sei sicuro di voler eliminare il lockfile?"
   },
   "dashboard": {
     "controlDeck": {

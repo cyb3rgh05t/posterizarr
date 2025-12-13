@@ -512,15 +512,15 @@
     "currentVersion": "✓ Current version installed"
   },
   "topNavbar": {
-    "changeTheme": "Design ändern",
-    "selectTheme": "Design wählen",
-    "userMenu": "Benutzermenü",
-    "signOut": "Abmelden",
-    "userProfile": "Benutzerprofil",
-    "stopSystem": "System stoppen",
-    "deleteLockfile": "Running-Datei löschen",
-    "confirmStop": "Sind Sie sicher, dass Sie den Stopp erzwingen wollen?",
-    "confirmDeleteLock": "Sind Sie sicher, dass Sie die Running-Datei löschen wollen?"
+    "changeTheme": "Change Theme",
+    "selectTheme": "Select Theme",
+    "userMenu": "User Menu",
+    "signOut": "Sign Out",
+    "userProfile": "User Profile",
+    "stopSystem": "Stop System",
+    "deleteLockfile": "Delete Lockfile",
+    "confirmStop": "Are you sure you want to force a stop?",
+    "confirmDeleteLock": "Are you sure you want to delete the lockfile?"
   },
   "dashboard": {
     "controlDeck": {
