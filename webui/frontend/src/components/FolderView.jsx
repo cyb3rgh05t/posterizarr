@@ -9,9 +9,12 @@ import {
   ChevronDown,
   RefreshCw,
   Trash2,
+  Check,
   CheckSquare,
   Square,
   Eye,
+  ArrowUpDown,
+  X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../context/ToastContext";
@@ -38,6 +41,50 @@ function FolderView() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [cacheBuster, setCacheBuster] = useState(Date.now());
 
+  // Search history to preserve filters per folder
+  const searchHistoryRef = useRef({});
+
+  // --- SORTING STATE ---
+  const [sortOrder, setSortOrder] = useState(() => {
+    return localStorage.getItem("folder-sort-order") || "name_asc";
+  });
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const sortDropdownRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem("folder-sort-order", sortOrder);
+  }, [sortOrder]);
+
+  // Click outside listener
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+        setSortDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Sorting Helper
+  const sortItems = (itemsToSort) => {
+    const sorted = [...itemsToSort];
+    sorted.sort((a, b) => {
+      if (sortOrder === "name_asc") return a.name.localeCompare(b.name);
+      if (sortOrder === "name_desc") return b.name.localeCompare(a.name);
+
+      // Folder items might not have modified dates, handle gracefully
+      const dateA = a.modified || a.created || 0;
+      const dateB = b.modified || b.created || 0;
+
+      if (sortOrder === "date_newest") return dateB - dateA;
+      if (sortOrder === "date_oldest") return dateA - dateB;
+
+      return 0;
+    });
+    return sorted;
+  };
+
   // Bulk delete state
   const [selectMode, setSelectMode] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState(new Set());
@@ -58,11 +105,16 @@ function FolderView() {
   }, [imageSize]);
 
   // Fetch data from the new recursive API
-  const fetchData = async (path, showToast = false) => {
-    setLoading(true);
+  const fetchData = async (path, showToast = false, keepScrollPosition = false) => {
+    if (!keepScrollPosition) {
+      setLoading(true);
+      // ONLY clear selection if this is a "hard" load (new folder/view)
+      // If we are keeping scroll position (silent refresh), we keep selection too.
+      setSelectMode(false);
+      setSelectedAssets(new Set());
+    }
     setError(null);
-    setSelectMode(false);
-    setSelectedAssets(new Set());
+
     try {
       const response = await fetch(
         `${API_URL}/folder-view/browse?path=${encodeURIComponent(path)}`
@@ -85,7 +137,9 @@ function FolderView() {
       setError(err.message);
       showError(err.message);
     } finally {
-      setLoading(false);
+      if (!keepScrollPosition) {
+        setLoading(false);
+      }
     }
   };
 
@@ -94,20 +148,37 @@ function FolderView() {
     fetchData("");
   }, []);
 
-  // Handle navigation
-  const navigateTo = (path) => {
+  // Enhanced navigation that handles search term persistence
+  const handleNavigation = (path) => {
+    // Save current search term for the current path before we move away
+    searchHistoryRef.current[currentPath] = searchTerm;
+
+    // Determine the search term for the new path
+    // If we've been there before (e.g. going back), restore it.
+    // If it's a new folder, default to empty "" (clear filter).
+    const nextSearchTerm = searchHistoryRef.current[path] || "";
+
+    // Update search state immediately
+    setSearchTerm(nextSearchTerm);
+
+    // Fetch data for the new path
     fetchData(path);
   };
 
-  // Handle breadcrumb navigation
+  // Handle navigation (Updated to use handleNavigation)
+  const navigateTo = (path) => {
+    handleNavigation(path);
+  };
+
+  // Handle breadcrumb navigation (Updated to use handleNavigation)
   const navigateToBreadcrumb = (index) => {
     if (index < 0) {
-      fetchData(""); // Go home
+      handleNavigation(""); // Go home
       return;
     }
     const pathParts = currentPath.split("/");
     const newPath = pathParts.slice(0, index + 1).join("/");
-    fetchData(newPath);
+    handleNavigation(newPath);
   };
 
   // Bulk delete actions
@@ -243,8 +314,10 @@ function FolderView() {
   const filteredItems = items.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  const folderItems = filteredItems.filter((item) => item.type === "folder");
-  const assetItems = filteredItems.filter((item) => item.type === "asset");
+
+  // Split AND Sort
+  const folderItems = sortItems(filteredItems.filter((item) => item.type === "folder"));
+  const assetItems = sortItems(filteredItems.filter((item) => item.type === "asset"));
 
   return (
     <div className="space-y-6">
@@ -294,8 +367,16 @@ function FolderView() {
               placeholder={t("galleryHub.searchCurrentFolder")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-theme-bg border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-theme-primary text-sm text-theme-text"
+              className="w-full pl-10 pr-10 py-2 bg-theme-bg border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-theme-primary text-sm text-theme-text"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-theme-muted hover:text-theme-text"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -321,6 +402,53 @@ function FolderView() {
                 <span>{selectMode ? t("folderView.cancel") : t("folderView.select")}</span>
               </button>
             )}
+
+            {/* Sorting Dropdown */}
+            <div className="relative" ref={sortDropdownRef}>
+              <button
+                onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all shadow-sm"
+                title={t("common.sorting.title")}
+              >
+                <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
+                <span className="hidden sm:inline">
+                  {sortOrder.includes("date") ? t("common.date") : t("common.name")}
+                </span>
+              </button>
+
+              {sortDropdownOpen && (
+                <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
+                  <div className="py-1">
+                    <button
+                      onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      {t("common.sorting.nameAsc")}
+                    </button>
+                    <button
+                      onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      {t("common.sorting.nameDesc")}
+                    </button>
+                    <div className="border-t border-theme-border my-1"></div>
+                    <button
+                      onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      {t("common.sorting.dateNewest")}
+                    </button>
+                    <button
+                      onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                    >
+                      {t("common.sorting.dateOldest")}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => fetchData(currentPath, true)}
               disabled={loading}
@@ -377,7 +505,10 @@ function FolderView() {
         </div>
       ) : error ? (
         <div className="text-center py-20 bg-theme-card border border-red-500/30 rounded-lg">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <div className="flex justify-center mb-4">
+             {/* Using standard lucide icon here if AlertCircle isn't imported, but assuming standard imports */}
+             <Trash2 className="w-12 h-12 text-red-400" />
+          </div>
           <p className="text-red-400">{error}</p>
         </div>
       ) : filteredItems.length === 0 ? (
@@ -528,7 +659,7 @@ function FolderView() {
         </div>
       )}
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialog and Modals (unchanged) */}
       {deleteConfirm && (
         <ConfirmDialog
           isOpen={!!deleteConfirm}
@@ -553,7 +684,6 @@ function FolderView() {
         />
       )}
 
-      {/* Image Preview Modal */}
       {selectedImage && (
         <ImagePreviewModal
           selectedImage={selectedImage}
@@ -563,7 +693,7 @@ function FolderView() {
             setAssetToReplace(image);
             setReplacerOpen(true);
           }}
-          isDeleting={false} // Add state for this if needed
+          isDeleting={false}
           cacheBuster={cacheBuster}
           formatDisplayPath={(p) => p}
           formatTimestamp={() => new Date().toLocaleString("sv-SE")}
@@ -571,7 +701,7 @@ function FolderView() {
           getTypeColor={(t) => getAssetTypeBadgeColor(selectedImage.asset_type)}
         />
       )}
-      {/* Asset Replacer Modal */}
+
       {replacerOpen && assetToReplace && (
         <AssetReplacer
           asset={assetToReplace}
@@ -580,19 +710,13 @@ function FolderView() {
             setAssetToReplace(null);
           }}
           onSuccess={() => {
-            // Force cache refresh by updating timestamp
             setCacheBuster(Date.now());
-
-            // Close modals
             setReplacerOpen(false);
             setAssetToReplace(null);
-            setSelectedImage(null); // Close the preview modal
-
+            setSelectedImage(null);
             showSuccess(t("gallery.assetReplaced") || "Asset replaced successfully.");
-
-            // Refresh the images after successful replacement
             setTimeout(() => {
-              fetchData(currentPath, false); // Refresh the folder view
+              fetchData(currentPath, false, true);
             }, 500);
           }}
         />

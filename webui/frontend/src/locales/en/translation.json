@@ -37,6 +37,11 @@
     },
     "tmdb": {
       "title": "Search TMDB for",
+      "selectLogo": "Select a Logo",
+      "clickToSelectLogo": "Click to use this logo URL",
+      "textResult": "Text Result",
+      "idResult": "ID Result",
+      "noLogosMatchingLanguages": "No logos found matching languages: {{languages}}",
       "seasonPosters": "Season Posters",
       "episodeImages": "Episode Images",
       "tvShowPosters": "TV Show Posters",
@@ -100,6 +105,8 @@
     },
     "manual": {
       "title": "Manual Mode (Semi-Automated)",
+      "browseLogos": "Browse Logos",
+      "browseLogosTooltip": "Browse for Logos/ClearArt",
       "description": "Create or replace posters manually with full control over search, source, and metadata.",
       "posterType": "Poster Type",
       "types": {
@@ -306,6 +313,71 @@
     "noReleases": "No releases found"
   },
   "overlayAssets": {
+    "tabs": {
+        "design": "Design",
+        "layers": "Layers"
+    },
+    "layers": {
+        "uploadTitle": "Upload Layer",
+        "uploadDesc": "PNG, Logo, Sticker",
+        "empty": "No layers added.",
+        "name": "Layer {{index}}",
+        "front": "FRONT",
+        "behind": "BEHIND",
+        "dimmed": "Dimmed",
+        "bright": "Bright"
+    },
+    "controls": {
+        "bringFront": "Bring to Front",
+        "sendBack": "Send Behind Overlay",
+        "moveUp": "Move Up",
+        "moveDown": "Move Down",
+        "delete": "Delete",
+        "makeBright": "Make Bright (100%)",
+        "makeDim": "Make Dim (50%)",
+        "adjustOpacity": "Adjust Opacity"
+    },
+    "help": {
+        "title": "Controls",
+        "text": "• Drag to Move, Handle to Resize/Rotate",
+        "text2": "• Use the icons to reorder or adjust opacity."
+    },
+    "showTextGuide": "Show Text Area Guide",
+    "showTextGuideHint": "Renders a red box based on 'MaxWidth', 'MaxHeight' and 'text_offset' from your Settings.",
+    "uploadSample": "Upload Custom Preview",
+    "resetSample": "Reset Sample",
+    "customBackground": "Custom Background",
+    "list": "Overlay Library",
+    "create": "Overlay Creator",
+    "designControls": "Design Controls",
+    "posterRatio": "Poster (2:3)",
+    "backgroundRatio": "16:9",
+    "enableBorder": "Enable Border",
+    "thickness": "Thickness",
+    "roundedCorners": "Rounded Corners",
+    "color": "Color",
+    "effects": "Effects",
+    "vignette": "Vignette (Dark Corners)",
+    "innerGlow": "Inner Glow (Fade All Sides)",
+    "filmGrainIntensity": "Film Grain Intensity",
+    "grainSize": "Grain Size (Roughness)",
+    "bottomGradient": "Bottom Gradient",
+    "matteHeight": "Matte Height (Solid)",
+    "fadeHeight": "Fade Height (Blur)",
+    "saveAs": "Save As",
+    "generateAndSave": "Save Overlay file",
+    "livePreview": "Live Preview",
+    "updating": "Updating...",
+    "backgroundContent": "Background Content",
+    "posterContent": "Poster Content",
+    "previewHint": "The background represents your media. The overlay (border/gradient) is shown on top.",
+    "savedSuccess": "Saved successfully",
+    "saveFailed": "Failed to save",
+    "filenameRequired": "Filename required",
+    "fileExistsTitle": "File Already Exists",
+    "fileExistsMessage": "A file named {{filename}} already exists.",
+    "overwriteConfirm": "Do you want to overwrite it?",
+    "overwrite": "Overwrite",
     "description": "Manage overlay files (Images: PNG, JPEG | Fonts: TTF, OTF, WOFF, WOFF2)",
     "loadFailed": "Failed to load overlay files",
     "loadError": "Failed to load overlay files: {{message}}",
@@ -400,7 +472,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "runModes": "Run Modes",
-    "runtimeHistory": "Runtime History",
+    "runtimeHistory": "Insights",
     "plexExport": "Plex Export",
     "mediaServerExport": "Media Server Export",
     "assets": "Asset Management",
@@ -440,13 +512,59 @@
     "currentVersion": "✓ Current version installed"
   },
   "topNavbar": {
-    "changeTheme": "Change Theme",
-    "selectTheme": "Select Theme",
-    "userMenu": "User Menu",
-    "signOut": "Sign Out",
-    "userProfile": "User Profile"
+    "changeTheme": "Design ändern",
+    "selectTheme": "Design wählen",
+    "userMenu": "Benutzermenü",
+    "signOut": "Abmelden",
+    "userProfile": "Benutzerprofil",
+    "stopSystem": "System stoppen",
+    "deleteLockfile": "Running-Datei löschen",
+    "confirmStop": "Sind Sie sicher, dass Sie den Stopp erzwingen wollen?",
+    "confirmDeleteLock": "Sind Sie sicher, dass Sie die Running-Datei löschen wollen?"
   },
   "dashboard": {
+    "controlDeck": {
+      "engineStatus": "Engine Status",
+      "running": "RUNNING",
+      "stopped": "STOPPED",
+      "mode": "Mode",
+      "idle": "Idle",
+      "pid": "PID",
+      "scheduler": "Scheduler",
+      "active": "Active",
+      "standby": "Standby",
+      "disabled": "Disabled",
+      "nextRun": "Next Run",
+      "noSchedules": "No schedules active",
+      "systemInfo": "System Information",
+      "docker": "DOCKER",
+      "cpu": "CPU",
+      "cores": "Cores",
+      "genericCpu": "Generic CPU",
+      "memory": "Memory",
+      "free": "Free",
+      "config": "Config",
+      "loaded": "Loaded",
+      "missing": "Missing",
+      "versionAbbr": "Ver.",
+      "editConfig": "Edit Config",
+      "createConfig": "Create Config"
+    },
+    "banners": {
+      "executionInProgress": "Script Execution in Progress",
+      "reviewLogs": "Review the logs below for real-time progress."
+    },
+    "cards": {
+      "systemControlDeck": "System Control Deck"
+    },
+    "logViewerLabel": {
+        "reading": "Reading:",
+        "autoScrollOn": "Auto-Scroll On",
+        "autoScrollOff": "Auto-Scroll Off",
+        "entries": "Entries:",
+        "refreshesEvery": "Refreshes every",
+        "event": "Event"
+    },
     "title": "Dashboard",
     "welcome": "Monitor your Posterizarr instance",
     "status": "Status",
@@ -519,6 +637,8 @@
     "nextRun": "Next",
     "configureNow": "Configure",
     "noSchedulesRegistered": "No schedules registered",
+    "run": "Run",
+    "stopSuccess": "Script stopping...",
     "cores": "Cores",
     "free": "Free"
   },
@@ -624,7 +744,12 @@
     "gatherSupport": "Gather Support Logs",
     "gatheringSupport": "Gathering support files... This may take a moment.",
     "gatheringSupportSuccess": "Support files downloaded.",
-    "gatheringSupportFailed": "Failed to gather support files: {{message}}"
+    "gatheringSupportFailed": "Failed to gather support files: {{message}}",
+    "scriptlogMissing": "Scriptlog.log not found, falling back to {{fallback}}",
+    "noLogsFound": "No log files found on server",
+    "noLogSelected": "Please select a log file first",
+    "pleaseSelectLog": "Please select a log file to view",
+    "noLogsAvailable": "No logs available"
   },
   "libraryExclusion": {
     "configNotFound": "Media server configuration not found",
@@ -778,18 +903,25 @@
         "text": "Works on Docker, Linux, Windows, macOS, and ARM"
       }
     },
-    "showcase": {
-      "title": "See It In Action",
-      "posterizarrOutput": "Posterizarr Output",
-      "posterizarrDescription": "High-quality artwork automatically downloaded and processed with your custom overlays",
-      "kometaIntegration": "After Kometa Integration",
-      "kometaDescription": "Final results in your media server with additional Kometa overlays applied"
+    "integration": {
+      "webhook": "Native Webhook",
+      "recommended": "Recommended",
+      "script": "Custom Script",
+      "legacy": "Legacy / Advanced",
+      "webhookDesc": "Seamless integration with *Arr apps and Tautulli via HTTP webhooks. No volume mapping required.",
+      "scriptDesc": "Traditional file-based monitoring. Requires script files and volume mapping."
     },
     "cta": {
       "title": "Ready to Transform Your Library?",
       "description": "Posterizarr handles everything from artwork discovery to media server upload, giving you beautiful, consistent artwork across your entire collection.",
+      "selectMethod": "Select your preferred integration method to view the correct setup instructions.",
       "installationGuide": "View Installation Guide",
-      "viewOnGitHub": "View on GitHub"
+      "viewOnGitHub": "View on GitHub",
+      "setupSonarrRadarr": "Setup Sonarr/Radarr",
+      "setupTautulli": "Setup Tautulli",
+      "setupArrScript": "Setup Arr (Script)",
+      "setupTautulliDocker": "Setup Tautulli (Docker)",
+      "setupTautulliWin": "Setup Tautulli (Win)"
     },
     "technical": {
       "title": "Technical Highlights",
@@ -1291,6 +1423,26 @@
     "autoSaved": "Auto-saved {{count}} change(s)",
     "savedSuccessfully": "Configuration saved successfully! ({{count}} change(s))"
   },
+    "apiKeys": {
+    "title": "API Keys & Webhooks",
+    "generateTitle": "Generate New Key",
+    "namePlaceholder": "Key Name (e.g. Tautulli)",
+    "generateButton": "Generate",
+    "generatedSuccess": "Key Generated! Copy it now (it won't be shown again):",
+    "authUrl": "Authenticate via URL:",
+    "authHeader": "Authenticate via Header:",
+    "activeKeys": "Active Keys",
+    "lastUsed": "Last used",
+    "never": "Never",
+    "noKeys": "No active API keys found",
+    "revokeTitle": "Revoke API Key?",
+    "revokeMessage": "Revoke this key? Apps using it will stop working immediately.",
+    "revokeConfirm": "Revoke Key",
+    "toastGenerated": "API Key Generated",
+    "toastFailed": "Failed to generate key",
+    "toastRevoked": "Key revoked",
+    "toastRevokeError": "Error revoking key"
+  },
   "assetsStats": {
     "title": "Assets Overview",
     "fetchError": "Failed to fetch assets stats",
@@ -1311,6 +1463,10 @@
   },
   "assetReplacer": {
     "title": "Replace Asset",
+    "selectLogoTitle": "Select a Logo/ClearArt",
+    "logoApplied": "Logo URL applied to Title Text",
+    "browseLogos": "Browse Logos",
+    "noLogosMatchingLanguages": "No logos found matching languages: {{languages}}",
     "enterTitleError": "Please enter a title to search for",
     "foundReplacements": "Found {{count}} replacement options from {{sources}} sources",
     "fetchPreviewsError": "Failed to fetch previews",
@@ -1360,7 +1516,8 @@
     "confirmReplaceButton": "Replace Asset",
     "confirmFetchTitle": "Confirm Fetch Replacement Options",
     "confirmFetchMessage": "This will search TMDB, TVDB, and Fanart.tv for replacement options. Continue?",
-    "confirmFetchButton": "Fetch Replacements"
+    "confirmFetchButton": "Fetch Replacements",
+    "titleText": "Title Text"
   },
   "assetOverview": {
     "title": "Action Center",
@@ -1440,7 +1597,13 @@
     "bulkDeleteSuccess": "Successfully deleted {{count}} asset(s).",
     "bulkDeleteFailed": "Bulk delete failed: {{error}}",
     "bulkDeleteError": "Bulk delete error: {{error}}",
-    "favProvider": "Fav Provider"
+    "favProvider": "Fav Provider",
+    "deleteAllFilteredTooltip": "Delete all filtered assets",
+    "deleteAllFiltered": "Delete All ({{count}})",
+    "noAssetsToDelete": "No filtered assets to delete.",
+    "bulkDeleteAllFilteredTitle": "Delete All Filtered Assets?",
+    "bulkDeleteAllFilteredConfirm": "Are you sure you want to permanently delete all {{count}} filtered assets?\n\nThis will delete both the files and their database records. This action cannot be undone.",
+    "confirmDeleteAll": "Confirm & Delete ({{count}})"
   },
   "common": {
     "view": "View",
@@ -1485,7 +1648,16 @@
     "season": "Season",
     "episode": "Episode",
     "background": "Background",
-    "asset": "Asset"
+    "asset": "Asset",
+    "name": "Name",
+    "date": "Date",
+    "sorting": {
+      "title": "Sort Assets",
+      "nameAsc": "Name (A-Z)",
+      "nameDesc": "Name (Z-A)",
+      "dateNewest": "Date (Newest)",
+      "dateOldest": "Date (Oldest)"
+    }
   },
   "theme": {
     "title": "Theme",
@@ -1534,7 +1706,8 @@
     "minLength": "Minimum length: {{min}} characters",
     "maxLength": "Maximum length: {{max}} characters",
     "email": "Invalid email address",
-    "url": "Invalid URL"
+    "url": "Invalid URL",
+    "enterTitleOrFolder": "Please enter a Title or Folder Name!"
   },
   "loading": {
     "initializing": "Initializing Posterizarr...",
@@ -1974,6 +2147,7 @@
     }
   },
   "plexExport": {
+    "updated": "Updated",
     "pageTitle": "Plex Export History",
     "description": "Track and query your Plex library exports over time",
     "refresh": "Refresh",
@@ -2011,12 +2185,78 @@
     "resolutions": "Resolutions",
     "importedAt": "Imported At",
     "alreadyImported": "Data already imported",
-    "importSuccess": "Import successful"
+    "importSuccess": "Import successful",
+    "addInfo": "Add. Info",
+    "externalIds": "External IDs"
+  },
+  "plexActions": {
+    "refreshMetadata": "Refresh Metadata",
+    "analyzeItem": "Analyze Item",
+    "scanLibrary": "Scan Library Files",
+    "emptyTrash": "Empty Trash",
+    "actionStarted": "Sending command to Plex..."
+  },
+  "jellyfinActions": {
+    "refreshMetadata": "Refresh Metadata",
+    "refreshImages": "Scan for Images",
+    "actionStarted": "Sending command..."
   },
   "mediaServerExport": {
     "pageTitle": "Media Server Export History",
     "description": "Track and query your media server library exports over time",
     "plex": "Plex",
     "jellyfinEmby": "Jellyfin / Emby"
+  },
+  "runtime_history": {
+    "analytics": "Analytics",
+    "history_list": "History List",
+    "periods": {
+      "last_7_days": "Last 7 Days",
+      "last_30_days": "Last 30 Days",
+      "last_3_months": "Last 3 Months",
+      "last_year": "Last Year"
+    },
+    "charts": {
+      "execution_time": "Execution Time (Seconds)",
+      "assets_created": "Assets Created",
+      "errors_per_run": "Errors per Run",
+      "source_distribution": "Source Distribution (Daily)",
+      "no_data": "No data available for this period",
+      "no_provider_data": "No provider data available"
+    },
+    "table": {
+      "start_time": "Start Time",
+      "mode": "Mode",
+      "duration": "Duration",
+      "created": "Created",
+      "errors": "Errors",
+      "page": "Page"
+    },
+    "details": {
+      "title": "Run Details",
+      "tab_stats": "Statistics",
+      "tab_items": "Items Created",
+      "runtime": "Runtime",
+      "total_images": "Total Images",
+      "space_saved": "Space Saved",
+      "breakdown": "Breakdown",
+      "logs": "Logs",
+      "log_file": "Log File",
+      "script_version": "Script Version"
+    },
+    "items": {
+      "loading": "Loading item details...",
+      "none_found": "No item details found",
+      "assets_no_records": "This run created {{count}} assets, but their detailed records could not be retrieved.",
+      "no_new_assets": "This run did not create any new assets.",
+      "timestamp_warning": "(Note: Items are often tracked by timestamp range. If the run logs are old or time-sync is off, specific items might not link to this History ID: {{id}})"
+    },
+    "types": {
+      "posters": "Posters",
+      "backgrounds": "Backgrounds",
+      "seasons": "Seasons",
+      "title_cards": "Title Cards",
+      "collections": "Collections"
+    }
   }
 }

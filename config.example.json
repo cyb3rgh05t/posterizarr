@@ -33,6 +33,10 @@
     ],
     "PreferredTCLanguageOrder": [
       "PleaseFillMe"
+    ],
+    "LogoLanguageOrder": [
+      "en",
+      "de"
     ]
   },
   "PlexPart": {
@@ -83,6 +87,10 @@
     "AssetPath": "/assets",
     "SkipAddText": "false",
     "SkipAddTextAndOverlay": "false",
+    "SkipLocalPosterTextAdd": "false",
+    "SkipLocalBackgroundTextAdd": "false",
+    "SkipLocalSeasonTextAdd": "false",
+    "SkipLocalTCTextAdd": "false",
     "FollowSymlink": "false",
     "ForceRunningDeletion": "false",
     "AutoUpdatePosterizarr": "false",
@@ -136,7 +144,12 @@
     "AssetCleanup": "false",
     "AutoUpdateIM": "false",
     "DisableHashValidation": "false",
-    "DisableOnlineAssetFetch": "false"
+    "DisableOnlineAssetFetch": "false",
+    "UseLogo": "false",
+    "UseBGLogo": "false",
+    "UseClearlogo": "false",
+    "UseClearart": "false",
+    "LogoTextFallback": "false"
   },
   "OverlayPart": {
     "ImageProcessing": "true",

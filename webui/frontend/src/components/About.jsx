@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReleasesSection from "./ReleasesSection";
-import AssetsStats from "./AssetsStats";
 
 const API_URL = "/api";
 const REPO_URL = "https://github.com/fscorrupt/posterizarr/releases/latest";
@@ -186,9 +185,6 @@ function About() {
           </div>
         </div>
       </div>
-
-      {/* Assets Statistics */}
-      <AssetsStats />
 
       {/* Releases Section */}
       <ReleasesSection />

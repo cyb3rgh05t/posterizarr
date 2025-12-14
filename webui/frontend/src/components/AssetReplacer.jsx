@@ -10,6 +10,7 @@ import {
   Star,
   Image as ImageIcon,
   AlertCircle,
+  Search,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../context/ToastContext";
@@ -40,6 +41,9 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
   const [imageDimensions, setImageDimensions] = useState(null); // Store {width, height}
   const [isDimensionValid, setIsDimensionValid] = useState(false); // Track if dimensions are valid
   const [activeProviderTab, setActiveProviderTab] = useState("tmdb"); // Provider tabs: tmdb, tvdb, fanart
+
+  // Logo selection mode
+  const [logoSelectionMode, setLogoSelectionMode] = useState(false);
 
   // Confirmation dialog states
   const [showUploadConfirm, setShowUploadConfirm] = useState(false);
@@ -252,38 +256,38 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     if (dbData?.Title && assetType !== "season" && assetType !== "titlecard") {
       title = dbData.Title;
       console.log(`Using Title from database: ${title}`);
-  	}
+    }
     if (dbData?.year) {
       year = parseInt(dbData.year);
       console.log(`Using Year from database: ${year}`);
-  	}
+    }
 
     // Determine mediaType
-    const backendAssetType = (asset.type || "").toLowerCase();
-    const dbType = (dbData?.Type || "").toLowerCase();
-    const libName = (libraryName || "").toLowerCase();
-    let mediaType = "movie"; // Default
+    const backendAssetType = (asset.type || "").toLowerCase();
+    const dbType = (dbData?.Type || "").toLowerCase();
+    const libName = (libraryName || "").toLowerCase();
+    let mediaType = "movie"; // Default
 
-    if (
-      dbType.includes("show") ||
-      backendAssetType.includes("show") ||
-      backendAssetType.includes("season") ||
-      backendAssetType.includes("episode") ||
-      assetType === "season" ||
-      assetType === "titlecard" ||
-      libName.includes("tv") ||
-      libName.includes("show") ||
-      libName.includes("series") ||
+    if (
+      dbType.includes("show") ||
+      backendAssetType.includes("show") ||
+      backendAssetType.includes("season") ||
+      backendAssetType.includes("episode") ||
+      assetType === "season" ||
+      assetType === "titlecard" ||
+      libName.includes("tv") ||
+      libName.includes("show") ||
+      libName.includes("series") ||
       libName.includes("serier") ||
-      libName.includes("anime")
-    ) {
-      mediaType = "tv";
-    }
+      libName.includes("anime")
+    ) {
+      mediaType = "tv";
+    }
 
-    console.log(`Backend asset.type: '${backendAssetType}'`);
-    console.log(`DB data Type: '${dbType}'`);
-  	console.log(`Library Name: '${libName}'`);
-  	console.log(`Derived mediaType: '${mediaType}'`);
+    console.log(`Backend asset.type: '${backendAssetType}'`);
+    console.log(`DB data Type: '${dbType}'`);
+    console.log(`Library Name: '${libName}'`);
+    console.log(`Derived mediaType: '${mediaType}'`);
 
     // Extract season/episode numbers
     // Priority 1: From DB Title field (if asset comes from AssetOverview)
@@ -467,6 +471,158 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     setSelectedPreview(null);
   }, [metadata]);
 
+  // Handle Logo Fetching with FavProvider priority AND LogoLanguageOrder
+  const handleFetchLogos = async () => {
+    console.log("=== Fetching Logos ===");
+    setLogoSelectionMode(true);
+    setLoading(true);
+
+    const logoMetadata = {
+      ...metadata,
+      asset_type: "logo",
+    };
+
+    try {
+      // ----------------------------------------------------------------------
+      // 1. Fetch User Config (FavProvider & LogoLanguageOrder)
+      // ----------------------------------------------------------------------
+      let userFavProvider = "fanart"; // Default fallback
+      let languageOrderList = [];
+
+      try {
+        const configResponse = await fetch(`${API_URL}/config`);
+        if (configResponse.ok) {
+          const configData = await configResponse.json();
+          // Handle flat or grouped config structure
+          const cfg = configData.config || {};
+          const apiPart = cfg.ApiPart || {};
+
+          // A) Get FavProvider
+          const provider = cfg.FavProvider || cfg.favprovider || apiPart.FavProvider || apiPart.favprovider;
+          if (provider) {
+             const p = provider.toLowerCase();
+             if (p.includes("tmdb")) userFavProvider = "tmdb";
+             else if (p.includes("tvdb")) userFavProvider = "tvdb";
+             else if (p.includes("fanart")) userFavProvider = "fanart";
+          }
+
+          // B) Get LogoLanguageOrder (Handle Array or String)
+          const rawOrder = cfg.LogoLanguageOrder || apiPart.LogoLanguageOrder;
+
+          if (Array.isArray(rawOrder)) {
+             languageOrderList = rawOrder.map(lang => lang.trim().toLowerCase());
+          } else if (typeof rawOrder === 'string' && rawOrder) {
+             languageOrderList = rawOrder.split(",").map(lang => lang.trim().toLowerCase());
+          }
+
+          if (languageOrderList.length > 0) {
+            console.log("Applying Logo Language Order:", languageOrderList);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch config for logo preference:", e);
+      }
+
+      // ----------------------------------------------------------------------
+      // 2. Fetch Replacements
+      // ----------------------------------------------------------------------
+      const response = await fetch(`${API_URL}/assets/fetch-replacements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          asset_path: asset.path,
+          ...logoMetadata,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        let results = {
+          tmdb: data.results.tmdb || [],
+          tvdb: data.results.tvdb || [],
+          fanart: data.results.fanart || [],
+        };
+
+        // --------------------------------------------------------------------
+        // 3. Filter & Sort by LogoLanguageOrder (STRICT MODE)
+        // --------------------------------------------------------------------
+        if (languageOrderList.length > 0) {
+          const processLogos = (logoList) => {
+            if (!logoList) return [];
+
+            // A) Filter: REMOVE logos not in the allowed list
+            const filtered = logoList.filter(logo => {
+              const logoLang = (logo.language || "xx").toLowerCase();
+              return languageOrderList.includes(logoLang);
+            });
+
+            // B) Sort: Order exactly as they appear in LogoLanguageOrder
+            return filtered.sort((a, b) => {
+              const langA = (a.language || "xx").toLowerCase();
+              const langB = (b.language || "xx").toLowerCase();
+              return languageOrderList.indexOf(langA) - languageOrderList.indexOf(langB);
+            });
+          };
+
+          // Apply to all providers
+          results.tmdb = processLogos(results.tmdb);
+          results.tvdb = processLogos(results.tvdb);
+          results.fanart = processLogos(results.fanart);
+        }
+
+        setPreviews(results);
+
+        // --------------------------------------------------------------------
+        // 4. Determine Active Provider
+        // --------------------------------------------------------------------
+        let activeProvider = userFavProvider;
+
+        // Fallback if preferred provider has no logos (after filtering)
+        if (!results[activeProvider] || results[activeProvider].length === 0) {
+          if (results.fanart.length > 0) activeProvider = "fanart";
+          else if (results.tmdb.length > 0) activeProvider = "tmdb";
+          else if (results.tvdb.length > 0) activeProvider = "tvdb";
+        }
+
+        // Check if we have any results at all
+        const totalResults = results.tmdb.length + results.tvdb.length + results.fanart.length;
+
+        if (totalResults > 0) {
+          setActiveProviderTab(activeProvider);
+          setActiveTab("previews");
+        } else {
+          // If 0 results, check if it was due to strict filtering
+          if (languageOrderList.length > 0) {
+             showError(t("assetReplacer.noLogosMatchingLanguages", { languages: languageOrderList.join(", ") }));
+          } else {
+             showError(t("assetReplacer.fetchPreviewsError"));
+          }
+          // Stay on upload tab or handle as prefered
+          setLogoSelectionMode(false);
+        }
+
+      } else {
+        showError(t("assetReplacer.fetchPreviewsError"));
+        setLogoSelectionMode(false);
+      }
+    } catch (err) {
+      showError(err.message);
+      setLogoSelectionMode(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogoSelect = (preview) => {
+    setManualForm((prev) => ({
+      ...prev,
+      titletext: preview.original_url,
+    }));
+    setActiveTab("upload");
+    setLogoSelectionMode(false);
+    showInfo(t("assetReplacer.logoApplied"));
+  };
+
   // Fetch language order preferences from config
   useEffect(() => {
     const fetchLanguageOrder = async () => {
@@ -547,195 +703,185 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     fetchLanguageOrder();
   }, []);
 
-// Fetch database data if not provided (e.g., when opened from FolderView)
-  useEffect(() => {
-    // Helper function to find a match in a list of records
-    // Handles both ImageChoices (Rootfolder) and MediaExport (root_foldername)
-    // Helper function to find a match in a list of records
-    // Handles both ImageChoices (Rootfolder) and MediaExport (root_foldername)
-    const findMatch = (records, libraryName, rootfolder) => {
-      // 1. Filter by LibraryName
-      const libraryMatchingRecords = records.filter(
-        (r) =>
-          (r.LibraryName && r.LibraryName === libraryName) ||
-          (r.library_name && r.library_name === libraryName)
-      );
+  // Fetch database data if not provided (e.g., when opened from FolderView)
+  useEffect(() => {
+    // Helper function to find a match in a list of records
+    // Handles both ImageChoices (Rootfolder) and MediaExport (root_foldername)
+    const findMatch = (records, libraryName, rootfolder) => {
+      // 1. Filter by LibraryName
+      const libraryMatchingRecords = records.filter(
+        (r) =>
+          (r.LibraryName && r.LibraryName === libraryName) ||
+          (r.library_name && r.library_name === libraryName)
+      );
 
-      // Debug: Show a few sample records from the library
-      const sampleRecords = libraryMatchingRecords
-        .slice(0, 3)
-        .map((r) => ({
-          LibraryName: r.LibraryName || r.library_name,
-          Rootfolder: r.Rootfolder || r.root_foldername,
-          Type: r.Type || r.library_type,
-        }));
+      // Debug: Show a few sample records from the library
+      const sampleRecords = libraryMatchingRecords
+        .slice(0, 3)
+        .map((r) => ({
+          LibraryName: r.LibraryName || r.library_name,
+          Rootfolder: r.Rootfolder || r.root_foldername,
+          Type: r.Type || r.library_type,
+        }));
 
-      if (sampleRecords.length > 0) {
-        console.log(
-          `Sample records from "${libraryName}" library:`,
-          sampleRecords
-        );
-      }
+      if (sampleRecords.length > 0) {
+        console.log(
+          `Sample records from "${libraryName}" library:`,
+          sampleRecords
+        );
+      }
 
-      // 2. Filter THAT list by Rootfolder
-      const rootfolderMatchingRecords = libraryMatchingRecords.filter(
-        (r) =>
-          (r.Rootfolder && r.Rootfolder === rootfolder) ||
-          (r.root_foldername && r.root_foldername === rootfolder)
-      );
+      // 2. Filter THAT list by Rootfolder
+      const rootfolderMatchingRecords = libraryMatchingRecords.filter(
+        (r) =>
+          (r.Rootfolder && r.Rootfolder === rootfolder) ||
+          (r.root_foldername && r.root_foldername === rootfolder)
+      );
 
-      // If no records match the root folder, we can't proceed.
-      if (rootfolderMatchingRecords.length === 0) {
-        console.log(
-          `...No records found matching rootfolder: "${rootfolder}"`
-        );
-        return null;
-      }
+      // If no records match the root folder, we can't proceed.
+      if (rootfolderMatchingRecords.length === 0) {
+        console.log(
+          `...No records found matching rootfolder: "${rootfolder}"`
+        );
+        return null;
+      }
 
-      // 3. Prioritize based on the SPECIFIC root folder matches
-      // Prioritize: Show/Movie records > Season records > Episode records
-      return (
-        rootfolderMatchingRecords.find(
-          (r) =>
-            (r.Type?.includes("Show") || r.Type?.includes("Movie")) ||
-            (r.library_type?.includes("show") || r.library_type?.includes("movie"))
-        ) ||
-        rootfolderMatchingRecords.find(
-          (r) =>
-            (r.Type?.includes("Season") && !r.Type?.includes("Episode")) ||
-            (r.library_type === "show" && r.season_number) // Approximate
-        ) ||
-        rootfolderMatchingRecords.find((r) => r.Type?.includes("Background")) ||
-        rootfolderMatchingRecords[0] // Fallback to first match in the rootfolder list
-      );
-    };
+      // 3. Prioritize based on the SPECIFIC root folder matches
+      // Prioritize: Show/Movie records > Season records > Episode records
+      return (
+        rootfolderMatchingRecords.find(
+          (r) =>
+            (r.Type?.includes("Show") || r.Type?.includes("Movie")) ||
+            (r.library_type?.includes("show") || r.library_type?.includes("movie"))
+        ) ||
+        rootfolderMatchingRecords.find(
+          (r) =>
+            (r.Type?.includes("Season") && !r.Type?.includes("Episode")) ||
+            (r.library_type === "show" && r.season_number) // Approximate
+        ) ||
+        rootfolderMatchingRecords.find((r) => r.Type?.includes("Background")) ||
+        rootfolderMatchingRecords[0] // Fallback to first match in the rootfolder list
+      );
+    };
 
-    // Helper to normalize data from media_export.db to match ImageChoices.db format
-    // This is CRITICAL so the rest of the component (like extractMetadata) works
-    const normalizeMediaExportData = (record) => {
-      if (!record) return null;
-      return {
-        LibraryName: record.library_name,
-        Rootfolder: record.root_foldername,
-        Title: record.title,
-        Type: record.library_type, // 'show' or 'movie'
-        tmdbid: record.tmdbid,
-        tvdbid: record.tvdbid,
-        imdbid: record.imdbid,
-        // Add any other fields from media_export.db that extractMetadata might need
-        // e.g., year, season_numbers, etc.
-        year: record.year,
-      };
-    };
+    // Helper to normalize data from media_export.db to match ImageChoices.db format
+    const normalizeMediaExportData = (record) => {
+      if (!record) return null;
+      return {
+        LibraryName: record.library_name,
+        Rootfolder: record.root_foldername,
+        Title: record.title,
+        Type: record.library_type, // 'show' or 'movie'
+        tmdbid: record.tmdbid,
+        tvdbid: record.tvdbid,
+        imdbid: record.imdbid,
+        year: record.year,
+      };
+    };
 
-    const fetchDatabaseData = async () => {
-      if (dbData !== null) {
-        // Already have database data
-        console.log("Already have database data, skipping fetch");
-        return;
-      }
+    const fetchDatabaseData = async () => {
+      if (dbData !== null) {
+        // Already have database data
+        console.log("Already have database data, skipping fetch");
+        return;
+      }
 
-      // --- Parse Path ---
-      const pathParts = asset.path?.split(/[\/\\]/).filter(Boolean);
-      if (!pathParts || pathParts.length < 2) {
-        console.log("✗ Cannot parse path:", pathParts);
-        return;
-      }
-      const libraryName = pathParts[0];
-      const rootfolder = pathParts[1];
-      console.log(
-        `Fetching DB data for: LibraryName="${libraryName}", Rootfolder="${rootfolder}"`
-      );
-      // --- End Parse Path ---
+      // --- Parse Path ---
+      const pathParts = asset.path?.split(/[\/\\]/).filter(Boolean);
+      if (!pathParts || pathParts.length < 2) {
+        console.log("✗ Cannot parse path:", pathParts);
+        return;
+      }
+      const libraryName = pathParts[0];
+      const rootfolder = pathParts[1];
+      console.log(
+        `Fetching DB data for: LibraryName="${libraryName}", Rootfolder="${rootfolder}"`
+      );
+      // --- End Parse Path ---
 
-      try {
-        let response; // Declare response once
+      try {
+        let response; // Declare response once
 
-        // --- 1. Try Plex Export (media_export.db) ---
-        console.log("Checking Plex Export DB (/api/plex-export/library)...");
-        response = await fetch(`${API_URL}/plex-export/library`);
-        if (response.ok) {
-          const plexData = await response.json();
-          if (plexData.success && plexData.data) {
-            const matchingRecord = findMatch(plexData.data, libraryName, rootfolder);
-            if (matchingRecord) {
-              console.log("✓ Found matching record in Plex Export DB:", matchingRecord);
-              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
-              return; // Found it!
-            }
-          }
-        }
-        console.log("...Not found in Plex Export DB.");
+        // --- 1. Try Plex Export (media_export.db) ---
+        console.log("Checking Plex Export DB (/api/plex-export/library)...");
+        response = await fetch(`${API_URL}/plex-export/library`);
+        if (response.ok) {
+          const plexData = await response.json();
+          if (plexData.success && plexData.data) {
+            const matchingRecord = findMatch(plexData.data, libraryName, rootfolder);
+            if (matchingRecord) {
+              console.log("✓ Found matching record in Plex Export DB:", matchingRecord);
+              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
+              return; // Found it!
+            }
+          }
+        }
+        console.log("...Not found in Plex Export DB.");
 
-        // --- 2. Try Other Media Export (media_export.db) ---
-        console.log("Checking Other Media Export DB (/api/other-media-export/library)...");
-        response = await fetch(`${API_URL}/other-media-export/library`);
-        if (response.ok) {
-          const otherData = await response.json();
-          if (otherData.success && otherData.data) {
-            const matchingRecord = findMatch(otherData.data, libraryName, rootfolder);
-            if (matchingRecord) {
-              console.log("✓ Found matching record in Other Media Export DB:", matchingRecord);
-              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
-              return; // Found it!
-            }
-          }
-        }
-        console.log("...Not found in Other Media Export DB.");
-        
-        // --- 3. Try ImageChoices (Posterizarr DB) ---
-        console.log("Checking ImageChoices DB (/api/imagechoices)...");
-        response = await fetch(`${API_URL}/imagechoices`);
-        if (response.ok) {
-          const allRecords = await response.json();
-          const matchingRecord = findMatch(allRecords, libraryName, rootfolder);
+        // --- 2. Try Other Media Export (media_export.db) ---
+        console.log("Checking Other Media Export DB (/api/other-media-export/library)...");
+        response = await fetch(`${API_URL}/other-media-export/library`);
+        if (response.ok) {
+          const otherData = await response.json();
+          if (otherData.success && otherData.data) {
+            const matchingRecord = findMatch(otherData.data, libraryName, rootfolder);
+            if (matchingRecord) {
+              console.log("✓ Found matching record in Other Media Export DB:", matchingRecord);
+              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
+              return; // Found it!
+            }
+          }
+        }
+        console.log("...Not found in Other Media Export DB.");
 
-          if (matchingRecord) {
-            console.log("✓ Found matching record in ImageChoices DB:", matchingRecord);
-            setDbData(matchingRecord); // Already in correct format
-            return; // Found it!
-          }
-        }
-        console.log("...Not found in ImageChoices DB.");
-        
-        // --- 4. Final Failure ---
-        console.log("✗ No matching database record found in ANY source for:", {
-          libraryName,
-          rootfolder,
-        });
+        // --- 3. Try ImageChoices (Posterizarr DB) ---
+        console.log("Checking ImageChoices DB (/api/imagechoices)...");
+        response = await fetch(`${API_URL}/imagechoices`);
+        if (response.ok) {
+          const allRecords = await response.json();
+          const matchingRecord = findMatch(allRecords, libraryName, rootfolder);
 
-      } catch (error) {
-        console.error("Error fetching database data:", error);
-      }
-    };
+          if (matchingRecord) {
+            console.log("✓ Found matching record in ImageChoices DB:", matchingRecord);
+            setDbData(matchingRecord); // Already in correct format
+            return; // Found it!
+          }
+        }
+        console.log("...Not found in ImageChoices DB.");
 
-    fetchDatabaseData();
-  }, [asset.path, dbData]); // Dependencies remain the same
+        // --- 4. Final Failure ---
+        console.log("✗ No matching database record found in ANY source for:", {
+          libraryName,
+          rootfolder,
+        });
+
+      } catch (error) {
+        console.error("Error fetching database data:", error);
+      }
+    };
+
+    fetchDatabaseData();
+  }, [asset.path, dbData]);
 
   // Initialize season number from metadata
   useEffect(() => {
     if (metadata.season_number) {
-      // For season posters, just use the number (e.g., "17")
-      // User can manually add "Season " prefix if they want it
       if (metadata.asset_type === "season") {
         const seasonNum = String(metadata.season_number).padStart(2, "0");
         setManualForm((prev) => ({
           ...prev,
           seasonPosterName: seasonNum,
         }));
-        // Also set for manual search
         setManualSearchForm((prev) => ({
           ...prev,
           seasonNumber: String(metadata.season_number),
         }));
       } else if (metadata.asset_type === "titlecard") {
-        // For titlecards, just the number
         const seasonNum = String(metadata.season_number).padStart(2, "0");
         setManualForm((prev) => ({
           ...prev,
           seasonPosterName: seasonNum,
         }));
-        // Also set for manual search
         setManualSearchForm((prev) => ({
           ...prev,
           seasonNumber: String(metadata.season_number),
@@ -749,8 +895,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     if (metadata.episode_number) {
       const episodeNum = String(metadata.episode_number).padStart(2, "0");
 
-      // Extract episode title from DB if available
-      // Format: "S04E01 | Episode Title"
       let episodeTitleName = "";
       const dbTitle = dbData?.Title || "";
       if (dbTitle && dbTitle.includes("|")) {
@@ -766,7 +910,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         episodeNumber: episodeNum,
         episodeTitleName: episodeTitleName || prev.episodeTitleName,
       }));
-      // Also set for manual search
       setManualSearchForm((prev) => ({
         ...prev,
         episodeNumber: String(metadata.episode_number),
@@ -786,56 +929,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     }
   }, [metadata.title, metadata.folder_name, metadata.library_name]);
 
-  // Format display name with metadata
-  const getDisplayName = () => {
-    const parts = [];
-
-    // Add title if available
-    if (metadata.title) {
-      parts.push(metadata.title);
-    }
-
-    // Add year if available
-    if (metadata.year) {
-      parts.push(`(${metadata.year})`);
-    }
-
-    // Add season/episode info
-    if (metadata.season_number !== null && metadata.episode_number) {
-      parts.push(
-        `S${String(metadata.season_number).padStart(2, "0")}E${String(
-          metadata.episode_number
-        ).padStart(2, "0")}`
-      );
-    } else if (metadata.season_number !== null) {
-      // Season 0 is "Specials"
-      parts.push(
-        metadata.season_number === 0
-          ? "Specials"
-          : `Season ${metadata.season_number}`
-      );
-    }
-
-    // Add asset type
-    const assetTypeLabel =
-      {
-        poster: "Poster",
-        background: "Background",
-        season:
-          metadata.season_number === 0
-            ? "Special Season Poster"
-            : "Season Poster",
-        titlecard: "Title Card",
-      }[metadata.asset_type] || "Asset";
-
-    if (parts.length > 0) {
-      return `${parts.join(" ")} - ${assetTypeLabel}`;
-    }
-
-    // Fallback to filename
-    return asset.name || "Unknown Asset";
-  };
-
   const handleFetchClick = () => {
     console.log("=== AssetReplacer: Fetch Button Clicked ===");
 
@@ -850,17 +943,10 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         return;
       }
 
-      console.log("Manual search params:", {
-        searchTitle,
-        searchYear,
-        manualSearchForm,
-      });
-
       metadata = {
         ...metadata,
         title: searchTitle.trim(),
         year: searchYear ? parseInt(searchYear) : null,
-        // Clear IDs when doing manual search - we want to search by title
         tmdb_id: null,
         tvdb_id: null,
         imdb_id: null,
@@ -871,12 +957,8 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
           ? parseInt(manualSearchForm.episodeNumber)
           : metadata.episode_number,
       };
-
-      console.log("Updated metadata with manual search:", metadata);
     }
 
-    // Store params and show confirmation
-    console.log("Storing fetch params and showing confirmation dialog");
     setPendingFetchParams({ metadata, manualSearch });
     setShowFetchConfirm(true);
   };
@@ -897,18 +979,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     showError(null);
 
     try {
-      // Debug logging
-      console.log("Fetching previews with metadata:", {
-        asset_path: asset.path,
-        title: metadata.title,
-        year: metadata.year,
-        media_type: metadata.media_type,
-        asset_type: metadata.asset_type,
-        season_number: metadata.season_number,
-        episode_number: metadata.episode_number,
-        manual_search: isManualSearch,
-      });
-
       const response = await fetch(`${API_URL}/assets/fetch-replacements`, {
         method: "POST",
         headers: {
@@ -920,21 +990,9 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         }),
       });
 
-      console.log("API response status:", response.status);
       const data = await response.json();
-      console.log("API response data:", data);
 
       if (data.success) {
-        console.log("✓ Successfully received results from API:");
-        console.log("  TMDB:", data.results.tmdb?.length || 0, "items");
-        console.log("  TVDB:", data.results.tvdb?.length || 0, "items");
-        console.log("  Fanart:", data.results.fanart?.length || 0, "items");
-        console.log("  Asset type:", metadata.asset_type);
-        console.log(
-          "  Results are already sorted by backend using language preferences"
-        );
-
-        // Backend already sorted by language preference, use results directly
         const results = {
           tmdb: data.results.tmdb || [],
           tvdb: data.results.tvdb || [],
@@ -950,19 +1008,10 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
           })
         );
 
-        // Auto-switch to first provider with results
-        if (results.tmdb.length > 0) {
-          console.log("Auto-switching to TMDB tab (has results)");
-          setActiveProviderTab("tmdb");
-        } else if (results.tvdb.length > 0) {
-          console.log("Auto-switching to TVDB tab (has results)");
-          setActiveProviderTab("tvdb");
-        } else if (results.fanart.length > 0) {
-          console.log("Auto-switching to Fanart tab (has results)");
-          setActiveProviderTab("fanart");
-        }
+        if (results.tmdb.length > 0) setActiveProviderTab("tmdb");
+        else if (results.tvdb.length > 0) setActiveProviderTab("tvdb");
+        else if (results.fanart.length > 0) setActiveProviderTab("fanart");
 
-        console.log("Switching to previews tab");
         setActiveTab("previews");
       } else {
         console.error("API returned error:", data.error || "Unknown error");
@@ -973,62 +1022,38 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       showError(
         t("assetReplacer.errorFetchingPreviews", { error: err.message })
       );
-      console.error("Error fetching previews:", err);
     } finally {
       setLoading(false);
-      console.log("=== Fetch Complete ===");
     }
   };
 
   const handleFileUpload = async (event) => {
-    console.log("=== AssetReplacer: File Upload ===");
     const file = event.target.files[0];
-    if (!file) {
-      console.log("No file selected");
-      return;
-    }
+    if (!file) return;
 
-    console.log("File selected:", {
-      name: file.name,
-      type: file.type,
-      size: file.size,
-    });
-
-    // Validate file type
     if (!file.type.startsWith("image/")) {
-      console.error("Invalid file type:", file.type);
       showError(t("assetReplacer.selectImageError"));
       return;
     }
 
-    // Store the file for later upload
     setUploadedFile(file);
-    console.log("File stored for upload");
 
-    // Show preview of uploaded image and check ratio
     const reader = new FileReader();
     reader.onloadend = () => {
       setUploadedImage(reader.result);
-      console.log("Image preview loaded");
 
-      // Create an Image object to get dimensions
       const img = new Image();
       img.onload = () => {
         const width = img.width;
         const height = img.height;
         setImageDimensions({ width, height });
-        console.log(`Image dimensions: ${width}x${height}`);
 
-        // Define target ratios and tolerance
-        const POSTER_RATIO = 2 / 3; // ~0.667
-        const BACKGROUND_RATIO = 16 / 9; // ~1.778
-        // Using 0.05 absolute tolerance (matches the 5% relative tolerance on 16:9, and is close for 2:3)
+        const POSTER_RATIO = 2 / 3;
+        const BACKGROUND_RATIO = 16 / 9;
         const TOLERANCE = 0.05;
 
-        // Check for zero height
         if (height === 0) {
           setIsDimensionValid(false);
-          // You may need to add this new translation key
           showError(
             t("assetReplacer.imageHeightZero", "Image height cannot be zero.")
           );
@@ -1040,7 +1065,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         let expectedRatio = 0;
         let expectedRatioString = "";
 
-        // Determine required ratio based on asset type
         if (
           metadata.asset_type === "poster" ||
           metadata.asset_type === "season"
@@ -1048,40 +1072,15 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
           expectedRatio = POSTER_RATIO;
           expectedRatioString = "2:3";
           isValid = Math.abs(imageRatio - POSTER_RATIO) <= TOLERANCE;
-          console.log(
-            `Checking poster ratio: ${imageRatio.toFixed(
-              3
-            )} vs ${POSTER_RATIO.toFixed(
-              3
-            )}, tolerance: ${TOLERANCE}, valid: ${isValid}`
-          );
         } else {
-          // background or titlecard
           expectedRatio = BACKGROUND_RATIO;
           expectedRatioString = "16:9";
           isValid = Math.abs(imageRatio - BACKGROUND_RATIO) <= TOLERANCE;
-          console.log(
-            `Checking background/titlecard ratio: ${imageRatio.toFixed(
-              3
-            )} vs ${BACKGROUND_RATIO.toFixed(
-              3
-            )}, tolerance: ${TOLERANCE}, valid: ${isValid}`
-          );
         }
 
-        // Check if ratio is valid
         setIsDimensionValid(isValid);
-        console.log(
-          `Image dimension validation result: ${isValid ? "VALID" : "INVALID"}`
-        );
 
         if (!isValid) {
-          console.warn(
-            `Image ratio mismatch! Got ${imageRatio.toFixed(
-              3
-            )}, expected ${expectedRatio.toFixed(3)} (${expectedRatioString})`
-          );
-          // You will need to add/update this translation key
           showError(
             t("assetReplacer.invalidImageRatio", {
               width,
@@ -1092,7 +1091,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
             })
           );
         } else {
-          // Re-use existing success message
           showSuccess(
             t("assetReplacer.imageDimensionsValid", { width, height })
           );
@@ -1104,51 +1102,34 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
   };
 
   const handleUploadClick = () => {
-    console.log("=== AssetReplacer: Upload Click ===");
-    console.log("File uploaded:", !!uploadedFile);
-    console.log("Dimensions valid:", isDimensionValid);
-    console.log("Posterizarr running:", isPosterizarrRunning);
-
     if (!uploadedFile || !isDimensionValid) {
-      console.warn("Upload validation failed: no file or invalid dimensions");
       showError(t("assetReplacer.selectValidImage"));
       return;
     }
 
-    // Check if Posterizarr is running
     if (isPosterizarrRunning) {
-      console.warn("Upload blocked: Posterizarr is running");
       showError(t("assetReplacer.posterizarrRunningError"));
       return;
     }
 
-    console.log("Showing upload confirmation dialog");
-    // Show confirmation dialog
     setShowUploadConfirm(true);
   };
 
   const handleConfirmUpload = async () => {
-    console.log("=== AssetReplacer: Confirmed Upload ===");
-    console.log("Process with overlays:", processWithOverlays);
-    console.log("Manual form:", manualForm);
-
     setShowUploadConfirm(false);
     setUploading(true);
     showError(null);
 
     try {
-      // Build URL with process_with_overlays parameter
       let url = `${API_URL}/assets/upload-replacement?asset_path=${encodeURIComponent(
         asset.path
       )}&process_with_overlays=${processWithOverlays}`;
 
-      // Add overlay processing parameters if checkbox is checked
       if (processWithOverlays) {
         const titleText = manualForm?.titletext || metadata.title;
         const folderName = manualForm?.foldername || metadata.folder_name;
         const libraryName = manualForm?.libraryname || metadata.library_name;
 
-        // Validation
         if (!titleText || !titleText.trim()) {
           showError(t("assetReplacer.enterTitleTextError"));
           setUploading(false);
@@ -1165,12 +1146,10 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
           return;
         }
 
-        // Add parameters to URL
         url += `&title_text=${encodeURIComponent(titleText)}`;
         url += `&folder_name=${encodeURIComponent(folderName)}`;
         url += `&library_name=${encodeURIComponent(libraryName)}`;
 
-        // For season posters
         if (metadata.asset_type === "season") {
           const seasonPosterName = manualForm?.seasonPosterName;
           if (!seasonPosterName || !seasonPosterName.trim()) {
@@ -1181,7 +1160,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
           url += `&season_number=${encodeURIComponent(seasonPosterName)}`;
         }
 
-        // For titlecards
         if (metadata.asset_type === "titlecard") {
           const episodeNumber = manualForm?.episodeNumber;
           const episodeTitleName = manualForm?.episodeTitleName;
@@ -1202,68 +1180,32 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         }
       }
 
-      console.log("Upload URL:", url);
-
       const formData = new FormData();
       formData.append("file", uploadedFile);
 
-      console.log("Sending upload request...");
       const response = await fetch(url, {
         method: "POST",
         body: formData,
       });
 
-      console.log("Upload response status:", response.status);
-
       if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        let errorMessage = `Server error: ${response.status}`;
-
-        if (contentType && contentType.includes("application/json")) {
-          try {
-            const errorData = await response.json();
-            console.error("Upload error (JSON):", errorData);
-            errorMessage =
-              errorData.detail || errorData.message || errorMessage;
-          } catch (e) {
-            console.error("Failed to parse JSON error:", e);
-            // Failed to parse JSON error
-          }
-        } else {
-          // Non-JSON response (possibly HTML error page)
-          const text = await response.text();
-          console.error("Non-JSON response:", text.substring(0, 500));
-        }
-
-        throw new Error(errorMessage);
+        throw new Error(`Server error: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("Upload response data:", data);
 
       if (data.success) {
         if (data.manual_run_triggered) {
-          console.log("✓ Upload successful - Manual run triggered");
           showSuccess(t("assetReplacer.replacedAndQueued"));
-          // Dispatch event to update badge counts
           window.dispatchEvent(new Event("assetReplaced"));
-
-          // Call onSuccess to delete DB entry
-          console.log(
-            "Calling onSuccess callback to delete DB entry (upload path)"
-          );
           if (onSuccess) {
             await onSuccess();
           }
           onClose();
         } else {
           showSuccess(t("assetReplacer.replacedSuccessfully"));
-          // Dispatch event to update badge counts
           window.dispatchEvent(new Event("assetReplaced"));
           setTimeout(async () => {
-            console.log(
-              "Calling onSuccess callback to delete DB entry (upload no-queue path)"
-            );
             if (onSuccess) {
               await onSuccess();
             }
@@ -1274,51 +1216,37 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         showError(t("assetReplacer.uploadError"));
       }
     } catch (err) {
-      console.error("✗ Error uploading file:", err);
       showError(t("assetReplacer.errorUploadingFile", { error: err.message }));
-      console.error("Error uploading file:", err);
     } finally {
       setUploading(false);
-      console.log("=== Upload Complete ===");
     }
   };
 
   const handlePreviewClick = (preview) => {
-    console.log("=== AssetReplacer: Preview Click ===");
-    console.log("Preview:", preview);
-    console.log("Posterizarr running:", isPosterizarrRunning);
+    if (logoSelectionMode) {
+      handleLogoSelect(preview);
+      return;
+    }
 
-    // Check if Posterizarr is running
     if (isPosterizarrRunning) {
-      console.warn("Preview selection blocked: Posterizarr is running");
       showError(t("assetReplacer.posterizarrRunningError"));
       return;
     }
 
-    console.log("Showing preview confirmation dialog");
-    // Store the preview and show confirmation
     setPendingPreview(preview);
     setShowPreviewConfirm(true);
   };
 
   const handleSelectPreview = async () => {
-    console.log("=== AssetReplacer: Confirmed Preview Selection ===");
-    console.log("Process with overlays:", processWithOverlays);
-
     setShowPreviewConfirm(false);
     const preview = pendingPreview;
 
-    if (!preview) {
-      console.error("No pending preview found!");
-      return;
-    }
-
-    console.log("Selected preview:", preview);
+    if (!preview) return;
 
     setUploading(true);
     showError(null);
 
-    // Validation for poster/background with overlays
+    // Validation
     if (
       processWithOverlays &&
       (metadata.asset_type === "poster" || metadata.asset_type === "background")
@@ -1409,31 +1337,22 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     }
 
     try {
-      // Build URL with parameters
       let url = `${API_URL}/assets/replace-from-url?asset_path=${encodeURIComponent(
         asset.path
       )}&image_url=${encodeURIComponent(
         preview.original_url
       )}&process_with_overlays=${processWithOverlays}`;
 
-      // Add title text if provided (for poster/background/season)
       if (processWithOverlays && metadata.asset_type !== "titlecard") {
         const titleText = manualForm?.titletext || metadata.title;
         const folderName = manualForm?.foldername || metadata.folder_name;
         const libraryName = manualForm?.libraryname || metadata.library_name;
 
-        if (titleText) {
-          url += `&title_text=${encodeURIComponent(titleText)}`;
-        }
-        if (folderName) {
-          url += `&folder_name=${encodeURIComponent(folderName)}`;
-        }
-        if (libraryName) {
-          url += `&library_name=${encodeURIComponent(libraryName)}`;
-        }
+        if (titleText) url += `&title_text=${encodeURIComponent(titleText)}`;
+        if (folderName) url += `&folder_name=${encodeURIComponent(folderName)}`;
+        if (libraryName) url += `&library_name=${encodeURIComponent(libraryName)}`;
       }
 
-      // Add season number if applicable (for season posters)
       if (processWithOverlays && metadata.asset_type === "season") {
         const seasonPosterName = manualForm?.seasonPosterName;
         if (seasonPosterName) {
@@ -1441,7 +1360,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         }
       }
 
-      // Add episode data for titlecards
       if (processWithOverlays && metadata.asset_type === "titlecard") {
         const folderName = manualForm?.foldername || metadata.folder_name;
         const libraryName = manualForm?.libraryname || metadata.library_name;
@@ -1449,75 +1367,30 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         const episodeNumber = manualForm?.episodeNumber;
         const episodeTitleName = manualForm?.episodeTitleName;
 
-        if (folderName) {
-          url += `&folder_name=${encodeURIComponent(folderName)}`;
-        }
-        if (libraryName) {
-          url += `&library_name=${encodeURIComponent(libraryName)}`;
-        }
-        if (seasonPosterName) {
-          url += `&season_number=${encodeURIComponent(seasonPosterName)}`;
-        }
-        if (episodeNumber) {
-          url += `&episode_number=${encodeURIComponent(episodeNumber)}`;
-        }
-        if (episodeTitleName) {
-          url += `&episode_title=${encodeURIComponent(episodeTitleName)}`;
-        }
+        if (folderName) url += `&folder_name=${encodeURIComponent(folderName)}`;
+        if (libraryName) url += `&library_name=${encodeURIComponent(libraryName)}`;
+        if (seasonPosterName) url += `&season_number=${encodeURIComponent(seasonPosterName)}`;
+        if (episodeNumber) url += `&episode_number=${encodeURIComponent(episodeNumber)}`;
+        if (episodeTitleName) url += `&episode_title=${encodeURIComponent(episodeTitleName)}`;
       }
 
-      const response = await fetch(url, {
-        method: "POST",
-      });
+      const response = await fetch(url, { method: "POST" });
 
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        let errorMessage = `Server error: ${response.status}`;
-
-        if (contentType && contentType.includes("application/json")) {
-          try {
-            const errorData = await response.json();
-            errorMessage =
-              errorData.detail || errorData.message || errorMessage;
-          } catch (e) {
-            // Failed to parse JSON error
-          }
-        } else {
-          // Non-JSON response (possibly HTML error page)
-          const text = await response.text();
-          console.error("Non-JSON response:", text.substring(0, 500));
-        }
-
-        throw new Error(errorMessage);
-      }
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
       const data = await response.json();
 
       if (data.success) {
         if (data.manual_run_triggered) {
           showSuccess(t("assetReplacer.replacedAndQueued"));
-          // Dispatch event to update badge counts
           window.dispatchEvent(new Event("assetReplaced"));
-
-          // Call onSuccess to delete DB entry
-          console.log(
-            "Calling onSuccess callback to delete DB entry (preview path)"
-          );
-          if (onSuccess) {
-            await onSuccess();
-          }
+          if (onSuccess) await onSuccess();
           onClose();
         } else {
           showSuccess(t("assetReplacer.replacedSuccessfully"));
-          // Dispatch event to update badge counts
           window.dispatchEvent(new Event("assetReplaced"));
           setTimeout(async () => {
-            console.log(
-              "Calling onSuccess callback to delete DB entry (preview no-queue path)"
-            );
-            if (onSuccess) {
-              await onSuccess();
-            }
+            if (onSuccess) await onSuccess();
             onClose();
           }, 2000);
         }
@@ -1526,22 +1399,8 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       }
     } catch (err) {
       showError(t("assetReplacer.errorReplacingAsset", { error: err.message }));
-      console.error("Error replacing asset:", err);
     } finally {
       setUploading(false);
-    }
-  };
-
-  const getSourceColor = (source) => {
-    switch (source.toLowerCase()) {
-      case "tmdb":
-        return "bg-blue-500/20 text-blue-400 border-blue-500/50";
-      case "tvdb":
-        return "bg-green-500/20 text-green-400 border-green-500/50";
-      case "fanart.tv":
-        return "bg-purple-500/20 text-purple-400 border-purple-500/50";
-      default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/50";
     }
   };
 
@@ -1561,8 +1420,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                 </p>
                 <p className="text-sm text-orange-300/80">
                   Asset replacement is disabled while Posterizarr is processing.
-                  Please wait until all operations are completed before using
-                  the replace or manual update options.
                 </p>
               </div>
             </div>
@@ -1577,29 +1434,15 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                 <div className="p-1.5 sm:p-2 rounded-lg bg-theme-primary/10">
                   <RefreshCw className="w-4 h-4 sm:w-6 sm:h-6 text-theme-primary" />
                 </div>
-                <span className="break-words">{t("assetReplacer.title")}</span>
+                <span className="break-words">
+                  {logoSelectionMode ? t("assetReplacer.selectLogoTitle") : t("assetReplacer.title")}
+                </span>
               </h2>
               <p className="text-base sm:text-xl font-bold text-theme-text mt-2 sm:mt-3 break-words">
                 {asset.path.split(/[\\/]/).slice(-2, -1)[0] || "Unknown"}
               </p>
               <p className="text-xs sm:text-sm text-theme-muted break-all mt-1">
                 {asset.path}
-              </p>
-              <p className="text-xs sm:text-sm text-theme-muted mt-1">
-                {metadata.asset_type === "poster" &&
-                  metadata.media_type === "movie" &&
-                  "Movie Poster"}
-                {metadata.asset_type === "poster" &&
-                  metadata.media_type === "tv" &&
-                  "Show Poster"}
-                {metadata.asset_type === "background" &&
-                  metadata.media_type === "movie" &&
-                  "Movie Background"}
-                {metadata.asset_type === "background" &&
-                  metadata.media_type === "tv" &&
-                  "Show Background"}
-                {metadata.asset_type === "season" && "Season Poster"}
-                {metadata.asset_type === "titlecard" && "Episode Title Card"}
               </p>
             </div>
             <button
@@ -1689,14 +1532,9 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                     </button>
                   </div>
 
-                  {/* Parameter Inputs - Shown when overlay processing is enabled */}
+                  {/* Parameter Inputs */}
                   {processWithOverlays && (
                     <div className="mt-4 pt-4 border-t border-theme space-y-3">
-                      <div className="text-center mb-3">
-                        <p className="text-xs font-medium text-theme-text">
-                          📝 Manual Run Parameters
-                        </p>
-                      </div>
 
                       {/* Title Text - For all types except titlecard */}
                       {metadata.asset_type !== "titlecard" && (
@@ -1704,18 +1542,39 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                           <label className="block text-xs font-medium text-theme-text mb-1">
                             Title Text *
                           </label>
-                          <input
-                            type="text"
-                            value={manualForm?.titletext || ""}
-                            onChange={(e) =>
-                              setManualForm({
-                                ...manualForm,
-                                titletext: e.target.value,
-                              })
-                            }
-                            placeholder="e.g., A Shaun the Sheep Movie"
-                            className="w-full px-2 py-1.5 text-sm bg-theme-bg border border-theme rounded text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary"
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={manualForm?.titletext || ""}
+                              onChange={(e) =>
+                                setManualForm({
+                                  ...manualForm,
+                                  titletext: e.target.value,
+                                })
+                              }
+                              placeholder="Enter text or Browse for Logo..."
+                              className="flex-1 px-2 py-1.5 text-sm bg-theme-bg border border-theme rounded text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleFetchLogos}
+                              disabled={loading}
+                              title="Browse for Logos/ClearArt"
+                              className="px-3 py-1.5 bg-theme-card hover:bg-theme-hover border border-theme rounded text-theme-text transition-colors flex items-center gap-2 whitespace-nowrap"
+                            >
+                              {loading && logoSelectionMode ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Search className="w-4 h-4" />
+                              )}
+                              <span className="hidden sm:inline">{t("assetReplacer.browseLogos")}</span>
+                            </button>
+                          </div>
+                          {manualForm?.titletext?.startsWith("http") && (
+                            <p className="text-[10px] text-green-400 mt-1 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Logo URL detected.
+                            </p>
+                          )}
                         </div>
                       )}
 
@@ -1774,7 +1633,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                                 seasonPosterName: e.target.value,
                               })
                             }
-                            placeholder="Season 01 or Season 00 (Specials) or 'Title | Season 01' (to apply Title Text)"
+                            placeholder="Season 01 or Season 00 (Specials)"
                             className="w-full px-2 py-1.5 text-sm bg-theme-bg border border-theme rounded text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary"
                           />
                         </div>
@@ -1803,7 +1662,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
                           <div>
                             <label className="block text-xs font-medium text-theme-text mb-1">
-                              Season Number * (0 = Specials)
+                              Season Number *
                             </label>
                             <input
                               type="text"
@@ -1814,7 +1673,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                                   seasonPosterName: e.target.value,
                                 })
                               }
-                              placeholder="e.g., 01 or 00 (Specials)"
+                              placeholder="e.g., 01"
                               className="w-full px-2 py-1.5 text-sm bg-theme-bg border border-theme rounded text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary"
                             />
                           </div>
@@ -1898,13 +1757,12 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                       />
                     </div>
 
-                    {/* Season/Episode fields for TV content */}
                     {(metadata.asset_type === "season" ||
                       metadata.asset_type === "titlecard") && (
                       <>
                         <div>
                           <label className="block text-xs font-medium text-theme-text mb-1">
-                            Season Number * (0 = Specials)
+                            Season Number *
                           </label>
                           <input
                             type="number"
@@ -1915,8 +1773,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                                 seasonNumber: e.target.value,
                               })
                             }
-                            placeholder="1 (or 0 for Specials)"
-                            min="0"
                             className="w-full px-2 py-1.5 text-sm bg-theme-bg border border-theme rounded text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary"
                           />
                         </div>
@@ -1935,8 +1791,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                                   episodeNumber: e.target.value,
                                 })
                               }
-                              placeholder="1"
-                              min="0"
                               className="w-full px-2 py-1.5 text-sm bg-theme-bg border border-theme rounded text-theme-text placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-theme-primary"
                             />
                           </div>
@@ -1944,12 +1798,11 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                       </>
                     )}
 
-                    {/* Fetch Button inside Manual Search */}
                     <div className="pt-3 border-t border-theme">
                       <button
                         onClick={handleFetchClick}
                         disabled={loading}
-                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg transition-all"
                       >
                         <Download className="w-4 h-4 text-theme-primary" />
                         {loading
@@ -1963,24 +1816,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
               {/* Upload Section */}
               <div className="bg-theme-card border border-theme rounded-lg p-4 sm:p-6">
-                {/* Recommended Size Info */}
-                <div className="mb-4 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                  <p className="text-xs text-blue-400 flex items-center gap-2">
-                    <span className="font-semibold">ℹ️ Recommended sizes:</span>
-                    {metadata.asset_type === "poster" ||
-                    metadata.asset_type === "season" ? (
-                      <span>Posters: 1000×1500px or higher (2:3 ratio)</span>
-                    ) : (
-                      <span>
-                        Backgrounds/Title Cards: 1920×1080px or higher (16:9
-                        ratio)
-                      </span>
-                    )}
-                  </p>
-                </div>
-
                 <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
-                  {/* Upload Area */}
                   <div className="flex-1 w-full">
                     <h3 className="text-base sm:text-lg font-semibold text-theme-text mb-3">
                       {t("assetReplacer.uploadYourOwnImage")}
@@ -1990,7 +1826,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                       <p className="text-xs sm:text-sm text-theme-muted mb-2 sm:mb-3">
                         {t("assetReplacer.selectCustomImage")}
                       </p>
-                      <span className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg transition-all text-xs sm:text-sm shadow-sm">
+                      <span className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg">
                         <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-theme-primary" />
                         {uploading
                           ? t("assetReplacer.uploading")
@@ -2006,7 +1842,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                     </label>
                   </div>
 
-                  {/* Preview of Uploaded Image */}
                   {uploadedImage && (
                     <div className="w-full sm:w-48 flex-shrink-0">
                       <p className="text-xs font-medium text-theme-text mb-2">
@@ -2025,8 +1860,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                           className="w-full h-full object-cover"
                         />
                       </div>
-
-                      {/* Dimension Info */}
                       {imageDimensions && (
                         <div
                           className={`mt-2 text-xs text-center p-2 rounded ${
@@ -2043,7 +1876,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                   )}
                 </div>
 
-                {/* Upload Asset Button */}
                 {uploadedImage && (
                   <div className="mt-4">
                     <button
@@ -2053,8 +1885,8 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                       }
                       className={`w-full px-4 py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
                         isDimensionValid && !uploading && !isPosterizarrRunning
-                          ? "bg-theme-primary hover:bg-theme-primary/90 text-white cursor-pointer shadow-lg hover:shadow-xl"
-                          : "bg-gray-500/20 text-gray-500 cursor-not-allowed border border-gray-500/30"
+                          ? "bg-theme-primary hover:bg-theme-primary/90 text-white"
+                          : "bg-gray-500/20 text-gray-500 cursor-not-allowed"
                       }`}
                     >
                       <Upload className="w-4 h-4" />
@@ -2064,17 +1896,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                         ? "Upload Disabled (Running)"
                         : t("assetReplacer.uploadAssetButton")}
                     </button>
-                    {!isDimensionValid && !isPosterizarrRunning && (
-                      <p className="mt-2 text-xs text-red-400 text-center">
-                        {t("assetReplacer.dimensionRequirement")}
-                      </p>
-                    )}
-                    {isPosterizarrRunning && (
-                      <p className="mt-2 text-xs text-orange-400 text-center">
-                        Asset replacement is disabled while Posterizarr is
-                        running
-                      </p>
-                    )}
                   </div>
                 )}
               </div>
@@ -2098,7 +1919,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                 <button
                   onClick={handleFetchClick}
                   disabled={loading}
-                  className="inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm sm:text-base w-full sm:w-auto"
+                  className="inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg transition-all"
                 >
                   <Download className="w-4 h-4 sm:w-5 sm:h-5 text-theme-primary" />
                   {loading
@@ -2126,7 +1947,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                   </p>
                   <button
                     onClick={handleFetchClick}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg transition-all shadow-sm"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 text-theme-text rounded-lg transition-all"
                   >
                     <Download className="w-5 h-5 text-theme-primary" />
                     {t("assetReplacer.fetchPreviews")}
@@ -2134,10 +1955,8 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                 </div>
               ) : (
                 <div>
-                  {/* Provider Tabs */}
                   <div className="border-b border-theme mb-6">
                     <div className="flex gap-2">
-                      {/* TMDB Tab */}
                       <button
                         onClick={() => setActiveProviderTab("tmdb")}
                         className={`px-4 py-3 font-medium transition-colors border-b-2 ${
@@ -2147,22 +1966,9 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          TMDB
-                          {previews.tmdb.length > 0 && (
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs ${
-                                activeProviderTab === "tmdb"
-                                  ? "bg-blue-500/30 text-blue-300"
-                                  : "bg-theme-primary/20 text-theme-primary"
-                              }`}
-                            >
-                              {previews.tmdb.length}
-                            </span>
-                          )}
+                          TMDB {previews.tmdb.length > 0 && <span>({previews.tmdb.length})</span>}
                         </span>
                       </button>
-
-                      {/* TVDB Tab */}
                       <button
                         onClick={() => setActiveProviderTab("tvdb")}
                         className={`px-4 py-3 font-medium transition-colors border-b-2 ${
@@ -2172,22 +1978,9 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          TVDB
-                          {previews.tvdb.length > 0 && (
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs ${
-                                activeProviderTab === "tvdb"
-                                  ? "bg-green-500/30 text-green-300"
-                                  : "bg-theme-primary/20 text-theme-primary"
-                              }`}
-                            >
-                              {previews.tvdb.length}
-                            </span>
-                          )}
+                          TVDB {previews.tvdb.length > 0 && <span>({previews.tvdb.length})</span>}
                         </span>
                       </button>
-
-                      {/* Fanart.tv Tab */}
                       <button
                         onClick={() => setActiveProviderTab("fanart")}
                         className={`px-4 py-3 font-medium transition-colors border-b-2 ${
@@ -2197,121 +1990,50 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          Fanart.tv
-                          {previews.fanart.length > 0 && (
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs ${
-                                activeProviderTab === "fanart"
-                                  ? "bg-purple-500/30 text-purple-300"
-                                  : "bg-theme-primary/20 text-theme-primary"
-                              }`}
-                            >
-                              {previews.fanart.length}
-                            </span>
-                          )}
+                          Fanart.tv {previews.fanart.length > 0 && <span>({previews.fanart.length})</span>}
                         </span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Provider Content */}
                   <div>
-                    {/* TMDB Content */}
                     {activeProviderTab === "tmdb" && (
-                      <div>
-                        {previews.tmdb.length > 0 ? (
-                          <div
-                            className={
-                              useHorizontalLayout
-                                ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-                                : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-                            }
-                          >
-                            {previews.tmdb.map((preview, index) => (
-                              <PreviewCard
-                                key={`tmdb-${index}`}
-                                preview={preview}
-                                onSelect={() => handlePreviewClick(preview)}
-                                disabled={uploading || isPosterizarrRunning}
-                                isHorizontal={useHorizontalLayout}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-12">
-                            <ImageIcon className="w-12 h-12 text-theme-muted mx-auto mb-3" />
-                            <p className="text-theme-muted">
-                              No TMDB results found
-                            </p>
-                          </div>
-                        )}
+                      <div className={useHorizontalLayout ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"}>
+                        {previews.tmdb.map((preview, index) => (
+                          <PreviewCard
+                            key={`tmdb-${index}`}
+                            preview={preview}
+                            onSelect={() => handlePreviewClick(preview)}
+                            disabled={uploading || isPosterizarrRunning}
+                            isHorizontal={useHorizontalLayout}
+                          />
+                        ))}
                       </div>
                     )}
-
-                    {/* TVDB Content */}
                     {activeProviderTab === "tvdb" && (
-                      <div>
-                        {previews.tvdb.length > 0 ? (
-                          <div
-                            className={
-                              useHorizontalLayout
-                                ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-                                : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-                            }
-                          >
-                            {previews.tvdb.map((preview, index) => (
-                              <PreviewCard
-                                key={`tvdb-${index}`}
-                                preview={preview}
-                                onSelect={() => handlePreviewClick(preview)}
-                                disabled={uploading || isPosterizarrRunning}
-                                isHorizontal={useHorizontalLayout}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-12">
-                            <ImageIcon className="w-12 h-12 text-theme-muted mx-auto mb-3" />
-                            <p className="text-theme-muted">
-                              No TVDB results found
-                            </p>
-                            <p className="text-xs text-theme-muted mt-2">
-                              TVDB is mainly for TV shows
-                            </p>
-                          </div>
-                        )}
+                      <div className={useHorizontalLayout ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"}>
+                        {previews.tvdb.map((preview, index) => (
+                          <PreviewCard
+                            key={`tvdb-${index}`}
+                            preview={preview}
+                            onSelect={() => handlePreviewClick(preview)}
+                            disabled={uploading || isPosterizarrRunning}
+                            isHorizontal={useHorizontalLayout}
+                          />
+                        ))}
                       </div>
                     )}
-
-                    {/* Fanart.tv Content */}
                     {activeProviderTab === "fanart" && (
-                      <div>
-                        {previews.fanart.length > 0 ? (
-                          <div
-                            className={
-                              useHorizontalLayout
-                                ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-                                : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-                            }
-                          >
-                            {previews.fanart.map((preview, index) => (
-                              <PreviewCard
-                                key={`fanart-${index}`}
-                                preview={preview}
-                                onSelect={() => handlePreviewClick(preview)}
-                                disabled={uploading || isPosterizarrRunning}
-                                isHorizontal={useHorizontalLayout}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-12">
-                            <ImageIcon className="w-12 h-12 text-theme-muted mx-auto mb-3" />
-                            <p className="text-theme-muted">
-                              No Fanart.tv results found
-                            </p>
-                          </div>
-                        )}
+                      <div className={useHorizontalLayout ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"}>
+                        {previews.fanart.map((preview, index) => (
+                          <PreviewCard
+                            key={`fanart-${index}`}
+                            preview={preview}
+                            onSelect={() => handlePreviewClick(preview)}
+                            disabled={uploading || isPosterizarrRunning}
+                            isHorizontal={useHorizontalLayout}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>
@@ -2322,32 +2044,16 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         </div>
       </div>
 
-      {/* Upload Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showUploadConfirm}
         onClose={() => setShowUploadConfirm(false)}
         onConfirm={handleConfirmUpload}
         title={t("assetReplacer.confirmReplaceTitle")}
-        message={
-          <>
-            {t("assetReplacer.confirmReplaceMessage")}
-            {!processWithOverlays && (
-              <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                <p className="text-sm text-blue-300 leading-relaxed">
-                  <strong>ℹ️ Note:</strong> If you do not check "Process with
-                  overlays after replace", the asset will be placed in the
-                  manualassets directory and the poster will be recreated by
-                  Posterizarr during the next normal/scheduled run.
-                </p>
-              </div>
-            )}
-          </>
-        }
+        message={t("assetReplacer.confirmReplaceMessage")}
         confirmText={t("assetReplacer.confirmReplaceButton")}
         type="warning"
       />
 
-      {/* Preview Selection Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showPreviewConfirm}
         onClose={() => {
@@ -2356,26 +2062,11 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
         }}
         onConfirm={handleSelectPreview}
         title={t("assetReplacer.confirmReplaceTitle")}
-        message={
-          <>
-            {t("assetReplacer.confirmReplaceMessage")}
-            {!processWithOverlays && (
-              <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                <p className="text-sm text-blue-300 leading-relaxed">
-                  <strong>ℹ️ Note:</strong> If you do not check "Process with
-                  overlays after replace", the asset will be placed in the
-                  manualassets directory and the poster will be recreated by
-                  Posterizarr during the next normal/scheduled run.
-                </p>
-              </div>
-            )}
-          </>
-        }
+        message={t("assetReplacer.confirmReplaceMessage")}
         confirmText={t("assetReplacer.confirmReplaceButton")}
         type="warning"
       />
 
-      {/* Fetch Previews Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showFetchConfirm}
         onClose={() => {
@@ -2397,8 +2088,14 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
+  // Detect if it is a logo (updated to handle multiple variants)
+  const isLogo = preview.type === "logo" ||
+                 preview.type?.includes("clearart") ||
+                 preview.type?.includes("clearlogo") ||
+                 preview.type?.includes("hdmovielogo");
+
   const handleDownload = async (e) => {
-    e.stopPropagation(); // Prevent card selection when clicking download
+    e.stopPropagation();
     try {
       const response = await fetch(preview.original_url || preview.url);
       const blob = await response.blob();
@@ -2406,7 +2103,6 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
       const a = document.createElement("a");
       a.href = url;
 
-      // Create filename from source and metadata
       const source = preview.source?.toLowerCase() || "image";
       const lang = preview.language || "";
       const timestamp = Date.now();
@@ -2429,7 +2125,7 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
       onClick={disabled ? undefined : onSelect}
     >
       <div
-        className={`relative bg-theme ${
+        className={`relative ${isLogo ? "bg-slate-700/50" : "bg-theme"} ${
           isHorizontal ? "aspect-[16/9]" : "aspect-[2/3]"
         }`}
       >
@@ -2446,7 +2142,7 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
           <img
             src={preview.url}
             alt="Preview"
-            className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-300 ${
+            className={`w-full h-full ${isLogo ? "object-contain p-2" : "object-cover"} group-hover:scale-105 transition-all duration-300 ${
               imageLoaded ? "opacity-100" : "opacity-0"
             }`}
             onLoad={() => setImageLoaded(true)}
@@ -2454,9 +2150,7 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
           />
         )}
 
-        {/* Hover overlay with metadata */}
         <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 text-center">
-          {/* Download Button - Top Right */}
           <button
             onClick={handleDownload}
             className="absolute top-2 right-2 px-3 py-2 bg-theme-primary hover:bg-theme-primary/80 rounded-lg transition-all shadow-lg z-10 flex items-center gap-2"
@@ -2468,10 +2162,8 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
             </span>
           </button>
 
-          {/* Select Button */}
           <Check className="w-10 h-10 text-green-400 mb-3" />
 
-          {/* Source Badge */}
           <div
             className={`px-3 py-1 rounded-full text-xs font-semibold mb-2 ${
               preview.source === "TMDB"
@@ -2486,37 +2178,28 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
             {preview.source}
           </div>
 
-          {/* Metadata Badges */}
           <div className="flex flex-wrap gap-1.5 justify-center mt-2">
-            {/* Dimensions */}
             {(preview.width || preview.height) && (
               <span className="bg-slate-600 px-2 py-1 rounded text-xs text-white font-medium">
                 {preview.width} × {preview.height}
               </span>
             )}
-            {/* Language */}
             {preview.language && (
               <span className="bg-theme-primary px-2 py-1 rounded text-xs text-white font-medium">
                 {preview.language.toUpperCase()}
               </span>
             )}
-
-            {/* Vote Average (TMDB/TVDB) */}
             {preview.vote_average !== undefined && preview.vote_average > 0 && (
               <span className="bg-yellow-500 px-2 py-1 rounded text-xs text-white font-medium flex items-center gap-1">
                 <Star className="w-3 h-3" />
                 {preview.vote_average.toFixed(1)}
               </span>
             )}
-
-            {/* Likes (Fanart.tv) */}
             {preview.likes !== undefined && preview.likes > 0 && (
               <span className="bg-red-500 px-2 py-1 rounded text-xs text-white font-medium">
                 ❤️ {preview.likes}
               </span>
             )}
-
-            {/* Asset Type */}
             {preview.type && (
               <span className="bg-gray-600 px-2 py-1 rounded text-xs text-white font-medium">
                 {preview.type === "episode_still"
@@ -2532,7 +2215,6 @@ function PreviewCard({ preview, onSelect, disabled, isHorizontal = false }) {
             )}
           </div>
 
-          {/* Select Text */}
           <p className="text-white text-sm font-semibold mt-3 flex items-center gap-2">
             <Check className="w-4 h-4" />
             {disabled

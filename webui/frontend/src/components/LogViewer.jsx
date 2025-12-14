@@ -15,7 +15,8 @@ import {
   Filter,
   Database,
   Loader2,
-  LifeBuoy, // Added
+  LifeBuoy,
+  X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Notification from "./Notification";
@@ -888,7 +889,7 @@ function LogViewer() {
           </div>
         </div>
 
-        {/* --- NEW FILTER/SEARCH ROW --- */}
+        {/* FILTER/SEARCH ROW */}
         <div className="mt-4 pt-4 border-t border-theme-border flex flex-col md:flex-row gap-4">
           {/* Search Bar */}
           <div className="flex-grow">
@@ -902,8 +903,16 @@ function LogViewer() {
                 placeholder={t("logViewer.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-theme-muted focus:outline-none focus:ring-1 focus:ring-theme-primary focus:border-theme-primary transition-all"
+                className="w-full pl-10 pr-10 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-theme-muted focus:outline-none focus:ring-1 focus:ring-theme-primary focus:border-theme-primary transition-all"
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-theme-muted hover:text-theme-text"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
           {/* Level Filters */}
@@ -917,7 +926,6 @@ function LogViewer() {
             />
           </div>
         </div>
-        {/* --- END NEW FILTER/SEARCH ROW --- */}
       </div>
 
       {/* Log Display Section */}

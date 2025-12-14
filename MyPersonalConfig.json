@@ -37,6 +37,10 @@
       "xx",
       "en",
       "de"
+    ],
+    "LogoLanguageOrder": [
+      "en",
+      "de"
     ]
   },
   "PlexPart": {
@@ -127,6 +131,10 @@
     "AutoUpdatePosterizarr": "false",
     "SkipAddText": "false",
     "SkipAddTextAndOverlay": "false",
+    "SkipLocalPosterTextAdd": "false",
+    "SkipLocalBackgroundTextAdd": "false",
+    "SkipLocalSeasonTextAdd": "false",
+    "SkipLocalTCTextAdd": "false",
     "FollowSymlink": "false",
     "poster4k": "overlay-innerglow.png",
     "Poster1080p": "overlay-innerglow.png",
@@ -149,7 +157,12 @@
     "UseTCResolutionOverlays": "false",
     "DisableOnlineAssetFetch": "false",
     "collectionfont": "Colus-Regular.ttf",
-    "collectionoverlayfile": "overlay-innerglow.png"
+    "collectionoverlayfile": "overlay-innerglow.png",
+    "UseLogo": "false",
+    "UseBGLogo": "false",
+    "UseClearlogo": "false",
+    "UseClearart": "false",
+    "LogoTextFallback": "false"
   },
   "OverlayPart": {
     "ImageProcessing": "true",

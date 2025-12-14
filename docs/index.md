@@ -6,7 +6,11 @@
   <p>
     Automate the creation of beautiful, textless posters for your Plex, Jellyfin, or Emby library.
   </p>
-
+<div align="center">
+  <a href="https://github.com/fscorrupt/posterizarr">
+    <img src="images/posterizarr_banner.jpg" alt="Logo" width="650" height="650">
+  </a>
+  <br />
   <p>
   <a href="https://ko-fi.com/R6R81S6SC" target="_blank">
     <img src="https://storage.ko-fi.com/cdn/brandasset/logo_white_stroke_small.png" alt="Buy Me A Coffee" style="height: 35px; width: auto;">

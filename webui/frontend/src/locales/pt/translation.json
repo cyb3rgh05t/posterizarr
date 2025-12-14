@@ -37,6 +37,11 @@
     },
     "tmdb": {
       "title": "Pesquisar no TMDB por",
+      "selectLogo": "Selecionar um Logo",
+      "clickToSelectLogo": "Clique para usar este URL de logo",
+      "textResult": "Resultado de Texto",
+      "idResult": "Resultado de ID",
+      "noLogosMatchingLanguages": "Nenhum logo encontrado para os idiomas: {{languages}}",
       "seasonPosters": "Cartazes de temporada",
       "episodeImages": "Imagens de episódio",
       "tvShowPosters": "Cartazes de Séries",
@@ -100,6 +105,8 @@
     },
     "manual": {
       "title": "Modo manual (semiautomatizado)",
+      "browseLogos": "Procurar Logotipos",
+      "browseLogosTooltip": "Procurar Logotipos/ClearArt",
       "description": "Crie ou substitua cartazes manualmente com controle total sobre pesquisa, fonte e metadados.",
       "posterType": "Tipo de cartaz",
       "types": {
@@ -306,6 +313,71 @@
     "noReleases": "Nenhum lançamento encontrado"
   },
   "overlayAssets": {
+    "tabs": {
+        "design": "Design",
+        "layers": "Camadas"
+    },
+    "layers": {
+        "uploadTitle": "Carregar Camada",
+        "uploadDesc": "PNG, Logo, Adesivo",
+        "empty": "Nenhuma camada adicionada.",
+        "name": "Camada {{index}}",
+        "front": "FRENTE",
+        "behind": "TRÁS",
+        "dimmed": "Escurecido",
+        "bright": "Brilhante"
+    },
+    "controls": {
+        "bringFront": "Trazer para frente",
+        "sendBack": "Enviar para trás",
+        "moveUp": "Mover para cima",
+        "moveDown": "Mover para baixo",
+        "delete": "Excluir",
+        "makeBright": "Clarear (100%)",
+        "makeDim": "Escurecer (50%)",
+        "adjustOpacity": "Ajustar Opacidade"
+    },
+    "help": {
+        "title": "Controles",
+        "text": "• Arraste para mover, use a alça para redimensionar/girar",
+        "text2": "• Use os ícones para reordenar ou ajustar a opacidade."
+    },
+    "showTextGuide": "Mostrar Guia de Área de Texto",
+    "showTextGuideHint": "Exibe uma caixa vermelha baseada em 'MaxWidth', 'MaxHeight' e 'text_offset' de suas Configurações.",
+    "uploadSample": "Carregar Prévia",
+    "resetSample": "Redefinir Exemplo",
+    "customBackground": "Fundo Personalizado",
+    "list": "Biblioteca de Overlay",
+    "create": "Criador de Overlay",
+    "designControls": "Controles de Design",
+    "posterRatio": "Pôster (2:3)",
+    "backgroundRatio": "16:9",
+    "enableBorder": "Ativar Borda",
+    "thickness": "Espessura",
+    "roundedCorners": "Cantos Arredondados",
+    "color": "Cor",
+    "effects": "Efeitos",
+    "vignette": "Vinheta (Cantos Escuros)",
+    "innerGlow": "Brilho Interno (Todos os lados)",
+    "filmGrainIntensity": "Intensidade da Granulação",
+    "grainSize": "Tamanho do Grão (Aspereza)",
+    "bottomGradient": "Gradiente Inferior",
+    "matteHeight": "Altura Fosca (Sólida)",
+    "fadeHeight": "Altura do Fade (Desfoque)",
+    "saveAs": "Salvar como",
+    "generateAndSave": "Salvar arquivo de sobreposição",
+    "livePreview": "Prévia ao Vivo",
+    "updating": "Atualizando...",
+    "backgroundContent": "Conteúdo do Fundo",
+    "posterContent": "Conteúdo do Pôster",
+    "previewHint": "O fundo representa sua mídia. A sobreposição (borda/gradiente) é mostrada acima.",
+    "savedSuccess": "Salvo com sucesso",
+    "saveFailed": "Falha ao salvar",
+    "filenameRequired": "Nome do arquivo obrigatório",
+    "fileExistsTitle": "Arquivo já existe",
+    "fileExistsMessage": "Um arquivo chamado {{filename}} já existe.",
+    "overwriteConfirm": "Deseja sobrescrevê-lo?",
+    "overwrite": "Sobrescrever",
     "description": "Gerenciar arquivos de sobreposição (Imagens: PNG, JPEG | Fontes: TTF, OTF, WOFF, WOFF2)",
     "loadFailed": "Falha ao carregar arquivos de sobreposição",
     "loadError": "Falha ao carregar arquivos de sobreposição: {{message}}",
@@ -400,7 +472,7 @@
   "nav": {
     "dashboard": "Painel",
     "runModes": "Modos de execução",
-    "runtimeHistory": "Histórico de execução",
+    "runtimeHistory": "Insights",
     "plexExport": "Exportação Plex",
     "mediaServerExport": "Histórico de exportação do servidor de mídia",
     "assets": "Gestão de Ativos",
@@ -440,13 +512,59 @@
     "currentVersion": "✓ Versão atual instalada"
   },
   "topNavbar": {
-    "changeTheme": "Mudar tema",
-    "selectTheme": "Selecionar tema",
-    "userMenu": "Menu do usuário",
+    "changeTheme": "Alterar Tema",
+    "selectTheme": "Selecionar Tema",
+    "userMenu": "Menu do Usuário",
     "signOut": "Sair",
-    "userProfile": "Perfil do usuário"
+    "userProfile": "Perfil do Usuário",
+    "stopSystem": "Parar Sistema",
+    "deleteLockfile": "Excluir Arquivo de Execução",
+    "confirmStop": "Tem certeza de que deseja forçar a parada?",
+    "confirmDeleteLock": "Tem certeza de que deseja excluir o arquivo de execução?"
   },
   "dashboard": {
+    "controlDeck": {
+      "engineStatus": "Estado do Motor",
+      "running": "A EXECUTAR",
+      "stopped": "PARADO",
+      "mode": "Modo",
+      "idle": "Inativo",
+      "pid": "PID",
+      "scheduler": "Agendador",
+      "active": "Ativo",
+      "standby": "Espera",
+      "disabled": "Desativado",
+      "nextRun": "Próxima Execução",
+      "noSchedules": "Sem agendamentos ativos",
+      "systemInfo": "Informação do Sistema",
+      "docker": "DOCKER",
+      "cpu": "CPU",
+      "cores": "Núcleos",
+      "genericCpu": "CPU Genérico",
+      "memory": "Memória",
+      "free": "Livre",
+      "config": "Config",
+      "loaded": "Carregado",
+      "missing": "Em Falta",
+      "versionAbbr": "Ver.",
+      "editConfig": "Editar Config",
+      "createConfig": "Criar Config"
+    },
+    "banners": {
+      "executionInProgress": "Execução de Script em Progresso",
+      "reviewLogs": "Verifique os logs abaixo para o progresso em tempo real."
+    },
+    "cards": {
+      "systemControlDeck": "Painel de Controlo do Sistema"
+    },
+    "logViewerLabel": {
+        "reading": "A ler:",
+        "autoScrollOn": "Auto-Scroll Ligado",
+        "autoScrollOff": "Auto-Scroll Desligado",
+        "entries": "Entradas:",
+        "refreshesEvery": "Atualiza a cada",
+        "event": "Evento"
+    },
     "title": "Painel",
     "welcome": "Monitore sua instância do Posterizarr",
     "status": "Status",
@@ -467,6 +585,8 @@
     "nextRun": "Próxima execução",
     "configureNow": "Configurar",
     "noSchedulesRegistered": "Nenhum horário registrado",
+    "run": "Iniciar",
+    "stopSuccess": "Parando o script...",
     "scriptFile": "Arquivo do script",
     "configFile": "Arquivo de configuração",
     "cores": "Núcleos",
@@ -616,7 +736,12 @@
     "gatherSupport": "Coletar logs de suporte",
     "gatheringSupport": "Coletando arquivos de suporte... Isso pode levar um momento.",
     "gatheringSupportSuccess": "Arquivos de suporte baixados.",
-    "gatheringSupportFailed": "Falha ao coletar arquivos de suporte: {{message}}"
+    "gatheringSupportFailed": "Falha ao coletar arquivos de suporte: {{message}}",
+    "scriptlogMissing": "Scriptlog.log não encontrado, usando {{fallback}}",
+    "noLogsFound": "Nenhum arquivo de log encontrado no servidor",
+    "noLogSelected": "Por favor, selecione um arquivo de log primeiro",
+    "pleaseSelectLog": "Por favor, selecione um arquivo de log para visualizar",
+    "noLogsAvailable": "Nenhum log disponível"
   },
   "libraryExclusion": {
     "configNotFound": "Configuração do servidor de mídia não encontrada",
@@ -770,18 +895,25 @@
         "text": "Funciona em Docker, Linux, Windows, macOS e ARM"
       }
     },
-    "showcase": {
-      "title": "Veja em ação",
-      "posterizarrOutput": "Saída do Posterizarr",
-      "posterizarrDescription": "Arte de alta qualidade baixada e processada automaticamente com suas sobreposições personalizadas",
-      "kometaIntegration": "Após integração com Kometa",
-      "kometaDescription": "Resultados finais em seu servidor de mídia com sobreposições Kometa adicionais aplicadas"
+    "integration": {
+      "webhook": "Webhook Nativo",
+      "recommended": "Recomendado",
+      "script": "Script Personalizado",
+      "legacy": "Legado / Avançado",
+      "webhookDesc": "Integração perfeita com aplicativos *Arr e Tautulli via webhooks HTTP. Nenhum mapeamento de volume necessário.",
+      "scriptDesc": "Monitoramento tradicional baseado em arquivos. Requer arquivos de script e mapeamento de volume."
     },
     "cta": {
       "title": "Pronto para transformar sua biblioteca?",
-      "description": "O Posterizarr cuida de tudo, desde a descoberta da arte até o envio para o servidor de mídia, oferecendo arte bonita e consistente em toda a sua coleção.",
-      "installationGuide": "Ver guia de instalação",
-      "viewOnGitHub": "Ver no GitHub"
+      "description": "O Posterizarr cuida de tudo, desde a descoberta de arte até o upload do servidor de mídia.",
+      "selectMethod": "Selecione seu método de integração preferido para ver as instruções de configuração.",
+      "installationGuide": "Ver Guia de Instalação",
+      "viewOnGitHub": "Ver no GitHub",
+      "setupSonarrRadarr": "Config. Sonarr/Radarr",
+      "setupTautulli": "Config. Tautulli",
+      "setupArrScript": "Config. Arr (Script)",
+      "setupTautulliDocker": "Config. Tautulli (Docker)",
+      "setupTautulliWin": "Config. Tautulli (Win)"
     },
     "technical": {
       "title": "Destaques técnicos",
@@ -1283,6 +1415,26 @@
     "autoSaved": "{{count}} alteração(ões) salva(s) automaticamente",
     "savedSuccessfully": "Configuração salva com sucesso! ({{count}} alteração(ões))"
   },
+    "apiKeys": {
+    "title": "Chaves de API & Webhooks",
+    "generateTitle": "Gerar Nova Chave",
+    "namePlaceholder": "Nome da Chave (ex: Tautulli)",
+    "generateButton": "Gerar",
+    "generatedSuccess": "Chave Gerada! Copie agora (não será mostrada novamente):",
+    "authUrl": "Autenticar via URL:",
+    "authHeader": "Autenticar via Cabeçalho:",
+    "activeKeys": "Chaves Ativas",
+    "lastUsed": "Último uso",
+    "never": "Nunca",
+    "noKeys": "Nenhuma chave de API ativa encontrada",
+    "revokeTitle": "Revogar Chave de API?",
+    "revokeMessage": "Revogar esta chave? Aplicativos que a utilizam deixarão de funcionar imediatamente.",
+    "revokeConfirm": "Revogar Chave",
+    "toastGenerated": "Chave de API Gerada",
+    "toastFailed": "Falha ao gerar chave",
+    "toastRevoked": "Chave revogada",
+    "toastRevokeError": "Erro ao revogar chave"
+  },
   "assetsStats": {
     "title": "Visão geral dos ativos",
     "fetchError": "Falha ao buscar estatísticas de ativos",
@@ -1303,6 +1455,10 @@
   },
   "assetReplacer": {
     "title": "Substituir ativo",
+    "selectLogoTitle": "Selecionar um Logo/ClearArt",
+    "logoApplied": "URL do logo aplicada ao texto do título",
+    "browseLogos": "Procurar Logotipos",
+    "noLogosMatchingLanguages": "Nenhum logo encontrado para os idiomas: {{languages}}",
     "enterTitleError": "Insira um título para pesquisar",
     "foundReplacements": "Encontradas {{count}} opções de substituição de {{sources}} fontes",
     "fetchPreviewsError": "Falha ao buscar pré-visualizações",
@@ -1352,7 +1508,8 @@
     "confirmReplaceButton": "Substituir ativo",
     "confirmFetchTitle": "Confirmar busca de opções de substituição",
     "confirmFetchMessage": "Isso buscará opções de substituição no TMDB, TVDB e Fanart.tv. Continuar?",
-    "confirmFetchButton": "Buscar substituições"
+    "confirmFetchButton": "Buscar substituições",
+    "titleText": "Texto do título"
   },
   "assetOverview": {
     "title": "Central de Ações",
@@ -1432,7 +1589,13 @@
     "bulkDeleteSuccess": "{{count}} recurso(s) excluído(s) com sucesso.",
     "bulkDeleteFailed": "Falha na exclusão em massa: {{error}}",
     "bulkDeleteError": "Erro na exclusão em massa: {{error}}",
-    "favProvider": "Prov. Fav."
+    "favProvider": "Prov. Fav.",
+    "deleteAllFilteredTooltip": "Excluir todos os ativos filtrados",
+    "deleteAllFiltered": "Excluir tudo ({{count}})",
+    "noAssetsToDelete": "Nenhum ativo filtrado para excluir.",
+    "bulkDeleteAllFilteredTitle": "Excluir todos os ativos filtrados?",
+    "bulkDeleteAllFilteredConfirm": "Tem certeza de que deseja excluir permanentemente todos os {{count}} ativos filtrados?\n\nIsso excluirá os arquivos e seus registros no banco de dados. Esta ação não pode ser desfeita.",
+    "confirmDeleteAll": "Confirmar e Excluir ({{count}})"
   },
   "common": {
     "view": "Visualizar",
@@ -1477,7 +1640,16 @@
     "season": "Temporada",
     "episode": "Episódio",
     "background": "Plano de fundo",
-    "asset": "Recurso"
+    "asset": "Recurso",
+    "name": "Nome",
+    "date": "Data",
+    "sorting": {
+      "title": "Ordenar recursos",
+      "nameAsc": "Nome (A-Z)",
+      "nameDesc": "Nome (Z-A)",
+      "dateNewest": "Data (Mais recentes)",
+      "dateOldest": "Data (Mais antigos)"
+    }
   },
   "theme": {
     "title": "Tema",
@@ -1526,7 +1698,8 @@
     "minLength": "Comprimento mínimo: {{min}} caracteres",
     "maxLength": "Comprimento máximo: {{max}} caracteres",
     "email": "Endereço de e-mail inválido",
-    "url": "URL inválida"
+    "url": "URL inválida",
+    "enterTitleOrFolder": "Por favor, insira um título ou nome de pasta!"
   },
   "loading": {
     "initializing": "Inicializando o Posterizarr...",
@@ -1968,6 +2141,7 @@
     }
   },
   "plexExport": {
+    "updated": "Atualizado",
     "pageTitle": "Histórico de exportação Plex",
     "description": "Rastreie e consulte suas exportações de biblioteca Plex ao longo do tempo",
     "refresh": "Atualizar",
@@ -2005,12 +2179,78 @@
     "resolutions": "Resoluções",
     "importedAt": "Importado em",
     "alreadyImported": "Dados já importados",
-    "importSuccess": "Importação bem-sucedida"
+    "importSuccess": "Importação bem-sucedida",
+    "addInfo": "Info Adic.",
+    "externalIds": "IDs Externos"
+  },
+  "plexActions": {
+    "refreshMetadata": "Atualizar Metadados",
+    "analyzeItem": "Analisar Item",
+    "scanLibrary": "Verificar Biblioteca",
+    "emptyTrash": "Esvaziar Lixeira",
+    "actionStarted": "Enviando comando para o Plex..."
+  },
+  "jellyfinActions": {
+    "refreshMetadata": "Atualizar Metadados",
+    "refreshImages": "Procurar Imagens",
+    "actionStarted": "Enviando comando..."
   },
   "mediaServerExport": {
     "pageTitle": "Histórico de exportação do servidor de mídia",
     "description": "Rastreie e consulte suas exportações de biblioteca do servidor de mídia ao longo do tempo",
     "plex": "Plex",
     "jellyfinEmby": "Jellyfin / Emby"
+  },
+  "runtime_history": {
+    "analytics": "Estatísticas",
+    "history_list": "Lista de Histórico",
+    "periods": {
+      "last_7_days": "Últimos 7 dias",
+      "last_30_days": "Últimos 30 dias",
+      "last_3_months": "Últimos 3 meses",
+      "last_year": "Ano passado"
+    },
+    "charts": {
+      "execution_time": "Tempo de execução (Segundos)",
+      "assets_created": "Ativos criados",
+      "errors_per_run": "Erros por execução",
+      "source_distribution": "Distribuição da fonte (Diária)",
+      "no_data": "Nenhum dado disponível para este período",
+      "no_provider_data": "Nenhum dado do provedor disponível"
+    },
+    "table": {
+      "start_time": "Hora de início",
+      "mode": "Modo",
+      "duration": "Duração",
+      "created": "Criado",
+      "errors": "Erros",
+      "page": "Página"
+    },
+    "details": {
+      "title": "Detalhes da execução",
+      "tab_stats": "Estatísticas",
+      "tab_items": "Itens criados",
+      "runtime": "Tempo de execução",
+      "total_images": "Total de imagens",
+      "space_saved": "Espaço economizado",
+      "breakdown": "Detalhamento",
+      "logs": "Logs",
+      "log_file": "Arquivo de log",
+      "script_version": "Versão do script"
+    },
+    "items": {
+      "loading": "Carregando detalhes...",
+      "none_found": "Nenhum detalhe encontrado",
+      "assets_no_records": "Esta execução criou {{count}} ativos, mas seus registros detalhados não puderam ser recuperados.",
+      "no_new_assets": "Esta execução não criou nenhum ativo novo.",
+      "timestamp_warning": "(Nota: Os itens são frequentemente rastreados por intervalo de tempo. Se os logs forem antigos ou a sincronização estiver desativada, itens específicos podem não vincular a este ID de histórico: {{id}})"
+    },
+    "types": {
+      "posters": "Pôsteres",
+      "backgrounds": "Planos de fundo",
+      "seasons": "Temporadas",
+      "title_cards": "Cartões de título",
+      "collections": "Coleções"
+    }
   }
 }

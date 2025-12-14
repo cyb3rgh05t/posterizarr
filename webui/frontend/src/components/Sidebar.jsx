@@ -2,36 +2,10 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
-  Activity,
-  Play,
-  Image,
-  Settings,
-  Clock,
-  FileText,
-  Info,
-  Menu,
-  X,
-  ChevronDown,
-  ChevronRight,
-  Film,
-  Layers,
-  Tv,
-  Database,
-  Server,
-  Palette,
-  Type,
-  Bell,
-  Lock,
-  User,
-  FileImage,
-  Lightbulb,
-  AlertTriangle,
-  TrendingUp,
-  Zap,
-  FolderKanban,
-  GripVertical,
-  MoreVertical,
-  TestTube,
+  Activity, Play, Image, Settings, Clock, FileText, Info, Menu, X,
+  ChevronDown, ChevronRight, Film, Layers, Tv, Database, Server,
+  Palette, Bell, Lock, User, FileImage, Lightbulb, AlertTriangle,
+  TrendingUp, Zap, FolderKanban, GripVertical, TestTube,
 } from "lucide-react";
 import VersionBadge from "./VersionBadge";
 import { useSidebar } from "../context/SidebarContext";
@@ -44,7 +18,6 @@ const Sidebar = () => {
   const { theme, setTheme, themes } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAssetsExpanded, setIsAssetsExpanded] = useState(false);
-  const [isConfigExpanded, setIsConfigExpanded] = useState(false);
   const [isMediaServerExpanded, setIsMediaServerExpanded] = useState(false);
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
   const [missingAssetsCount, setMissingAssetsCount] = useState(0);
@@ -52,44 +25,28 @@ const Sidebar = () => {
   const [draggedItem, setDraggedItem] = useState(null);
   const [hoveredItem, setHoveredItem] = useState(null);
 
-  // Check if Folder View is active
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem("gallery-view-mode") || "grid";
   });
 
-  // Fetch missing assets count
+  // Counts Fetching Logic
   React.useEffect(() => {
     const fetchMissingAssetsCount = async () => {
       try {
         const response = await fetch("/api/assets/overview");
         if (response.ok) {
           const data = await response.json();
-          // Show total assets with issues (not just missing assets)
           setMissingAssetsCount(data.categories.assets_with_issues.count);
         }
-      } catch (error) {
-        console.error("Failed to fetch missing assets count:", error);
-      }
+      } catch (error) { console.error("Failed to fetch missing assets count:", error); }
     };
-
     fetchMissingAssetsCount();
-
-    // Listen for assetReplaced event to refresh immediately
-    const handleAssetReplaced = () => {
-      fetchMissingAssetsCount();
-    };
+    const handleAssetReplaced = () => fetchMissingAssetsCount();
     window.addEventListener("assetReplaced", handleAssetReplaced);
-
-    // Refresh every 60 seconds
     const interval = setInterval(fetchMissingAssetsCount, 60000);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("assetReplaced", handleAssetReplaced);
-    };
+    return () => { clearInterval(interval); window.removeEventListener("assetReplaced", handleAssetReplaced); };
   }, []);
 
-  // Fetch manual assets count
   React.useEffect(() => {
     const fetchManualAssetsCount = async () => {
       try {
@@ -98,66 +55,30 @@ const Sidebar = () => {
           const data = await response.json();
           setManualAssetsCount(data.total_assets || 0);
         }
-      } catch (error) {
-        console.error("Failed to fetch manual assets count:", error);
-      }
+      } catch (error) { console.error("Failed to fetch manual assets count:", error); }
     };
-
     fetchManualAssetsCount();
-
-    // Listen for assetReplaced event to refresh immediately
-    const handleAssetReplaced = () => {
-      fetchManualAssetsCount();
-    };
+    const handleAssetReplaced = () => fetchManualAssetsCount();
     window.addEventListener("assetReplaced", handleAssetReplaced);
-
-    // Refresh every 10 Minutes
     const interval = setInterval(fetchManualAssetsCount, 600000);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("assetReplaced", handleAssetReplaced);
-    };
+    return () => { clearInterval(interval); window.removeEventListener("assetReplaced", handleAssetReplaced); };
   }, []);
 
-  // Update viewMode when localStorage changes (listen to storage events)
   React.useEffect(() => {
-    const handleStorageChange = () => {
-      setViewMode(localStorage.getItem("gallery-view-mode") || "grid");
-    };
-
-    // Listen for custom event from GalleryHub
+    const handleStorageChange = () => { setViewMode(localStorage.getItem("gallery-view-mode") || "grid"); };
     window.addEventListener("viewModeChanged", handleStorageChange);
-    // Also check periodically (fallback)
     const interval = setInterval(handleStorageChange, 500);
-
-    return () => {
-      window.removeEventListener("viewModeChanged", handleStorageChange);
-      clearInterval(interval);
-    };
+    return () => { window.removeEventListener("viewModeChanged", handleStorageChange); clearInterval(interval); };
   }, []);
 
   const themeArray = Object.entries(themes).map(([id, config]) => ({
-    id,
-    name: config.name,
-    color: config.variables["--theme-primary"],
+    id, name: config.name, color: config.variables["--theme-primary"],
   }));
 
-  // Define all nav items with unique IDs
   const defaultNavItems = [
     { id: "dashboard", path: "/", label: t("nav.dashboard"), icon: Activity },
-    {
-      id: "runModes",
-      path: "/run-modes",
-      label: t("nav.runModes"),
-      icon: Play,
-    },
-    {
-      id: "scheduler",
-      path: "/scheduler",
-      label: t("nav.scheduler"),
-      icon: Clock,
-    },
+    { id: "runModes", path: "/run-modes", label: t("nav.runModes"), icon: Play },
+    { id: "scheduler", path: "/scheduler", label: t("nav.scheduler"), icon: Clock },
     {
       id: "mediaServerExport",
       path: "/media-server-export",
@@ -165,16 +86,8 @@ const Sidebar = () => {
       icon: Server,
       hasSubItems: true,
       subItems: [
-        {
-          path: "/media-server-export/plex",
-          label: t("mediaServerExport.plex", "Plex"),
-          icon: Database,
-        },
-        {
-          path: "/media-server-export/jellyfin-emby",
-          label: t("mediaServerExport.jellyfinEmby", "Jellyfin / Emby"),
-          icon: Server,
-        },
+        { path: "/media-server-export/plex", label: t("mediaServerExport.plex", "Plex"), icon: Database },
+        { path: "/media-server-export/jellyfin-emby", label: t("mediaServerExport.jellyfinEmby", "Jellyfin / Emby"), icon: Server },
       ],
     },
     {
@@ -183,352 +96,143 @@ const Sidebar = () => {
       label: t("nav.assets"),
       icon: Image,
       hasSubItems: true,
-      subItems:
-        // In Folder View:
-        viewMode === "folder"
-          ? [
-              {
-                path: "/gallery/posters",
-                label: t("assets.assetsFolders"),
-                icon: FolderKanban,
-              },
-              {
-                path: "/manual-assets",
-                label: "Manual Assets",
-                icon: FileImage,
-                badge: manualAssetsCount,
-                badgeColor: "green",
-              },
-              {
-                path: "/asset-overview",
-                label: t("nav.assetOverview"),
-                icon: AlertTriangle,
-                badge: missingAssetsCount,
-                badgeColor: "red",
-              },
-              {
-                path: "/assets-manager", // This is your Overlay Assets
-                label: t("nav.assetsManager", "Assets Manager"),
-                icon: Layers,
-              },
-              // --- START MODIFICATION 1 ---
-              {
-                path: "/test-gallery",
-                label: t("nav.testGallery", "Test Gallery"),
-                icon: TestTube,
-              },
-              // --- END MODIFICATION 1 ---
-            ]
-          : [
-              // In Grid View:
-              {
-                path: "/gallery/posters",
-                label: t("assets.posters"),
-                icon: Image,
-              },
-              {
-                path: "/gallery/backgrounds",
-                label: t("assets.backgrounds"),
-                icon: Layers,
-              },
-              {
-                path: "/gallery/seasons",
-                label: t("assets.seasons"),
-                icon: Film,
-              },
-              {
-                path: "/gallery/titlecards",
-                label: t("assets.titleCards"),
-                icon: Tv,
-              },
-              {
-                path: "/manual-assets",
-                label: "Manual Assets",
-                icon: FileImage,
-                badge: manualAssetsCount,
-                badgeColor: "green",
-              },
-              {
-                path: "/asset-overview",
-                label: t("nav.assetOverview"),
-                icon: AlertTriangle,
-                badge: missingAssetsCount,
-                badgeColor: "red",
-              },
-              {
-                path: "/assets-manager", // This is your Overlay Assets
-                label: t("nav.assetsManager", "Assets Manager"),
-                icon: Layers,
-              },
-              // --- START MODIFICATION 2 ---
-              {
-                path: "/test-gallery",
-                label: t("nav.testGallery", "Test Gallery"),
-                icon: TestTube,
-              },
-              // --- END MODIFICATION 2 ---
-            ],
+      subItems: viewMode === "folder"
+        ? [
+            { path: "/gallery/posters", label: t("assets.assetsFolders"), icon: FolderKanban },
+            { path: "/manual-assets", label: "Manual Assets", icon: FileImage, badge: manualAssetsCount, badgeColor: "green" },
+            { path: "/asset-overview", label: t("nav.assetOverview"), icon: AlertTriangle, badge: missingAssetsCount, badgeColor: "red" },
+            { path: "/assets-manager", label: t("nav.assetsManager", "Assets Manager"), icon: Layers },
+            { path: "/test-gallery", label: t("nav.testGallery", "Test Gallery"), icon: TestTube },
+          ]
+        : [
+            { path: "/gallery/posters", label: t("assets.posters"), icon: Image },
+            { path: "/gallery/backgrounds", label: t("assets.backgrounds"), icon: Layers },
+            { path: "/gallery/seasons", label: t("assets.seasons"), icon: Film },
+            { path: "/gallery/titlecards", label: t("assets.titleCards"), icon: Tv },
+            { path: "/manual-assets", label: "Manual Assets", icon: FileImage, badge: manualAssetsCount, badgeColor: "green" },
+            { path: "/asset-overview", label: t("nav.assetOverview"), icon: AlertTriangle, badge: missingAssetsCount, badgeColor: "red" },
+            { path: "/assets-manager", label: t("nav.assetsManager", "Assets Manager"), icon: Layers },
+            { path: "/test-gallery", label: t("nav.testGallery", "Test Gallery"), icon: TestTube },
+          ],
     },
-    {
-      id: "autoTriggers",
-      path: "/auto-triggers",
-      label: t("nav.autoTriggers"),
-      icon: Zap,
-    },
+    { id: "autoTriggers", path: "/auto-triggers", label: t("nav.autoTriggers"), icon: Zap },
+
     {
       id: "config",
-      path: "/config",
+      path: "/config/webui",
       label: t("nav.config"),
       icon: Settings,
-      hasSubItems: true,
-      subItems: [
-        { path: "/config/webui", label: "WebUI", icon: Lock },
-        {
-          path: "/config/general",
-          label: t("nav.generalSettings"),
-          icon: Settings,
-        },
-        { path: "/config/services", label: "Media Servers", icon: Database },
-        { path: "/config/api", label: "Service APIs", icon: Settings },
-        { path: "/config/languages", label: t("nav.library"), icon: Type },
-        { path: "/config/visuals", label: "Visuals", icon: Palette },
-        { path: "/config/overlays", label: "Overlays", icon: Palette },
-        { path: "/config/collections", label: "Collections", icon: Type },
-        {
-          path: "/config/notifications",
-          label: t("nav.notifications"),
-          icon: Bell,
-        },
-      ],
+      hasSubItems: false
     },
-    {
-      id: "runtimeHistory",
-      path: "/runtime-history",
-      label: t("nav.runtimeHistory"),
-      icon: TrendingUp,
-    },
+
+    { id: "runtimeHistory", path: "/runtime-history", label: t("nav.runtimeHistory"), icon: TrendingUp },
     { id: "logs", path: "/logs", label: t("nav.logs"), icon: FileText },
-    {
-      id: "howItWorks",
-      path: "/how-it-works",
-      label: t("nav.howItWorks"),
-      icon: Lightbulb,
-    },
+    { id: "howItWorks", path: "/how-it-works", label: t("nav.howItWorks"), icon: Lightbulb },
     { id: "about", path: "/about", label: t("nav.about"), icon: Info },
   ];
 
-  // Load nav order from localStorage or use default
   const [navOrder, setNavOrder] = React.useState(() => {
     const saved = localStorage.getItem("sidebar_nav_order");
     if (saved) {
       try {
         const savedOrder = JSON.parse(saved);
-        // Ensure all items exist and add new ones
-        const savedIds = new Set(savedOrder);
         const defaultIds = defaultNavItems.map((item) => item.id);
-        const missingIds = defaultIds.filter((id) => !savedIds.has(id));
-
-        // Filter out all the old top-level links that are now in the dropdown
-        const validSavedOrder = savedOrder.filter(
-          (id) =>
-            // "assetsManager" is not a top-level item, but it's not in the defaultNavItems
-            // so we don't need to filter it. We just filter the ones we moved.
-            id !== "manualAssets" &&
-            id !== "assetOverview"
-        );
+        const missingIds = defaultIds.filter((id) => !savedOrder.includes(id));
+        const validSavedOrder = savedOrder.filter(id => defaultIds.includes(id));
         return [...validSavedOrder, ...missingIds];
-      } catch (e) {
-        return defaultNavItems.map((item) => item.id);
-      }
+      } catch (e) { return defaultNavItems.map((item) => item.id); }
     }
     return defaultNavItems.map((item) => item.id);
   });
 
-  // Create ordered nav items based on saved order
-  const navItems = React.useMemo(() => {
-    return navOrder
-      .map((id) => defaultNavItems.find((item) => item.id === id))
-      .filter(Boolean);
-  }, [navOrder, viewMode, missingAssetsCount, manualAssetsCount]);
+  const navItems = React.useMemo(() => navOrder.map((id) => defaultNavItems.find((item) => item.id === id)).filter(Boolean), [navOrder, viewMode, missingAssetsCount, manualAssetsCount]);
 
-  // Save nav order to localStorage
-  const saveNavOrder = (order) => {
-    setNavOrder(order);
-    localStorage.setItem("sidebar_nav_order", JSON.stringify(order));
-  };
+  const saveNavOrder = (order) => { setNavOrder(order); localStorage.setItem("sidebar_nav_order", JSON.stringify(order)); };
+  const handleDragStart = (e, index) => { setDraggedItem(index); e.dataTransfer.effectAllowed = "move"; };
+  const handleDragOver = (e, index) => { e.preventDefault(); if (draggedItem === null || draggedItem === index) return; const newOrder = [...navOrder]; const draggedId = newOrder[draggedItem]; newOrder.splice(draggedItem, 1); newOrder.splice(index, 0, draggedId); setDraggedItem(index); setNavOrder(newOrder); };
+  const handleDragEnd = () => { if (draggedItem !== null) saveNavOrder(navOrder); setDraggedItem(null); };
 
-  const handleDragStart = (e, index) => {
-    setDraggedItem(index);
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    if (draggedItem === null || draggedItem === index) return;
-
-    const newOrder = [...navOrder];
-    const draggedId = newOrder[draggedItem];
-    newOrder.splice(draggedItem, 1);
-    newOrder.splice(index, 0, draggedId);
-
-    setDraggedItem(index);
-    setNavOrder(newOrder);
-  };
-
-  const handleDragEnd = () => {
-    if (draggedItem !== null) {
-      saveNavOrder(navOrder);
-    }
-    setDraggedItem(null);
-  };
-
-  // --- START MODIFICATION 3 ---
-  // Update section logic to highlight the "Assets" parent for all child routes
-  const isInAssetsSection =
-    location.pathname.startsWith("/gallery") ||
-    location.pathname.startsWith("/manual-assets") ||
-    location.pathname.startsWith("/asset-overview") ||
-    location.pathname.startsWith("/assets-manager") || // This is for Overlay Assets
-    location.pathname.startsWith("/test-gallery");    // This is for Test Gallery
-  // --- END MODIFICATION 3 ---
-
+  const isInAssetsSection = location.pathname.startsWith("/gallery") || location.pathname.startsWith("/manual-assets") || location.pathname.startsWith("/asset-overview") || location.pathname.startsWith("/assets-manager") || location.pathname.startsWith("/test-gallery");
+  const isInMediaServerSection = location.pathname.startsWith("/media-server-export");
   const isInConfigSection = location.pathname.startsWith("/config");
-  const isInMediaServerSection = location.pathname.startsWith(
-    "/media-server-export"
-  );
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <div
-        className={`hidden md:flex flex-col fixed left-0 top-0 h-screen bg-theme-card border-r border-theme transition-all duration-300 z-50 ${
-          isCollapsed ? "w-20" : "w-80"
-        }`}
-      >
-        <div className="flex items-center p-4 h-20">
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 rounded-lg hover:bg-theme-hover transition-colors text-theme-text"
-            title={isCollapsed ? "Sidebar erweitern" : "Sidebar minimieren"}
-          >
+      {/* REMOVED border-r, added shadow-2xl for cleaner separation */}
+      <div className={`hidden md:flex flex-col fixed left-0 top-0 h-screen bg-theme-card shadow-2xl transition-all duration-300 z-50 ${isCollapsed ? "w-20" : "w-80"}`}>
+
+        {/* Header Logo Area - REMOVED border-b */}
+        <div className="flex items-center p-5 h-20">
+          <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-2 rounded-xl hover:bg-theme-hover transition-colors text-theme-muted hover:text-theme-text">
             <Menu className="w-5 h-5" />
           </button>
           {!isCollapsed && (
-            <div className="ml-3 flex items-center">
-              <img
-                src="/logo.png"
-                alt="Posterizarr Logo"
-                className="h-12 w-auto object-contain"
-              />
-            </div>
+             <div className="ml-4 flex items-center animate-in fade-in duration-300">
+               <img src="/logo.png" alt="Posterizarr Logo" className="h-10 w-auto object-contain drop-shadow-md" />
+               {/* Text span removed entirely */}
+             </div>
           )}
         </div>
 
-        {/* Navigation Items - Desktop */}
-        <nav className="flex-1 overflow-y-auto py-4">
-          <div className="space-y-1 px-3">
+        <nav className="flex-1 overflow-y-auto py-6 px-3 scrollbar-thin scrollbar-thumb-theme-border scrollbar-track-transparent">
+          <div className="space-y-1.5">
             {navItems.map((item, index) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const isActive = item.id === "config" ? isInConfigSection : location.pathname === item.path;
               const isDragging = draggedItem === index;
+
+              // Removed purple gradient, now strictly uses theme-primary
+              const activeClass = "bg-theme-primary text-white shadow-lg shadow-theme-primary/20";
+              const inactiveClass = "text-theme-muted hover:bg-theme-hover hover:text-theme-text";
 
               if (item.hasSubItems) {
                 const isAssetsItem = item.path === "/gallery";
-                const isConfigItem = item.path === "/config";
-                const isMediaServerItem = item.path === "/media-server-export";
-                const isExpanded = isAssetsItem
-                  ? isAssetsExpanded
-                  : isConfigItem
-                  ? isConfigExpanded
-                  : isMediaServerExpanded;
-                const isInSection = isAssetsItem
-                  ? isInAssetsSection
-                  : isConfigItem
-                  ? isInConfigSection
-                  : isInMediaServerSection;
-                const toggleExpanded = isAssetsItem
-                  ? () => setIsAssetsExpanded(!isAssetsExpanded)
-                  : isConfigItem
-                  ? () => setIsConfigExpanded(!isConfigExpanded)
-                  : () => setIsMediaServerExpanded(!isMediaServerExpanded);
+                const isExpanded = isAssetsItem ? isAssetsExpanded : isMediaServerExpanded;
+                const isInSection = isAssetsItem ? isInAssetsSection : isInMediaServerSection;
+                const toggleExpanded = isAssetsItem ? () => setIsAssetsExpanded(!isAssetsExpanded) : () => setIsMediaServerExpanded(!isMediaServerExpanded);
+                const isGroupActive = isInSection;
 
                 return (
-                  <div
-                    key={item.id}
-                    draggable={!isCollapsed}
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragEnd={handleDragEnd}
-                    onMouseEnter={() => setHoveredItem(index)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    className={`relative ${isDragging ? "opacity-50" : ""}`}
-                  >
+                  <div key={item.id} draggable={!isCollapsed} onDragStart={(e) => handleDragStart(e, index)} onDragOver={(e) => handleDragOver(e, index)} onDragEnd={handleDragEnd} onMouseEnter={() => setHoveredItem(index)} onMouseLeave={() => setHoveredItem(null)} className={`relative ${isDragging ? "opacity-50" : ""}`}>
                     <button
                       onClick={toggleExpanded}
-                      className={`w-full flex items-center ${
-                        isCollapsed ? "justify-center" : "justify-between px-3"
-                      } py-3 rounded-lg text-sm font-medium transition-all group ${
-                        isInSection
-                          ? "bg-theme-primary/20 text-theme-primary"
-                          : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"
-                      }`}
+                      className={`w-full flex items-center ${isCollapsed ? "justify-center" : "justify-between px-4"} py-3 rounded-xl text-sm font-medium transition-all duration-200 group relative overflow-hidden ${isGroupActive && !isExpanded ? "bg-theme-primary/10 text-theme-primary border border-theme-primary/20" : inactiveClass}`}
                       title={isCollapsed ? item.label : ""}
                     >
-                      <div className="flex items-center">
-                        <Icon className="w-5 h-5 flex-shrink-0" />
-                        {!isCollapsed && (
-                          <span className="ml-3">{item.label}</span>
-                        )}
+                      <div className="flex items-center relative z-10">
+                        <Icon className={`w-5 h-5 flex-shrink-0 ${isGroupActive ? "text-theme-primary" : ""}`} />
+                        {!isCollapsed && <span className="ml-3 font-medium">{item.label}</span>}
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 relative z-10">
                         {!isCollapsed && (
-                          <>
-                            {hoveredItem === index && (
-                              <GripVertical className="w-4 h-4 text-theme-muted opacity-60 cursor-grab active:cursor-grabbing" />
-                            )}
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
-                          </>
+                           <>
+                             {hoveredItem === index && <GripVertical className="w-4 h-4 text-theme-muted opacity-60 cursor-grab active:cursor-grabbing" />}
+                             {isExpanded ? <ChevronDown className="w-4 h-4 opacity-70" /> : <ChevronRight className="w-4 h-4 opacity-70" />}
+                           </>
                         )}
                       </div>
                     </button>
 
                     {isExpanded && !isCollapsed && (
-                      <div className="ml-4 mt-1 space-y-1">
+                      <div className="ml-5 mt-1 space-y-1 pl-4 border-l-2 border-theme/50 animate-in slide-in-from-top-1 duration-200">
                         {item.subItems.map((subItem) => {
                           const SubIcon = subItem.icon;
-                          const isSubActive =
-                            location.pathname === subItem.path;
-
+                          const isSubActive = location.pathname === subItem.path;
                           return (
                             <Link
-                              key={subItem.path}
-                              to={subItem.path}
-                              className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                                isSubActive
-                                  ? "bg-theme-primary text-white shadow-lg"
-                                  : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"
-                              }`}
+                                key={subItem.path}
+                                to={subItem.path}
+                                className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isSubActive ? activeClass : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"}`}
                             >
                               <div className="flex items-center">
                                 <SubIcon className="w-4 h-4 flex-shrink-0" />
                                 <span className="ml-3">{subItem.label}</span>
                               </div>
-                              {subItem.badge !== undefined &&
-                                subItem.badge > 0 && (
-                                  <span
-                                    className={`${
-                                      subItem.badgeColor === "green"
-                                        ? "bg-green-500"
-                                        : "bg-red-500"
-                                    } text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center`}
-                                  >
+                              {subItem.badge !== undefined && subItem.badge > 0 && (
+                                <span className={`${subItem.badgeColor === "green" ? "bg-green-500" : "bg-red-500"} text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[1.25rem] text-center shadow-sm`}>
                                     {subItem.badge}
-                                  </span>
-                                )}
+                                </span>
+                              )}
                             </Link>
                           );
                         })}
@@ -539,49 +243,23 @@ const Sidebar = () => {
               }
 
               return (
-                <div
-                  key={item.id}
-                  draggable={!isCollapsed}
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
-                  onMouseEnter={() => setHoveredItem(index)}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  className={`relative ${isDragging ? "opacity-50" : ""}`}
-                >
+                <div key={item.id} draggable={!isCollapsed} onDragStart={(e) => handleDragStart(e, index)} onDragOver={(e) => handleDragOver(e, index)} onDragEnd={handleDragEnd} onMouseEnter={() => setHoveredItem(index)} onMouseLeave={() => setHoveredItem(null)} className={`relative ${isDragging ? "opacity-50" : ""}`}>
                   <Link
                     to={item.path}
-                    className={`flex items-center ${
-                      isCollapsed ? "justify-center" : "justify-between px-3"
-                    } py-3 rounded-lg text-sm font-medium transition-all group ${
-                      isActive
-                        ? "bg-theme-primary text-white shadow-lg"
-                        : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"
-                    }`}
+                    className={`flex items-center ${isCollapsed ? "justify-center" : "justify-between px-4"} py-3 rounded-xl text-sm font-medium transition-all duration-200 group relative ${isActive ? activeClass : inactiveClass}`}
                     title={isCollapsed ? item.label : ""}
                   >
-                    <div className="flex items-center">
-                      <Icon className="w-5 h-5 flex-shrink-0" />
-                      {!isCollapsed && (
-                        <span className="ml-3">{item.label}</span>
-                      )}
+                    <div className="flex items-center relative z-10">
+                        <Icon className="w-5 h-5 flex-shrink-0" />
+                        {!isCollapsed && <span className="ml-3 font-medium">{item.label}</span>}
                     </div>
-                    <div className="flex items-center gap-2">
-                      {!isCollapsed && hoveredItem === index && (
-                        <GripVertical className="w-4 h-4 text-theme-muted opacity-60 cursor-grab active:cursor-grabbing" />
-                      )}
-                      {!isCollapsed &&
-                        item.badge !== undefined &&
-                        item.badge > 0 && (
-                          <span
-                            className={`${
-                              item.badgeColor === "green"
-                                ? "bg-green-500"
-                                : "bg-red-500"
-                            } text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center`}
-                          >
-                            {item.badge}
-                          </span>
+
+                    <div className="flex items-center gap-2 relative z-10">
+                        {!isCollapsed && hoveredItem === index && <GripVertical className="w-4 h-4 text-theme-muted opacity-60 cursor-grab active:cursor-grabbing" />}
+                        {!isCollapsed && item.badge !== undefined && item.badge > 0 && (
+                            <span className={`${item.badgeColor === "green" ? "bg-green-500" : "bg-red-500"} text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[1.25rem] text-center shadow-sm`}>
+                                {item.badge}
+                            </span>
                         )}
                     </div>
                   </Link>
@@ -591,269 +269,66 @@ const Sidebar = () => {
           </div>
         </nav>
 
-        <div className="p-4">
-          {!isCollapsed ? (
-            <VersionBadge />
-          ) : (
-            <div className="flex justify-center items-center">
-              <div className="text-xs text-theme-muted font-semibold">v2.0</div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile Header - FIXED: jetzt bei top-0 mit integrierten Icons */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-theme-card border-b border-theme z-50 h-16">
-        <div className="flex items-center justify-between h-full px-4">
-          {/* Left side - Menu button and Logo */}
-          <div className="flex items-center">
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 rounded-lg hover:bg-theme-hover transition-colors text-theme-text"
-            >
-              {isMobileMenuOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
-                <Menu className="w-6 h-6" />
-              )}
-            </button>
-            <span className="ml-3 text-xl font-bold text-theme-primary">
-              Posterizarr
-            </span>
-          </div>
-
-          {/* Right side - Theme and User Icons */}
-          <div className="flex items-center gap-2">
-            {/* Theme Switcher */}
-            <div className="relative">
-              <button
-                onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-                className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-theme-hover transition-colors text-theme-text"
-                title="Theme wechseln"
-              >
-                <Palette className="w-5 h-5" />
-              </button>
-
-              {/* Theme Dropdown */}
-              {isThemeDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsThemeDropdownOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-2 w-48 rounded-lg bg-theme-card border border-theme shadow-lg z-50">
-                    <div className="p-2">
-                      <div className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
-                        Select Theme
-                      </div>
-                      {themeArray.map((t) => (
-                        <button
-                          key={t.id}
-                          onClick={() => {
-                            setTheme(t.id);
-                            setIsThemeDropdownOpen(false);
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
-                            theme === t.id
-                              ? "bg-theme-primary text-white"
-                              : "text-gray-300 hover:bg-theme-hover"
-                          }`}
-                        >
-                          <span>{t.name}</span>
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: t.color }}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* User Icon */}
-            <button
-              className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-theme-hover transition-colors text-theme-text"
-              title="User Profile"
-            >
-              <User className="w-5 h-5" />
-            </button>
-          </div>
+        {/* Footer Version Area - REMOVED border-t */}
+        <div className="p-5 bg-theme-hover/5">
+            {!isCollapsed ? (
+                <div className="transform scale-90 origin-left">
+                     <VersionBadge />
+                </div>
+            ) : (
+                <div className="flex justify-center items-center">
+                    <VersionBadge compact={true} />
+                </div>
+            )}
         </div>
       </div>
 
       {/* Mobile Menu */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-theme-card/90 backdrop-blur-md border-b border-theme z-50 h-16 shadow-lg">
+        <div className="flex items-center justify-between h-full px-4">
+          <div className="flex items-center">
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 rounded-xl hover:bg-theme-hover transition-colors text-theme-text">
+                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+            <span className="ml-3 text-lg font-bold text-theme-primary tracking-tight">Posterizarr</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)} className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-theme-hover transition-colors text-theme-text"><Palette className="w-5 h-5" /></button>
+              {isThemeDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsThemeDropdownOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-theme-card border border-theme shadow-xl z-50 overflow-hidden">
+                    <div className="p-2 space-y-1">{themeArray.map((t) => (<button key={t.id} onClick={() => { setTheme(t.id); setIsThemeDropdownOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${theme === t.id ? "bg-theme-primary text-white" : "text-gray-300 hover:bg-theme-hover"}`}><span>{t.name}</span><div className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} /></button>))}</div>
+                  </div>
+                </>
+              )}
+            </div>
+            <button className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-theme-hover transition-colors text-theme-text"><User className="w-5 h-5" /></button>
+          </div>
+        </div>
+      </div>
+
       {isMobileMenuOpen && (
         <>
-          {/* Backdrop */}
-          <div
-            className="md:hidden fixed inset-0 bg-black/50 z-40 top-16"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-
-          {/* Mobile Sidebar */}
-          <div className="md:hidden fixed left-0 top-16 bottom-0 w-64 bg-theme-card border-r border-theme z-40 flex flex-col">
-            {/* Scrollable Navigation Area */}
-            <nav className="flex-1 overflow-y-auto py-4">
-              <div className="space-y-1 px-3">
+          <div className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 top-16" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="md:hidden fixed left-0 top-16 bottom-0 w-72 bg-theme-card border-r border-theme z-40 flex flex-col shadow-2xl">
+            <nav className="flex-1 overflow-y-auto py-6">
+              <div className="space-y-1 px-4">
                 {navItems.map((item, index) => {
                   const Icon = item.icon;
-                  const isActive = location.pathname === item.path;
-                  const isDragging = draggedItem === index;
+                  const isActive = item.id === "config" ? isInConfigSection : location.pathname === item.path;
 
                   if (item.hasSubItems) {
                     const isAssetsItem = item.path === "/gallery";
-                    const isConfigItem = item.path === "/config";
-                    const isMediaServerItem =
-                      item.path === "/media-server-export";
-                    const isExpanded = isAssetsItem
-                      ? isAssetsExpanded
-                      : isConfigItem
-                      ? isConfigExpanded
-                      : isMediaServerExpanded;
-                    const isInSection = isAssetsItem
-                      ? isInAssetsSection
-                      : isConfigItem
-                      ? isInConfigSection
-                      : isInMediaServerSection;
-                    const toggleExpanded = isAssetsItem
-                      ? () => setIsAssetsExpanded(!isAssetsExpanded)
-                      : isConfigItem
-                      ? () => setIsConfigExpanded(!isConfigExpanded)
-                      : () => setIsMediaServerExpanded(!isMediaServerExpanded);
-
-                    return (
-                      <div
-                        key={item.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragOver={(e) => handleDragOver(e, index)}
-                        onDragEnd={handleDragEnd}
-                        onMouseEnter={() => setHoveredItem(index)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        className={`relative ${isDragging ? "opacity-50" : ""}`}
-                      >
-                        <button
-                          onClick={toggleExpanded}
-                          className={`w-full flex items-center justify-between px-3 py-3 rounded-lg text-sm font-medium transition-all ${
-                            isInSection
-                              ? "bg-theme-primary/20 text-theme-primary"
-                              : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"
-                          }`}
-                        >
-                          <div className="flex items-center">
-                            <Icon className="w-5 h-5 mr-3" />
-                            <span>{item.label}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {hoveredItem === index && (
-                              <GripVertical className="w-4 h-4 text-theme-muted opacity-60 cursor-grab active:cursor-grabbing" />
-                            )}
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
-                          </div>
-                        </button>
-
-                        {isExpanded && (
-                          <div className="ml-4 mt-1 space-y-1">
-                            {item.subItems.map((subItem) => {
-                              const SubIcon = subItem.icon;
-                              const isSubActive =
-                                location.pathname === subItem.path;
-
-                              return (
-                                <Link
-                                  key={subItem.path}
-                                  to={subItem.path}
-                                  onClick={() => setIsMobileMenuOpen(false)}
-                                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                                    isSubActive
-                                      ? "bg-theme-primary text-white shadow-lg"
-                                      : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"
-                                  }`}
-                                >
-                                  <div className="flex items-center">
-                                    <SubIcon className="w-4 h-4" />
-                                    <span className="ml-3">
-                                      {subItem.label}
-                                    </span>
-                                  </div>
-                                  {subItem.badge !== undefined &&
-                                    subItem.badge > 0 && (
-                                      <span
-                                        className={`${
-                                          subItem.badgeColor === "green"
-                                            ? "bg-green-500"
-                                            : "bg-red-500"
-                                        } text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center`}
-                                      >
-                                        {subItem.badge}
-                                      </span>
-                                    )}
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
+                    const isExpanded = isAssetsItem ? isAssetsExpanded : isMediaServerExpanded;
+                    const toggleExpanded = isAssetsItem ? () => setIsAssetsExpanded(!isAssetsExpanded) : () => setIsMediaServerExpanded(!isMediaServerExpanded);
+                    return (<div key={item.id}><button onClick={toggleExpanded} className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium text-theme-muted hover:bg-theme-hover/50"><div className="flex items-center"><Icon className="w-5 h-5 mr-3" /><span>{item.label}</span></div>{isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</button>{isExpanded && (<div className="ml-4 mt-1 space-y-1 border-l border-theme/30 pl-3">{item.subItems.map(sub => (<Link key={sub.path} to={sub.path} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-4 py-3 rounded-xl text-sm font-medium text-theme-muted hover:bg-theme-hover"><sub.icon className="w-4 h-4 mr-3" />{sub.label}</Link>))}</div>)}</div>)
                   }
-
-                  return (
-                    <div
-                      key={item.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragEnd={handleDragEnd}
-                      onMouseEnter={() => setHoveredItem(index)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      className={`relative ${isDragging ? "opacity-50" : ""}`}
-                    >
-                      <Link
-                        to={item.path}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`flex items-center justify-between px-3 py-3 rounded-lg text-sm font-medium transition-all ${
-                          isActive
-                            ? "bg-theme-primary text-white shadow-lg"
-                            : "text-theme-muted hover:bg-theme-hover hover:text-theme-text"
-                        }`}
-                      >
-                        <div className="flex items-center">
-                          <Icon className="w-5 h-5 mr-3" />
-                          <span>{item.label}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {hoveredItem === index && (
-                            <GripVertical className="w-4 h-4 text-theme-muted opacity-60 cursor-grab active:cursor-grabbing" />
-                          )}
-                          {item.badge !== undefined && item.badge > 0 && (
-                            <span
-                              className={`${
-                                item.badgeColor === "green"
-                                  ? "bg-green-500"
-                                  : "bg-red-500"
-                              } text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.5rem] text-center`}
-                            >
-                              {item.badge}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    </div>
-                  );
+                  return (<Link key={item.id} to={item.path} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center px-4 py-3 rounded-xl text-sm font-medium ${isActive ? "bg-theme-primary text-white shadow-lg" : "text-theme-muted hover:bg-theme-hover"}`}><Icon className="w-5 h-5 mr-3" /><span>{item.label}</span></Link>);
                 })}
               </div>
             </nav>
-
-            {/* Mobile Version Badge - Fixed at Bottom */}
-            <div className="p-4 border-t border-theme bg-theme-card">
-              <VersionBadge />
-            </div>
           </div>
         </>
       )}

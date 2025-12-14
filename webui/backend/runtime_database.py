@@ -169,9 +169,9 @@ class RuntimeDatabase:
                 else:
                     logger.debug("Migration already completed, skipping")
 
-                # --- NEW: Run date format migration ---
+                # NEW: Run date format migration
                 self._migrate_date_formats()
-                # --- END NEW ---
+                # END NEW
 
             logger.info("=" * 60)
 
@@ -525,7 +525,7 @@ class RuntimeDatabase:
                 conn = self._get_connection()
                 cursor = conn.cursor()
 
-                # --- START TIMESTAMP FIX ---
+                # START TIMESTAMP FIX
                 # Use the 'start_time' (which is now ISO format) as the primary timestamp.
                 # If it's missing (e.g., from an old log), use the current time in ISO format.
                 timestamp_to_insert = None
@@ -533,7 +533,7 @@ class RuntimeDatabase:
                     timestamp_to_insert = start_time
                 else:
                     timestamp_to_insert = datetime.now().isoformat()
-                # --- END TIMESTAMP FIX ---
+                # END TIMESTAMP FIX
 
                 cursor.execute(
                     """
@@ -838,6 +838,24 @@ class RuntimeDatabase:
                 if 'conn' in locals():
                     conn.close()
                 return {"error": str(e)}
+
+    def get_run_by_id(self, run_id: int) -> Optional[Dict]:
+        """Get a specific runtime entry by ID"""
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM runtime_stats WHERE id = ?", (run_id,))
+                row = cursor.fetchone()
+                conn.close()
+                if row:
+                    return dict(row)
+                return None
+            except Exception as e:
+                logger.error(f"Error getting run by ID: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                return None
 
 # Global database instance
 runtime_db = RuntimeDatabase()

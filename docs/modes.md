@@ -336,6 +336,33 @@ In this mode we use Tautulli to trigger Posterizarr for an specific item in Plex
 
    ![backgroundtesting](images/Tautulli_Step4.png
 
+### Tautulli Mode (Native Webhook)
+
+!!! tip "Recommended"
+    This is the easiest way to set up Tautulli. It requires no custom scripts or volume mounts.
+
+1. Open Tautulli and go to **Settings** -> **Notification Agents**.
+2. Click `Add a new notification agent` and select **Webhook**.
+3. **Configuration Tab:**
+    * **Webhook URL:** `http://YOUR_POSTERIZARR_IP:8000/api/webhook/tautulli`
+    * **Auth Webhook URL:** `http://YOUR_POSTERIZARR_IP:8000/api/webhook/tautulli?api_key=YOUR_API_KEY`
+      - *(Generate an API Key in Posterizarr settings under WebUI)*
+    * **Webhook Method:** `POST`
+4. **Triggers Tab:**
+    * Check `Recently Added`.
+5. **Data Tab:**
+    * Scroll down to **Recently Added**.
+    * Paste the following into **JSON Data**:
+    ```json
+    {
+        "RatingKey": "{rating_key}",
+        "mediatype": "{media_type}",
+        "parentratingkey": "{parent_rating_key}",
+        "grandparentratingkey": "{grandparent_rating_key}"
+    }
+    ```
+6. Click **Save**.
+
 ### Sonarr/Radarr Mode Docker
 
 !!! important
@@ -368,3 +395,39 @@ To use it we need to configure a script in Sonarr/Radarr, please follow these in
    - The file will be named like: `recently_added_20250925114601966_1da214d7.posterizarr`
 9. Posterizarr monitors this directory for files ending in `.posterizarr`.
    - When such a file is detected, it **waits** up to `5 minutes`(based on fileage), then reads the file and triggers a Posterizarr run for the corresponding item.
+
+### Sonarr/Radarr Mode (Native Webhook)
+
+!!! tip "Recommended"
+    This method replaces the need for `ArrTrigger.sh` and works without complex volume mapping.
+
+1. Open Sonarr or Radarr.
+2. Go to **Settings** -> **Connect**.
+3. Click the `+` button and select **Webhook**.
+4. **Name:** Posterizarr
+5. **On Import:** Yes
+6. **On Upgrade:** Yes
+7. **URL:** `http://YOUR_POSTERIZARR_IP:8000/api/webhook/arr`
+8. **Auth Webhook URL:** `http://YOUR_POSTERIZARR_IP:8000/api/webhook/tautulli?api_key=YOUR_API_KEY`
+    - *(Generate an API Key in Posterizarr settings under WebUI)*
+8. **Method:** POST
+9. Click **Save**.
+
+### Gather Logs Mode
+
+Run the script with the `-GatherLogs` flag. In this mode, the script collects logs, rotated logs, and database files into a single archive for troubleshooting.
+
+Crucially, the script sanitizes these files before zipping them automatically masking API keys, tokens, PINs, and sensitive hostnames. The result is saved in the script root as `posterizarr_support_<timestamp>.zip`
+
+!!! tip Use this when reporting bugs or requesting support. It allows you to share comprehensive debugging information with the developer without manually scrubbing your credentials or private links from the files.
+
+
+```powershell
+.\Posterizarr.ps1 -GatherLogs
+```
+
+On [docker](platformandtools.md#docker) this way:
+
+```sh
+docker exec -it posterizarr pwsh /app/Posterizarr.ps1 -GatherLogs
+```

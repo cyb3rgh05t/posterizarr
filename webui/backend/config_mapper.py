@@ -264,6 +264,7 @@ CONFIG_GROUPS = {
     "FavProvider": "ApiPart",
     "PreferredLanguageOrder": "ApiPart",
     "PreferredSeasonLanguageOrder": "ApiPart",
+    "LogoLanguageOrder": "ApiPart",
     "tmdb_vote_sorting": "ApiPart",
     "WidthHeightFilter": "ApiPart",
     "PosterMinWidth": "ApiPart",
@@ -331,6 +332,10 @@ CONFIG_GROUPS = {
     "AutoUpdatePosterizarr": "PrerequisitePart",
     "ManualAssetPath": "PrerequisitePart",
     "SkipAddText": "PrerequisitePart",
+    "SkipLocalPosterTextAdd": "PrerequisitePart",
+    "SkipLocalBackgroundTextAdd": "PrerequisitePart",
+    "SkipLocalSeasonTextAdd": "PrerequisitePart",
+    "SkipLocalTCTextAdd": "PrerequisitePart",
     "SkipAddTextAndOverlay": "PrerequisitePart",
     "FollowSymlink": "PrerequisitePart",
     "poster4k": "PrerequisitePart",
@@ -355,6 +360,11 @@ CONFIG_GROUPS = {
     "DisableOnlineAssetFetch": "PrerequisitePart",
     "collectionfont": "PrerequisitePart",
     "collectionoverlayfile": "PrerequisitePart",
+    "UseLogo": "PrerequisitePart",
+    "UseBGLogo": "PrerequisitePart",
+    "UseClearlogo": "PrerequisitePart",
+    "UseClearart": "PrerequisitePart",
+    "LogoTextFallback": "PrerequisitePart",
     # OverlayPart
     "ImageProcessing": "OverlayPart",
     "outputQuality": "OverlayPart",
@@ -525,6 +535,10 @@ UI_GROUPS = {
         "SkipTBA",
         "SkipJapTitle",
         "SkipAddText",
+        "SkipLocalPosterTextAdd",
+        "SkipLocalBackgroundTextAdd",
+        "SkipLocalSeasonTextAdd",
+        "SkipLocalTCTextAdd",
         "SkipAddTextAndOverlay",
         "DisableOnlineAssetFetch",
         "AutoUpdateIM",
@@ -532,6 +546,11 @@ UI_GROUPS = {
         "ForceRunningDeletion",
         "DisableHashValidation",
         "FileTestOnTrigger",
+        "UseLogo",
+        "UseBGLogo",
+        "UseClearlogo",
+        "UseClearart",
+        "LogoTextFallback",
     ],
     "API Keys & Tokens": [
         "tvdbapi",
@@ -545,6 +564,7 @@ UI_GROUPS = {
         "PreferredSeasonLanguageOrder",
         "PreferredBackgroundLanguageOrder",
         "PreferredTCLanguageOrder",
+        "LogoLanguageOrder",
     ],
     "Image Filters": [
         "WidthHeightFilter",
@@ -919,6 +939,10 @@ def unflatten_config(flat_config):
         ):
             storage_key = remove_prefix_with_original_case(key)
 
+        # Convert booleans to strings "true"/"false" for PowerShell script compatibility
+        if isinstance(value, bool):
+            value = "true" if value else "false"
+
         grouped[group_name][storage_key] = value
 
     return grouped
@@ -944,6 +968,7 @@ DISPLAY_NAMES = {
     "PreferredSeasonLanguageOrder": "Season Language Order",
     "PreferredBackgroundLanguageOrder": "Background Language Order",
     "PreferredTCLanguageOrder": "TitleCard Language Order",
+    "LogoLanguageOrder": "Logo Language Order",
     # Image Filters
     "WidthHeightFilter": "Width/Height Filter",
     "PosterMinWidth": "Poster Min Width",
@@ -1009,6 +1034,10 @@ DISPLAY_NAMES = {
     "AutoUpdatePosterizarr": "Auto-Update Posterizarr",
     "ManualAssetPath": "Manual Asset Path",
     "SkipAddText": "Skip Add Text",
+    "SkipLocalPosterTextAdd": "Skip adding local poster text",
+    "SkipLocalBackgroundTextAdd": "Skip adding local background poster text",
+    "SkipLocalSeasonTextAdd": "Skip adding local season poster text",
+    "SkipLocalTCTextAdd": "Skip adding local TC text",
     "SkipAddTextAndOverlay": "Skip Add Text and Skip add Overlay",
     "FollowSymlink": "Follow Symlinks",
     "poster4k": "4K Poster Overlay",
@@ -1031,6 +1060,11 @@ DISPLAY_NAMES = {
     "4KHDR10TC": "4K HDR10 Title Card Overlay",
     "4KDoViHDR10TC": "4K DoVi & HDR10 Title Card Overlay",
     "DisableOnlineAssetFetch": "Disable Online Asset Fetch",
+    "UseLogo": "Use Logo for Posters",
+    "UseBGLogo": "Use Logo for Backgrounds",
+    "UseClearlogo": "Use Clearlogo",
+    "UseClearart": "Use Clearart",
+    "LogoTextFallback": "Fallback to Text",
     # Image Processing
     "ImageProcessing": "Image Processing",
     "outputQuality": "Output Quality",

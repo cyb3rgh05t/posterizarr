@@ -8,7 +8,21 @@ Write-Host "🚀 Posterizarr Web UI - Quick Setup"
 Write-Host "===================================="
 Write-Host ""
 
-# Prerequisite Checks
+# --- 0. Administrator Check ---
+$currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+$isAdmin = $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if (-not $isAdmin) {
+    Write-Host "⚠️  WARNING: You are NOT running as Administrator." -ForegroundColor Yellow
+    Write-Host "   If you need to install missing dependencies (Python/Node), this script will fail."
+    Write-Host "   It is highly recommended to close this and run PowerShell as Administrator."
+    Write-Host ""
+    Start-Sleep -Seconds 2
+} else {
+    Write-Host "✅ Running as Administrator"
+}
+
+# --- 1. Prerequisite Checks ---
 
 # Check if we're in the right directory
 if (-not (Test-Path "..\Posterizarr.ps1")) {
@@ -19,87 +33,169 @@ if (-not (Test-Path "..\Posterizarr.ps1")) {
 }
 Write-Host "✅ Found Posterizarr.ps1"
 
-# Check for Python using the 'py.exe' launcher for robustness
-if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
-    Write-Host "❌ Python 3 is not installed or 'py.exe' is not in your PATH." -ForegroundColor Red
-    Write-Host "Please install Python 3 from python.org and ensure it's added to your system PATH."
-    Read-Host "Press Enter to exit..."
-    exit 1
-}
-Write-Host "✅ Python 3 found"
+# --- Python Check (Python vs Py Launcher vs Winget) ---
+$UsePyLauncher = $false
+$PythonFound = $false
 
-# Check for Node.js
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Host "❌ Node.js is not installed." -ForegroundColor Red
-    Write-Host "Please install Node.js from nodejs.org."
-    Read-Host "Press Enter to exit..."
-    exit 1
+if (Get-Command python -ErrorAction SilentlyContinue) {
+    $PythonFound = $true
+    Write-Host "✅ Python 3 found (python.exe)"
+} 
+elseif (Get-Command py -ErrorAction SilentlyContinue) {
+    $PythonFound = $true
+    $UsePyLauncher = $true
+    Write-Host "✅ Python 3 found (py.exe launcher)"
+} 
+else {
+    Write-Host "❌ Python 3 is not installed." -ForegroundColor Red
+    $install = Read-Host "   > Would you like to install Python 3 via Winget now? (Y/N)"
+    
+    if ($install -eq 'Y' -or $install -eq 'y') {
+        if (-not $isAdmin) {
+            Write-Host "❌ Error: Administrator privileges are required to install Python." -ForegroundColor Red
+            Read-Host "Press Enter to exit..."
+            exit 1
+        }
+        Write-Host "📦 Installing Python 3 via Winget..."
+        winget install -e --id Python.Python.3 --accept-package-agreements --accept-source-agreements
+        Write-Host "🔄 Refreshing Environment Variables..."
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        
+        if (Get-Command python -ErrorAction SilentlyContinue) {
+            $PythonFound = $true
+            Write-Host "✅ Python 3 installed and detected." -ForegroundColor Green
+        } else {
+            Write-Host "⚠️  Python installed, but session cannot see it. Please restart script." -ForegroundColor Yellow
+            Read-Host "Press Enter to exit..."
+            exit 1
+        }
+    } else {
+        Write-Host "❌ Setup cannot proceed without Python."
+        exit 1
+    }
 }
-Write-Host "✅ Node.js found"
+
+# --- Node.js Check ---
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    Write-Host "✅ Node.js found"
+} else {
+    Write-Host "❌ Node.js is not installed." -ForegroundColor Red
+    $installNode = Read-Host "   > Would you like to install Node.js via Winget now? (Y/N)"
+    
+    if ($installNode -eq 'Y' -or $installNode -eq 'y') {
+        if (-not $isAdmin) {
+            Write-Host "❌ Error: Administrator privileges are required."
+            exit 1
+        }
+        Write-Host "📦 Installing Node.js via Winget..."
+        winget install -e --id OpenJS.NodeJS --accept-package-agreements --accept-source-agreements
+        Write-Host "🔄 Refreshing Environment Variables..."
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        
+        if (Get-Command node -ErrorAction SilentlyContinue) {
+            Write-Host "✅ Node.js installed and detected." -ForegroundColor Green
+        } else {
+            Write-Host "⚠️  Node.js installed, but session cannot see it. Please restart script." -ForegroundColor Yellow
+            exit 1
+        }
+    } else {
+        Write-Host "❌ Setup cannot proceed without Node.js."
+        exit 1
+    }
+}
 Write-Host ""
 
-# Backend Setup
+# --- 2. Backend Setup ---
 Write-Host "📦 Setting up Python backend..."
 Push-Location -Path "backend"
 
-# Create a virtual environment if it doesn't exist
 if (-not (Test-Path "venv")) {
-    Write-Host "   - Creating virtual environment in '.\venv\'..."
+    Write-Host "   - Creating virtual environment..."
     try {
-        py -3 -m venv venv
+        if ($UsePyLauncher) { py -3 -m venv venv } else { python -m venv venv }
     }
     catch {
         Write-Host "❌ Failed to create virtual environment." -ForegroundColor Red
-        Pop-Location
-        Read-Host "Press Enter to exit..."
-        exit 1
+        Pop-Location; exit 1
     }
 } else {
     Write-Host "   - Virtual environment already exists."
 }
 
-# Install dependencies using the virtual environment's pip
 Write-Host "   - Installing Python dependencies..."
 try {
-    # Execute pip install directly from the venv for script simplicity
-    .\venv\Scripts\pip.exe install -r requirements.txt
+    .\venv\Scripts\pip.exe install -r requirements.txt | Out-Null
     Write-Host "✅ Backend dependencies installed." -ForegroundColor Green
 }
 catch {
     Write-Host "❌ Failed to install backend dependencies." -ForegroundColor Red
-    Pop-Location
-    Read-Host "Press Enter to exit..."
-    exit 1
+    Pop-Location; exit 1
 }
-
 Pop-Location
 Write-Host ""
 
-# Frontend Setup
+# --- 3. Frontend Setup ---
 Write-Host "📦 Installing Frontend Dependencies..."
 Push-Location -Path "frontend"
-npm install
+try {
+    npm install
+    Write-Host "✅ Frontend dependencies installed." -ForegroundColor Green
+} catch {
+    Write-Host "❌ Failed to install frontend dependencies." -ForegroundColor Red
+}
 Pop-Location
-Write-Host "✅ Frontend dependencies installed." -ForegroundColor Green
 Write-Host ""
 
-# --- 4. Final Instructions ---
+# --- 4. Automation & Launch ---
 Write-Host "🎉 Setup Complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "🎯 Next Steps:" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "1. In a NEW terminal, start the frontend dev server:"
-Write-Host "   cd webui\frontend"
-Write-Host "   npm run build"
-Write-Host ""
-Write-Host "2. In ANOTHER new terminal, start the backend server:"
-Write-Host "   cd webui\backend"
-Write-Host "   .\venv\Scripts\Activate.ps1"
-Write-Host "   python -m uvicorn main:app --host 0.0.0.0 --port 8000"
-Write-Host ""
-Write-Host "   NOTE: If activation fails, you may need to change your execution policy for this terminal session by running:"
-Write-Host "   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass"
-Write-Host ""
-Write-Host "3. Open your browser and navigate to the address provided by the frontend server (e.g., http://localhost:8000)."
-Write-Host ""
-Read-Host "Press Enter to close this window..."
+
+$autoRun = Read-Host "🚀 Do you want to build the frontend and start the app now? (Y/N)"
+
+if ($autoRun -eq 'Y' -or $autoRun -eq 'y') {
+    
+    # Step A: Build Frontend
+    Write-Host "🔨 Building Frontend (this may take a moment)..." -ForegroundColor Cyan
+    Push-Location -Path "frontend"
+    try {
+        npm run build
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Frontend Build Success." -ForegroundColor Green
+        } else {
+            throw "NPM Build failed."
+        }
+    }
+    catch {
+        Write-Host "❌ Frontend build failed. Cannot start application." -ForegroundColor Red
+        Pop-Location
+        Read-Host "Press Enter to exit..."
+        exit 1
+    }
+    Pop-Location
+
+    # Step B: Start Backend in New Window
+    Write-Host "🔌 Starting Backend Server in a new window..." -ForegroundColor Cyan
+    $backendPath = Join-Path $PSScriptRoot "backend"
+    
+    # Determine python command for the new window
+    $pyCmd = if ($UsePyLauncher) { "py" } else { "python" }
+    
+    # Construct the command block to run in the new window
+    $commands = "Set-Location '$backendPath'; .\venv\Scripts\Activate.ps1; $pyCmd -m uvicorn main:app --host 0.0.0.0 --port 8000"
+    
+    # Launch new PowerShell process
+    Start-Process pwsh -ArgumentList "-NoExit", "-Command", "& {$commands}"
+
+    # Step C: Open Browser
+    Write-Host "🌐 Opening Browser..." -ForegroundColor Cyan
+    Start-Sleep -Seconds 3 # Give uvicorn a moment to spin up
+    Start-Process "http://localhost:8000"
+    
+} else {
+    # Fallback to manual instructions if they said No
+    Write-Host "🎯 Manual Next Steps:" -ForegroundColor Yellow
+    Write-Host "1. cd webui\frontend -> npm run build"
+    Write-Host "2. cd webui\backend -> .\venv\Scripts\Activate.ps1 -> python -m uvicorn main:app --host 0.0.0.0 --port 8000"
+}
+
+Read-Host "Press Enter to close this setup window..."
