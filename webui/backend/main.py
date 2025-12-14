@@ -9383,19 +9383,22 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                         )
                         search_method = "path"
 
-                        # Search database for matching record
-                        cursor = db.conn.cursor()
-                        cursor.execute(
-                            """
-                            SELECT tmdbid, tvdbid, imdbid, Rootfolder
-                            FROM imagechoices
-                            WHERE Rootfolder LIKE ?
-                            LIMIT 1
-                        """,
-                            (f"%{rootfolder_candidate}%",),
-                        )
-
-                        db_record = cursor.fetchone()
+                        with db.lock:
+                            conn = db._get_connection()
+                            try:
+                                cursor = conn.cursor()
+                                cursor.execute(
+                                    """
+                                    SELECT tmdbid, tvdbid, imdbid, Rootfolder
+                                    FROM imagechoices
+                                    WHERE Rootfolder LIKE ?
+                                    LIMIT 1
+                                """,
+                                    (f"%{rootfolder_candidate}%",),
+                                )
+                                db_record = cursor.fetchone()
+                            finally:
+                                conn.close()
 
                 # Method 2: Search by title + year (for Manual Mode)
                 if not db_record and request.title:
@@ -9404,33 +9407,33 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                     )
                     search_method = "title"
 
-                    cursor = db.conn.cursor()
-
-                    # Try exact title match first
-                    if request.year:
-                        # Search with year in Rootfolder pattern: "Title (YYYY)"
-                        cursor.execute(
-                            """
-                            SELECT tmdbid, tvdbid, imdbid, Rootfolder
-                            FROM imagechoices
-                            WHERE Rootfolder LIKE ?
-                            LIMIT 1
-                        """,
-                            (f"%{request.title}%({request.year})%",),
-                        )
-                    else:
-                        # Search without year
-                        cursor.execute(
-                            """
-                            SELECT tmdbid, tvdbid, imdbid, Rootfolder
-                            FROM imagechoices
-                            WHERE Rootfolder LIKE ?
-                            LIMIT 1
-                        """,
-                            (f"%{request.title}%",),
-                        )
-
-                    db_record = cursor.fetchone()
+                    with db.lock:
+                        conn = db._get_connection()
+                        try:
+                            cursor = conn.cursor()
+                            if request.year:
+                                cursor.execute(
+                                    """
+                                    SELECT tmdbid, tvdbid, imdbid, Rootfolder
+                                    FROM imagechoices
+                                    WHERE Rootfolder LIKE ?
+                                    LIMIT 1
+                                """,
+                                    (f"%{request.title}%({request.year})%",),
+                                )
+                            else:
+                                cursor.execute(
+                                    """
+                                    SELECT tmdbid, tvdbid, imdbid, Rootfolder
+                                    FROM imagechoices
+                                    WHERE Rootfolder LIKE ?
+                                    LIMIT 1
+                                """,
+                                    (f"%{request.title}%",),
+                                )
+                            db_record = cursor.fetchone()
+                        finally:
+                            conn.close()
 
                 # Process database record if found
                 if db_record:
@@ -11082,8 +11085,6 @@ def delete_db_entries_for_asset(asset_path: str):
             # Regular poster - could be Movie or Show or Poster
             search_types = ["Movie", "Show", "Poster"]
 
-        cursor = db.conn.cursor()
-
         # Collect all matching entries across all possible type names
         all_entries = []
 
@@ -11091,48 +11092,53 @@ def delete_db_entries_for_asset(asset_path: str):
             f"Searching for DB entries: folder={folder_name}, types={search_types}, is_episode={bool(is_episode)}, is_season={bool(is_season)}"
         )
 
-        for db_type in search_types:
-            if is_season:
-                # For seasons, find entries with matching season number in title
-                season_num = is_season.group(1)
-                cursor.execute(
-                    """SELECT id, Title, Type FROM imagechoices
-                       WHERE Rootfolder = ? AND Type = ?
-                       AND (Title LIKE ? OR Title LIKE ? OR Title LIKE ?)""",
-                    (
-                        folder_name,
-                        db_type,
-                        f"%Season{season_num}%",
-                        f"%Season {season_num}%",
-                        f"%Season0{season_num}%",
-                    ),
-                )
-            elif is_episode:
-                # For episodes, find entries with matching episode pattern in title
-                season_num = is_episode.group(1)
-                episode_num = is_episode.group(2)
-                pattern1 = f"%S{season_num}E{episode_num}%"
-                pattern2 = f"%S0{season_num}E0{episode_num}%"
-                logger.debug(
-                    f"Episode search: folder={folder_name}, type={db_type}, patterns={pattern1}, {pattern2}"
-                )
-                cursor.execute(
-                    """SELECT id, Title, Type FROM imagechoices
-                       WHERE Rootfolder = ? AND Type = ?
-                       AND (Title LIKE ? OR Title LIKE ?)""",
-                    (folder_name, db_type, pattern1, pattern2),
-                )
-            else:
-                # For poster/background, match on Rootfolder + Type only
-                cursor.execute(
-                    "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type = ?",
-                    (folder_name, db_type),
-                )
+        # FIX: Use _get_connection within the lock
+        with db.lock:
+            conn = db._get_connection()
+            try:
+                cursor = conn.cursor()
+                
+                for db_type in search_types:
+                    if is_season:
+                        # For seasons, find entries with matching season number in title
+                        season_num = is_season.group(1)
+                        cursor.execute(
+                            """SELECT id, Title, Type FROM imagechoices
+                               WHERE Rootfolder = ? AND Type = ?
+                               AND (Title LIKE ? OR Title LIKE ? OR Title LIKE ?)""",
+                            (
+                                folder_name,
+                                db_type,
+                                f"%Season{season_num}%",
+                                f"%Season {season_num}%",
+                                f"%Season0{season_num}%",
+                            ),
+                        )
+                    elif is_episode:
+                        # For episodes, find entries with matching episode pattern in title
+                        season_num = is_episode.group(1)
+                        episode_num = is_episode.group(2)
+                        pattern1 = f"%S{season_num}E{episode_num}%"
+                        pattern2 = f"%S0{season_num}E0{episode_num}%"
+                        cursor.execute(
+                            """SELECT id, Title, Type FROM imagechoices
+                               WHERE Rootfolder = ? AND Type = ?
+                               AND (Title LIKE ? OR Title LIKE ?)""",
+                            (folder_name, db_type, pattern1, pattern2),
+                        )
+                    else:
+                        # For poster/background, match on Rootfolder + Type only
+                        cursor.execute(
+                            "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type = ?",
+                            (folder_name, db_type),
+                        )
 
-            # Fetch and extend results for this type
-            found = cursor.fetchall()
-            logger.debug(f"Found {len(found)} entries for type {db_type}")
-            all_entries.extend(found)
+                    # Fetch and extend results for this type
+                    found = cursor.fetchall()
+                    logger.debug(f"Found {len(found)} entries for type {db_type}")
+                    all_entries.extend(found)
+            finally:
+                conn.close()
 
         if all_entries:
             for entry in all_entries:
@@ -11231,69 +11237,73 @@ async def update_asset_db_entry_as_manual(
         # - For episodes: match on Rootfolder + Type + episode pattern in Title
         # - For poster/background: match on Rootfolder + Type
 
-        cursor = db.conn.cursor()
+        existing_entries = []
+        with db.lock:
+            conn = db._get_connection()
+            try:
+                cursor = conn.cursor()
 
-        # Extract season/episode info from filename for more specific matching
-        season_match = re.match(r"^Season(\d+)\.jpg$", filename, re.IGNORECASE)
-        episode_match = re.match(r"^S(\d+)E(\d+)\.jpg$", filename, re.IGNORECASE)
+                # Extract season/episode info from filename for more specific matching
+                season_match = re.match(r"^Season(\d+)\.jpg$", filename, re.IGNORECASE)
+                episode_match = re.match(r"^S(\d+)E(\d+)\.jpg$", filename, re.IGNORECASE)
 
-        if season_match:
-            # For seasons, find entries with matching season number in title
-            season_num = season_match.group(1)
-            # Also try without leading zero
-            season_num_int = str(int(season_num))
-            logger.info(
-                f"Searching for Season: folder='{final_folder_name}', season_num='{season_num}', season_num_int='{season_num_int}'"
-            )
-            cursor.execute(
-                """SELECT id, Title, Type FROM imagechoices
-                   WHERE Rootfolder = ? AND Type = ?
-                   AND (Title LIKE ? OR Title LIKE ? OR Title LIKE ? OR Title LIKE ?)""",
-                (
-                    final_folder_name,
-                    asset_type,
-                    f"%Season{season_num}%",
-                    f"%Season {season_num}%",
-                    f"%Season {season_num_int}%",
-                    f"%Season{season_num_int}%",
-                ),
-            )
-        elif episode_match:
-            # For episodes, find entries with matching episode pattern in title
-            season_num = episode_match.group(1)
-            episode_num = episode_match.group(2)
-            cursor.execute(
-                """SELECT id, Title FROM imagechoices
-                   WHERE Rootfolder = ? AND Type = ?
-                   AND (Title LIKE ? OR Title LIKE ?)""",
-                (
-                    final_folder_name,
-                    asset_type,
-                    f"%S{season_num}E{episode_num}%",
-                    f"%S0{season_num}E0{episode_num}%",
-                ),
-            )
-        else:
-            # For poster/background, match on Rootfolder + Type
-            # For posters, match both "Show" and "Movie" types
-            # For backgrounds, match both "Show Background" and "Movie Background" types
-            if asset_type == "Poster":
-                cursor.execute(
-                    "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type IN ('Show', 'Movie')",
-                    (final_folder_name,),
-                )
-            elif asset_type == "Background":
-                cursor.execute(
-                    "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type IN ('Show Background', 'Movie Background')",
-                    (final_folder_name,),
-                )
-            else:
-                cursor.execute(
-                    "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type = ?",
-                    (final_folder_name, asset_type),
-                )
+                if season_match:
+                    # For seasons, find entries with matching season number in title
+                    season_num = season_match.group(1)
+                    # Also try without leading zero
+                    season_num_int = str(int(season_num))
+                    logger.info(
+                        f"Searching for Season: folder='{final_folder_name}', season_num='{season_num}', season_num_int='{season_num_int}'"
+                    )
+                    cursor.execute(
+                        """SELECT id, Title, Type FROM imagechoices
+                           WHERE Rootfolder = ? AND Type = ?
+                           AND (Title LIKE ? OR Title LIKE ? OR Title LIKE ? OR Title LIKE ?)""",
+                        (
+                            final_folder_name,
+                            asset_type,
+                            f"%Season{season_num}%",
+                            f"%Season {season_num}%",
+                            f"%Season {season_num_int}%",
+                            f"%Season{season_num_int}%",
+                        ),
+                    )
+                elif episode_match:
+                    # For episodes, find entries with matching episode pattern in title
+                    season_num = episode_match.group(1)
+                    episode_num = episode_match.group(2)
+                    cursor.execute(
+                        """SELECT id, Title FROM imagechoices
+                           WHERE Rootfolder = ? AND Type = ?
+                           AND (Title LIKE ? OR Title LIKE ?)""",
+                        (
+                            final_folder_name,
+                            asset_type,
+                            f"%S{season_num}E{episode_num}%",
+                            f"%S0{season_num}E0{episode_num}%",
+                        ),
+                    )
+                else:
+                    # For poster/background, match on Rootfolder + Type
+                    if asset_type == "Poster":
+                        cursor.execute(
+                            "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type IN ('Show', 'Movie')",
+                            (final_folder_name,),
+                        )
+                    elif asset_type == "Background":
+                        cursor.execute(
+                            "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type IN ('Show Background', 'Movie Background')",
+                            (final_folder_name,),
+                        )
+                    else:
+                        cursor.execute(
+                            "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type = ?",
+                            (final_folder_name, asset_type),
+                        )
 
-        existing_entries = cursor.fetchall()
+                existing_entries = cursor.fetchall()
+            finally:
+                conn.close()
 
         if existing_entries:
             for entry in existing_entries:
