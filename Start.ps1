@@ -36,7 +36,11 @@ function ScriptSchedule {
                 }
             }
             catch {
-                # Ignore errors and continue retrying
+                # If the server responds with 401 (Unauthorized), it means it IS online/running, just protected.
+                if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 401) {
+                    $isOnline = $true
+                    break
+                }
             }
             Start-Sleep -Seconds $retryIntervalSeconds
         }

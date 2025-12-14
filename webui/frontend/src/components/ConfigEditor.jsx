@@ -1114,6 +1114,45 @@ const ApiKeyManager = () => {
 
     useEffect(() => { fetchKeys(); }, []);
 
+    // Robust Copy Function with Fallback for HTTP
+    const handleCopy = async (text, label) => {
+        try {
+            // Try modern API first
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                showSuccess(`${label} copied to clipboard!`);
+            } else {
+                throw new Error("Clipboard API unavailable");
+            }
+        } catch (err) {
+            // Fallback for HTTP/Non-secure contexts
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                
+                // Ensure it's not visible but part of the DOM
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                if (successful) {
+                    showSuccess(`${label} copied to clipboard!`);
+                } else {
+                    showError("Failed to copy text manually.");
+                }
+            } catch (fallbackErr) {
+                showError("Could not copy text. Browser restrictions may apply.");
+            }
+        }
+    };
+
     const handleCreate = async () => {
         if (!newKeyName) return;
         setLoading(true);
@@ -1185,7 +1224,11 @@ const ApiKeyManager = () => {
                             <p className="text-green-400 text-xs font-bold mb-2">{t("apiKeys.generatedSuccess")}</p>
                             <div className="flex items-center gap-2 bg-black/40 p-2 rounded border border-green-500/20">
                                 <code className="flex-1 text-green-300 font-mono text-sm break-all">{generatedKey}</code>
-                                <button onClick={() => navigator.clipboard.writeText(generatedKey)} className="text-gray-400 hover:text-white transition-colors" title="Copy Key">
+                                <button 
+                                    onClick={() => handleCopy(generatedKey, "API Key")}
+                                    className="text-gray-400 hover:text-white transition-colors" 
+                                    title="Copy Key"
+                                >
                                     <Copy className="w-4 h-4" />
                                 </button>
                             </div>
@@ -1200,7 +1243,10 @@ const ApiKeyManager = () => {
                                 <code className="flex-1 text-[10px] text-theme-text font-mono truncate">
                                     {origin}/api/webhook/arr?api_key={displayKey}
                                 </code>
-                                <button onClick={() => navigator.clipboard.writeText(`${origin}/api/webhook/arr?api_key=${displayKey}`)} className="text-theme-muted hover:text-theme-primary transition-colors">
+                                <button 
+                                    onClick={() => handleCopy(`${origin}/api/webhook/arr?api_key=${displayKey}`, "Webhook URL")}
+                                    className="text-theme-muted hover:text-theme-primary transition-colors"
+                                >
                                     <Copy className="w-3 h-3" />
                                 </button>
                             </div>
@@ -1211,7 +1257,10 @@ const ApiKeyManager = () => {
                                 <code className="flex-1 text-[10px] text-theme-text font-mono truncate">
                                     {origin}/api/webhook/tautulli?api_key={displayKey}
                                 </code>
-                                <button onClick={() => navigator.clipboard.writeText(`${origin}/api/webhook/tautulli?api_key=${displayKey}`)} className="text-theme-muted hover:text-theme-primary transition-colors">
+                                <button 
+                                    onClick={() => handleCopy(`${origin}/api/webhook/tautulli?api_key=${displayKey}`, "Webhook URL")}
+                                    className="text-theme-muted hover:text-theme-primary transition-colors"
+                                >
                                     <Copy className="w-3 h-3" />
                                 </button>
                             </div>
