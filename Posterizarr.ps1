@@ -7937,29 +7937,45 @@ if (Test-Path $CurrentlyRunning) {
     Exit
 }
 Else {
-    New-Item -Path $CurrentlyRunning -Force | out-null
+    $RunMode = "Normal"
 
     if ($Tautulli) {
-        Write-Entry -Message "Recently Added running file created..." -Path $global:configLogging -Color White -log Info
+        $RunMode = "Tautulli"
+        Write-Entry -Message "Tautulli Recently Added running file created..." -Path $global:configLogging -Color White -log Info
+    }
+    Elseif ($ArrTrigger) {
+        $RunMode = "arr"
+        Write-Entry -Message "Arr Recently Added running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($Testing) {
+        $RunMode = "Testing"
         Write-Entry -Message "Testing running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($Manual) {
+        $RunMode = "Manual"
         Write-Entry -Message "Manual running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($SyncJelly) {
+        $RunMode = "SyncJelly"
         Write-Entry -Message "SyncJelly running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($SyncEmby) {
+        $RunMode = "SyncEmby"
         Write-Entry -Message "SyncEmby running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($Backup) {
+        $RunMode = "Backup"
         Write-Entry -Message "Backup running file created..." -Path $global:configLogging -Color White -log Info
+    }
+    Elseif ($PosterReset) {
+        $RunMode = "Reset"
+        Write-Entry -Message "Reset running file created..." -Path $global:configLogging -Color White -log Info
     }
     Else {
         Write-Entry -Message "Posterizarr running file created..." -Path $global:configLogging -Color White -log Info
     }
+
+    New-Item -Path $CurrentlyRunning -Force -Value $RunMode | Out-Null
 }
 # Delete all files and subfolders within the temp directory
 if (Test-Path $TempPath) {
@@ -10409,11 +10425,36 @@ Elseif ($Tautulli) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -10968,11 +11009,37 @@ Elseif ($Tautulli) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
+
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -11615,11 +11682,36 @@ Elseif ($Tautulli) {
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
                                                 $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -12185,11 +12277,36 @@ Elseif ($Tautulli) {
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
                                                 $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -15686,11 +15803,36 @@ Elseif ($ArrTrigger) {
                                                             'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
                                                     }
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        $global:IsFallback = $false
+                                                        switch ($global:FavProvider) {
+                                                            'TMDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'TVDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'FANART' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                        }
+                                                        if ($global:IsFallback) {
+                                                            Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                        }
+                                                    }
                                                     if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                         Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                     }
                                                     if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                         $ApplyTextInsteadOfLogo = 'true'
+                                                        Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                        $global:IsFallback = $true
                                                     }
                                                     ElseIf ($global:LogoUrl){
                                                         $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -16182,11 +16324,36 @@ Elseif ($ArrTrigger) {
                                                             'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
                                                     }
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        $global:IsFallback = $false
+                                                        switch ($global:FavProvider) {
+                                                            'TMDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'TVDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'FANART' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                        }
+                                                        if ($global:IsFallback) {
+                                                            Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                        }
+                                                    }
                                                     if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                         Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                     }
                                                     if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                         $ApplyTextInsteadOfLogo = 'true'
+                                                        Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                        $global:IsFallback = $true
                                                     }
                                                     ElseIf ($global:LogoUrl){
                                                         $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -16761,11 +16928,36 @@ Elseif ($ArrTrigger) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -17270,11 +17462,36 @@ Elseif ($ArrTrigger) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -19977,11 +20194,36 @@ Elseif ($ArrTrigger) {
                                                             'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
                                                     }
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        $global:IsFallback = $false
+                                                        switch ($global:FavProvider) {
+                                                            'TMDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'TVDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'FANART' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                        }
+                                                        if ($global:IsFallback) {
+                                                            Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                        }
+                                                    }
                                                     if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                         Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                     }
                                                     if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                         $ApplyTextInsteadOfLogo = 'true'
+                                                        Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                        $global:IsFallback = $true
                                                     }
                                                     ElseIf ($global:LogoUrl){
                                                         $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -20536,11 +20778,36 @@ Elseif ($ArrTrigger) {
                                                             'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
                                                     }
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        $global:IsFallback = $false
+                                                        switch ($global:FavProvider) {
+                                                            'TMDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'TVDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'FANART' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                        }
+                                                        if ($global:IsFallback) {
+                                                            Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                        }
+                                                    }
                                                     if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                         Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                     }
                                                     if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                         $ApplyTextInsteadOfLogo = 'true'
+                                                        Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                        $global:IsFallback = $true
                                                     }
                                                     ElseIf ($global:LogoUrl){
                                                         $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -21183,11 +21450,36 @@ Elseif ($ArrTrigger) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -21753,11 +22045,36 @@ Elseif ($ArrTrigger) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -26404,11 +26721,36 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -26901,11 +27243,36 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -27480,11 +27847,36 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
                                                 $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -27989,11 +28381,36 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
                                                 $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -31072,11 +31489,36 @@ else {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -31697,11 +32139,36 @@ else {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
                                                     $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -32413,11 +32880,36 @@ else {
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
                                                 $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
@@ -33053,11 +33545,36 @@ else {
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
                                                 $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
