@@ -9384,7 +9384,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                         search_method = "path"
 
                         # Search database for matching record
-                        cursor = db.connection.cursor()
+                        cursor = db.conn.cursor()
                         cursor.execute(
                             """
                             SELECT tmdbid, tvdbid, imdbid, Rootfolder
@@ -9404,7 +9404,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                     )
                     search_method = "title"
 
-                    cursor = db.connection.cursor()
+                    cursor = db.conn.cursor()
 
                     # Try exact title match first
                     if request.year:
@@ -11082,7 +11082,7 @@ def delete_db_entries_for_asset(asset_path: str):
             # Regular poster - could be Movie or Show or Poster
             search_types = ["Movie", "Show", "Poster"]
 
-        cursor = db.connection.cursor()
+        cursor = db.conn.cursor()
 
         # Collect all matching entries across all possible type names
         all_entries = []
@@ -11231,7 +11231,7 @@ async def update_asset_db_entry_as_manual(
         # - For episodes: match on Rootfolder + Type + episode pattern in Title
         # - For poster/background: match on Rootfolder + Type
 
-        cursor = db.connection.cursor()
+        cursor = db.conn.cursor()
 
         # Extract season/episode info from filename for more specific matching
         season_match = re.match(r"^Season(\d+)\.jpg$", filename, re.IGNORECASE)
