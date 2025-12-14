@@ -1,4 +1,9 @@
 {
+  "WebUI": {
+    "basicAuthEnabled": false,
+    "basicAuthUsername": "admin",
+    "basicAuthPassword": "posterizarr"
+  },
   "ApiPart": {
     "tvdbapi": "xxxxxxxxxxxxx",
     "tmdbtoken": "xxxxxxxxxxxxx",
@@ -25,6 +30,15 @@
     "BgTcMinHeight": "2160",
     "PreferredBackgroundLanguageOrder": [
       "xx",
+      "en",
+      "de"
+    ],
+    "PreferredTCLanguageOrder": [
+      "xx",
+      "en",
+      "de"
+    ],
+    "LogoLanguageOrder": [
       "en",
       "de"
     ]
@@ -80,15 +94,14 @@
     "DiscordUserName": "Posterizarr"
   },
   "PrerequisitePart": {
+    "FileTestOnTrigger": "true",
     "AssetPath": "/assets",
     "magickinstalllocation": "C:\\PosterTemp\\ImageMagickPortable",
     "maxLogs": "5",
     "font": "Colus-Regular.ttf",
-    "collectionfont": "Colus-Regular.ttf",
     "backgroundfont": "Colus-Regular.ttf",
     "titlecardfont": "Colus-Regular.ttf",
     "overlayfile": "overlay-innerglow.png",
-    "collectionoverlayfile": "overlay-innerglow.png",
     "backgroundoverlayfile": "backgroundoverlay-innerglow.png",
     "titlecardoverlayfile": "backgroundoverlay-innerglow.png",
     "LibraryFolders": "true",
@@ -108,6 +121,7 @@
       ": ",
       " – "
     ],
+    "SymbolsToKeepOnNewLine": [],
     "seasonoverlayfile": "overlay-innerglow.png",
     "RTLFont": "VarelaRound-Regular.ttf",
     "PlexUpload": "false",
@@ -116,6 +130,11 @@
     "ForceRunningDeletion": "false",
     "AutoUpdatePosterizarr": "false",
     "SkipAddText": "false",
+    "SkipAddTextAndOverlay": "false",
+    "SkipLocalPosterTextAdd": "false",
+    "SkipLocalBackgroundTextAdd": "false",
+    "SkipLocalSeasonTextAdd": "false",
+    "SkipLocalTCTextAdd": "false",
     "FollowSymlink": "false",
     "poster4k": "overlay-innerglow.png",
     "Poster1080p": "overlay-innerglow.png",
@@ -125,8 +144,25 @@
     "Background1080p": "backgroundoverlay-innerglow.png",
     "TC4k": "backgroundoverlay-innerglow.png",
     "TC1080p": "backgroundoverlay-innerglow.png",
+    "4KDoVi": "overlay-innerglow.png",
+    "4KHDR10": "overlay-innerglow.png",
+    "4KDoViHDR10": "overlay-innerglow.png",
+    "4KDoViBackground": "backgroundoverlay-innerglow.png",
+    "4KHDR10Background": "backgroundoverlay-innerglow.png",
+    "4KDoViHDR10Background": "backgroundoverlay-innerglow.png",
+    "4KDoViTC": "backgroundoverlay-innerglow.png",
+    "4KHDR10TC": "backgroundoverlay-innerglow.png",
+    "4KDoViHDR10TC": "backgroundoverlay-innerglow.png",
     "UseBackgroundResolutionOverlays": "false",
-    "UseTCResolutionOverlays": "false"
+    "UseTCResolutionOverlays": "false",
+    "DisableOnlineAssetFetch": "false",
+    "collectionfont": "Colus-Regular.ttf",
+    "collectionoverlayfile": "overlay-innerglow.png",
+    "UseLogo": "false",
+    "UseBGLogo": "false",
+    "UseClearlogo": "false",
+    "UseClearart": "false",
+    "LogoTextFallback": "false"
   },
   "OverlayPart": {
     "ImageProcessing": "true",

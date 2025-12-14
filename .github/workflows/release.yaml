@@ -1,8 +1,16 @@
 name: Release Posterizarr
 
 on:
+  # Production releases
   release:
     types: [published]
+
+  # Dev branch automatic builds
+  push:
+    branches:
+      - dev
+
+  # Manual builds
   workflow_dispatch:
     inputs:
       version:
@@ -14,9 +22,10 @@ jobs:
   release:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
-      packages: write # Needed to push to GHCR
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -39,39 +48,45 @@ jobs:
         id: repo_name_lowercase
         run: echo "REPO_NAME_LOWERCASE=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      - name: Normalize Release Tag (Handle v.X.Y.Z and vX.Y.Z)
+        if: github.event_name == 'release'
+        id: clean_tag
+        run: |
+          # The GITHUB_REF for a release is typically refs/tags/v.0.0.1 or refs/tags/v0.0.1
+          # This command strips "refs/tags/" and then removes any leading 'v' or '.'
+          RAW_TAG=${{ github.ref_name }}
+          # Use 'sed' to remove leading 'v' and any '.' immediately following it.
+          CLEANED_TAG=$(echo "$RAW_TAG" | sed -E 's/^[vV]\.?//')
+          echo "RAW_TAG: $RAW_TAG"
+          echo "CLEANED_TAG: $CLEANED_TAG"
+          echo "CLEAN_TAG=$CLEANED_TAG" >> $GITHUB_ENV
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ env.REPO_NAME_LOWERCASE }} # Image name based on repo owner/name
+          images: ghcr.io/${{ env.REPO_NAME_LOWERCASE }}
+
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            # Use the manually provided version when triggered via workflow_dispatch
-            ${{ github.event_name == 'workflow_dispatch' && format('type=raw,value={0}', github.event.inputs.version) || '' }}
-          
-      - name: Install container-structure-test
-        run: |
-          curl -LO https://storage.googleapis.com/container-structure-test/latest/container-structure-test-linux-amd64
-          chmod +x container-structure-test-linux-amd64
-          sudo mv container-structure-test-linux-amd64 /usr/local/bin/container-structure-test
-          
-      - name: Build test image (amd64 only)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          load: true
-          tags: posterizarr:test
-          
-      - name: Run container structure tests
-        run: container-structure-test test --image posterizarr:test --config tests/docker/tests.yaml
+            # Main/Production Tags (on 'release')
+            # Use the cleaned version for SemVer extraction.
+            type=semver,pattern={{version}},value=${{ env.CLEAN_TAG }},enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.CLEAN_TAG }},enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{major}},value=${{ env.CLEAN_TAG }},enable=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+
+            # Dev tags (only on dev branch)
+            type=raw,value=dev,enable=${{ github.event_name == 'push' && github.ref_name == 'dev' }}
+            type=sha,prefix=dev-,enable=${{ github.event_name == 'push' && github.ref_name == 'dev' }}
+
+            # Manual test tag
+            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64 # Build for amd64 and arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

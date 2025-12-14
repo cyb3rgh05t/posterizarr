@@ -4,10 +4,64 @@ function ScriptSchedule {
     $Directory = Get-ChildItem -Name $inputDir
 
     if (!$env:RUN_TIME) {
-        $env:RUN_TIME = "05:00" # Set default value if not provided
+        $env:RUN_TIME = "disabled" # Set default value if not provided
+    }
+    if (!$env:APP_PORT) {
+        $env:APP_PORT = "8000" # Set default value if not provided
     }
 
+    # get Runtime Values
     $NextScriptRun = $env:RUN_TIME -split ',' | Sort-Object
+
+    # Check if UI is disabled
+    $disableUiValue = "$($env:DISABLE_UI)"
+    if ($disableUiValue -eq "true") {
+        Write-Host "UI is disabled, skipping UI availability check."
+    }
+    Else {
+        Write-Host "UI is being initialized. This can take a minute or two..."
+        $websiteUrl = "http://localhost:$($env:APP_PORT)/"
+        $retryIntervalSeconds = 5
+        $maxWaitSeconds = 360
+        $UIstartTime = Get-Date
+        $isOnline = $false
+
+        # Loop until the website is online or the timeout is reached.
+        while (((Get-Date) - $UIstartTime).TotalSeconds -lt $maxWaitSeconds) {
+            try {
+                $response = Invoke-WebRequest -Uri $websiteUrl -UseBasicParsing -TimeoutSec $retryIntervalSeconds -ErrorAction Stop
+                if ($response.StatusCode -eq 200) {
+                    $isOnline = $true
+                    break # Exit the loop since the website is online.
+                }
+            }
+            catch {
+                # If the server responds with 401 (Unauthorized), it means it IS online/running, just protected.
+                if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 401) {
+                    $isOnline = $true
+                    break
+                }
+            }
+            Start-Sleep -Seconds $retryIntervalSeconds
+        }
+
+        # Final status message after the loop exits.
+        $UIendTime = Get-Date
+        $totalTime = $UIendTime - $UIstartTime
+        $totalSeconds = [math]::Round($totalTime.TotalSeconds)
+        $minutes = [math]::Floor($totalSeconds / 60)
+        $seconds = $totalSeconds % 60
+        $formattedTime = "{0}m {1}s" -f $minutes, $seconds
+
+        if ($isOnline) {
+            Write-Host "UI & Cache are now built and online after $formattedTime." -ForegroundColor Green
+            Write-Host "    You can access it by going to: http://localhost:$($env:APP_PORT)/"
+        }
+        else {
+            Write-Host "UI did not become available within $maxWaitSeconds seconds." -ForegroundColor Red
+            Write-Host "    Total time waited: $formattedTime."
+        }
+    }
 
     Write-Host "File Watcher Started..."
     # Next Run
@@ -47,12 +101,13 @@ function ScriptSchedule {
             if ($NextScriptRunOffset -le '60') {
                 $alreadydisplayed = $null
                 Start-Sleep $NextScriptRunOffset
+                $ScriptArgs = "-ContainerSchedule"
                 # Calling the Posterizarr Script
                 if ((Get-Process pwsh -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*Posterizarr.ps1*" })) {
                     Write-Warning "There is currently running another Process of Posterizarr, skipping this run."
                 }
                 Else {
-                    pwsh -File "$env:APP_ROOT/Posterizarr.ps1"
+                    pwsh -Command "$env:APP_ROOT/Posterizarr.ps1 $ScriptArgs"
                 }
             }
         }
@@ -137,12 +192,23 @@ function ScriptSchedule {
                 else {
                     write-host "Tautulli Recently added finished, removing trigger file: $($item.Name)"
                 }
+
+                # Check temp dir if there is a Currently running file present
+                $CurrentlyRunning = "$env:APP_DATA/temp/Posterizarr.Running"
+
+                # Clear Running File
+                if (Test-Path $CurrentlyRunning) {
+                    Remove-Item -LiteralPath $CurrentlyRunning | out-null
+                }
+
                 write-host ""
                 write-host "Container is running since: " -NoNewline
                 write-host "$totalTime" -ForegroundColor Cyan
                 CompareScriptVersion
                 write-host ""
-                Write-Host "Next Script Run is at: $NextScriptRunTime"
+                if ($env:RUN_TIME -ne "disabled") {
+                    Write-Host "Next Script Run is at: $NextScriptRunTime"
+                }
                 Remove-Item "$inputDir/$($item.Name)" -Force -Confirm:$false
             }
 
@@ -156,7 +222,7 @@ function ScriptSchedule {
 }
 function GetLatestScriptVersion {
     try {
-        return Invoke-RestMethod -Uri "https://github.com/fscorrupt/Posterizarr/raw/main/Release.txt" -Method Get -ErrorAction Stop
+        return Invoke-RestMethod -Uri "https://github.com/fscorrupt/posterizarr/raw/main/Release.txt" -Method Get -ErrorAction Stop
     }
     catch {
         Write-Host "Could not query latest script version, Error: $($_.Exception.Message)"
@@ -164,13 +230,6 @@ function GetLatestScriptVersion {
     }
 }
 function CompareScriptVersion {
-    <#
-    .SYNOPSIS
-        Compares the current script version with the latest available version
-    .DESCRIPTION
-        Extracts the version from Posterizarr.ps1 and compares it with
-        the latest version from GitHub, displaying the results
-    #>
     try {
         $posterizarrPath = "$env:APP_ROOT/Posterizarr.ps1"
         if (Test-Path $posterizarrPath) {
@@ -181,7 +240,41 @@ function CompareScriptVersion {
                 # Extract the version from the line
                 Write-Host ""
                 $version = $lineContainingVersion -replace '^\$CurrentScriptVersion\s*=\s*"([^"]+)".*', '$1'
-                Write-Host "Current Script Version: $version | Latest Script Version: $LatestScriptVersion" -ForegroundColor Green
+
+                # Check if local version is greater than remote (development version)
+                $displayVersion = $version
+                if ($version -and $LatestScriptVersion) {
+                    try {
+                        $localParts = $version.Split('.') | ForEach-Object { [int]$_ }
+                        $remoteParts = $LatestScriptVersion.Split('.') | ForEach-Object { [int]$_ }
+
+                        # Compare versions (major.minor.patch)
+                        $isGreater = $false
+                        for ($i = 0; $i -lt [Math]::Min($localParts.Count, $remoteParts.Count); $i++) {
+                            if ($localParts[$i] -gt $remoteParts[$i]) {
+                                $isGreater = $true
+                                break
+                            }
+                            elseif ($localParts[$i] -lt $remoteParts[$i]) {
+                                break
+                            }
+                        }
+
+                        if ($isGreater) {
+                            $displayVersion = "$version-dev"
+                            Write-Host "Current Script Version: $displayVersion | Latest Script Version: $LatestScriptVersion (Development version ahead of release)" -ForegroundColor Yellow
+                        }
+                        else {
+                            Write-Host "Current Script Version: $displayVersion | Latest Script Version: $LatestScriptVersion" -ForegroundColor Green
+                        }
+                    }
+                    catch {
+                        Write-Host "Current Script Version: $displayVersion | Latest Script Version: $LatestScriptVersion" -ForegroundColor Green
+                    }
+                }
+                else {
+                    Write-Host "Current Script Version: $displayVersion | Latest Script Version: $LatestScriptVersion" -ForegroundColor Green
+                }
             }
         }
         else {
@@ -192,32 +285,36 @@ function CompareScriptVersion {
         Write-Host "Error checking script version: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
-function Test-And-Download {
-    param(
-        [string]$url,
-        [string]$destination
-    )
-
-    if (!(Test-Path $destination)) {
-        Invoke-WebRequest -Uri $url -OutFile $destination
-    }
-}
 function CopyAssetFiles {
-    <#
-    .SYNOPSIS
-        Copies asset files from APP_ROOT to APP_DATA if they are missing.
-    .DESCRIPTION
-        Copies all .png and .ttf files from the APP_ROOT directory to the APP_DATA directory,
-        but only if they do not already exist in APP_DATA.
-        Special rule: config.example.json is only copied if config.json does not exist in APP_DATA.
-    #>
+    $overlayDir = "$env:APP_DATA/Overlayfiles"
+    if (-not (Test-Path $overlayDir)) {
+        $null = New-Item -Path $overlayDir -ItemType Directory -ErrorAction SilentlyContinue
+    }
 
-    # Get all asset files - using wildcard in path to make -Include work correctly
-    $assetFiles = Get-ChildItem -Path "$env:APP_ROOT/*" -Include "*.png", "*.ttf", "config.example.json" -File
+    # Migrate .png, .ttf, .otf files from APP_DATA to Overlayfiles
+    $migrateFiles = Get-ChildItem -Path $env:APP_DATA -Include "*.png", "*.ttf", "*.otf" -File
+    $migratedCount = 0
+    foreach ($file in $migrateFiles) {
+        $dest = Join-Path -Path $overlayDir -ChildPath $file.Name
+        try {
+            Move-Item -LiteralPath $file.FullName -Destination $dest -Force
+            $migratedCount++
+            Write-Host "Migrated $($file.Name) to $overlayDir" -ForegroundColor Cyan
+        }
+        catch {
+            Write-Host "Failed to migrate $($file.Name): $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
+    if ($migratedCount -gt 0) {
+        Write-Host "Migrated $migratedCount files from APP_DATA to Overlayfiles." -ForegroundColor Green
+    }
+
+    # Get all asset files from APP_ROOT
+    $assetFiles = Get-ChildItem -Path "$env:APP_ROOT/Overlayfiles/*" -Include "*.png", "*.ttf", "*.otf", "config.example.json" -File
     $fileCount = $assetFiles.Count
 
     if ($fileCount -eq 0) {
-        Write-Host "No asset files found in $env:APP_ROOT" -ForegroundColor Yellow
+        Write-Host "No asset files found in $env:APP_ROOT/Overlayfiles/" -ForegroundColor Yellow
     }
     else {
         $copiedCount = 0
@@ -226,10 +323,9 @@ function CopyAssetFiles {
 
         $assetFiles | ForEach-Object {
             try {
-                $destinationPath = Join-Path -Path $env:APP_DATA -ChildPath $_.Name
-
                 if ($_.Name -eq "config.example.json") {
                     $configJsonPath = Join-Path -Path $env:APP_DATA -ChildPath "config.json"
+                    $destinationPath = Join-Path -Path $env:APP_DATA -ChildPath $_.Name
 
                     if (-Not (Test-Path -Path $configJsonPath)) {
                         if (-Not (Test-Path -Path $destinationPath)) {
@@ -245,6 +341,7 @@ function CopyAssetFiles {
                     }
                 }
                 else {
+                    $destinationPath = Join-Path -Path $overlayDir -ChildPath $_.Name
                     if (-Not (Test-Path -Path $destinationPath)) {
                         Copy-Item -Path $_.FullName -Destination $destinationPath -Force
                         $copiedCount++
@@ -261,12 +358,184 @@ function CopyAssetFiles {
         }
 
         # Summary
-        Write-Host "Copied $copiedCount new asset files to $env:APP_DATA" -ForegroundColor Cyan
+        Write-Host "Copied $copiedCount new asset files" -ForegroundColor Cyan
         Write-Host "Skipped $skippedCount files (already exist or not needed)" -ForegroundColor Gray
 
         if ($errorCount -gt 0) {
             Write-Host "Failed to copy $errorCount files" -ForegroundColor Yellow
         }
+    }
+}
+function CheckJson {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$jsonExampleUrl,
+
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [object]$jsonFilePath
+    )
+    try {
+        $AttributeChanged = $null
+        # Download the default configuration JSON file from the URL
+        $defaultConfig = Invoke-RestMethod -Uri $jsonExampleUrl -Method Get -ErrorAction Stop
+
+        # Read the existing configuration file if it exists
+        if (Test-Path $jsonFilePath) {
+            try {
+                $config = Get-Content -Path $jsonFilePath -Raw | ConvertFrom-Json
+            }
+            catch {
+                Write-Host "Failed to read the existing configuration file: $jsonFilePath. Please ensure it is valid JSON. Aborting..." -ForegroundColor Red
+                Exit
+            }
+        }
+        else {
+            $config = @{}
+        }
+
+        # Remove keys from config that are no longer in the default config
+        foreach ($existingKey in $config.PSObject.Properties.Name) {
+            if (-not $defaultConfig.PSObject.Properties.Name.Contains($existingKey)) {
+                Write-Host "Removing obsolete Main Attribute from your Config file: $existingKey." -ForegroundColor Yellow
+                $config.PSObject.Properties.Remove($existingKey)
+                $AttributeChanged = $True
+            }
+        }
+
+        # Remove sub-attributes no longer in the default config
+        foreach ($partKey in $config.PSObject.Properties.Name) {
+            if ($defaultConfig.PSObject.Properties.Name.Contains($partKey)) {
+                # Check each sub-attribute in the part
+                foreach ($existingSubKey in $config.$partKey.PSObject.Properties.Name) {
+                    if (-not $defaultConfig.$partKey.PSObject.Properties.Name.Contains($existingSubKey)) {
+                        Write-Host "Removing obsolete Sub-Attribute from your Config file: $partKey.$existingSubKey." -ForegroundColor Yellow
+                        $config.$partKey.PSObject.Properties.Remove($existingSubKey)
+                        $AttributeChanged = $True
+                    }
+                }
+            }
+        }
+
+        # Check and add missing keys from the default configuration
+        foreach ($partKey in $defaultConfig.PSObject.Properties.Name) {
+            # Check if the part exists in the current configuration
+            if (-not $config.PSObject.Properties.Name.Contains($partKey)) {
+                if (-not $config.PSObject.Properties.Name.tolower().Contains($partKey.tolower())) {
+                    # Add "SeasonPosterOverlayPart" if it's missing in $config
+                    if (-not $config.PSObject.Properties.Name.tolower().Contains("seasonposteroverlaypart")) {
+                        $config | Add-Member -MemberType NoteProperty -Name "SeasonPosterOverlayPart" -Value $defaultConfig.PosterOverlayPart
+                        Write-Host "Missing Main Attribute in your Config file: $partKey." -ForegroundColor Yellow
+                        Write-Host "    I will copy all settings from 'PosterOverlayPart'..." -ForegroundColor White
+                        Write-Host "    Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -ForegroundColor White
+                        Write-Host "    GH Readme -> https://fscorrupt.github.io/posterizarr/configuration" -ForegroundColor White
+                        # Convert the updated configuration object back to JSON and save it, then reload it
+                        $configJson = $config | ConvertTo-Json -Depth 10
+                        $configJson | Set-Content -Path $jsonFilePath -Force
+                        $config = Get-Content -Path $jsonFilePath -Raw | ConvertFrom-Json
+                    }
+                    Else {
+                        Write-Host "Missing Main Attribute in your Config file: $partKey." -ForegroundColor Yellow
+                        Write-Host "    Adding it for you... In GH Readme, look for $partKey - if you want to see what changed..." -ForegroundColor White
+                        Write-Host "    GH Readme -> https://fscorrupt.github.io/posterizarr/configuration" -ForegroundColor White
+                        $config | Add-Member -MemberType NoteProperty -Name $partKey -Value $defaultConfig.$partKey
+                        $AttributeChanged = $True
+                    }
+                }
+                else {
+                    # Inform user about the case issue
+                    Write-Host "The Main Attribute '$partKey' in your configuration file has a different casing than the expected property." -ForegroundColor Red
+                    Write-Host "Please correct the casing of the property in your configuration file to '$partKey'." -ForegroundColor Yellow
+                    Exit  # Abort the script
+                }
+            }
+            else {
+                # Check each key in the part
+                foreach ($propertyKey in $defaultConfig.$partKey.PSObject.Properties.Name) {
+                    # Show user that a sub-attribute is missing
+                    if (-not $config.$partKey.PSObject.Properties.Name.Contains($propertyKey)) {
+                        if (-not $config.$partKey.PSObject.Properties.Name.tolower().Contains($propertyKey.tolower())) {
+                            Write-Host "Missing Sub-Attribute in your Config file: $partKey.$propertyKey" -ForegroundColor Yellow
+                            Write-Host "    Adding it for you... In GH Readme, look for $partKey.$propertyKey - if you want to see what changed..." -ForegroundColor White
+                            Write-Host "    GH Readme -> https://fscorrupt.github.io/posterizarr/configuration" -ForegroundColor White
+                            # Add the property using the expected casing
+                            $config.$partKey | Add-Member -MemberType NoteProperty -Name $propertyKey -Value $defaultConfig.$partKey.$propertyKey -Force
+                            $AttributeChanged = $True
+                        }
+                        else {
+                            # Inform user about the case issue
+                            Write-Host "The Sub-Attribute '$partKey.$propertyKey' in your configuration file has a different casing than the expected property." -ForegroundColor Red
+                            Write-Host "Please correct the casing of the Sub-Attribute in your configuration file to '$partKey.$propertyKey'." -ForegroundColor Yellow
+                            Exit  # Abort the script
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($AttributeChanged -eq 'true') {
+            # Convert the updated configuration object back to JSON and save it
+            $configJson = $config | ConvertTo-Json -Depth 10
+            $configJson | Set-Content -Path $jsonFilePath -Force
+
+            Write-Host "Configuration file updated successfully." -ForegroundColor Green
+        }
+    }
+    catch [System.Net.WebException] {
+        Write-Host "Failed to download the default configuration JSON file from the URL. Config check skipped." -ForegroundColor Yellow
+        # We don't exit here because the container might still work with the existing config if offline
+    }
+    catch {
+        Write-Host "An unexpected error occurred during config check: $($_.Exception.Message)" -ForegroundColor Red
+        Exit
+    }
+}
+function Ensure-WebUIConfig {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$jsonFilePath
+    )
+
+    try {
+        # Define the default WebUI configuration object
+        $defaultWebUI = [PSCustomObject]@{
+            basicAuthEnabled = $false
+            basicAuthUsername = "admin"
+            basicAuthPassword = "posterizarr"
+        }
+
+        # Read the existing configuration file
+        $config = Get-Content -Path $jsonFilePath -Raw | ConvertFrom-Json
+
+        $configChanged = $false
+
+        # Ensure the 'WebUI' top-level attribute exists
+        if (-not $config.PSObject.Properties.Name.Contains('WebUI')) {
+            $config | Add-Member -MemberType NoteProperty -Name 'WebUI' -Value $defaultWebUI
+            $configChanged = $true
+        }
+        # If 'WebUI' exists, ensure all its sub-attributes are present
+        else {
+            foreach ($key in $defaultWebUI.PSObject.Properties.Name) {
+                if (-not $config.WebUI.PSObject.Properties.Name.Contains($key)) {
+                    # Add the specific missing sub-attribute and its default value
+                    $config.WebUI | Add-Member -MemberType NoteProperty -Name $key -Value $defaultWebUI.$key
+                    $configChanged = $true
+                }
+            }
+        }
+
+        # If changes were made, convert the object back to JSON and save it
+        if ($configChanged) {
+            $config | ConvertTo-Json -Depth 10 | Set-Content -Path $jsonFilePath -Force
+        }
+    }
+    catch {
+        Write-Error "An unexpected error occurred while processing '$jsonFilePath': $($_.Exception.Message)"
     }
 }
 
@@ -275,7 +544,7 @@ Set-PSReadLineOption -HistorySaveStyle SaveNothing
 $Header = @"
 ----------------------------------------------------
 Ideas for the container were taken from:
-DapperDrivers & Onedr0p
+DapperDrivers, Onedr0p and PJGitHub9 (effect toolkit inspiration)
 ----------------------------------------------------
 ======================================================
   _____          _            _
@@ -286,7 +555,7 @@ DapperDrivers & Onedr0p
  |_|   \___/|___/\__\___|_|  |_/___\__,_|_|  |_|
  ======================================================
  To support the projects visit:
- https://github.com/fscorrupt/Posterizarr
+ https://github.com/fscorrupt/posterizarr
 ----------------------------------------------------
 "@
 
@@ -305,11 +574,8 @@ $ProgressPreference = 'Continue'
 # Check script version
 CompareScriptVersion
 
-# Move assets to APP_DATA
-CopyAssetFiles
-
 # Creating Folder structure
-$folders = @("$env:APP_DATA/Logs", "$env:APP_DATA/temp", "$env:APP_DATA/watcher", "$env:APP_DATA/test")
+$folders = @("$env:APP_DATA/Logs", "$env:APP_DATA/temp", "$env:APP_DATA/watcher", "$env:APP_DATA/test", "$env:APP_DATA/Overlayfiles")
 $createdFolders = @()
 $allPresent = $true
 
@@ -331,19 +597,33 @@ else {
     }
 }
 
-# Checking Config file
-if (-not (test-path "$env:APP_DATA/config.json")) {
-    Write-Host ""
-    Write-Host "Could not find a 'config.json' file" -ForegroundColor Red
-    Write-Host "Please edit the config.example.json according to GH repo and save it as 'config.json'" -ForegroundColor Yellow
-    Write-Host "    After that restart the container..."
-    Write-Host "Waiting for config.json file to be created..."
-    do {
-        Start-Sleep 600
-    } until (
-        test-path "$env:APP_DATA/config.json"
-    )
+# Move assets to APP_DATA
+CopyAssetFiles
+
+# Define file paths in variables for clarity and easy maintenance
+$configDir = "$env:APP_DATA"
+$configFile = Join-Path -Path $configDir -ChildPath "config.json"
+$exampleFile = Join-Path -Path $configDir -ChildPath "config.example.json"
+
+# Create default config if missing completely
+if (-not (Test-Path $configFile)) {
+    Write-Warning "Configuration file not found at '$configFile'."
+    # Check if the example file exists (copied by CopyAssetFiles)
+    if (Test-Path $exampleFile) {
+        Copy-Item -Path $exampleFile -Destination $configFile -Force | Out-Null
+        Write-Host "    A new 'config.json' has been created from the example." -ForegroundColor Green
+    }
 }
+
+# Run advanced CheckJson to fix/update keys
+Write-Host "Verifying configuration file integrity..." -ForegroundColor Cyan
+CheckJson -jsonExampleUrl "https://github.com/fscorrupt/posterizarr/raw/main/config.example.json" -jsonFilePath $configFile
+
+# Ensure WebUI config
+Ensure-WebUIConfig -jsonFilePath $configFile
+
+# Rest of your script continues here
+Write-Host "Config check complete. Proceeding with script..."
 
 # Check temp dir if there is a Currently running file present
 $CurrentlyRunning = "$env:APP_DATA/temp/Posterizarr.Running"
