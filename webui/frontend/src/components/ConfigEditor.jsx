@@ -608,10 +608,17 @@ function ConfigEditor() {
     if (key === "NewLineSymbols" && !getValue("NewLineOnSpecificSymbols")) return true;
 
     // Logo Logic
-    if (["UseClearlogo", "UseClearart", "LogoTextFallback"].includes(key)) {
+    if (["UseClearlogo", "UseClearart", "LogoTextFallback", "ConvertLogoColor"].includes(key)) {
         const useLogo = getValue("UseLogo");
         const useBGLogo = getValue("UseBGLogo");
         if (!useLogo && !useBGLogo) return true;
+    }
+    
+    if (key === "LogoFlatColor") {
+        const useLogo = getValue("UseLogo");
+        const useBGLogo = getValue("UseBGLogo");
+        const convert = getValue("ConvertLogoColor");
+        if ((!useLogo && !useBGLogo) || !convert) return true;
     }
 
     // Visual Settings Groups

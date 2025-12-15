@@ -1,9 +1,4 @@
 {
-  "WebUI": {
-    "basicAuthEnabled": false,
-    "basicAuthUsername": "admin",
-    "basicAuthPassword": "posterizarr"
-  },
   "ApiPart": {
     "tvdbapi": "xxxxxxxxxxxxx",
     "tmdbtoken": "xxxxxxxxxxxxx",
@@ -45,12 +40,13 @@
   },
   "PlexPart": {
     "LibstoExclude": [
+      "PosterizarrTestMovies",
+      "PosterizarrTestShows",
+      "Tech Trainings",
       "Youtube",
       "Audiobooks",
       "Kids Audiobooks",
-      "Tech Trainings",
       "Kids Music",
-      "Photos",
       "Music"
     ],
     "PlexUrl": "http://plex:32400",
@@ -88,13 +84,12 @@
   "Notification": {
     "SendNotification": "true",
     "UseUptimeKuma": "true",
-    "AppriseUrl": "discord://xxxxxxxxxxxxx/xxxxxxxxxxxxx-xxxxxxxxxxxxx",
+    "AppriseUrl": "discord://xxxxxxxxxxxxx/xxxxxxxxxxxxx",
     "Discord": "",
     "UptimeKumaUrl": "https://uptime-kuma.domain.com/api/push/xxxxxxxxxxxxx",
     "DiscordUserName": "Posterizarr"
   },
   "PrerequisitePart": {
-    "FileTestOnTrigger": "true",
     "AssetPath": "/assets",
     "magickinstalllocation": "C:\\PosterTemp\\ImageMagickPortable",
     "maxLogs": "5",
@@ -121,7 +116,6 @@
       ": ",
       " – "
     ],
-    "SymbolsToKeepOnNewLine": [],
     "seasonoverlayfile": "overlay-innerglow.png",
     "RTLFont": "VarelaRound-Regular.ttf",
     "PlexUpload": "false",
@@ -130,11 +124,6 @@
     "ForceRunningDeletion": "false",
     "AutoUpdatePosterizarr": "false",
     "SkipAddText": "false",
-    "SkipAddTextAndOverlay": "false",
-    "SkipLocalPosterTextAdd": "false",
-    "SkipLocalBackgroundTextAdd": "false",
-    "SkipLocalSeasonTextAdd": "false",
-    "SkipLocalTCTextAdd": "false",
     "FollowSymlink": "false",
     "poster4k": "overlay-innerglow.png",
     "Poster1080p": "overlay-innerglow.png",
@@ -144,6 +133,11 @@
     "Background1080p": "backgroundoverlay-innerglow.png",
     "TC4k": "backgroundoverlay-innerglow.png",
     "TC1080p": "backgroundoverlay-innerglow.png",
+    "UseBackgroundResolutionOverlays": "false",
+    "UseTCResolutionOverlays": "false",
+    "DisableOnlineAssetFetch": "false",
+    "collectionfont": "Colus-Regular.ttf",
+    "collectionoverlayfile": "overlay-innerglow.png",
     "4KDoVi": "overlay-innerglow.png",
     "4KHDR10": "overlay-innerglow.png",
     "4KDoViHDR10": "overlay-innerglow.png",
@@ -153,16 +147,20 @@
     "4KDoViTC": "backgroundoverlay-innerglow.png",
     "4KHDR10TC": "backgroundoverlay-innerglow.png",
     "4KDoViHDR10TC": "backgroundoverlay-innerglow.png",
-    "UseBackgroundResolutionOverlays": "false",
-    "UseTCResolutionOverlays": "false",
-    "DisableOnlineAssetFetch": "false",
-    "collectionfont": "Colus-Regular.ttf",
-    "collectionoverlayfile": "overlay-innerglow.png",
+    "SymbolsToKeepOnNewLine": [],
+    "SkipAddTextAndOverlay": "false",
+    "FileTestOnTrigger": "true",
+    "SkipLocalPosterTextAdd": "false",
+    "SkipLocalBackgroundTextAdd": "false",
+    "SkipLocalSeasonTextAdd": "false",
+    "SkipLocalTCTextAdd": "false",
     "UseLogo": "false",
-    "UseBGLogo": "false",
     "UseClearlogo": "false",
     "UseClearart": "false",
-    "LogoTextFallback": "false"
+    "LogoTextFallback": "false",
+    "UseBGLogo": "false",
+    "ConvertLogoColor": "false",
+    "LogoFlatColor": "white"
   },
   "OverlayPart": {
     "ImageProcessing": "true",
@@ -315,5 +313,10 @@
     "text_offset": "+300",
     "lineSpacing": "0",
     "TextGravity": "south"
+  },
+  "WebUI": {
+    "basicAuthEnabled": "false",
+    "basicAuthUsername": "admin",
+    "basicAuthPassword": "posterizarr"
   }
 }

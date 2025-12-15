@@ -31,7 +31,9 @@ const TopNavbar = () => {
         const data = await res.json();
         setSystemStatus({
           running: data.running,
-          mode: data.current_mode,
+          // Use the specific mode from the backend (e.g. "tautulli", "arr")
+          // If null, fallback to "Running"
+          mode: data.current_mode || "Running", 
           runningFileExists: data.already_running_detected || data.running_file_exists
         });
       }

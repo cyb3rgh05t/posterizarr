@@ -44,6 +44,8 @@ const API_URL = "/api";
 const isDev = import.meta.env.DEV;
 
 const getLogFileForMode = (mode) => {
+  const safeMode = (mode || "").toLowerCase();
+  
   const logMapping = {
     testing: "Testinglog.log",
     manual: "Manuallog.log",
@@ -53,8 +55,11 @@ const getLogFileForMode = (mode) => {
     syncemby: "Scriptlog.log",
     reset: "Scriptlog.log",
     scheduled: "Scriptlog.log",
+    tautulli: "Scriptlog.log",
+    arr: "Scriptlog.log",
+    webhook: "Scriptlog.log"
   };
-  return logMapping[mode] || "Scriptlog.log";
+  return logMapping[safeMode] || "Scriptlog.log";
 };
 
 const getWebSocketURL = (logFile) => {

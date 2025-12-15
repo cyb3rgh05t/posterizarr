@@ -53,7 +53,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.2.8"
+$CurrentScriptVersion = "2.2.9"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -7501,6 +7501,8 @@ $SkipAddTextAndOverlay = $config.PrerequisitePart.SkipAddTextAndOverlay.tolower(
 $DisableHashValidation = $config.PrerequisitePart.DisableHashValidation.tolower()
 $global:DisableOnlineAssetFetch = $config.PrerequisitePart.DisableOnlineAssetFetch.tolower()
 $UseLogo = $config.PrerequisitePart.UseLogo.tolower()
+$ConvertLogoColor = $config.PrerequisitePart.ConvertLogoColor.tolower()
+$LogoFlatColor = $config.PrerequisitePart.LogoFlatColor.tolower()
 $UseBGLogo = $config.PrerequisitePart.UseBGLogo.tolower()
 $TextFallback = $config.PrerequisitePart.LogoTextFallback.tolower()
 $global:UseClearlogo = $config.PrerequisitePart.UseClearlogo.tolower()
@@ -7935,29 +7937,45 @@ if (Test-Path $CurrentlyRunning) {
     Exit
 }
 Else {
-    New-Item -Path $CurrentlyRunning -Force | out-null
+    $RunMode = "Normal"
 
     if ($Tautulli) {
-        Write-Entry -Message "Recently Added running file created..." -Path $global:configLogging -Color White -log Info
+        $RunMode = "Tautulli"
+        Write-Entry -Message "Tautulli Recently Added running file created..." -Path $global:configLogging -Color White -log Info
+    }
+    Elseif ($ArrTrigger) {
+        $RunMode = "arr"
+        Write-Entry -Message "Arr Recently Added running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($Testing) {
+        $RunMode = "Testing"
         Write-Entry -Message "Testing running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($Manual) {
+        $RunMode = "Manual"
         Write-Entry -Message "Manual running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($SyncJelly) {
+        $RunMode = "SyncJelly"
         Write-Entry -Message "SyncJelly running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($SyncEmby) {
+        $RunMode = "SyncEmby"
         Write-Entry -Message "SyncEmby running file created..." -Path $global:configLogging -Color White -log Info
     }
     Elseif ($Backup) {
+        $RunMode = "Backup"
         Write-Entry -Message "Backup running file created..." -Path $global:configLogging -Color White -log Info
+    }
+    Elseif ($PosterReset) {
+        $RunMode = "Reset"
+        Write-Entry -Message "Reset running file created..." -Path $global:configLogging -Color White -log Info
     }
     Else {
         Write-Entry -Message "Posterizarr running file created..." -Path $global:configLogging -Color White -log Info
     }
+
+    New-Item -Path $CurrentlyRunning -Force -Value $RunMode | Out-Null
 }
 # Delete all files and subfolders within the temp directory
 if (Test-Path $TempPath) {
@@ -10407,14 +10425,41 @@ Elseif ($Tautulli) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -10429,7 +10474,18 @@ Elseif ($Tautulli) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    } else {
+                                                        $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -10953,14 +11009,42 @@ Elseif ($Tautulli) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
+
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -10975,7 +11059,18 @@ Elseif ($Tautulli) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    } else {
+                                                        $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -11587,14 +11682,41 @@ Elseif ($Tautulli) {
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -11609,7 +11731,18 @@ Elseif ($Tautulli) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                # Only apply color if enabled AND color is defined
+                                                $colorEffect = ""
+                                                if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                    $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                    Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                }
+                                                if ($urlExtension -match "(?i)\.svg") {
+                                                    Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                    $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                } else {
+                                                    $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                }
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $magickLog -Append
@@ -12144,14 +12277,41 @@ Elseif ($Tautulli) {
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -12166,7 +12326,18 @@ Elseif ($Tautulli) {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                # Only apply color if enabled AND color is defined
+                                                $colorEffect = ""
+                                                if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                    $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                    Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                }
+                                                if ($urlExtension -match "(?i)\.svg") {
+                                                    Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                    $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                } else {
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                }
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $magickLog -Append
@@ -15632,14 +15803,41 @@ Elseif ($ArrTrigger) {
                                                             'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
                                                     }
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        $global:IsFallback = $false
+                                                        switch ($global:FavProvider) {
+                                                            'TMDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'TVDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'FANART' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                        }
+                                                        if ($global:IsFallback) {
+                                                            Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                        }
+                                                    }
                                                     if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                         Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                     }
                                                     if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                         $ApplyTextInsteadOfLogo = 'true'
+                                                        Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                        $global:IsFallback = $true
                                                     }
                                                     ElseIf ($global:LogoUrl){
-                                                        $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                        $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                        if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                        $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                         try {
                                                             $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                         }
@@ -15653,7 +15851,18 @@ Elseif ($ArrTrigger) {
                                                             Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:configLogging -Color Red -log Error
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
                                                         }
-                                                        $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        # Only apply color if enabled AND color is defined
+                                                        $colorEffect = ""
+                                                        if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                            $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                            Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                        }
+                                                        if ($urlExtension -match "(?i)\.svg") {
+                                                            Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                            $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        } else {
+                                                            $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
                                                         Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $magickLog -Append
@@ -16115,14 +16324,41 @@ Elseif ($ArrTrigger) {
                                                             'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
                                                     }
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        $global:IsFallback = $false
+                                                        switch ($global:FavProvider) {
+                                                            'TMDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'TVDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'FANART' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                        }
+                                                        if ($global:IsFallback) {
+                                                            Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                        }
+                                                    }
                                                     if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                         Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                     }
                                                     if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                         $ApplyTextInsteadOfLogo = 'true'
+                                                        Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                        $global:IsFallback = $true
                                                     }
                                                     ElseIf ($global:LogoUrl){
-                                                        $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                        $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                        if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                        $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                         try {
                                                             $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                         }
@@ -16137,7 +16373,18 @@ Elseif ($ArrTrigger) {
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                         }
-                                                        $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        # Only apply color if enabled AND color is defined
+                                                        $colorEffect = ""
+                                                        if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                            $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                            Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                        }
+                                                        if ($urlExtension -match "(?i)\.svg") {
+                                                            Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                            $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        } else {
+                                                            $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
                                                         Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $magickLog -Append
@@ -16681,14 +16928,41 @@ Elseif ($ArrTrigger) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -16703,7 +16977,18 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    } else {
+                                                        $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -17177,14 +17462,41 @@ Elseif ($ArrTrigger) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -17199,7 +17511,18 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    } else {
+                                                        $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -19871,14 +20194,41 @@ Elseif ($ArrTrigger) {
                                                             'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
                                                     }
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        $global:IsFallback = $false
+                                                        switch ($global:FavProvider) {
+                                                            'TMDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'TVDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'FANART' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                        }
+                                                        if ($global:IsFallback) {
+                                                            Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                        }
+                                                    }
                                                     if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                         Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                     }
                                                     if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                         $ApplyTextInsteadOfLogo = 'true'
+                                                        Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                        $global:IsFallback = $true
                                                     }
                                                     ElseIf ($global:LogoUrl){
-                                                        $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                        $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                        if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                        $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                         try {
                                                             $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                         }
@@ -19893,7 +20243,18 @@ Elseif ($ArrTrigger) {
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                         }
-                                                        $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        # Only apply color if enabled AND color is defined
+                                                        $colorEffect = ""
+                                                        if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                            $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                            Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                        }
+                                                        if ($urlExtension -match "(?i)\.svg") {
+                                                            Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                            $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        } else {
+                                                            $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
                                                         Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $magickLog -Append
@@ -20417,14 +20778,41 @@ Elseif ($ArrTrigger) {
                                                             'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                         }
                                                     }
+                                                    if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                        $global:IsFallback = $false
+                                                        switch ($global:FavProvider) {
+                                                            'TMDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'TVDB' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                            'FANART' {
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                    $global:IsFallback = $true 
+                                                                }
+                                                            }
+                                                        }
+                                                        if ($global:IsFallback) {
+                                                            Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                        }
+                                                    }
                                                     if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                         Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                     }
                                                     if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                         $ApplyTextInsteadOfLogo = 'true'
+                                                        Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                        $global:IsFallback = $true
                                                     }
                                                     ElseIf ($global:LogoUrl){
-                                                        $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                        $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                        if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                        $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                         try {
                                                             $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                         }
@@ -20439,7 +20827,18 @@ Elseif ($ArrTrigger) {
                                                             $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                         }
-                                                        $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        # Only apply color if enabled AND color is defined
+                                                        $colorEffect = ""
+                                                        if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                            $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                            Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                        }
+                                                        if ($urlExtension -match "(?i)\.svg") {
+                                                            Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                            $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        } else {
+                                                            $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
                                                         Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $magickLog -Append
@@ -21051,14 +21450,41 @@ Elseif ($ArrTrigger) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -21073,7 +21499,18 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    } else {
+                                                        $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -21608,14 +22045,41 @@ Elseif ($ArrTrigger) {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -21630,7 +22094,18 @@ Elseif ($ArrTrigger) {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    } else {
+                                                        $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -26246,14 +26721,41 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -26268,7 +26770,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    } else {
+                                                        $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -26730,14 +27243,41 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -26752,7 +27292,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    } else {
+                                                        $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -27296,14 +27847,41 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -27318,7 +27896,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                # Only apply color if enabled AND color is defined
+                                                $colorEffect = ""
+                                                if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                    $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                    Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                }
+                                                if ($urlExtension -match "(?i)\.svg") {
+                                                    Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                    $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                } else {
+                                                    $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                }
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $magickLog -Append
@@ -27792,14 +28381,41 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -27814,7 +28430,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                # Only apply color if enabled AND color is defined
+                                                $colorEffect = ""
+                                                if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                    $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                    Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                }
+                                                if ($urlExtension -match "(?i)\.svg") {
+                                                    Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                    $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                } else {
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                }
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $magickLog -Append
@@ -30862,14 +31489,41 @@ else {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -30882,9 +31536,19 @@ else {
                                                         }
                                                         Write-Entry -Subtext "An error occurred while downloading the artwork: $statusCode" -Path $global:configLogging -Color Red -log Error
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
-
                                                     }
-                                                    $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    } else {
+                                                        $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -31475,14 +32139,41 @@ else {
                                                         'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type movies } }
                                                     }
                                                 }
+                                                if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                    $global:IsFallback = $false
+                                                    switch ($global:FavProvider) {
+                                                        'TMDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'TVDB' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                        'FANART' {
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                                $global:IsFallback = $true 
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($global:IsFallback) {
+                                                        Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                    }
+                                                }
                                                 if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                     Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                                 }
                                                 if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                     $ApplyTextInsteadOfLogo = 'true'
+                                                    Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                    $global:IsFallback = $true
                                                 }
                                                 ElseIf ($global:LogoUrl){
-                                                    $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                    $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                    if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                    $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                     try {
                                                         $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                     }
@@ -31497,7 +32188,18 @@ else {
                                                         $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                     }
-                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    # Only apply color if enabled AND color is defined
+                                                    $colorEffect = ""
+                                                    if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                        $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                        Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                    }
+                                                    if ($urlExtension -match "(?i)\.svg") {
+                                                        Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                        $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    } else {
+                                                        $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    }
                                                     Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -32178,14 +32880,41 @@ else {
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -32200,7 +32929,18 @@ else {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$PosterImage`" `( -background none `"$LogoImage`" -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                # Only apply color if enabled AND color is defined
+                                                $colorEffect = ""
+                                                if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                    $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                    Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                }
+                                                if ($urlExtension -match "(?i)\.svg") {
+                                                    Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                    $Arguments = "`"$PosterImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                } else {
+                                                    $Arguments = "`"$PosterImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$boxsize`" `) -gravity `"$textgravity`" -geometry +0+`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                }
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $magickLog -Append
@@ -32805,14 +33545,41 @@ else {
                                                     'TVDB' { if ($entry.tvdbid) { $global:LogoUrl = GetTVDBLogo -Type series } }
                                                 }
                                             }
+                                            if (-not [string]::IsNullOrEmpty($global:LogoUrl)) {
+                                                $global:IsFallback = $false
+                                                switch ($global:FavProvider) {
+                                                    'TMDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'TVDB' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                    'FANART' {
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
+                                                            $global:IsFallback = $true 
+                                                        }
+                                                    }
+                                                }
+                                                if ($global:IsFallback) {
+                                                    Write-Entry -Subtext "Logo Source: Fallback (URL did not match $global:FavProvider)" -Path $global:configLogging -Color Yellow -log Debug
+                                                }
+                                            }
                                             if ([string]::IsNullOrEmpty($global:LogoUrl)) {
                                                 Write-Entry -Subtext "Could not find a logo on any provider (Tried: $($searchOrder -join ', '))" -Path $global:configLogging -Color Yellow -log Warning
                                             }
                                             if (!$global:LogoUrl -and $TextFallback -eq 'true'){
                                                 $ApplyTextInsteadOfLogo = 'true'
+                                                Write-Entry -Subtext "Falling back to text as no logo was found." -Path $global:configLogging -Color Yellow -log Warning
+                                                $global:IsFallback = $true
                                             }
                                             ElseIf ($global:LogoUrl){
-                                                $LogoImage = Join-Path $TempPath 'logo.png';Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
+                                                $urlExtension = [System.IO.Path]::GetExtension($global:LogoUrl).Split('?')[0]
+                                                if ([string]::IsNullOrWhiteSpace($urlExtension)) { $urlExtension = ".png" }
+                                                $LogoImage = Join-Path $TempPath ("logo" + $urlExtension);Write-Entry -Message "Logo Used: $global:LogoUrl" -Path $global:configLogging -Color Cyan -log Debug
                                                 try {
                                                     $response = Invoke-WebRequest -Uri $global:LogoUrl -OutFile $LogoImage -ErrorAction Stop
                                                 }
@@ -32827,7 +33594,18 @@ else {
                                                     $global:errorCount++; Write-Entry -Subtext "[ERROR-HERE] See above. ^^^ errorCount: $errorCount" -Path $global:configLogging -Color Red -log Error
 
                                                 }
-                                                $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                # Only apply color if enabled AND color is defined
+                                                $colorEffect = ""
+                                                if ($ConvertLogoColor -eq "true" -and -not [string]::IsNullOrWhiteSpace($LogoFlatColor)) {
+                                                    $colorEffect = "-fill `"$LogoFlatColor`" -colorize 100"
+                                                    Write-Entry -Subtext "Converting logo to $LogoFlatColor..." -Path $global:configLogging -Color Cyan -log Info
+                                                }
+                                                if ($urlExtension -match "(?i)\.svg") {
+                                                    Write-Entry -Subtext "Detected SVG. Applying High-Res settings." -Path $global:configLogging -Color Cyan -log Info
+                                                    $Arguments = "`"$backgroundImage`" ( -background none -density 300 `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                } else {
+                                                    $Arguments = "`"$backgroundImage`" ( -background none `"$LogoImage`" $colorEffect -resize `"$Backgroundboxsize`" `) -gravity `"$Backgroundtextgravity`" -geometry +0+`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                }
                                                 Write-Entry -Subtext "Applying Logo..." -Path $global:configLogging -Color White -log Info
                                                 $logEntry = "`"$magick`" $Arguments"
                                                 $logEntry | Out-File $magickLog -Append

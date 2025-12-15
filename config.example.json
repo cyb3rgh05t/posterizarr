@@ -149,7 +149,9 @@
     "UseBGLogo": "false",
     "UseClearlogo": "false",
     "UseClearart": "false",
-    "LogoTextFallback": "false"
+    "LogoTextFallback": "false",
+    "ConvertLogoColor": "false",
+    "LogoFlatColor": "white"
   },
   "OverlayPart": {
     "ImageProcessing": "true",
