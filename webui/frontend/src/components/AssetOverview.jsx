@@ -1386,107 +1386,140 @@ const AssetOverview = () => {
     const tags = [];
     const downloadSource = asset.DownloadSource;
     const providerLink = asset.FavProviderLink;
-    const isDownloadMissing =
-      downloadSource === "false" || downloadSource === false || !downloadSource;
-    const isProviderLinkMissing =
-      providerLink === "false" || providerLink === false || !providerLink;
 
-    if (isDownloadMissing) {
+    // --- Config Values ---
+    // Safely access config values, handling potential snake_case from backend
+    const logoLangOrder = data?.config?.logo_language_order || data?.config?.LogoLanguageOrder || [];
+    const primaryProvider = (data?.config?.primary_provider || data?.config?.FavProvider || "").toLowerCase();
+
+    // -------------------------------------------------------
+    // 1. MISSING ASSET TAGS
+    // -------------------------------------------------------
+    // Check if asset is completely missing
+    if (!downloadSource || downloadSource === "false" || downloadSource === false) {
       tags.push({
-        label: t("assetOverview.missingAsset"),
+        label: t("assetOverview.missingAsset"), // "Missing Asset"
         color: "bg-red-500/20 text-red-400 border-red-500/30",
       });
     }
-    if (isProviderLinkMissing) {
+
+    // Check if link to favorite provider is missing
+    if (!providerLink || providerLink === "false" || providerLink === false) {
       tags.push({
-        label: t("assetOverview.missingAssetAtFavProvider"),
+        label: t("assetOverview.missingLink"), // "Missing Link"
         color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
       });
     }
 
-    if (!isDownloadMissing && !isProviderLinkMissing) {
-      const primaryProvider = data?.config?.primary_provider || "";
-      if (primaryProvider) {
-        const providerPatterns = {
-          tmdb: ["tmdb", "themoviedb"],
-          tvdb: ["tvdb", "thetvdb"],
-          fanart: ["fanart"],
-          plex: ["plex"],
-        };
-        const patterns = providerPatterns[primaryProvider] || [primaryProvider];
-        const isDownloadFromPrimaryProvider = patterns.some((pattern) =>
-          downloadSource.toLowerCase().includes(pattern)
-        );
-        const isFavLinkFromPrimaryProvider = patterns.some((pattern) =>
-          providerLink.toLowerCase().includes(pattern)
-        );
-        if (!isDownloadFromPrimaryProvider || !isFavLinkFromPrimaryProvider) {
-          tags.push({
-            label: t("assetOverview.notPrimaryProvider"),
-            color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-          });
+    // -------------------------------------------------------
+    // 2. POSTER PROVIDER LOGIC
+    // -------------------------------------------------------
+    if (downloadSource && downloadSource !== "false" && primaryProvider) {
+      const providerPatterns = {
+        tmdb: ["tmdb", "themoviedb"],
+        tvdb: ["tvdb", "thetvdb"],
+        fanart: ["fanart"],
+        plex: ["plex"],
+      };
+
+      const patterns = providerPatterns[primaryProvider] || [primaryProvider];
+      const isFromPrimary = patterns.some((pattern) =>
+        downloadSource.toLowerCase().includes(pattern)
+      );
+
+      if (!isFromPrimary) {
+        tags.push({
+          label: t("assetOverview.notPrimaryProvider"), // "Not Primary Provider"
+          color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+        });
+      }
+    }
+
+    // -------------------------------------------------------
+    // 3. LOGO TAGGING LOGIC (NEW)
+    // -------------------------------------------------------
+    const logoSource = asset.LogoSource;
+    const logoLanguage = asset.LogoLanguage;
+    const logoTextFallback = asset.LogoTextFallback;
+
+    // A. Check if Logo is from Primary Provider
+    if (logoSource && logoSource !== "false" && logoSource !== false && primaryProvider) {
+      const providerPatterns = {
+        tmdb: ["tmdb", "themoviedb"],
+        tvdb: ["tvdb", "thetvdb"],
+        fanart: ["fanart"],
+        plex: ["plex"],
+      };
+      const patterns = providerPatterns[primaryProvider] || [primaryProvider];
+      const isLogoFromPrimary = patterns.some((pattern) =>
+        logoSource.toLowerCase().includes(pattern)
+      );
+
+      if (!isLogoFromPrimary) {
+        tags.push({
+          label: "Logo: Not Primary Provider",
+          color: "bg-pink-500/20 text-pink-400 border-pink-500/30",
+        });
+      }
+    }
+
+    // B. Check if Logo is Primary Language
+    if (logoLanguage && logoLanguage !== "false" && logoLanguage !== false && logoLangOrder.length > 0) {
+        const primaryLogoLang = logoLangOrder[0].toLowerCase();
+        const currentLogoLang = logoLanguage.toLowerCase();
+
+        // If languages don't match (and it's not a special case like 'false')
+        if (currentLogoLang !== primaryLogoLang) {
+             tags.push({
+                label: `Logo: ${logoLanguage.toUpperCase()}`,
+                color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
+             });
         }
-      }
     }
 
-    // UPDATED LANGUAGE LOGIC
-    const assetTypeRaw = (asset.Type || "").toLowerCase();
-
-    // Determine the correct primary language based on asset type
-    let targetPrimaryLang = data?.config?.primary_language; // Default (Posters)
-
-    if (assetTypeRaw.includes("background")) {
-      targetPrimaryLang = data?.config?.primary_language_background || targetPrimaryLang;
-    } else if (assetTypeRaw.includes("season")) {
-      targetPrimaryLang = data?.config?.primary_language_season || targetPrimaryLang;
-    }
-
-    if (
-      !asset.Language ||
-      asset.Language === "false" ||
-      asset.Language === false ||
-      asset.Language.toLowerCase() === "unknown"
-    ) {
-      tags.push({
-        label: t("assetOverview.notPrimaryLanguage"),
-        color: "bg-sky-500/20 text-sky-400 border-sky-500/30",
-      });
-    } else if (targetPrimaryLang) {
-      const langNormalized =
-        asset.Language.toLowerCase() === "textless"
-          ? "xx"
-          : asset.Language.toLowerCase();
-      const primaryNormalized =
-        targetPrimaryLang.toLowerCase() === "textless"
-          ? "xx"
-          : targetPrimaryLang.toLowerCase();
-
-      if (langNormalized !== primaryNormalized) {
+    // C. Check for Text Fallback (Applied Text instead of Logo)
+    if (logoTextFallback && (logoTextFallback === "true" || logoTextFallback === true)) {
         tags.push({
-          label: t("assetOverview.notPrimaryLanguage"),
-          color: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+            label: "Logo: Text Fallback",
+            color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
         });
-      }
-    } else if (!targetPrimaryLang) {
-      // If no config found, fallback behavior
-      if (!["textless", "xx"].includes(asset.Language.toLowerCase())) {
-        tags.push({
-          label: t("assetOverview.notPrimaryLanguage"),
-          color: "bg-sky-500/20 text-sky-400 border-sky-500/30",
-        });
-      }
     }
 
-    if (
-      asset.TextTruncated &&
-      (asset.TextTruncated.toLowerCase() === "true" ||
-        asset.TextTruncated === true)
-    ) {
+    // -------------------------------------------------------
+    // 4. POSTER LANGUAGE LOGIC
+    // -------------------------------------------------------
+    // This logic depends on how your `asset.Language` is stored vs your config `PreferredLanguageOrder`
+    // Assuming you have a helper or config for poster languages similar to logos
+    const posterLang = asset.Language;
+    const preferredLangs = data?.config?.preferred_language_order || data?.config?.PreferredLanguageOrder || [];
+
+    if (posterLang && preferredLangs.length > 0) {
+        const primaryLang = preferredLangs[0].toLowerCase();
+        const currentLang = posterLang.toLowerCase();
+
+        // Handle "xx" / "textless" equivalence if necessary
+        const isPrimary = currentLang === primaryLang ||
+                         (primaryLang === 'xx' && currentLang === 'textless') ||
+                         (primaryLang === 'textless' && currentLang === 'xx');
+
+        if (!isPrimary) {
+             tags.push({
+                label: posterLang.toUpperCase(),
+                color: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+             });
+        }
+    }
+
+    // -------------------------------------------------------
+    // 5. TRUNCATED TEXT LOGIC
+    // -------------------------------------------------------
+    if (asset.TextTruncated === true || asset.TextTruncated === "true") {
       tags.push({
-        label: t("assetOverview.truncatedText"),
-        color: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+        label: t("assetOverview.truncated"), // "Truncated"
+        color: "bg-red-500/20 text-red-400 border-red-500/30",
       });
     }
+
     return tags;
   };
 

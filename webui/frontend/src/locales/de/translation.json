@@ -424,6 +424,7 @@
     "deleteConfirm": "Bist du sicher, dass du diese Datei löschen möchtest?",
     "cancel": "Abbrechen",
     "uploadPreview": "Upload-Vorschau",
+    "blurStrength": "Unschärfe-Stärke",
     "fontFile": "Schriftart-Datei"
   },
   "assetsManager": {

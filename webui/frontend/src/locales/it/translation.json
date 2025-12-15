@@ -424,6 +424,7 @@
     "deleteConfirm": "Sei sicuro di voler eliminare questo file?",
     "cancel": "Annulla",
     "uploadPreview": "Anteprima caricamento",
+    "blurStrength": "Intensità sfocatura",
     "fontFile": "File di carattere"
   },
   "assetsManager": {

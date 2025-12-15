@@ -365,6 +365,8 @@ CONFIG_GROUPS = {
     "UseClearlogo": "PrerequisitePart",
     "UseClearart": "PrerequisitePart",
     "LogoTextFallback": "PrerequisitePart",
+    "ConvertLogoColor": "PrerequisitePart",
+    "LogoFlatColor": "PrerequisitePart",
     # OverlayPart
     "ImageProcessing": "OverlayPart",
     "outputQuality": "OverlayPart",
@@ -551,6 +553,8 @@ UI_GROUPS = {
         "UseClearlogo",
         "UseClearart",
         "LogoTextFallback",
+        "ConvertLogoColor",
+        "LogoFlatColor",
     ],
     "API Keys & Tokens": [
         "tvdbapi",
@@ -1065,6 +1069,8 @@ DISPLAY_NAMES = {
     "UseClearlogo": "Use Clearlogo",
     "UseClearart": "Use Clearart",
     "LogoTextFallback": "Fallback to Text",
+    "ConvertLogoColor": "Convert Logo Color",
+    "LogoFlatColor": "Flat Logo Color",
     # Image Processing
     "ImageProcessing": "Image Processing",
     "outputQuality": "Output Quality",

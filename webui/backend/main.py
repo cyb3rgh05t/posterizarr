@@ -971,6 +971,11 @@ def get_library_type_from_db(library_folder: str) -> Optional[str]:
         logger.debug(f"[LibraryType] Cache hit for '{library_folder}': {cached_type}")
         return cached_type
 
+    # Silence warnings for 'Collections' folder and cache the result as None
+    if library_folder.lower() == "collections":
+        get_library_type_from_db.cache[library_folder] = None
+        return None
+
     logger.debug(
         f"[LibraryType] Cache miss for '{library_folder}', querying database..."
     )
@@ -2144,16 +2149,16 @@ async def create_api_key(data: ApiKeyCreate):
     """Generate a new API key"""
     if not CONFIG_DATABASE_AVAILABLE or not config_db:
         raise HTTPException(status_code=503, detail="Config DB not available")
-    
+
     # Generate a secure random key (32 chars)
     raw_key = secrets.token_urlsafe(32)
-    
+
     key_id = config_db.add_api_key(data.name, raw_key)
-    
+
     if key_id != -1:
         return {
-            "success": True, 
-            "key": raw_key, 
+            "success": True,
+            "key": raw_key,
             "message": "Key generated. Save it now, it won't be shown again!",
             "id": key_id
         }
@@ -2165,7 +2170,7 @@ async def revoke_api_key(key_id: int):
     """Revoke an API key"""
     if not CONFIG_DATABASE_AVAILABLE or not config_db:
         raise HTTPException(status_code=503, detail="Config DB not available")
-        
+
     if config_db.delete_api_key(key_id):
         return {"success": True, "message": "Key revoked"}
     else:
@@ -2190,7 +2195,7 @@ async def get_config(request: Request):
 
         # 1. Check for API Key presence
         api_key = request.query_params.get("api_key") or request.headers.get("X-API-Key")
-        
+
         # 2. Validate API Key if present
         is_key_valid = False
         if api_key and config_db:
@@ -2208,22 +2213,22 @@ async def get_config(request: Request):
             referer = request.headers.get("referer", "")
             origin = request.headers.get("origin", "")
             host = request.headers.get("host", "")
-            
+
             is_valid_ui = False
             if host:
                 if referer and host in referer: is_valid_ui = True
                 if origin and host in origin: is_valid_ui = True
-            
+
             if not is_valid_ui:
                 # If they provided a key but it was wrong, give a specific error
                 if api_key:
                     logger.warning("Blocking request: Invalid API Key")
                     raise HTTPException(status_code=403, detail="Invalid API Key")
-                
+
                 # Otherwise, give the standard "Browser Only" error
                 logger.warning(f"SECURITY: Blocking direct non-browser access to config from {request.client.host}")
                 raise HTTPException(status_code=403, detail="Direct API access denied. Use the Web UI.")
-                
+
     except HTTPException:
         raise
     except Exception as sec_err:
@@ -2238,7 +2243,7 @@ async def get_config(request: Request):
 
         if CONFIG_MAPPER_AVAILABLE:
             flat_config = flatten_config(grouped_config)
-            
+
             display_names_dict = {}
             for key in flat_config.keys():
                 display_names_dict[key] = get_display_name(key)
@@ -2263,7 +2268,7 @@ async def get_config(request: Request):
     except Exception as e:
         logger.error(f"Error reading config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 @app.post("/api/config")
 async def update_config(data: ConfigUpdate):
     """Update config.json - accepts FLAT structure and saves as GROUPED when config_mapper available"""
@@ -2366,7 +2371,7 @@ async def update_config(data: ConfigUpdate):
                 logger.info("Config database synced successfully with config.json")
             except Exception as db_error:
                 logger.warning(f"Could not sync config database: {db_error}")
-        
+
         logger.info("=" * 60)
         return {
             "success": True,
@@ -4973,17 +4978,9 @@ async def get_status():
                 except Exception as e:
                     logger.error(f"Error refreshing cache after script completion: {e}")
 
-                # Import ImageChoices.csv to database
-                try:
-                    # import_imagechoices_to_db()
-                    pass
-                except Exception as e:
-                    logger.error(f"Error importing ImageChoices.csv to database: {e}")
-
                 # Save runtime statistics to database
                 if RUNTIME_DB_AVAILABLE and finished_mode:
                     try:
-                        # Determine which log file was used
                         mode_log_map = {
                             "normal": "Scriptlog.log",
                             "testing": "Testinglog.log",
@@ -4995,16 +4992,6 @@ async def get_status():
                         }
                         log_filename = mode_log_map.get(finished_mode, "Scriptlog.log")
                         log_path = LOGS_DIR / log_filename
-
-                        # Runtime import is now handled by logs_watcher automatically
-                        # Commenting out to prevent duplicate entries
-                        # if log_path.exists():
-                        #     save_runtime_to_db(log_path, finished_mode)
-                        #     logger.info(
-                        #         f"Runtime statistics saved to database for {finished_mode} mode"
-                        #     )
-                        # else:
-                        #     logger.warning(f"Log file not found: {log_path}")
 
                         if log_path.exists():
                             logger.info(
@@ -5043,25 +5030,10 @@ async def get_status():
                             f"Error refreshing cache after scheduler completion: {e}"
                         )
 
-                    # Import ImageChoices.csv to database
-                    try:
-                        # import_imagechoices_to_db()
-                        pass
-                    except Exception as e:
-                        logger.error(f"Error importing ImageChoices.csv to database: {e}")
-
                     # Save runtime statistics to database for scheduler runs
                     if RUNTIME_DB_AVAILABLE:
                         try:
                             log_path = LOGS_DIR / "Scriptlog.log"
-                            # Runtime import is now handled by logs_watcher automatically
-                            # Commenting out to prevent duplicate entries
-                            # if log_path.exists():
-                            #     save_runtime_to_db(log_path, "scheduled")
-                            #     logger.info(
-                            #         "Runtime statistics saved to database for scheduled run"
-                            #     )
-
                             if log_path.exists():
                                 logger.info(
                                     "Runtime statistics will be imported by logs_watcher for scheduled run"
@@ -5069,13 +5041,27 @@ async def get_status():
                         except Exception as e:
                             logger.error(f"Error saving scheduler runtime to database: {e}")
 
+        # Check if running file exists
+        running_file_exists = RUNNING_FILE.exists()
+
         # Combined running status
-        is_running = manual_is_running or scheduler_is_running
+        # FIX: Treat running_file_exists as a valid running state for Webhook/Watcher triggers
+        is_running = manual_is_running or scheduler_is_running or running_file_exists
 
         # Determine current mode
         effective_mode = current_mode
         if scheduler_is_running and not manual_is_running:
-            effective_mode = "scheduled"  # Special mode for scheduler runs
+            effective_mode = "scheduled"
+        elif running_file_exists and not manual_is_running and not scheduler_is_running:
+            # If lockfile exists but API didn't start it, it's a Webhook/Watcher run.
+            # Read the content to know exactly what it is (e.g. "Tautulli", "Arr")
+            try:
+                with open(RUNNING_FILE, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                    # Use content as mode if present, else default to "webhook"
+                    effective_mode = content.lower() if content else "webhook"
+            except Exception:
+                effective_mode = "webhook"
         elif not is_running:
             effective_mode = None
 
@@ -5089,7 +5075,10 @@ async def get_status():
             "syncjelly": "Scriptlog.log",
             "syncemby": "Scriptlog.log",
             "reset": "Scriptlog.log",
-            "scheduled": "Scriptlog.log",  # Scheduler runs use Scriptlog
+            "scheduled": "Scriptlog.log",
+            "webhook": "Scriptlog.log",
+            "tautulli": "Scriptlog.log",
+            "arr": "Scriptlog.log"
         }
 
         # If script is running, use current mode
@@ -5121,15 +5110,14 @@ async def get_status():
                 already_running = True
                 break
 
-        # Check if running file exists
-        running_file_exists = RUNNING_FILE.exists()
-
         # Determine PID to show
         display_pid = None
         if manual_is_running:
             display_pid = current_process.pid
         elif scheduler_is_running:
             display_pid = scheduler_pid
+        elif is_running and (effective_mode == "webhook" or effective_mode == "tautulli" or effective_mode == "arr"):
+            display_pid = "External"
 
         return {
             "running": is_running,
@@ -5139,20 +5127,13 @@ async def get_status():
             "last_logs": last_logs,
             "script_exists": SCRIPT_PATH.exists(),
             "config_exists": CONFIG_PATH.exists(),
-            "pid": (
-                scheduler_pid
-                if scheduler_is_running and scheduler_pid
-                else (
-                    current_process.pid if manual_is_running and current_process else None
-                )
-            ),
+            "pid": display_pid,
             "current_mode": effective_mode,
             "active_log": active_log,
             "already_running_detected": already_running,
             "running_file_exists": running_file_exists,
             "start_time": current_start_time if is_running else None,
         }
-
 
 @app.delete("/api/running-file")
 async def delete_running_file():
@@ -8664,6 +8645,9 @@ async def get_recent_assets():
                             else ""
                         ),
                         "is_manually_created": is_manually_created,
+                        "LogoSource": asset_dict.get("LogoSource", ""),
+                        "LogoLanguage": asset_dict.get("LogoLanguage", ""),
+                        "LogoTextFallback": asset_dict.get("LogoTextFallback", ""),
                         # Use data directly from the cache
                         "poster_url": poster_data["url"],
                         "has_poster": True,
@@ -9383,19 +9367,22 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                         )
                         search_method = "path"
 
-                        # Search database for matching record
-                        cursor = db.connection.cursor()
-                        cursor.execute(
-                            """
-                            SELECT tmdbid, tvdbid, imdbid, Rootfolder
-                            FROM imagechoices
-                            WHERE Rootfolder LIKE ?
-                            LIMIT 1
-                        """,
-                            (f"%{rootfolder_candidate}%",),
-                        )
-
-                        db_record = cursor.fetchone()
+                        with db.lock:
+                            conn = db._get_connection()
+                            try:
+                                cursor = conn.cursor()
+                                cursor.execute(
+                                    """
+                                    SELECT tmdbid, tvdbid, imdbid, Rootfolder
+                                    FROM imagechoices
+                                    WHERE Rootfolder LIKE ?
+                                    LIMIT 1
+                                """,
+                                    (f"%{rootfolder_candidate}%",),
+                                )
+                                db_record = cursor.fetchone()
+                            finally:
+                                conn.close()
 
                 # Method 2: Search by title + year (for Manual Mode)
                 if not db_record and request.title:
@@ -9404,33 +9391,33 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                     )
                     search_method = "title"
 
-                    cursor = db.connection.cursor()
-
-                    # Try exact title match first
-                    if request.year:
-                        # Search with year in Rootfolder pattern: "Title (YYYY)"
-                        cursor.execute(
-                            """
-                            SELECT tmdbid, tvdbid, imdbid, Rootfolder
-                            FROM imagechoices
-                            WHERE Rootfolder LIKE ?
-                            LIMIT 1
-                        """,
-                            (f"%{request.title}%({request.year})%",),
-                        )
-                    else:
-                        # Search without year
-                        cursor.execute(
-                            """
-                            SELECT tmdbid, tvdbid, imdbid, Rootfolder
-                            FROM imagechoices
-                            WHERE Rootfolder LIKE ?
-                            LIMIT 1
-                        """,
-                            (f"%{request.title}%",),
-                        )
-
-                    db_record = cursor.fetchone()
+                    with db.lock:
+                        conn = db._get_connection()
+                        try:
+                            cursor = conn.cursor()
+                            if request.year:
+                                cursor.execute(
+                                    """
+                                    SELECT tmdbid, tvdbid, imdbid, Rootfolder
+                                    FROM imagechoices
+                                    WHERE Rootfolder LIKE ?
+                                    LIMIT 1
+                                """,
+                                    (f"%{request.title}%({request.year})%",),
+                                )
+                            else:
+                                cursor.execute(
+                                    """
+                                    SELECT tmdbid, tvdbid, imdbid, Rootfolder
+                                    FROM imagechoices
+                                    WHERE Rootfolder LIKE ?
+                                    LIMIT 1
+                                """,
+                                    (f"%{request.title}%",),
+                                )
+                            db_record = cursor.fetchone()
+                        finally:
+                            conn.close()
 
                 # Process database record if found
                 if db_record:
@@ -11082,8 +11069,6 @@ def delete_db_entries_for_asset(asset_path: str):
             # Regular poster - could be Movie or Show or Poster
             search_types = ["Movie", "Show", "Poster"]
 
-        cursor = db.connection.cursor()
-
         # Collect all matching entries across all possible type names
         all_entries = []
 
@@ -11091,48 +11076,53 @@ def delete_db_entries_for_asset(asset_path: str):
             f"Searching for DB entries: folder={folder_name}, types={search_types}, is_episode={bool(is_episode)}, is_season={bool(is_season)}"
         )
 
-        for db_type in search_types:
-            if is_season:
-                # For seasons, find entries with matching season number in title
-                season_num = is_season.group(1)
-                cursor.execute(
-                    """SELECT id, Title, Type FROM imagechoices
-                       WHERE Rootfolder = ? AND Type = ?
-                       AND (Title LIKE ? OR Title LIKE ? OR Title LIKE ?)""",
-                    (
-                        folder_name,
-                        db_type,
-                        f"%Season{season_num}%",
-                        f"%Season {season_num}%",
-                        f"%Season0{season_num}%",
-                    ),
-                )
-            elif is_episode:
-                # For episodes, find entries with matching episode pattern in title
-                season_num = is_episode.group(1)
-                episode_num = is_episode.group(2)
-                pattern1 = f"%S{season_num}E{episode_num}%"
-                pattern2 = f"%S0{season_num}E0{episode_num}%"
-                logger.debug(
-                    f"Episode search: folder={folder_name}, type={db_type}, patterns={pattern1}, {pattern2}"
-                )
-                cursor.execute(
-                    """SELECT id, Title, Type FROM imagechoices
-                       WHERE Rootfolder = ? AND Type = ?
-                       AND (Title LIKE ? OR Title LIKE ?)""",
-                    (folder_name, db_type, pattern1, pattern2),
-                )
-            else:
-                # For poster/background, match on Rootfolder + Type only
-                cursor.execute(
-                    "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type = ?",
-                    (folder_name, db_type),
-                )
+        # FIX: Use _get_connection within the lock
+        with db.lock:
+            conn = db._get_connection()
+            try:
+                cursor = conn.cursor()
 
-            # Fetch and extend results for this type
-            found = cursor.fetchall()
-            logger.debug(f"Found {len(found)} entries for type {db_type}")
-            all_entries.extend(found)
+                for db_type in search_types:
+                    if is_season:
+                        # For seasons, find entries with matching season number in title
+                        season_num = is_season.group(1)
+                        cursor.execute(
+                            """SELECT id, Title, Type FROM imagechoices
+                               WHERE Rootfolder = ? AND Type = ?
+                               AND (Title LIKE ? OR Title LIKE ? OR Title LIKE ?)""",
+                            (
+                                folder_name,
+                                db_type,
+                                f"%Season{season_num}%",
+                                f"%Season {season_num}%",
+                                f"%Season0{season_num}%",
+                            ),
+                        )
+                    elif is_episode:
+                        # For episodes, find entries with matching episode pattern in title
+                        season_num = is_episode.group(1)
+                        episode_num = is_episode.group(2)
+                        pattern1 = f"%S{season_num}E{episode_num}%"
+                        pattern2 = f"%S0{season_num}E0{episode_num}%"
+                        cursor.execute(
+                            """SELECT id, Title, Type FROM imagechoices
+                               WHERE Rootfolder = ? AND Type = ?
+                               AND (Title LIKE ? OR Title LIKE ?)""",
+                            (folder_name, db_type, pattern1, pattern2),
+                        )
+                    else:
+                        # For poster/background, match on Rootfolder + Type only
+                        cursor.execute(
+                            "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type = ?",
+                            (folder_name, db_type),
+                        )
+
+                    # Fetch and extend results for this type
+                    found = cursor.fetchall()
+                    logger.debug(f"Found {len(found)} entries for type {db_type}")
+                    all_entries.extend(found)
+            finally:
+                conn.close()
 
         if all_entries:
             for entry in all_entries:
@@ -11231,69 +11221,73 @@ async def update_asset_db_entry_as_manual(
         # - For episodes: match on Rootfolder + Type + episode pattern in Title
         # - For poster/background: match on Rootfolder + Type
 
-        cursor = db.connection.cursor()
+        existing_entries = []
+        with db.lock:
+            conn = db._get_connection()
+            try:
+                cursor = conn.cursor()
 
-        # Extract season/episode info from filename for more specific matching
-        season_match = re.match(r"^Season(\d+)\.jpg$", filename, re.IGNORECASE)
-        episode_match = re.match(r"^S(\d+)E(\d+)\.jpg$", filename, re.IGNORECASE)
+                # Extract season/episode info from filename for more specific matching
+                season_match = re.match(r"^Season(\d+)\.jpg$", filename, re.IGNORECASE)
+                episode_match = re.match(r"^S(\d+)E(\d+)\.jpg$", filename, re.IGNORECASE)
 
-        if season_match:
-            # For seasons, find entries with matching season number in title
-            season_num = season_match.group(1)
-            # Also try without leading zero
-            season_num_int = str(int(season_num))
-            logger.info(
-                f"Searching for Season: folder='{final_folder_name}', season_num='{season_num}', season_num_int='{season_num_int}'"
-            )
-            cursor.execute(
-                """SELECT id, Title, Type FROM imagechoices
-                   WHERE Rootfolder = ? AND Type = ?
-                   AND (Title LIKE ? OR Title LIKE ? OR Title LIKE ? OR Title LIKE ?)""",
-                (
-                    final_folder_name,
-                    asset_type,
-                    f"%Season{season_num}%",
-                    f"%Season {season_num}%",
-                    f"%Season {season_num_int}%",
-                    f"%Season{season_num_int}%",
-                ),
-            )
-        elif episode_match:
-            # For episodes, find entries with matching episode pattern in title
-            season_num = episode_match.group(1)
-            episode_num = episode_match.group(2)
-            cursor.execute(
-                """SELECT id, Title FROM imagechoices
-                   WHERE Rootfolder = ? AND Type = ?
-                   AND (Title LIKE ? OR Title LIKE ?)""",
-                (
-                    final_folder_name,
-                    asset_type,
-                    f"%S{season_num}E{episode_num}%",
-                    f"%S0{season_num}E0{episode_num}%",
-                ),
-            )
-        else:
-            # For poster/background, match on Rootfolder + Type
-            # For posters, match both "Show" and "Movie" types
-            # For backgrounds, match both "Show Background" and "Movie Background" types
-            if asset_type == "Poster":
-                cursor.execute(
-                    "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type IN ('Show', 'Movie')",
-                    (final_folder_name,),
-                )
-            elif asset_type == "Background":
-                cursor.execute(
-                    "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type IN ('Show Background', 'Movie Background')",
-                    (final_folder_name,),
-                )
-            else:
-                cursor.execute(
-                    "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type = ?",
-                    (final_folder_name, asset_type),
-                )
+                if season_match:
+                    # For seasons, find entries with matching season number in title
+                    season_num = season_match.group(1)
+                    # Also try without leading zero
+                    season_num_int = str(int(season_num))
+                    logger.info(
+                        f"Searching for Season: folder='{final_folder_name}', season_num='{season_num}', season_num_int='{season_num_int}'"
+                    )
+                    cursor.execute(
+                        """SELECT id, Title, Type FROM imagechoices
+                           WHERE Rootfolder = ? AND Type = ?
+                           AND (Title LIKE ? OR Title LIKE ? OR Title LIKE ? OR Title LIKE ?)""",
+                        (
+                            final_folder_name,
+                            asset_type,
+                            f"%Season{season_num}%",
+                            f"%Season {season_num}%",
+                            f"%Season {season_num_int}%",
+                            f"%Season{season_num_int}%",
+                        ),
+                    )
+                elif episode_match:
+                    # For episodes, find entries with matching episode pattern in title
+                    season_num = episode_match.group(1)
+                    episode_num = episode_match.group(2)
+                    cursor.execute(
+                        """SELECT id, Title FROM imagechoices
+                           WHERE Rootfolder = ? AND Type = ?
+                           AND (Title LIKE ? OR Title LIKE ?)""",
+                        (
+                            final_folder_name,
+                            asset_type,
+                            f"%S{season_num}E{episode_num}%",
+                            f"%S0{season_num}E0{episode_num}%",
+                        ),
+                    )
+                else:
+                    # For poster/background, match on Rootfolder + Type
+                    if asset_type == "Poster":
+                        cursor.execute(
+                            "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type IN ('Show', 'Movie')",
+                            (final_folder_name,),
+                        )
+                    elif asset_type == "Background":
+                        cursor.execute(
+                            "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type IN ('Show Background', 'Movie Background')",
+                            (final_folder_name,),
+                        )
+                    else:
+                        cursor.execute(
+                            "SELECT id, Title, Type FROM imagechoices WHERE Rootfolder = ? AND Type = ?",
+                            (final_folder_name, asset_type),
+                        )
 
-        existing_entries = cursor.fetchall()
+                existing_entries = cursor.fetchall()
+            finally:
+                conn.close()
 
         if existing_entries:
             for entry in existing_entries:

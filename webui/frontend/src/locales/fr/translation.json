@@ -424,6 +424,7 @@
     "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce fichier ?",
     "cancel": "Annuler",
     "uploadPreview": "Aperçu du téléversement",
+    "blurStrength": "Intensité du flou",
     "fontFile": "Fichier de police"
   },
   "assetsManager": {

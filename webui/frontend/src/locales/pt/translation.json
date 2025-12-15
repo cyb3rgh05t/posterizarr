@@ -424,6 +424,7 @@
     "deleteConfirm": "Tem certeza de que deseja excluir este arquivo?",
     "cancel": "Cancelar",
     "uploadPreview": "Pré-visualização do upload",
+    "blurStrength": "Intensidade do desfoque",
     "fontFile": "Arquivo de fonte"
   },
   "assetsManager": {
