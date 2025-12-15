@@ -4078,11 +4078,18 @@ async def perform_jellyfin_emby_action(request: JellyfinEmbyActionRequest):
 
 @app.get("/api/libraries/{server_type}/cached")
 async def get_cached_libraries(server_type: str):
-    # ... (This function remains unchanged) ...
     logger.info(f"Fetching cached libraries for {server_type}")
 
     if server_type not in ["plex", "jellyfin", "emby"]:
         return {"success": False, "error": "Invalid server type"}
+    
+    if not SERVER_LIBRARIES_DB_AVAILABLE or server_libraries_db is None:
+        return {
+            "success": True, 
+            "libraries": [], 
+            "excluded": [],
+            "message": "Server libraries database not initialized"
+        }
 
     try:
         result = server_libraries_db.get_media_server_libraries(server_type)
@@ -4103,7 +4110,6 @@ class LibraryExclusionUpdate(BaseModel):
 
 @app.post("/api/libraries/{server_type}/exclusions")
 async def update_library_exclusions(server_type: str, request: LibraryExclusionUpdate):
-    # ... (This function remains unchanged) ...
     logger.info(f"Updating exclusions for {server_type}: {request.excluded_libraries}")
 
     if server_type not in ["plex", "jellyfin", "emby"]:
@@ -8528,11 +8534,19 @@ async def get_recent_assets():
     USES FAST CACHE FOR IMAGE LOOKUPS
     """
     try:
+        if not DATABASE_AVAILABLE or db is None:
+            # Return empty list instead of crashing if DB isn't ready
+            return {
+                "success": True,
+                "assets": [],
+                "total_count": 0,
+            }
+
         # CSV import is handled by logs_watcher, no import needed here
         try:
             pass # Keep block for safety
         except Exception as e:
-            logger.warning(f"Could not import CSV to database: {e}") # This should not run
+            logger.warning(f"Could not import CSV to database: {e}") 
 
         # Get all assets from database (already sorted by id DESC - newest first)
         db_records = db.get_all_choices()
