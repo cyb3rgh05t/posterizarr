@@ -305,6 +305,7 @@ function AssetsManager() {
     vignette_color: "#000000",
     grain_amount: 0.0,
     grain_size: 1.0,
+    blur_amount: 0.0,
     show_text_area: false,
     filename: "custom_overlay"
   });
@@ -326,7 +327,7 @@ function AssetsManager() {
       const timer = setTimeout(() => { fetchCreatorPreview(); }, 500);
       return () => clearTimeout(timer);
     }
-  }, [options.overlay_type, options.border_enabled, options.border_px, options.border_color, options.corner_radius, options.matte_height_ratio, options.fade_height_ratio, options.gradient_color, options.inner_glow_strength, options.inner_glow_color, options.vignette_strength, options.vignette_color, options.grain_amount, options.grain_size, options.show_text_area]);
+  }, [options.overlay_type, options.border_enabled, options.border_px, options.border_color, options.corner_radius, options.matte_height_ratio, options.fade_height_ratio, options.gradient_color, options.inner_glow_strength, options.inner_glow_color, options.vignette_strength, options.vignette_color, options.grain_amount, options.grain_size, options.blur_amount, options.show_text_area]);
 
   const loadFiles = async () => {
     try {
@@ -649,6 +650,22 @@ function AssetsManager() {
                         <div className="h-px bg-theme-border" />
                         <div className="space-y-6">
                             <h3 className="text-sm font-medium text-theme-text">{t("overlayAssets.effects")}</h3>
+                            {/* BLUR SLIDER START */}
+                            <div>
+                                <div className="flex justify-between text-sm mb-2">
+                                    <span className="text-theme-muted">{t("overlayAssets.blurStrength") || "Blur Strength"}</span>
+                                    <span className="text-theme-text font-mono">{options.blur_amount}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="50"
+                                    step="0.5"
+                                    value={options.blur_amount}
+                                    onChange={e => setOptions({...options, blur_amount: parseFloat(e.target.value)})}
+                                    className="w-full h-2 bg-theme-input rounded-lg appearance-none cursor-pointer accent-theme-primary"
+                                />
+                            </div>
                             <div>
                                 <div className="flex justify-between text-sm mb-2"><span className="text-theme-muted">{t("overlayAssets.vignette")}</span><span className="text-theme-text font-mono">{Math.round(options.vignette_strength * 100)}%</span></div>
                                 <input type="range" min="0" max="100" value={options.vignette_strength * 100} onChange={e => setOptions({...options, vignette_strength: e.target.value / 100})} className="w-full h-2 bg-theme-input rounded-lg appearance-none cursor-pointer accent-theme-primary" />

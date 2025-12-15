@@ -424,6 +424,7 @@
     "deleteConfirm": "Are you sure you want to delete this file?",
     "cancel": "Cancel",
     "uploadPreview": "Upload Preview",
+    "blurStrength": "Blur Strength",
     "fontFile": "Font File"
   },
   "assetsManager": {
