@@ -975,7 +975,7 @@ def get_library_type_from_db(library_folder: str) -> Optional[str]:
     if library_folder.lower() == "collections":
         get_library_type_from_db.cache[library_folder] = None
         return None
-    
+
     logger.debug(
         f"[LibraryType] Cache miss for '{library_folder}', querying database..."
     )
@@ -2149,16 +2149,16 @@ async def create_api_key(data: ApiKeyCreate):
     """Generate a new API key"""
     if not CONFIG_DATABASE_AVAILABLE or not config_db:
         raise HTTPException(status_code=503, detail="Config DB not available")
-    
+
     # Generate a secure random key (32 chars)
     raw_key = secrets.token_urlsafe(32)
-    
+
     key_id = config_db.add_api_key(data.name, raw_key)
-    
+
     if key_id != -1:
         return {
-            "success": True, 
-            "key": raw_key, 
+            "success": True,
+            "key": raw_key,
             "message": "Key generated. Save it now, it won't be shown again!",
             "id": key_id
         }
@@ -2170,7 +2170,7 @@ async def revoke_api_key(key_id: int):
     """Revoke an API key"""
     if not CONFIG_DATABASE_AVAILABLE or not config_db:
         raise HTTPException(status_code=503, detail="Config DB not available")
-        
+
     if config_db.delete_api_key(key_id):
         return {"success": True, "message": "Key revoked"}
     else:
@@ -2195,7 +2195,7 @@ async def get_config(request: Request):
 
         # 1. Check for API Key presence
         api_key = request.query_params.get("api_key") or request.headers.get("X-API-Key")
-        
+
         # 2. Validate API Key if present
         is_key_valid = False
         if api_key and config_db:
@@ -2213,22 +2213,22 @@ async def get_config(request: Request):
             referer = request.headers.get("referer", "")
             origin = request.headers.get("origin", "")
             host = request.headers.get("host", "")
-            
+
             is_valid_ui = False
             if host:
                 if referer and host in referer: is_valid_ui = True
                 if origin and host in origin: is_valid_ui = True
-            
+
             if not is_valid_ui:
                 # If they provided a key but it was wrong, give a specific error
                 if api_key:
                     logger.warning("Blocking request: Invalid API Key")
                     raise HTTPException(status_code=403, detail="Invalid API Key")
-                
+
                 # Otherwise, give the standard "Browser Only" error
                 logger.warning(f"SECURITY: Blocking direct non-browser access to config from {request.client.host}")
                 raise HTTPException(status_code=403, detail="Direct API access denied. Use the Web UI.")
-                
+
     except HTTPException:
         raise
     except Exception as sec_err:
@@ -2243,7 +2243,7 @@ async def get_config(request: Request):
 
         if CONFIG_MAPPER_AVAILABLE:
             flat_config = flatten_config(grouped_config)
-            
+
             display_names_dict = {}
             for key in flat_config.keys():
                 display_names_dict[key] = get_display_name(key)
@@ -2268,7 +2268,7 @@ async def get_config(request: Request):
     except Exception as e:
         logger.error(f"Error reading config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 @app.post("/api/config")
 async def update_config(data: ConfigUpdate):
     """Update config.json - accepts FLAT structure and saves as GROUPED when config_mapper available"""
@@ -2371,7 +2371,7 @@ async def update_config(data: ConfigUpdate):
                 logger.info("Config database synced successfully with config.json")
             except Exception as db_error:
                 logger.warning(f"Could not sync config database: {db_error}")
-        
+
         logger.info("=" * 60)
         return {
             "success": True,
@@ -8645,6 +8645,9 @@ async def get_recent_assets():
                             else ""
                         ),
                         "is_manually_created": is_manually_created,
+                        "LogoSource": asset_dict.get("LogoSource", ""),
+                        "LogoLanguage": asset_dict.get("LogoLanguage", ""),
+                        "LogoTextFallback": asset_dict.get("LogoTextFallback", ""),
                         # Use data directly from the cache
                         "poster_url": poster_data["url"],
                         "has_poster": True,
@@ -11078,7 +11081,7 @@ def delete_db_entries_for_asset(asset_path: str):
             conn = db._get_connection()
             try:
                 cursor = conn.cursor()
-                
+
                 for db_type in search_types:
                     if is_season:
                         # For seasons, find entries with matching season number in title
