@@ -659,8 +659,8 @@ function AssetsManager() {
                                 <input
                                     type="range"
                                     min="0"
-                                    max="50"
-                                    step="0.5"
+                                    max="400"
+                                    step="1"
                                     value={options.blur_amount}
                                     onChange={e => setOptions({...options, blur_amount: parseFloat(e.target.value)})}
                                     className="w-full h-2 bg-theme-input rounded-lg appearance-none cursor-pointer accent-theme-primary"

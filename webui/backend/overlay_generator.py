@@ -38,7 +38,7 @@ def generate_overlay_image(options: Dict[str, Any]) -> Image.Image:
     grain_amt = float(options.get("grain_amount", 0.0))
     grain_size = float(options.get("grain_size", 1.0))
 
-    # NEW: Blur Strength (Default 0.0)
+    # BLUR: Now supports high values
     blur_amt = float(options.get("blur_amount", 0.0))
 
     # Helper to create a solid color layer
@@ -63,7 +63,7 @@ def generate_overlay_image(options: Dict[str, Any]) -> Image.Image:
         canvas = Image.alpha_composite(canvas, color_fill)
 
     # ---------------------------------------------------------
-    # LAYER 2: MATTE / GRADIENT FADE (Bottom Up)
+    # LAYER 2: MATTE / GRADIENT FADE
     # ---------------------------------------------------------
     if matte_height > 0 or fade_height > 0:
         gradient_layer = get_color_layer("gradient_color", "#000000")
@@ -86,7 +86,7 @@ def generate_overlay_image(options: Dict[str, Any]) -> Image.Image:
         canvas = Image.alpha_composite(canvas, gradient_layer)
 
     # ---------------------------------------------------------
-    # LAYER 3: INNER GLOW (Fade from all sides)
+    # LAYER 3: INNER GLOW
     # ---------------------------------------------------------
     if inner_glow_str > 0:
         blur_radius = int(min(canvas_w, canvas_h) * 0.2 * inner_glow_str)
@@ -122,15 +122,33 @@ def generate_overlay_image(options: Dict[str, Any]) -> Image.Image:
         canvas = Image.alpha_composite(canvas, black_grain)
 
     # ---------------------------------------------------------
-    # NEW LAYER: BLUR (Softens previous effects)
+    # LAYER 4.5: SUPER BLUR (Optimized for speed & heavy blur)
     # ---------------------------------------------------------
-    # We apply blur BEFORE the border so the border stays sharp
     if blur_amt > 0:
-        # A radius of 10-20 is usually a good starting point for a noticeable blur
-        canvas = canvas.filter(ImageFilter.GaussianBlur(radius=blur_amt))
+        # Optimization: Downscale -> Blur -> Upscale
+        # This allows massive blur radii without performance hits
+        orig_size = canvas.size
+
+        # Scale down factor: higher blur = we can shrink more safely
+        downscale_factor = 4 if blur_amt > 10 else 1
+
+        if downscale_factor > 1:
+            # 1. Shrink
+            small_w = max(1, orig_size[0] // downscale_factor)
+            small_h = max(1, orig_size[1] // downscale_factor)
+            small_canvas = canvas.resize((small_w, small_h), Image.Resampling.BILINEAR)
+
+            # 2. Blur (Scale radius down)
+            small_canvas = small_canvas.filter(ImageFilter.GaussianBlur(radius=blur_amt / downscale_factor))
+
+            # 3. Enlarge (Bicubic for smoothness)
+            canvas = small_canvas.resize(orig_size, Image.Resampling.BICUBIC)
+        else:
+            # Normal blur for small values
+            canvas = canvas.filter(ImageFilter.GaussianBlur(radius=blur_amt))
 
     # ---------------------------------------------------------
-    # LAYER 5: BORDER & ROUNDED CORNERS
+    # LAYER 5: BORDER & ROUNDED CORNERS (Stays Sharp)
     # ---------------------------------------------------------
     if border_enabled:
         border_layer = Image.new("RGBA", (canvas_w, canvas_h), (*border_color, 255))
@@ -166,7 +184,7 @@ def generate_overlay_image(options: Dict[str, Any]) -> Image.Image:
             canvas.putalpha(new_a)
 
     # ---------------------------------------------------------
-    # DEBUG LAYER: TEXT AREA GUIDE
+    # DEBUG LAYER: TEXT AREA
     # ---------------------------------------------------------
     if options.get("show_text_area", False):
         box_w = int(options.get("text_box_w", 0))
@@ -182,8 +200,6 @@ def generate_overlay_image(options: Dict[str, Any]) -> Image.Image:
             overlay_guide = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
             draw_guide = ImageDraw.Draw(overlay_guide)
             draw_guide.rectangle([x1, y1, x2, y2], fill=(255, 0, 0, 80), outline=(255, 0, 0, 255), width=3)
-            draw_guide.line([x1, y1, x2, y2], fill=(255, 0, 0, 120), width=2)
-            draw_guide.line([x1, y2, x2, y1], fill=(255, 0, 0, 120), width=2)
             canvas = Image.alpha_composite(canvas, overlay_guide)
 
     return canvas
