@@ -105,6 +105,7 @@ function GetTMDBLogo {
                         if ($lang -ne 'null' -or $lang -ne 'xx') {
                             Write-Entry -Subtext "Found Logo with Language '$lang' on TMDB" -Path $global:configLogging -Color Blue -log Info
                         }
+                        $global:LogoLanguage = $lang
                         return $global:LogoUrl
                         continue
                     }
@@ -166,6 +167,7 @@ function GetTVDBLogo {
                     if ($global:tvdblogo) {
                         $global:LogoUrl = $global:tvdblogo[0].image
                         Write-Entry -Subtext "Found Logo with Language '$lang' on TVDB" -Path $global:configLogging -Color Blue -log Info
+                        $global:LogoLanguage = $lang
                         return $global:LogoUrl
                         continue
                     }
@@ -208,6 +210,7 @@ function GetFanartLogo {
                         if (($entrytemp.$field | Where-Object lang -eq "$lang")) {
                             $global:LogoUrl = ($entrytemp.$field)[0].url
                             Write-Entry -Subtext "Found Clear Art Logo  with Language '$lang' on FANART" -Path $global:configLogging -Color Blue -log Info
+                            $global:LogoLanguage = $lang
                             return $global:LogoUrl
                             continue
                         }
@@ -226,6 +229,7 @@ function GetFanartLogo {
                         if (($entrytemp.$field | Where-Object lang -eq "$lang")) {
                             $global:LogoUrl = ($entrytemp.$field)[0].url
                             Write-Entry -Subtext "Found Clear Logo with Language '$lang' on FANART" -Path $global:configLogging -Color Blue -log Info
+                            $global:LogoLanguage = $lang
                             return $global:LogoUrl
                             continue
                         }
@@ -565,23 +569,23 @@ function New-TextSizeCacheKey {
 function Get-TextSizeFromCache {
     param([Parameter(Mandatory)][string]$Key, [string]$Path = $Global:TextSizeCachePath)
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
-    
+
     try {
         $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
         if (-not $raw) { return $null }
-        
+
         $db = $raw | ConvertFrom-Json -ErrorAction Stop
         if ($db.PSObject.Properties.Name -contains $Key) { return $db.$Key }
     }
     catch {
         # If any file read or json parse error occurs, return null (miss)
-        return $null 
+        return $null
     }
     return $null
 }
 function Set-TextSizeCacheEntry {
     param([Parameter(Mandatory)][string]$Key, [Parameter(Mandatory)]$Result, [string]$Path = $Global:TextSizeCachePath)
-    
+
     # Ensure directory exists
     if (-not (Test-Path -LiteralPath $Path)) {
         try { '{}' | Set-Content -LiteralPath $Path -Encoding UTF8 } catch {}
@@ -589,34 +593,34 @@ function Set-TextSizeCacheEntry {
 
     $lockPath = "$Path.lock"
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    
+
     # Wait for lock
     while (Test-Path -LiteralPath $lockPath) {
         Start-Sleep -Milliseconds 50
         if ($sw.ElapsedMilliseconds -gt 5000) { break }
     }
-    
+
     # Create lock
     New-Item -ItemType File -Path $lockPath -Force | Out-Null
-    
+
     try {
         $raw = if (Test-Path -LiteralPath $Path) { Get-Content -LiteralPath $Path -Raw -Encoding UTF8 } else { '{}' }
         if (-not $raw) { $raw = '{}' }
-        
+
         try {
             $db = $raw | ConvertFrom-Json -ErrorAction Stop
         }
         catch {
             # If JSON is corrupt, log it and reset DB so we don't crash next time
             Write-Entry -Message "TextSizeCache JSON is corrupt. Resetting cache." -Path $global:configLogging -Color Yellow -log Warning
-            $db = @{} 
+            $db = @{}
         }
 
         if ($null -eq $db) { $db = @{ } }
-        
+
         $db | Add-Member -NotePropertyName $Key -NotePropertyValue $Result -Force
         ($db | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $Path -Encoding UTF8
-    } 
+    }
     catch {
         Write-Entry -Message "Failed to write to TextSizeCache: $_" -Path $global:configLogging -Color Red -log Error
     }
@@ -1464,16 +1468,16 @@ function Get-OptimalPointSize {
 
     try {
         if (-not $script:IMVersion) { $script:IMVersion = (& $magick -version | Select-Object -First 1) }
-        
+
         $__tsc_Params = @{
             font=$fontImagemagick; w=$box_width; h=$box_height;
             min=$min_pointsize; max=$max_pointsize; line=$lineSpacing;
             imv=$script:IMVersion; algo='Get-OptimalPointSize-v1'
         }
-        
+
         $__tsc_Key  = New-TextSizeCacheKey -Text $text -Params $__tsc_Params
         $__tsc_Path = if ($Global:TextSizeCachePath) { $Global:TextSizeCachePath } else { Join-Path $global:ScriptRoot 'Cache\text_size_cache.json' }
-        
+
         # Wrapped in try/catch to ensure corruption doesn't stop flow
         try {
             $__tsc_Hit = Get-TextSizeFromCache -Key $__tsc_Key -Path $__tsc_Path
@@ -9272,12 +9276,12 @@ Elseif ($Testing) {
             # 2. Create the stroke-only text layer (background none).
             # 3. Create the fill-only text layer (background none).
             # 4. Composite them in order: Background -> Stroke -> Fill.
-            
+
             return "`"$InputFile`" -gravity center -background none -layers Flatten ( -size `"$BoxSize`" xc:`"#F3AC7C`" ( -font `"$Font`" -pointsize `"$PointSize`" -fill `"$StrokeColor`" -stroke `"$StrokeColor`" -strokewidth `"$StrokeWidth`" -size `"$BoxSize`" -background none -interline-spacing `"$LineSpacing`" -gravity `"$TextGravity`" caption:`"$CaptionText`" ) -gravity center -composite ( -font `"$Font`" -pointsize `"$PointSize`" -fill `"$FontColor`" -stroke none -size `"$BoxSize`" -background none -interline-spacing `"$LineSpacing`" -gravity `"$TextGravity`" caption:`"$CaptionText`" ) -gravity center -composite -trim +repage -extent `"$BoxSize`" ) -gravity south -geometry +0+`"$TextOffset`" -quality $global:outputQuality -composite `"$OutputFile`""
         }
         else {
             # Simple single-pass render. We can just set the background here.
-            
+
             return "`"$InputFile`" -gravity center -background none -layers Flatten ( -font `"$Font`" -pointsize `"$PointSize`" -fill `"$FontColor`" -size `"$BoxSize`" -background `"#F3AC7C`" -interline-spacing `"$LineSpacing`" -gravity `"$TextGravity`" caption:`"$CaptionText`" -trim +repage -extent `"$BoxSize`" ) -gravity south -geometry +0+`"$TextOffset`" -quality $global:outputQuality -composite `"$OutputFile`""
         }
     }
@@ -10158,6 +10162,7 @@ Elseif ($Tautulli) {
                             $LocalAssetMissing = $null
                             $Arturl = $null
                             $global:LogoUrl = $null
+                            $global:LogoLanguage = $null
 
                             if ($entry.PlexPosterUrl -like "/library/*") {
                                 if ($PlexToken) {
@@ -10414,6 +10419,7 @@ Elseif ($Tautulli) {
                                             if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -10429,18 +10435,18 @@ Elseif ($Tautulli) {
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -10627,6 +10633,9 @@ Elseif ($Tautulli) {
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -10998,6 +11007,7 @@ Elseif ($Tautulli) {
                                             if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -11013,18 +11023,18 @@ Elseif ($Tautulli) {
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -11213,6 +11223,9 @@ Elseif ($Tautulli) {
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -11671,6 +11684,7 @@ Elseif ($Tautulli) {
                                         if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
+                                            $global:LogoLanguage = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
                                             $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -11686,18 +11700,18 @@ Elseif ($Tautulli) {
                                                 $global:IsFallback = $false
                                                 switch ($global:FavProvider) {
                                                     'TMDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'TVDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'FANART' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                 }
@@ -11884,6 +11898,9 @@ Elseif ($Tautulli) {
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -12266,6 +12283,7 @@ Elseif ($Tautulli) {
                                         if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
+                                            $global:LogoLanguage = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
                                             $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -12281,18 +12299,18 @@ Elseif ($Tautulli) {
                                                 $global:IsFallback = $false
                                                 switch ($global:FavProvider) {
                                                     'TMDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'TVDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'FANART' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                 }
@@ -12485,6 +12503,9 @@ Elseif ($Tautulli) {
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -13208,6 +13229,9 @@ Elseif ($Tautulli) {
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -13865,6 +13889,9 @@ Elseif ($Tautulli) {
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -14503,6 +14530,9 @@ Elseif ($Tautulli) {
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -14633,6 +14663,9 @@ Elseif ($Tautulli) {
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Language" -Value $null
+        $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value $null
+        $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $null
+        $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $null
@@ -15792,6 +15825,7 @@ Elseif ($ArrTrigger) {
                                                 if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                     $ApplyTextInsteadOfLogo = $null
                                                     $global:LogoUrl = $null
+                                                    $global:LogoLanguage = $null
                                                     $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                     $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -15807,18 +15841,18 @@ Elseif ($ArrTrigger) {
                                                         $global:IsFallback = $false
                                                         switch ($global:FavProvider) {
                                                             'TMDB' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                             'TVDB' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                             'FANART' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                         }
@@ -15963,6 +15997,9 @@ Elseif ($ArrTrigger) {
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -16313,6 +16350,7 @@ Elseif ($ArrTrigger) {
                                                 if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                     $ApplyTextInsteadOfLogo = $null
                                                     $global:LogoUrl = $null
+                                                    $global:LogoLanguage = $null
                                                     $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                     $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -16328,18 +16366,18 @@ Elseif ($ArrTrigger) {
                                                         $global:IsFallback = $false
                                                         switch ($global:FavProvider) {
                                                             'TMDB' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                             'TVDB' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                             'FANART' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                         }
@@ -16488,6 +16526,9 @@ Elseif ($ArrTrigger) {
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -16917,6 +16958,7 @@ Elseif ($ArrTrigger) {
                                             if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -16932,18 +16974,18 @@ Elseif ($ArrTrigger) {
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -17090,6 +17132,9 @@ Elseif ($ArrTrigger) {
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -17451,6 +17496,7 @@ Elseif ($ArrTrigger) {
                                             if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -17466,18 +17512,18 @@ Elseif ($ArrTrigger) {
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -17624,6 +17670,9 @@ Elseif ($ArrTrigger) {
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -18232,6 +18281,9 @@ Elseif ($ArrTrigger) {
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -18767,6 +18819,9 @@ Elseif ($ArrTrigger) {
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'True' } Else { 'False' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -19285,6 +19340,9 @@ Elseif ($ArrTrigger) {
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'True' } Else { 'False' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -19453,6 +19511,9 @@ Elseif ($ArrTrigger) {
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Language" -Value $null
+            $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value $null
+            $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $null
+            $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $null
@@ -20183,6 +20244,7 @@ Elseif ($ArrTrigger) {
                                                 if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                     $ApplyTextInsteadOfLogo = $null
                                                     $global:LogoUrl = $null
+                                                    $global:LogoLanguage = $null
                                                     $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                     $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -20198,18 +20260,18 @@ Elseif ($ArrTrigger) {
                                                         $global:IsFallback = $false
                                                         switch ($global:FavProvider) {
                                                             'TMDB' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                             'TVDB' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                             'FANART' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                         }
@@ -20396,6 +20458,9 @@ Elseif ($ArrTrigger) {
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -20767,6 +20832,7 @@ Elseif ($ArrTrigger) {
                                                 if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                     $ApplyTextInsteadOfLogo = $null
                                                     $global:LogoUrl = $null
+                                                    $global:LogoLanguage = $null
                                                     $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                     $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -20782,18 +20848,18 @@ Elseif ($ArrTrigger) {
                                                         $global:IsFallback = $false
                                                         switch ($global:FavProvider) {
                                                             'TMDB' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                             'TVDB' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                             'FANART' {
-                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                    $global:IsFallback = $true 
+                                                                if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                    $global:IsFallback = $true
                                                                 }
                                                             }
                                                         }
@@ -20981,6 +21047,9 @@ Elseif ($ArrTrigger) {
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -21439,6 +21508,7 @@ Elseif ($ArrTrigger) {
                                             if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -21454,18 +21524,18 @@ Elseif ($ArrTrigger) {
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -21652,6 +21722,9 @@ Elseif ($ArrTrigger) {
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -22034,6 +22107,7 @@ Elseif ($ArrTrigger) {
                                             if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -22049,18 +22123,18 @@ Elseif ($ArrTrigger) {
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -22253,6 +22327,9 @@ Elseif ($ArrTrigger) {
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -22975,6 +23052,9 @@ Elseif ($ArrTrigger) {
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -23632,6 +23712,9 @@ Elseif ($ArrTrigger) {
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -24270,6 +24353,9 @@ Elseif ($ArrTrigger) {
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -24400,6 +24486,9 @@ Elseif ($ArrTrigger) {
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Language" -Value $null
+            $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value $null
+            $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $null
+            $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $null
             $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $null
@@ -26710,6 +26799,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -26725,18 +26815,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -26882,6 +26972,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -27232,6 +27325,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -27247,18 +27341,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -27407,6 +27501,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -27836,6 +27933,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
+                                            $global:LogoLanguage = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
                                             $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -27851,18 +27949,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $global:IsFallback = $false
                                                 switch ($global:FavProvider) {
                                                     'TMDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'TVDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'FANART' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                 }
@@ -28009,6 +28107,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -28370,6 +28471,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
+                                            $global:LogoLanguage = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
                                             $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -28385,18 +28487,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $global:IsFallback = $false
                                                 switch ($global:FavProvider) {
                                                     'TMDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'TVDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'FANART' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                 }
@@ -28543,6 +28645,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -29165,6 +29270,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -29700,6 +29808,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'True' } Else { 'False' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -30218,6 +30329,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'True' } Else { 'False' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -30469,6 +30583,9 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Language" -Value $null
+        $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value $null
+        $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $null
+        $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $null
@@ -31478,6 +31595,7 @@ else {
                                             if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -31493,18 +31611,18 @@ else {
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -31692,6 +31810,9 @@ else {
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -32128,6 +32249,7 @@ else {
                                             if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                                 $ApplyTextInsteadOfLogo = $null
                                                 $global:LogoUrl = $null
+                                                $global:LogoLanguage = $null
                                                 $allProviders = @('TMDB', 'FANART', 'TVDB')
                                                 $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -32143,18 +32265,18 @@ else {
                                                     $global:IsFallback = $false
                                                     switch ($global:FavProvider) {
                                                         'TMDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'TVDB' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                         'FANART' {
-                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                                $global:IsFallback = $true 
+                                                            if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                                $global:IsFallback = $true
                                                             }
                                                         }
                                                     }
@@ -32344,6 +32466,9 @@ else {
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -32869,6 +32994,7 @@ else {
                                         if ($UseLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
+                                            $global:LogoLanguage = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
                                             $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -32884,18 +33010,18 @@ else {
                                                 $global:IsFallback = $false
                                                 switch ($global:FavProvider) {
                                                     'TMDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'TVDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'FANART' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                 }
@@ -33084,6 +33210,9 @@ else {
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -33534,6 +33663,7 @@ else {
                                         if ($UseBGLogo -eq 'true' -and ($global:UseClearlogo -eq 'true' -or $global:UseClearart -eq 'true')) {
                                             $ApplyTextInsteadOfLogo = $null
                                             $global:LogoUrl = $null
+                                            $global:LogoLanguage = $null
                                             $allProviders = @('TMDB', 'FANART', 'TVDB')
                                             $searchOrder = @($global:FavProvider) + ($allProviders -ne $global:FavProvider)
 
@@ -33549,18 +33679,18 @@ else {
                                                 $global:IsFallback = $false
                                                 switch ($global:FavProvider) {
                                                     'TMDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://image.tmdb.org"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'TVDB' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://artworks.thetvdb.com"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                     'FANART' {
-                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) { 
-                                                            $global:IsFallback = $true 
+                                                        if (-not ($global:LogoUrl.StartsWith("https://assets.fanart.tv"))) {
+                                                            $global:IsFallback = $true
                                                         }
                                                     }
                                                 }
@@ -33750,6 +33880,9 @@ else {
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -34551,6 +34684,9 @@ else {
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -35270,6 +35406,9 @@ else {
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -35974,6 +36113,9 @@ else {
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $($entry.RootFoldername)
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $($entry.'Library Name')
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -36279,6 +36421,9 @@ else {
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Rootfolder" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "LibraryName" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Language" -Value $null
+        $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value $null
+        $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $null
+        $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $null
         $ImageChoicesDummycsv | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $null

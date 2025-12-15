@@ -56,6 +56,9 @@ class ImageChoicesDB:
                         tmdbid TEXT,
                         tvdbid TEXT,
                         imdbid TEXT,
+                        LogoSource TEXT,
+                        LogoLanguage TEXT,
+                        LogoTextFallback TEXT,
                         created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                         updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                         UNIQUE(Title, Rootfolder, Type, LibraryName)
@@ -76,6 +79,10 @@ class ImageChoicesDB:
 
                 conn.commit()
                 conn.close()
+
+            # Run schema migration check to add columns to existing DBs
+            self.check_schema_updates()
+
             logger.info("✓ ImageChoices database initialized successfully")
             logger.info("=" * 60)
         except sqlite3.Error as e:
@@ -84,6 +91,48 @@ class ImageChoicesDB:
                 conn.rollback()
                 conn.close()
             raise
+
+    def check_schema_updates(self):
+        """
+        Automatic Schema Migration:
+        Checks for missing columns and adds them dynamically.
+        This allows updates without deleting the database.
+        """
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+
+                # Get list of existing columns in the table
+                cursor.execute("PRAGMA table_info(imagechoices)")
+                existing_columns = {row['name'] for row in cursor.fetchall()}
+
+                # Define columns that MUST exist and their types
+                required_columns = {
+                    "LogoSource": "TEXT",
+                    "LogoLanguage": "TEXT",
+                    "LogoTextFallback": "TEXT"
+                }
+
+                # Check and Add
+                changes_made = False
+                for col_name, col_type in required_columns.items():
+                    if col_name not in existing_columns:
+                        logger.info(f"MIGRATION: Adding missing column '{col_name}' to database...")
+                        cursor.execute(f"ALTER TABLE imagechoices ADD COLUMN {col_name} {col_type}")
+                        changes_made = True
+
+                if changes_made:
+                    conn.commit()
+                    logger.info("✓ Schema migration completed successfully")
+                else:
+                    logger.debug("Schema is up to date")
+
+                conn.close()
+            except sqlite3.Error as e:
+                logger.error(f"Error during schema migration: {e}")
+                if 'conn' in locals():
+                    conn.close()
 
     def close(self):
         """Close connection - No longer needed as connections are per-function."""
@@ -346,6 +395,9 @@ class ImageChoicesDB:
                                 clean_row.get("Download Source", ""),
                                 clean_row.get("Fav Provider Link", ""),
                                 clean_row.get("Manual", ""),
+                                clean_row.get("Logo Source", ""),
+                                clean_row.get("Logo Language", ""),
+                                clean_row.get("Logo TextFallback", ""),
                             ))
                         except Exception as e_row:
                             logger.warning(f"Error processing CSV row {i+1}: {e_row}")
@@ -363,8 +415,9 @@ class ImageChoicesDB:
                     sql_upsert = """
                         INSERT INTO imagechoices (
                             Title, Type, Rootfolder, LibraryName, Language,
-                            Fallback, TextTruncated, DownloadSource, FavProviderLink, Manual
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            Fallback, TextTruncated, DownloadSource, FavProviderLink, Manual,
+                            LogoSource, LogoLanguage, LogoTextFallback
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(Title, Rootfolder, Type, LibraryName) DO UPDATE SET
                             Language = excluded.Language,
                             Fallback = excluded.Fallback,
@@ -372,6 +425,9 @@ class ImageChoicesDB:
                             DownloadSource = excluded.DownloadSource,
                             FavProviderLink = excluded.FavProviderLink,
                             Manual = excluded.Manual,
+                            LogoSource = excluded.LogoSource,
+                            LogoLanguage = excluded.LogoLanguage,
+                            LogoTextFallback = excluded.LogoTextFallback,
                             updated_at = (datetime('now', 'localtime'))
                         WHERE
                             imagechoices.Language IS NOT excluded.Language OR
@@ -379,7 +435,10 @@ class ImageChoicesDB:
                             imagechoices.TextTruncated IS NOT excluded.TextTruncated OR
                             imagechoices.DownloadSource IS NOT excluded.DownloadSource OR
                             imagechoices.FavProviderLink IS NOT excluded.FavProviderLink OR
-                            imagechoices.Manual IS NOT excluded.Manual
+                            imagechoices.Manual IS NOT excluded.Manual OR
+                            imagechoices.LogoSource IS NOT excluded.LogoSource OR
+                            imagechoices.LogoLanguage IS NOT excluded.LogoLanguage OR
+                            imagechoices.LogoTextFallback IS NOT excluded.LogoTextFallback
                     """
 
                     cursor.executemany(sql_upsert, records_to_upsert)
