@@ -1029,6 +1029,7 @@ def scan_and_cache_assets():
         "titlecards": [],
         "folders": [],
         "manual_gallery": {"libraries": [], "total_assets": 0},
+        "backup_gallery": {"libraries": [], "total_assets": 0}, # NEW: Initialize backup gallery
         "last_scanned": 0, # Will be set at the end
     }
 
@@ -1041,6 +1042,9 @@ def scan_and_cache_assets():
         return
 
     try:
+        # =========================================================
+        # 1. MAIN ASSETS SCAN (Existing Logic)
+        # =========================================================
         # Scan once for all image types and filter @eaDir in one pass
         image_extensions = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -1093,7 +1097,7 @@ def scan_and_cache_assets():
             temp_folders[folder_name]["files"] += 1
             temp_folders[folder_name]["size"] += image_data["size"]
 
-            # 2. Add assets to the 'new_cache', not the global 'asset_cache'
+            # Add assets to the 'new_cache'
             if is_poster_file(image_path.name):
                 new_cache["posters"].append(image_data)
                 temp_folders[folder_name]["poster_count"] += 1
@@ -1108,7 +1112,7 @@ def scan_and_cache_assets():
                 temp_folders[folder_name]["titlecard_count"] += 1
 
         logger.info("Sorting asset lists...")
-        # 3. Sort the lists in 'new_cache'
+        # Sort the lists in 'new_cache'
         for key in ["posters", "backgrounds", "seasons", "titlecards"]:
             new_cache[key].sort(key=lambda x: x["path"])
 
@@ -1123,9 +1127,11 @@ def scan_and_cache_assets():
                 + folder["titlecard_count"]
             )
         folder_list.sort(key=lambda x: x["name"])
-        # 4. Add folders to 'new_cache'
         new_cache["folders"] = folder_list
 
+        # =========================================================
+        # 2. MANUAL ASSETS SCAN (Existing Logic)
+        # =========================================================
         logger.info("Scanning manual assets directory...")
         manual_libraries = []
         manual_total_assets = 0
@@ -1180,6 +1186,7 @@ def scan_and_cache_assets():
                                         "type": asset_type,
                                         "size": img_file.stat().st_size,
                                         "url": f"/manual_poster_assets/{encoded_relative_path}",
+                                        "modified": img_file.stat().st_mtime
                                     }
                                 )
                                 manual_total_assets += 1
@@ -1205,7 +1212,7 @@ def scan_and_cache_assets():
             except Exception as e:
                 logger.error(f"Error scanning manual assets directory: {e}")
 
-        # 5. Add manual gallery to 'new_cache'
+        # Add manual gallery to 'new_cache'
         new_cache["manual_gallery"] = {
             "libraries": manual_libraries,
             "total_assets": manual_total_assets
@@ -1214,16 +1221,106 @@ def scan_and_cache_assets():
             f"Manual assets scan complete: {len(manual_libraries)} libraries, {manual_total_assets} total assets"
         )
 
-        # 6. Now that 'new_cache' is fully built, replace the global 'asset_cache'
-        #    This is a single, instant operation.
+        # =========================================================
+        # 3. BACKUP ASSETS SCAN (NEW LOGIC)
+        # =========================================================
+        logger.info("Scanning backup assets directory...")
+        backup_libraries = []
+        backup_total_assets = 0
+
+        if not BACKUP_DIR.exists():
+            logger.warning(f"Backup assets directory does not exist: {BACKUP_DIR}")
+        else:
+            try:
+                for library_dir in BACKUP_DIR.iterdir():
+                    if not library_dir.is_dir() or library_dir.name == "@eaDir":
+                        continue
+
+                    library_name = library_dir.name
+                    folders = []
+
+                    for folder_dir in library_dir.iterdir():
+                        if not folder_dir.is_dir() or folder_dir.name == "@eaDir":
+                            continue
+
+                        folder_name = folder_dir.name
+                        assets = []
+
+                        for img_file in folder_dir.iterdir():
+                            if "@eaDir" in img_file.parts:
+                                continue
+
+                            # Support standard image extensions
+                            # Note: You can add or remove specific extensions here
+                            if img_file.is_file() and img_file.suffix.lower() in [
+                                ".jpg", ".jpeg", ".png", ".webp"
+                            ]:
+                                filename_lower = img_file.name.lower()
+
+                                # Determine Asset Type based on filename patterns
+                                if "poster" in filename_lower:
+                                    asset_type = "poster"
+                                elif "background" in filename_lower:
+                                    asset_type = "background"
+                                elif filename_lower.startswith("season"):
+                                    asset_type = "season"
+                                elif re.match(r"^s\d+e\d+\.", filename_lower, re.IGNORECASE):
+                                    asset_type = "titlecard"
+                                else:
+                                    asset_type = "other"
+
+                                relative_path = f"{library_name}/{folder_name}/{img_file.name}"
+                                encoded_relative_path = quote(relative_path, safe="/")
+
+                                assets.append({
+                                    "name": img_file.name,
+                                    "path": relative_path,
+                                    "type": asset_type,
+                                    "size": img_file.stat().st_size,
+                                    "url": f"/backup_assets/{encoded_relative_path}", # Points to static mount
+                                    "modified": img_file.stat().st_mtime
+                                })
+                                backup_total_assets += 1
+
+                        if assets:
+                            folders.append({
+                                "name": folder_name,
+                                "path": f"{library_name}/{folder_name}",
+                                "assets": assets,
+                                "asset_count": len(assets),
+                            })
+
+                    if folders:
+                        backup_libraries.append({
+                            "name": library_name,
+                            "folders": folders,
+                            "folder_count": len(folders),
+                        })
+            except Exception as e:
+                logger.error(f"Error scanning backup assets directory: {e}")
+
+        # Add backup gallery to 'new_cache'
+        new_cache["backup_gallery"] = {
+            "libraries": backup_libraries,
+            "total_assets": backup_total_assets
+        }
+        logger.info(
+            f"Backup assets scan complete: {len(backup_libraries)} libraries, {backup_total_assets} total assets"
+        )
+
+        # =========================================================
+        # 4. FINALIZE CACHE UPDATE
+        # =========================================================
+        # Now that 'new_cache' is fully built, replace the global 'asset_cache'
+        # This is a single, instant operation.
         new_cache["last_scanned"] = time.time()
         asset_cache = new_cache
 
     except Exception as e:
         logger.error(f"An error occurred during asset scan: {e}")
     finally:
-        # 7. Update log message to use 'new_cache' and release lock
-        cache_scan_in_progress = False  # Release lock
+        # Release lock
+        cache_scan_in_progress = False
         scan_duration = time.time() - scan_start_time
         logger.info(
             f"Asset cache refresh finished in {scan_duration:.1f}s. "
@@ -1231,7 +1328,9 @@ def scan_and_cache_assets():
             f"{len(new_cache['backgrounds'])} backgrounds, "
             f"{len(new_cache['seasons'])} seasons, "
             f"{len(new_cache['titlecards'])} titlecards, "
-            f"{len(new_cache['folders'])} folders."
+            f"{len(new_cache['folders'])} folders, "
+            f"{new_cache['manual_gallery']['total_assets']} manual assets, "
+            f"{new_cache['backup_gallery']['total_assets']} backup assets."
         )
 
 def background_cache_refresh(skip_initial_scan: bool = False):
@@ -4078,11 +4177,18 @@ async def perform_jellyfin_emby_action(request: JellyfinEmbyActionRequest):
 
 @app.get("/api/libraries/{server_type}/cached")
 async def get_cached_libraries(server_type: str):
-    # ... (This function remains unchanged) ...
     logger.info(f"Fetching cached libraries for {server_type}")
 
     if server_type not in ["plex", "jellyfin", "emby"]:
         return {"success": False, "error": "Invalid server type"}
+    
+    if not SERVER_LIBRARIES_DB_AVAILABLE or server_libraries_db is None:
+        return {
+            "success": True, 
+            "libraries": [], 
+            "excluded": [],
+            "message": "Server libraries database not initialized"
+        }
 
     try:
         result = server_libraries_db.get_media_server_libraries(server_type)
@@ -4103,7 +4209,6 @@ class LibraryExclusionUpdate(BaseModel):
 
 @app.post("/api/libraries/{server_type}/exclusions")
 async def update_library_exclusions(server_type: str, request: LibraryExclusionUpdate):
-    # ... (This function remains unchanged) ...
     logger.info(f"Updating exclusions for {server_type}: {request.excluded_libraries}")
 
     if server_type not in ["plex", "jellyfin", "emby"]:
@@ -8361,6 +8466,98 @@ async def bulk_delete_manual_assets(request: BulkDeleteRequest):
 
 
 # ============================================================================
+# BACKUP ASSETS ENDPOINTS
+# ============================================================================
+
+@app.get("/api/backup-assets-gallery")
+async def get_backup_assets_gallery():
+    """Get all assets from backup directory - (uses cache)"""
+    try:
+        cache = get_fresh_assets()
+        # Return empty structure if not found in cache yet
+        return cache.get("backup_gallery", {"libraries": [], "total_assets": 0})
+    except Exception as e:
+        logger.error(f"Error getting backup gallery: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/backup-assets/{path:path}")
+async def delete_backup_asset(path: str):
+    """Delete an asset from the backup directory"""
+    try:
+        # Construct the full file path
+        file_path = BACKUP_DIR / path
+
+        # Ensure the path is within BACKUP_DIR
+        try:
+            file_path = file_path.resolve()
+            file_path.relative_to(BACKUP_DIR.resolve())
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Access denied: Invalid path")
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Asset not found")
+
+        file_path.unlink()
+        logger.info(f"Deleted backup asset: {file_path}")
+
+        # Trigger background scan to update cache
+        threading.Thread(target=scan_and_cache_assets, daemon=True).start()
+
+        return {"success": True, "message": f"Backup asset '{path}' deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting backup asset {path}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/backup-assets/bulk-delete")
+async def bulk_delete_backup_assets(request: BulkDeleteRequest):
+    """Bulk delete assets from the backup directory"""
+    try:
+        deleted = []
+        failed = []
+
+        for path in request.paths:
+            try:
+                file_path = BACKUP_DIR / path
+                try:
+                    file_path = file_path.resolve()
+                    file_path.relative_to(BACKUP_DIR.resolve())
+                except ValueError:
+                    failed.append({"path": path, "error": "Access denied"})
+                    continue
+
+                if not file_path.exists():
+                    failed.append({"path": path, "error": "File not found"})
+                    continue
+
+                file_path.unlink()
+                deleted.append(path)
+                logger.info(f"Deleted backup asset: {file_path}")
+            except Exception as e:
+                failed.append({"path": path, "error": str(e)})
+
+        # Trigger background scan
+        threading.Thread(target=scan_and_cache_assets, daemon=True).start()
+
+        return {
+            "success": True,
+            "deleted": deleted,
+            "failed": failed,
+            "message": f"Deleted {len(deleted)} backup asset(s)."
+        }
+    except Exception as e:
+        logger.error(f"Error in bulk delete backups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Mount Static Files for Backups
+if BACKUP_DIR.exists():
+    app.mount(
+        "/backup_assets",
+        CachedStaticFiles(directory=str(BACKUP_DIR), max_age=86400),
+        name="backup_assets",
+    )
+    logger.info(f"Mounted /backup_assets -> {BACKUP_DIR}")
 
 
 @app.get("/api/assets-folders")
@@ -8528,11 +8725,19 @@ async def get_recent_assets():
     USES FAST CACHE FOR IMAGE LOOKUPS
     """
     try:
+        if not DATABASE_AVAILABLE or db is None:
+            # Return empty list instead of crashing if DB isn't ready
+            return {
+                "success": True,
+                "assets": [],
+                "total_count": 0,
+            }
+
         # CSV import is handled by logs_watcher, no import needed here
         try:
             pass # Keep block for safety
         except Exception as e:
-            logger.warning(f"Could not import CSV to database: {e}") # This should not run
+            logger.warning(f"Could not import CSV to database: {e}") 
 
         # Get all assets from database (already sorted by id DESC - newest first)
         db_records = db.get_all_choices()
