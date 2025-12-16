@@ -64,8 +64,35 @@ function RecentAssets({ refreshTrigger = 0 }) {
       const data = await response.json();
 
       if (data.success) {
-        cachedAssets = data.assets;
-        setAssets(data.assets);
+        // We filter out duplicates that have the same path, type, and creation time.
+        // If a duplicate is found, we prefer the one that DOES NOT have a URL as the title.
+        const uniqueMap = new Map();
+
+        data.assets.forEach((asset) => {
+          // Create a unique key based on properties that define a specific upload event
+          const uniqueKey = `${asset.rootfolder}-${asset.type}-${asset.created}`;
+
+          if (!uniqueMap.has(uniqueKey)) {
+            uniqueMap.set(uniqueKey, asset);
+          } else {
+            // Collision detected. Check if we should swap the existing one for this one.
+            const existing = uniqueMap.get(uniqueKey);
+
+            // Check if titles look like URLs (indicators of malformed data)
+            const existingTitleIsUrl = existing.title?.startsWith("http");
+            const newTitleIsUrl = asset.title?.startsWith("http");
+
+            // If the stored one is a URL but the new one is a real title, use the new one.
+            if (existingTitleIsUrl && !newTitleIsUrl) {
+              uniqueMap.set(uniqueKey, asset);
+            }
+          }
+        });
+
+        const cleanedAssets = Array.from(uniqueMap.values());
+
+        cachedAssets = cleanedAssets;
+        setAssets(cleanedAssets);
         setError(null);
 
         if (!hasInitiallyLoaded.current) {

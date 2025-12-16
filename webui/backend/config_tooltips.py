@@ -110,6 +110,8 @@ CONFIG_TOOLTIPS = {
     "UseClearlogo": "Set to true to use Clearlogo.",
     "UseClearart": "Set to true to use Clearart.",
     "LogoTextFallback": "Set to true to fallback to Text if no logos are found.",
+    "ConvertLogoColor": "Set to true to convert the logo image to a solid color (monochrome).",
+    "LogoFlatColor": "The specific color to use when Convert Logo Color is enabled (e.g., 'white', '#FFFFFF').",
     # OverlayPart
     "ImageProcessing": "Set to true if you want the ImageMagick part (text, overlay and/or border); if false, it only downloads the posters",
     "outputQuality": "Image output quality (default is 92%). Setting to 100% doubles the image size",
