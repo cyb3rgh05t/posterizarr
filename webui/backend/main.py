@@ -70,7 +70,7 @@ if IS_DOCKER:
     MANUAL_ASSETS_DIR = Path("/manualassets")
     IMAGES_DIR = Path("/config/Cache/images")
     FRONTEND_DIR = Path("/app/frontend/dist")
-    BACKUP_DIR = BASE_DIR / "assetsbackup"  # Docker default
+    BACKUP_DIR = Path("/assetsbackup")
 else:
     # Local: webui/backend/main.py -> project root (3 levels up)
     PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -4181,11 +4181,11 @@ async def get_cached_libraries(server_type: str):
 
     if server_type not in ["plex", "jellyfin", "emby"]:
         return {"success": False, "error": "Invalid server type"}
-    
+
     if not SERVER_LIBRARIES_DB_AVAILABLE or server_libraries_db is None:
         return {
-            "success": True, 
-            "libraries": [], 
+            "success": True,
+            "libraries": [],
             "excluded": [],
             "message": "Server libraries database not initialized"
         }
@@ -8737,7 +8737,7 @@ async def get_recent_assets():
         try:
             pass # Keep block for safety
         except Exception as e:
-            logger.warning(f"Could not import CSV to database: {e}") 
+            logger.warning(f"Could not import CSV to database: {e}")
 
         # Get all assets from database (already sorted by id DESC - newest first)
         db_records = db.get_all_choices()
