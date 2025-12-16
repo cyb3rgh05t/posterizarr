@@ -7880,6 +7880,7 @@ $SeasonsTemp = $null
 $SeasonNames = $null
 $SeasonNumbers = $null
 $SeasonRatingkeys = $null
+$ApplyTextInsteadOfLogo = $null
 
 # Define cross-platform paths
 $LogsPath = Join-Path $global:ScriptRoot 'Logs'
