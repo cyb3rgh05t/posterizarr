@@ -35,6 +35,7 @@ import SeasonGallery from "./SeasonGallery";
 import TitleCardGallery from "./TitleCardGallery";
 import FolderView from "./FolderView";
 import ScrollToButtons from "./ScrollToButtons"; // Used by child tabs
+import BackupAssets from "./BackupAssets";
 
 const API_URL = "/api";
 
@@ -72,6 +73,7 @@ function GalleryHub() {
 
     if (path.includes("/test-gallery")) return "testGallery";
     if (path.includes("/manual-assets")) return "manualAssets";
+    if (path.includes("/asset-backups")) return "backupAssets";
     if (path.includes("/asset-overview")) return "assetOverview";
 
     // Default to "posters"
@@ -83,17 +85,19 @@ function GalleryHub() {
   // This function will render the correct tab's content
   const renderActiveTabContent = () => {
 
-    // --- MODIFICATION: Updated logic ---
     if (activeTab === "overlayUpload") {
       return <OverlayUploadView />;
     }
     if (activeTab === "overlayFiles") {
       return <OverlayFilesView />;
     }
-    // --- END MODIFICATION ---
 
     if (activeTab === "testGallery") {
       return <TestGalleryTab />;
+    }
+
+    if (activeTab === "backupAssets") {
+      return <BackupAssets />;
     }
 
     // These routes are handled by their own <Route>
