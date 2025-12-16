@@ -131,6 +131,17 @@ function BackupAssets() {
 
   useEffect(() => localStorage.setItem("backup-assets-sort-order", sortOrder), [sortOrder]);
 
+  // Click outside listener for sorting
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+        setSortDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const getSortedAssets = (assetsToSort) => {
     const sorted = [...assetsToSort];
     sorted.sort((a, b) => {
@@ -320,6 +331,20 @@ function BackupAssets() {
   const allGridAssets = viewMode === "grid" ? getAllAssets() : [];
   const displayedGridAssets = allGridAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  // --- Grid View Pagination Logic for FOLDER view ---
+  // When in folder view, if we are at level 2 (assets), we might need pagination
+  const toggleSelectAllGrid = () => {
+    const viewData = getCurrentViewData();
+    if (viewData.type === "assets") {
+       const displayedAssets = viewData.items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+       if (selectedAssets.size === displayedAssets.length) {
+         clearSelection();
+       } else {
+         setSelectedAssets(new Set(displayedAssets.map(a => a.path)));
+       }
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin w-10 h-10 text-theme-primary" /></div>;
   if (error) return <div className="text-red-500 p-6 border border-red-500/50 rounded-lg">{error}</div>;
 
@@ -481,8 +506,9 @@ function BackupAssets() {
       {/* 3. FOLDER VIEW CONTENT */}
       {viewMode === "folder" && (
         <div className="bg-theme-card border border-theme-border rounded-lg p-4">
+          {/* Breadcrumb Navigation */}
           <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
-            <button onClick={navigateHome} className="flex items-center gap-2 px-3 py-2 bg-theme-primary text-white rounded-lg flex-shrink-0">
+            <button onClick={navigateHome} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all text-sm font-medium ${currentPath.length === 0 ? "bg-theme-primary text-white" : "bg-theme-hover text-theme-text"}`}>
                 <Home className="w-4 h-4" /> {t("backupAssets.title")}
             </button>
             {currentPath.map((part, i) => (
@@ -495,17 +521,84 @@ function BackupAssets() {
             ))}
           </div>
 
-          {currentPath.length === 2 && (
-             <div className="flex items-center gap-4 mb-4 flex-wrap border-b border-theme-border pb-4">
-                <CompactImageSizeSlider value={imageSize} onChange={setImageSize} />
-                <button onClick={() => setBulkDeleteMode(!bulkDeleteMode)} className={`px-4 py-2 rounded-lg text-sm ${bulkDeleteMode ? "bg-orange-600 text-white" : "bg-theme-primary text-white"}`}>
-                    {bulkDeleteMode ? t("backupAssets.cancelSelection") : t("backupAssets.selectMultiple")}
-                </button>
-                {bulkDeleteMode && selectedAssets.size > 0 && (
-                    <button onClick={bulkDeleteAssets} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm flex items-center gap-2">
-                        <Trash2 className="w-4 h-4"/> {t("backupAssets.deleteSelected")} ({selectedAssets.size})
+          {/* Search & Controls Bar */}
+          <div className="flex flex-wrap items-center gap-4 mb-4 border-b border-theme-border pb-4">
+             {/* Search */}
+             <div className="flex-1 min-w-[200px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-muted" />
+                  <input
+                    type="text"
+                    placeholder={t("backupAssets.searchPlaceholder")}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-10 py-2 bg-theme-bg border border-theme-primary/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-theme-primary text-sm text-theme-text"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-theme-muted hover:text-theme-text">
+                      <X className="w-4 h-4" />
                     </button>
+                  )}
+                </div>
+             </div>
+
+             {/* Slider (only at asset level) */}
+             {currentPath.length === 2 && (
+                <CompactImageSizeSlider value={imageSize} onChange={setImageSize} />
+             )}
+
+             {/* Bulk Selection (only at asset level) */}
+             {currentPath.length === 2 && (
+                <>
+                  <button onClick={() => setBulkDeleteMode(!bulkDeleteMode)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${bulkDeleteMode ? "bg-orange-600 text-white" : "bg-theme-primary text-white"}`}>
+                     {bulkDeleteMode ? <Square className="w-4 h-4"/> : <CheckSquare className="w-4 h-4"/>}
+                     {bulkDeleteMode ? t("backupAssets.cancelSelection") : t("backupAssets.selectMultiple")}
+                  </button>
+                  {bulkDeleteMode && selectedAssets.size > 0 && (
+                      <button onClick={bulkDeleteAssets} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm flex items-center gap-2">
+                          <Trash2 className="w-4 h-4"/> {t("backupAssets.deleteSelected")} ({selectedAssets.size})
+                      </button>
+                  )}
+                </>
+             )}
+
+             {/* Sorting (All levels) */}
+             <div className="relative" ref={sortDropdownRef}>
+                <button onClick={() => setSortDropdownOpen(!sortDropdownOpen)} className="flex items-center gap-1.5 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium">
+                  <ArrowUpDown className="w-4 h-4 text-theme-primary" />
+                  <span className="hidden sm:inline">{sortOrder.includes("date") ? t("common.date") : t("common.name")}</span>
+                </button>
+                {sortDropdownOpen && (
+                  <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
+                    <div className="py-1">
+                      {["name_asc", "name_desc", "date_newest", "date_oldest"].map(opt => (
+                        <button key={opt} onClick={() => { setSortOrder(opt); setSortDropdownOpen(false); }} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === opt ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}>
+                          {t(`common.sorting.${opt.replace('_', '')}`) || opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
+             </div>
+
+             {/* Refresh */}
+             <button onClick={() => fetchAssets(true)} className="flex items-center gap-2 px-3 py-2 bg-theme-card hover:bg-theme-hover border border-theme-border hover:border-theme-primary/50 rounded-lg text-theme-text font-medium transition-all text-sm">
+                <RefreshCw className="w-4 h-4 text-theme-primary" />
+                <span className="hidden sm:inline">Refresh</span>
+             </button>
+          </div>
+
+          {/* Bulk Selection Actions Row (when active) */}
+          {bulkDeleteMode && currentPath.length === 2 && (
+             <div className="flex items-center gap-2 mb-4">
+                 <button onClick={toggleSelectAllGrid} className="flex items-center gap-2 px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium text-sm">
+                     <CheckSquare className="w-4 h-4" />
+                     Select Page
+                 </button>
+                 <button onClick={clearSelection} disabled={selectedAssets.size === 0} className="flex items-center gap-2 px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium text-sm disabled:opacity-50">
+                     <Square className="w-4 h-4" />
+                     Clear ({selectedAssets.size})
+                 </button>
              </div>
           )}
 
@@ -514,13 +607,21 @@ function BackupAssets() {
 
             if (viewData.type === "libraries") {
               return (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {viewData.items.map(lib => (
-                    <button key={lib.name} onClick={() => navigateToLibrary(lib.name)} className="p-4 bg-theme-bg border border-theme-border rounded-lg hover:border-theme-primary text-left flex items-center gap-4 transition-all hover:shadow-md">
-                      <div className="p-3 bg-theme-hover rounded-full"><Archive className="w-6 h-6 text-theme-primary" /></div>
-                      <div>
-                        <h3 className="font-medium text-lg">{lib.name}</h3>
-                        <p className="text-xs text-theme-muted">{lib.folder_count} folders</p>
+                    <button key={lib.name} onClick={() => navigateToLibrary(lib.name)} className="group relative bg-theme-card border border-theme-border rounded-lg p-4 transition-all text-left shadow-sm hover:shadow-md hover:border-theme-primary">
+                      <div className="flex items-start gap-3">
+                        <div className="p-3 bg-theme-hover rounded-full group-hover:bg-theme-primary transition-colors"><Archive className="w-6 h-6 text-theme-muted group-hover:text-white" /></div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-theme-text truncate mb-1 text-lg">{lib.name}</h3>
+                          <div className="text-xs text-theme-muted space-y-1">
+                            <div>Total: {lib.folders.reduce((sum, f) => sum + f.asset_count, 0)} assets</div>
+                            <div>Posters: {lib.folders.reduce((sum, f) => sum + f.assets.filter(a => a.type === 'poster').length, 0)}</div>
+                            <div>Backgrounds: {lib.folders.reduce((sum, f) => sum + f.assets.filter(a => a.type === 'background').length, 0)}</div>
+                            <div>Seasons: {lib.folders.reduce((sum, f) => sum + f.assets.filter(a => a.type === 'season').length, 0)}</div>
+                            <div>Episodes: {lib.folders.reduce((sum, f) => sum + f.assets.filter(a => a.type === 'titlecard').length, 0)}</div>
+                          </div>
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -529,13 +630,15 @@ function BackupAssets() {
               );
             } else if (viewData.type === "folders") {
               return (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {viewData.items.map(folder => (
-                    <button key={folder.name} onClick={() => navigateToFolder(currentPath[0], folder.name)} className="p-4 bg-theme-bg border border-theme-border rounded-lg hover:border-theme-primary text-left flex items-center gap-4 transition-all hover:shadow-md">
-                      <div className="p-3 bg-theme-hover rounded-full"><Folder className="w-6 h-6 text-theme-primary" /></div>
-                      <div>
-                        <h3 className="font-medium truncate">{folder.name}</h3>
-                        <p className="text-xs text-theme-muted">{folder.asset_count} assets</p>
+                    <button key={folder.name} onClick={() => navigateToFolder(currentPath[0], folder.name)} className="group relative bg-theme-card border border-theme-border rounded-lg p-4 transition-all text-left shadow-sm hover:shadow-md hover:border-theme-primary">
+                      <div className="flex items-start gap-3">
+                        <div className="p-3 bg-theme-hover rounded-full group-hover:bg-theme-primary transition-colors"><Folder className="w-6 h-6 text-theme-muted group-hover:text-white" /></div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-theme-text truncate mb-1">{folder.name}</h3>
+                          <p className="text-xs text-theme-muted">{folder.asset_count} assets</p>
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -549,8 +652,8 @@ function BackupAssets() {
                 <div>
                   <div className={`grid ${getGridClass(imageSize)} gap-4`}>
                     {pagedAssets.map(asset => (
-                      <div key={asset.path} className={`relative group bg-theme-bg border rounded-lg overflow-hidden ${bulkDeleteMode && selectedAssets.has(asset.path) ? "ring-2 ring-theme-primary" : "border-theme-border"}`}>
-                         {bulkDeleteMode && <div className="absolute top-2 left-2 z-10"><input type="checkbox" checked={selectedAssets.has(asset.path)} onChange={() => toggleAssetSelection(asset.path)} className="w-5 h-5 accent-theme-primary" /></div>}
+                      <div key={asset.path} className={`relative group bg-theme-bg border rounded-lg overflow-hidden ${bulkDeleteMode && selectedAssets.has(asset.path) ? "ring-2 ring-theme-primary" : "border-theme-border hover:border-theme-primary/50"}`}>
+                         {bulkDeleteMode && <div className="absolute top-2 left-2 z-10"><input type="checkbox" checked={selectedAssets.has(asset.path)} onChange={() => toggleAssetSelection(asset.path)} className="w-5 h-5 accent-theme-primary cursor-pointer" /></div>}
 
                          <div className={`${getAssetAspectRatio(asset.type)} relative cursor-pointer`} onClick={() => bulkDeleteMode ? toggleAssetSelection(asset.path) : setSelectedImage(asset)}>
                            <img src={asset.url} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" alt={asset.name} />
