@@ -10296,16 +10296,15 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                 )
 
                                 # =========================================================
-                                # LOGIC 1: SEASON POSTERS (Matches GetTVDBSeasonPoster)
+                                # LOGIC 1: SEASON POSTERS
                                 # =========================================================
                                 if (
                                     request.asset_type == "season"
                                     and request.season_number
                                     and entity_type == "series"
                                 ):
+                                    # [Logic remains same as previous working version]
                                     logger.info(f" TVDB: Fetching season {request.season_number} for {tvdb_id}")
-
-                                    # Step 1: Get Series Extended to find Season ID
                                     series_ext_url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/extended"
                                     series_resp = await client.get(series_ext_url, headers=auth_headers)
 
@@ -10314,7 +10313,6 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                         seasons_list = series_data.get("seasons", [])
 
                                         target_season_id = None
-                                        # PowerShell logic: matches number and type=official, fallback to alternate
                                         for s in seasons_list:
                                             if s.get("number") == request.season_number and s.get("type", {}).get("type") == "official":
                                                 target_season_id = s.get("id")
@@ -10327,17 +10325,14 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                     break
 
                                         if target_season_id:
-                                            # Step 2: Get Season Extended
                                             season_ext_url = f"https://api4.thetvdb.com/v4/seasons/{target_season_id}/extended"
                                             season_resp = await client.get(season_ext_url, headers=auth_headers)
 
                                             if season_resp.status_code == 200:
                                                 season_data = season_resp.json().get("data", {})
-                                                # PowerShell uses 'artwork' (singular) for season extended
                                                 artworks = season_data.get("artwork", [])
 
                                                 for art in artworks:
-                                                    # PowerShell: type -eq '7' (Season Poster)
                                                     if str(art.get("type")) == '7':
                                                         img = art.get("image")
                                                         if img and img not in seen_urls:
@@ -10354,7 +10349,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                             })
 
                                 # =========================================================
-                                # LOGIC 2: TITLE CARDS (Matches GetTVDBTitleCard)
+                                # LOGIC 2: TITLE CARDS
                                 # =========================================================
                                 elif (
                                     request.asset_type == "titlecard"
@@ -10362,29 +10357,20 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                     and request.episode_number is not None
                                     and entity_type == "series"
                                 ):
+                                    # [Logic remains same as previous working version]
                                     logger.info(f" TVDB: Fetching Title Card S{request.season_number}E{request.episode_number} for {tvdb_id}")
-
                                     page = 0
                                     found_episode = False
-
-                                    # PowerShell loops pages of /episodes/default
                                     while not found_episode:
                                         ep_url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/episodes/default"
                                         ep_resp = await client.get(ep_url, headers=auth_headers, params={"page": page})
-
-                                        if ep_resp.status_code != 200:
-                                            break
-
+                                        if ep_resp.status_code != 200: break
                                         ep_data = ep_resp.json().get("data", {})
                                         episodes_list = ep_data.get("episodes", [])
-
-                                        if not episodes_list:
-                                            break
-
+                                        if not episodes_list: break
                                         for ep in episodes_list:
                                             if (ep.get("seasonNumber") == request.season_number and
                                                 ep.get("number") == request.episode_number):
-
                                                 img = ep.get("image")
                                                 if img and img not in seen_urls:
                                                     seen_urls.add(img)
@@ -10394,51 +10380,42 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                         "source": "TVDB",
                                                         "source_type": source,
                                                         "type": "titlecard",
-                                                        "language": None, # Title cards (stills) usually textless/universal
+                                                        "language": None,
                                                         "width": 0, "height": 0,
                                                     })
                                                 found_episode = True
                                                 break
-
                                         page += 1
-                                        # Safety break to prevent infinite loops if API behaves weirdly
-                                        if page > 50:
-                                            break
+                                        if page > 50: break
 
                                 # =========================================================
-                                # LOGIC 3: MOVIES & SERIES MAIN ART (Posters, Backgrounds, Logos)
-                                # Matches GetTVDBMoviePoster, GetTVDBShowPoster, etc.
+                                # LOGIC 3: MAIN ARTWORKS (POSTERS, BACKGROUNDS, LOGOS)
                                 # =========================================================
                                 else:
                                     artworks_found = []
                                     should_try_both = source == "manual_id_entry"
 
-                                    # --- MOVIE LOGIC (GetTVDBMoviePoster/Background) ---
-                                    # Endpoint: /movies/{id}/extended
+                                    # 3a. MOVIE Logic -> /extended
                                     if entity_type == "movies" or should_try_both:
                                         artwork_url = f"https://api4.thetvdb.com/v4/movies/{tvdb_id}/extended"
                                         resp = await client.get(artwork_url, headers=auth_headers)
-
                                         if resp.status_code == 200:
                                             movie_data = resp.json()
-                                            # PowerShell: $response.data.artworks
                                             raw_list = movie_data.get("data", {}).get("artworks", [])
                                             for x in raw_list:
                                                 x['_origin_type'] = 'movie'
                                             artworks_found.extend(raw_list)
 
-                                    # --- SERIES LOGIC (GetTVDBShowPoster/Background) ---
-                                    # Endpoint: /series/{id}/artworks
+                                    # 3b. SERIES Logic -> /artworks
+                                    # Only skip if we are in 'try both' mode and already found movies.
+                                    # For normal series requests, this ALWAYS runs.
                                     if entity_type == "series" or (should_try_both and not artworks_found):
                                         artwork_url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/artworks"
                                         resp = await client.get(artwork_url, headers=auth_headers)
-
                                         if resp.status_code == 200:
                                             series_data = resp.json()
                                             raw_data = series_data.get("data")
-
-                                            # Robustness: Support both direct list and data.artworks object
-                                            # PowerShell script uses $response.data.artworks, implying structure is dict
+                                            # Handle both Data list (direct) and Data dict (with .artworks)
                                             if isinstance(raw_data, dict) and "artworks" in raw_data:
                                                 raw_list = raw_data.get("artworks", [])
                                             elif isinstance(raw_data, list):
@@ -10452,43 +10429,43 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
 
                                     logger.info(f" TVDB: Processing {len(artworks_found)} total artworks for ID {tvdb_id}")
 
-                                    # --- FILTERING ---
+                                    # 3c. FILTERING
                                     for artwork in artworks_found:
                                         image_url = artwork.get("image")
                                         if not image_url or image_url in seen_urls:
                                             continue
 
                                         art_type = str(artwork.get("type"))
-                                        origin = artwork.get("_origin_type", "series")
-
+                                        # Relax origin check slightly to ensure we don't miss valid types due to tagging issues
                                         is_match = False
 
-                                        if request.asset_type == "logo":
-                                            # Series: 23 (Logo), 22 (ClearArt)
-                                            # Movies: 25 (Logo), 24 (ClearArt)
-                                            if origin == 'series' and art_type in ['22', '23']: is_match = True
-                                            elif origin == 'movie' and art_type in ['24', '25']: is_match = True
+                                        # Allow "logo", "clearlogo", "clearart" to trigger logo logic
+                                        if request.asset_type in ["logo", "clearlogo", "clearart"]:
+                                            # Series: 23 (ClearLogo), 22 (ClearArt)
+                                            # Movies: 25 (ClearLogo), 24 (ClearArt)
+                                            # We check ALL valid logo types to be safe
+                                            if art_type in ['22', '23', '24', '25']:
+                                                is_match = True
 
                                         elif request.asset_type in ["poster", "standard"]:
-                                            # Matches GetTVDBShowPoster (Type 2) and GetTVDBMoviePoster (Type 14)
-                                            if origin == 'series' and art_type == '2': is_match = True
-                                            elif origin == 'movie' and art_type == '14': is_match = True
+                                            # Series: 2, Movies: 14
+                                            if art_type in ['2', '14']:
+                                                is_match = True
 
                                         elif request.asset_type == "background":
-                                            # Matches GetTVDBShowBackground (Type 3) and GetTVDBMovieBackground (Type 15)
-                                            if origin == 'series' and art_type == '3': is_match = True
-                                            elif origin == 'movie' and art_type == '15': is_match = True
+                                            # Series: 3, Movies: 15
+                                            if art_type in ['3', '15']:
+                                                is_match = True
 
                                         if is_match:
                                             seen_urls.add(image_url)
-
                                             all_results.append({
                                                 "url": image_url,
                                                 "original_url": image_url,
                                                 "source": "TVDB",
                                                 "source_type": source,
-                                                "type": "logo" if request.asset_type == "logo" else request.asset_type,
-                                                "language": artwork.get("language"), # Pass raw (None if textless)
+                                                "type": "logo" if request.asset_type in ["logo", "clearlogo", "clearart"] else request.asset_type,
+                                                "language": artwork.get("language"),
                                                 "width": artwork.get("width", 0),
                                                 "height": artwork.get("height", 0),
                                             })
