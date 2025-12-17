@@ -10361,7 +10361,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                             f" TVDB: Non-200 response: {artwork_response.status_code} - {artwork_response.text[:200]}"
                                         )
                                 else:
-                                    # Regular artwork fetch (posters, backgrounds)
+                                    # Regular artwork fetch (posters, backgrounds, logos)
                                     logger.info(
                                         f" TVDB: Fetching artwork for {entity_type} ID: {tvdb_id} (from {source})"
                                     )
@@ -10404,7 +10404,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
 
                                                 if request.asset_type == "logo":
                                                     # 23 = ClearLogo, 22 = ClearArt
-                                                    if artwork_type in [22, 23]:
+                                                    if str(artwork_type) in ['22', '23']:
                                                         if image_url and image_url not in seen_urls:
                                                             seen_urls.add(image_url)
                                                             all_results.append({
@@ -10413,14 +10413,15 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                                 "source": "TVDB",
                                                                 "source_type": source,
                                                                 "type": "logo",
-                                                                "language": artwork.get("language"),
+                                                                # Map null/None language to "xx" (Textless) for cleaner handling
+                                                                "language": artwork.get("language") or "xx",
                                                                 "width": artwork.get("width", 0),
                                                                 "height": artwork.get("height", 0),
                                                             })
                                                 elif (
                                                     request.asset_type
                                                     in ["poster", "standard"]
-                                                ) and artwork_type == 14:
+                                                ) and str(artwork_type) == '14':
                                                     poster_count += 1
                                                     if (
                                                         image_url
@@ -10434,16 +10435,14 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                                 "source": "TVDB",
                                                                 "source_type": source,
                                                                 "type": request.asset_type,
-                                                                "language": artwork.get(
-                                                                    "language"
-                                                                ),
+                                                                "language": artwork.get("language") or "xx",
                                                                 "width": artwork.get("width", 0),
                                                                 "height": artwork.get("height", 0),
                                                             }
                                                         )
                                                 elif (
                                                     request.asset_type == "background"
-                                                    and artwork_type == 15
+                                                    and str(artwork_type) == '15'
                                                 ):
                                                     background_count += 1
                                                     if (
@@ -10458,9 +10457,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                                 "source": "TVDB",
                                                                 "source_type": source,
                                                                 "type": request.asset_type,
-                                                                "language": artwork.get(
-                                                                    "language"
-                                                                ),
+                                                                "language": artwork.get("language") or "xx",
                                                                 "width": artwork.get("width", 0),
                                                                 "height": artwork.get("height", 0),
                                                             }
@@ -10490,8 +10487,10 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                             )
                                         elif request.asset_type == "logo":
                                             artwork_params["type"] = (
-                                                "23" # type=23 for logos
+                                                "23" # type=23 for logos (ClearLogo)
                                             )
+                                            # Note: TVDB API might separate type 22 (ClearArt) and 23 (ClearLogo).
+                                            # We request 23 primarily, but if it returns all, we filter below.
 
                                         logger.info(
                                             f" TVDB: Requesting {artwork_url} with params {artwork_params} (series)"
@@ -10507,15 +10506,24 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                         )
                                         if artwork_response.status_code == 200:
                                             artwork_data = artwork_response.json()
-                                            artworks = artwork_data.get("data", {}).get(
-                                                "artworks", []
-                                            )
+
+                                            # FIX: TVDB API Inconsistency Handling
+                                            # Series /artworks endpoint returns data as a direct list
+                                            # Movies /extended endpoint returns data.artworks
+                                            raw_data = artwork_data.get("data")
+                                            if isinstance(raw_data, list):
+                                                artworks = raw_data
+                                            else:
+                                                artworks = raw_data.get("artworks", []) if raw_data else []
+
                                             logger.info(
                                                 f" TVDB: Found {len(artworks)} artworks in series response"
                                             )
 
                                             for artwork in artworks:
                                                 image_url = artwork.get("image")
+                                                # Check type for series response (filtered by params, but double check doesn't hurt)
+                                                # For Series /artworks, type is already filtered by params, but we accept the result
                                                 if (
                                                     image_url
                                                     and image_url not in seen_urls
@@ -10527,10 +10535,9 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                             "original_url": image_url,
                                                             "source": "TVDB",
                                                             "source_type": source,  # "provided_id" or "title_search"
-                                                            "type": request.asset_type,
-                                                            "language": artwork.get(
-                                                                "language"
-                                                            ),
+                                                            "type": request.asset_type if request.asset_type != "standard" else "poster",
+                                                            # Handle potential None language from API
+                                                            "language": artwork.get("language") or "xx",
                                                             "width": artwork.get("width", 0),
                                                             "height": artwork.get("height", 0),
                                                         }
