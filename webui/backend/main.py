@@ -10333,6 +10333,9 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                             "source_type": source,
                                                             "type": "season",
                                                             "language": "eng",
+                                                            # Note: Season summary object in extended response usually doesn't have dimensions
+                                                            "width": 0,
+                                                            "height": 0,
                                                         }
                                                     )
                                                     logger.info(
@@ -10378,18 +10381,6 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                 f" TVDB: Found {len(artworks)} artworks in movies extended response"
                                             )
 
-                                            # Debug: Log first few artwork types to understand the structure
-                                            if artworks:
-                                                sample_types = {}
-                                                for artwork in artworks[:10]:
-                                                    art_type = artwork.get("type")
-                                                    if art_type not in sample_types:
-                                                        sample_types[art_type] = 0
-                                                    sample_types[art_type] += 1
-                                                logger.info(
-                                                    f" TVDB: Sample artwork types from first 10: {sample_types}"
-                                                )
-
                                             # Filter artworks by type
                                             poster_count = 0
                                             background_count = 0
@@ -10398,9 +10389,6 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                 image_url = artwork.get("image")
 
                                                 if request.asset_type == "logo":
-                                                    # Type 23 is ClearLogo in TVDB API v4 (usually)
-                                                    # But we should check the artwork type name or look for clearlogo/clearart
-                                                    artwork_type = artwork.get("type")
                                                     # 23 = ClearLogo, 22 = ClearArt
                                                     if artwork_type in [22, 23]:
                                                         if image_url and image_url not in seen_urls:
@@ -10412,6 +10400,8 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                                 "source_type": source,
                                                                 "type": "logo",
                                                                 "language": artwork.get("language"),
+                                                                "width": artwork.get("width", 0),
+                                                                "height": artwork.get("height", 0),
                                                             })
                                                 elif (
                                                     request.asset_type
@@ -10433,6 +10423,8 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                                 "language": artwork.get(
                                                                     "language"
                                                                 ),
+                                                                "width": artwork.get("width", 0),
+                                                                "height": artwork.get("height", 0),
                                                             }
                                                         )
                                                 elif (
@@ -10455,6 +10447,8 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                                 "language": artwork.get(
                                                                     "language"
                                                                 ),
+                                                                "width": artwork.get("width", 0),
+                                                                "height": artwork.get("height", 0),
                                                             }
                                                         )
 
@@ -10523,6 +10517,8 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                             "language": artwork.get(
                                                                 "language"
                                                             ),
+                                                            "width": artwork.get("width", 0),
+                                                            "height": artwork.get("height", 0),
                                                         }
                                                     )
                                         else:
