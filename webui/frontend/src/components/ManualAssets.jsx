@@ -233,6 +233,11 @@ function ManualAssets() {
     return saved ? parseInt(saved) : 5;
   });
 
+  // Helper to encode path segments but keep slashes
+  const safeEncodePath = (path) => {
+    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  };
+
   // Dropdown state
   const [itemsPerPageDropdownOpen, setItemsPerPageDropdownOpen] =
     useState(false);
@@ -340,8 +345,9 @@ function ManualAssets() {
     }
 
     try {
+      // FIX: Use safeEncodePath instead of encodeURIComponent
       const response = await fetch(
-        `${API_URL}/manual-assets/${encodeURIComponent(assetPath)}`,
+        `${API_URL}/manual-assets/${safeEncodePath(assetPath)}`,
         {
           method: "DELETE",
         }
