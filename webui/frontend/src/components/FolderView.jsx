@@ -217,7 +217,7 @@ function FolderView() {
       count: selectedAssets.size,
       onConfirm: async () => {
         try {
-          const response = await fetch(`${API_URL}/manual-assets/bulk-delete`, {
+          const response = await fetch(`${API_URL}/gallery/bulk-delete`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ paths: Array.from(selectedAssets) }),
@@ -247,7 +247,7 @@ function FolderView() {
       onConfirm: async () => {
         try {
           const response = await fetch(
-            `${API_URL}/manual-assets/${encodeURIComponent(asset.path)}`,
+            `${API_URL}/gallery/${encodeURIComponent(asset.path)}`,
             {
               method: "DELETE",
             }
