@@ -10459,13 +10459,26 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
 
                                         if is_match:
                                             seen_urls.add(image_url)
+
+                                            # FIX: "Asterisk" / Wildcard Logic
+                                            # Instead of a hardcoded map, we take the first 2 letters of the language code.
+                                            # This allows 'eng' to match 'en' and 'deu' to match 'de', mimicking the
+                                            # PowerShell logic: $_.language -like "$lang*"
+                                            raw_lang = artwork.get("language")
+                                            final_lang = raw_lang
+
+                                            if raw_lang and isinstance(raw_lang, str) and len(raw_lang) >= 2:
+                                                final_lang = raw_lang[:2].lower()
+
                                             all_results.append({
                                                 "url": image_url,
                                                 "original_url": image_url,
                                                 "source": "TVDB",
                                                 "source_type": source,
                                                 "type": "logo" if request.asset_type in ["logo", "clearlogo", "clearart"] else request.asset_type,
-                                                "language": artwork.get("language"),
+                                                "language": final_lang,
+                                                # Map 'score' to 'vote_average' to ensure they aren't sorted to the bottom
+                                                "vote_average": artwork.get("score", 0),
                                                 "width": artwork.get("width", 0),
                                                 "height": artwork.get("height", 0),
                                             })
