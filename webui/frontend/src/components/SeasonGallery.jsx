@@ -224,6 +224,11 @@ function SeasonGallery() {
   const [itemsPerPageDropdownUp, setItemsPerPageDropdownUp] = useState(false);
   const itemsPerPageDropdownRef = useRef(null);
 
+  // Helper to encode path segments but keep slashes
+  const safeEncodePath = (path) => {
+    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  };
+
   // Image size state with localStorage (2-10 range, default 5)
   const [imageSize, setImageSize] = useState(() => {
     const saved = localStorage.getItem("gallery-season-size");
@@ -422,8 +427,9 @@ function SeasonGallery() {
 
     setDeletingImage(imagePath);
     try {
+      // FIX: Use safeEncodePath instead of encodeURIComponent
       const response = await fetch(
-        `${API_URL}/seasons/${encodeURIComponent(imagePath)}`,
+        `${API_URL}/seasons/${safeEncodePath(imagePath)}`,
         {
           method: "DELETE",
         }

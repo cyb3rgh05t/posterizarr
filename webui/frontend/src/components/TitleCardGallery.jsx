@@ -218,6 +218,11 @@ function TitleCardGallery() {
   // Cache-busting state to force image reload after replacement
   const [cacheBuster, setCacheBuster] = useState(Date.now());
 
+  // Helper to encode path segments but keep slashes
+  const safeEncodePath = (path) => {
+    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  };
+
   // Dropdown state
   const [itemsPerPageDropdownOpen, setItemsPerPageDropdownOpen] =
     useState(false);
@@ -423,8 +428,9 @@ function TitleCardGallery() {
 
     setDeletingImage(imagePath);
     try {
+      // FIX: Use safeEncodePath instead of encodeURIComponent
       const response = await fetch(
-        `${API_URL}/titlecards/${encodeURIComponent(imagePath)}`,
+        `${API_URL}/titlecards/${safeEncodePath(imagePath)}`,
         {
           method: "DELETE",
         }

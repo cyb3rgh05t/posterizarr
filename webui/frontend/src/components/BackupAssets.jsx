@@ -129,6 +129,11 @@ function BackupAssets() {
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const sortDropdownRef = useRef(null);
 
+  // Helper to encode path segments but keep slashes
+  const safeEncodePath = (path) => {
+    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  };
+
   useEffect(() => localStorage.setItem("backup-assets-sort-order", sortOrder), [sortOrder]);
 
   // Click outside listener for sorting
@@ -225,9 +230,16 @@ function BackupAssets() {
   const deleteAsset = async (assetPath, assetName) => {
     if (!confirm(t("backupAssets.deleteConfirm", { name: assetName }))) return;
     try {
-      const response = await fetch(`${API_URL}/backup-assets/${encodeURIComponent(assetPath)}`, { method: "DELETE" });
+      // FIX: Use safeEncodePath instead of encodeURIComponent
+      const response = await fetch(
+        `${API_URL}/backup-assets/${safeEncodePath(assetPath)}`,
+        { method: "DELETE" }
+      );
+
       if (!response.ok) throw new Error("Failed to delete asset");
+
       showSuccess(t("backupAssets.deleteSuccess", { name: assetName }));
+
       // Refresh logic
       const isLastItem = displayedGridAssets.length === 1 && currentPage > 1;
       await fetchAssets();
