@@ -10283,97 +10283,90 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                     "series" if request.media_type == "tv" else "movies"
                                 )
 
-                                # =========================================================
-                                # HANDLE SEASON ASSETS (Strict Language Order Implemented)
-                                # =========================================================
+                                # Handle season-specific requests
                                 if (
                                     request.asset_type == "season"
                                     and request.season_number
                                     and entity_type == "series"
                                 ):
-                                    # 1. First fetch extended info to get the specific Season ID
+                                    # Fetch season-specific artwork using extended endpoint
                                     logger.info(
-                                        f" TVDB: Fetching season {request.season_number} info for series ID: {tvdb_id}"
+                                        f" TVDB: Fetching season {request.season_number} artwork for series ID: {tvdb_id} (from {source})"
                                     )
-                                    extended_url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/extended"
+                                    artwork_url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/extended"
 
-                                    extended_response = await client.get(extended_url, headers=auth_headers)
+                                    logger.info(f" TVDB: Requesting {artwork_url}")
+                                    artwork_response = await client.get(
+                                        artwork_url,
+                                        headers=auth_headers,
+                                    )
 
-                                    if extended_response.status_code == 200:
-                                        extended_data = extended_response.json()
-                                        seasons = extended_data.get("data", {}).get("seasons", [])
+                                    if artwork_response.status_code == 200:
+                                        extended_data = artwork_response.json()
+                                        seasons = extended_data.get("data", {}).get(
+                                            "seasons", []
+                                        )
+                                        logger.info(
+                                            f" TVDB: Found {len(seasons)} seasons in response"
+                                        )
 
-                                        # Find the ID for the requested season number
-                                        target_season_id = None
+                                        # Find matching season
                                         for season in seasons:
-                                            if season.get("number") == request.season_number:
-                                                target_season_id = season.get("id")
-                                                break
+                                            if (
+                                                season.get("number")
+                                                == request.season_number
+                                            ):
+                                                season_image = season.get("image")
+                                                # Check Language (if available in extended response, often it's just 'image')
+                                                # Extended usually doesn't give lang for the season summary image.
+                                                # So we accept it as is or default to 'eng' if we must.
 
-                                        if target_season_id:
-                                            # 2. Fetch Season Posters (Type 7) using the Artwork Endpoint
-                                            # This allows us to see ALL languages and filter them
-                                            logger.info(f" TVDB: Found Season ID {target_season_id}, fetching artworks...")
-
-                                            art_url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/artworks"
-                                            params = {"type": "7"} # Type 7 = Season Poster
-
-                                            art_response = await client.get(art_url, headers=auth_headers, params=params)
-
-                                            if art_response.status_code == 200:
-                                                artworks = art_response.json().get("data", {}).get("artworks", [])
-
-                                                for art in artworks:
-                                                    # Verify it belongs to the correct season
-                                                    if art.get("seasonId") != target_season_id:
-                                                        continue
-
-                                                    # Strict Language Filtering
-                                                    art_lang = (art.get("language") or "").lower()
-                                                    if not art_lang: art_lang = "xx"
-
-                                                    if season_language_order_list and art_lang not in season_language_order_list:
-                                                        continue
-
-                                                    image_url = art.get("image")
-                                                    if image_url and image_url not in seen_urls:
-                                                        seen_urls.add(image_url)
-                                                        all_results.append({
-                                                            "url": image_url,
-                                                            "original_url": image_url,
+                                                if (
+                                                    season_image
+                                                    and season_image not in seen_urls
+                                                ):
+                                                    seen_urls.add(season_image)
+                                                    all_results.append(
+                                                        {
+                                                            "url": season_image,
+                                                            "original_url": season_image,
                                                             "source": "TVDB",
                                                             "source_type": source,
                                                             "type": "season",
-                                                            "language": art.get("language"),
-                                                            "width": art.get("width", 0),
-                                                            "height": art.get("height", 0),
-                                                        })
-                                                logger.info(f" TVDB: Added {len(all_results)} season posters after filtering")
-                                            else:
-                                                 logger.warning(f" TVDB: Failed to fetch season artworks: {art_response.status_code}")
-                                        else:
-                                            logger.warning(f" TVDB: Season {request.season_number} not found in series data")
+                                                            "language": "eng", # Default
+                                                            "width": 0,  # Extended usually doesn't have dimensions
+                                                            "height": 0,
+                                                        }
+                                                    )
+                                                    logger.info(
+                                                        f" TVDB: Added season {request.season_number} poster"
+                                                    )
+                                                break
                                     else:
-                                        logger.warning(f" TVDB: Failed to fetch extended info: {extended_response.status_code}")
-
+                                        logger.warning(
+                                            f" TVDB: Non-200 response: {artwork_response.status_code}"
+                                        )
                                 else:
-                                    # =========================================================
-                                    # HANDLE REGULAR ASSETS (Poster, Background, Logo)
-                                    # =========================================================
+                                    # Regular artwork fetch (posters, backgrounds)
                                     logger.info(
                                         f" TVDB: Fetching artwork for {entity_type} ID: {tvdb_id} (from {source})"
                                     )
 
                                     should_try_both_types = source == "manual_id_entry"
 
-                                    # --- MOVIES LOGIC ---
+                                    # Try movies first
                                     if entity_type == "movies" or should_try_both_types:
                                         artwork_url = f"https://api4.thetvdb.com/v4/movies/{tvdb_id}/extended"
-                                        artwork_response = await client.get(artwork_url, headers=auth_headers)
+                                        artwork_response = await client.get(
+                                            artwork_url,
+                                            headers=auth_headers,
+                                        )
 
                                         if artwork_response.status_code == 200:
                                             movie_data = artwork_response.json()
-                                            artworks = movie_data.get("data", {}).get("artworks", [])
+                                            artworks = movie_data.get("data", {}).get(
+                                                "artworks", []
+                                            )
 
                                             for artwork in artworks:
                                                 artwork_type = artwork.get("type")
@@ -10381,11 +10374,11 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                 art_lang = (artwork.get("language") or "").lower()
                                                 if not art_lang: art_lang = "xx"
 
-                                                # -- LOGO (Type 22/23) --
+                                                # LOGOS
                                                 if request.asset_type == "logo":
                                                     if artwork_type in [22, 23]:
                                                         if logo_language_order_list and art_lang not in logo_language_order_list:
-                                                            continue
+                                                            continue # Skip if not in pref list
 
                                                         if image_url and image_url not in seen_urls:
                                                             seen_urls.add(image_url)
@@ -10396,14 +10389,14 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                                 "source_type": source,
                                                                 "type": "logo",
                                                                 "language": artwork.get("language"),
-                                                                "width": artwork.get("width", 0),
-                                                                "height": artwork.get("height", 0),
+                                                                "width": artwork.get("width", 0),   # ADDED
+                                                                "height": artwork.get("height", 0), # ADDED
                                                             })
 
-                                                # -- POSTER (Type 14) --
+                                                # POSTERS
                                                 elif (request.asset_type in ["poster", "standard"]) and artwork_type == 14:
                                                     if language_order_list and art_lang not in language_order_list:
-                                                        continue
+                                                        continue # Skip
 
                                                     if image_url and image_url not in seen_urls:
                                                         seen_urls.add(image_url)
@@ -10414,14 +10407,14 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                             "source_type": source,
                                                             "type": request.asset_type,
                                                             "language": artwork.get("language"),
-                                                            "width": artwork.get("width", 0),
-                                                            "height": artwork.get("height", 0),
+                                                            "width": artwork.get("width", 0),   # ADDED
+                                                            "height": artwork.get("height", 0), # ADDED
                                                         })
 
-                                                # -- BACKGROUND (Type 15) --
+                                                # BACKGROUNDS
                                                 elif (request.asset_type == "background" and artwork_type == 15):
                                                     if background_language_order_list and art_lang not in background_language_order_list:
-                                                        continue
+                                                        continue # Skip
 
                                                     if image_url and image_url not in seen_urls:
                                                         seen_urls.add(image_url)
@@ -10432,16 +10425,17 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                             "source_type": source,
                                                             "type": request.asset_type,
                                                             "language": artwork.get("language"),
-                                                            "width": artwork.get("width", 0),
-                                                            "height": artwork.get("height", 0),
+                                                            "width": artwork.get("width", 0),   # ADDED
+                                                            "height": artwork.get("height", 0), # ADDED
                                                         })
 
-                                    # --- SERIES LOGIC ---
-                                    if entity_type == "series" or (should_try_both_types and len(all_results) == 0):
+                                    # Try series endpoint
+                                    if entity_type == "series" or (
+                                        should_try_both_types and len(all_results) == 0
+                                    ):
                                         artwork_url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/artworks"
-
-                                        # Removed "lang" param to fetch ALL languages for local filtering
-                                        artwork_params = {"type": "2"}  # Default: Poster
+                                        # REMOVED "lang": "eng" so we get ALL langs
+                                        artwork_params = {"type": "2"}
 
                                         if request.asset_type == "background":
                                             artwork_params["type"] = "3"
@@ -10456,24 +10450,26 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
 
                                         if artwork_response.status_code == 200:
                                             artwork_data = artwork_response.json()
-                                            artworks = artwork_data.get("data", {}).get("artworks", [])
+                                            artworks = artwork_data.get("data", {}).get(
+                                                "artworks", []
+                                            )
 
                                             for artwork in artworks:
+                                                image_url = artwork.get("image")
                                                 art_lang = (artwork.get("language") or "").lower()
                                                 if not art_lang: art_lang = "xx"
 
-                                                # -- Local Language Filtering --
+                                                # STRICT FILTERING LOCALLY
                                                 if request.asset_type == "logo":
                                                     if logo_language_order_list and art_lang not in logo_language_order_list:
                                                         continue
                                                 elif request.asset_type == "background":
                                                     if background_language_order_list and art_lang not in background_language_order_list:
                                                         continue
-                                                elif request.asset_type == "poster" or request.asset_type == "standard":
+                                                elif request.asset_type in ["poster", "standard"]:
                                                     if language_order_list and art_lang not in language_order_list:
                                                         continue
 
-                                                image_url = artwork.get("image")
                                                 if image_url and image_url not in seen_urls:
                                                     seen_urls.add(image_url)
                                                     all_results.append({
@@ -10483,8 +10479,8 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                                         "source_type": source,
                                                         "type": request.asset_type,
                                                         "language": artwork.get("language"),
-                                                        "width": artwork.get("width", 0),
-                                                        "height": artwork.get("height", 0),
+                                                        "width": artwork.get("width", 0),   # ADDED
+                                                        "height": artwork.get("height", 0), # ADDED
                                                     })
                         else:
                             logger.error(f" TVDB: Login failed with code: {login_response.status_code}")
@@ -10516,30 +10512,24 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     for source, fanart_id in fanart_ids_to_use:
-                        # Fanart.tv separates Movies and TV
                         section = "movies" if request.media_type == "movie" else "tv"
-
                         url = f"https://webservice.fanart.tv/v3/{section}/{fanart_id}"
                         params = {"api_key": fanart_api_key}
 
-                        logger.info(f" Fanart: Requesting {url}")
                         response = await client.get(url, params=params)
 
                         if response.status_code == 200:
                             data = response.json()
 
-                            # Helper to process a list of items from fanart response
-                            def process_fanart_items(item_list, type_label, lang_order_list):
-                                if not item_list:
-                                    return
-
+                            # Define helper to reduce code duplication
+                            def add_fanart_item(item_list, type_lbl, lang_list=None):
+                                if not item_list: return
                                 for item in item_list:
-                                    # Language Filtering
+                                    # Language Check
                                     item_lang = (item.get("lang") or "").lower()
-                                    if not item_lang: item_lang = "xx" # Fanart uses '00' or empty for no lang
+                                    if not item_lang: item_lang = "xx"
 
-                                    # Strict filter: If user defined a list, and this lang isn't in it, skip it.
-                                    if lang_order_list and item_lang not in lang_order_list:
+                                    if lang_list and item_lang not in lang_list:
                                         continue
 
                                     item_url = item.get("url")
@@ -10550,98 +10540,37 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                             "original_url": item_url,
                                             "source": "Fanart",
                                             "source_type": source,
-                                            "type": type_label,
+                                            "type": type_lbl,
                                             "language": item.get("lang"),
                                             "likes": item.get("likes", 0),
-                                            # NO HARDCODING: We try to get it, otherwise 0
+                                            # ADDED: Attempt to read width/height if available, else 0
                                             "width": item.get("width", 0),
                                             "height": item.get("height", 0),
                                         })
 
-                            # ==========================
-                            # LOGOS (Uses LogoLanguageOrder)
-                            # ==========================
                             if request.asset_type == "logo":
-                                # HD TV Logos
-                                process_fanart_items(
-                                    data.get("hdtvlogo", []),
-                                    "logo",
-                                    logo_language_order_list
-                                )
-                                # HD Movie Logos
-                                process_fanart_items(
-                                    data.get("hdmovielogo", []),
-                                    "logo",
-                                    logo_language_order_list
-                                )
-                                # ClearLogos / MovieLogos
-                                process_fanart_items(
-                                    data.get("clearlogo", []) or data.get("movielogo", []),
-                                    "logo",
-                                    logo_language_order_list
-                                )
+                                add_fanart_item(data.get("hdtvlogo"), "logo", logo_language_order_list)
+                                add_fanart_item(data.get("hdmovielogo"), "logo", logo_language_order_list)
+                                add_fanart_item(data.get("clearlogo"), "logo", logo_language_order_list)
+                                add_fanart_item(data.get("movielogo"), "logo", logo_language_order_list)
 
-                            # ==========================
-                            # POSTERS (Uses PreferredLanguageOrder)
-                            # ==========================
                             elif request.asset_type in ["poster", "standard"]:
-                                process_fanart_items(
-                                    data.get("tvposter", []),
-                                    "poster",
-                                    language_order_list
-                                )
-                                process_fanart_items(
-                                    data.get("movieposter", []),
-                                    "poster",
-                                    language_order_list
-                                )
+                                add_fanart_item(data.get("tvposter"), "poster", language_order_list)
+                                add_fanart_item(data.get("movieposter"), "poster", language_order_list)
 
-                            # ==========================
-                            # BACKGROUNDS (Uses PreferredBackgroundLanguageOrder)
-                            # ==========================
                             elif request.asset_type == "background":
-                                process_fanart_items(
-                                    data.get("showbackground", []),
-                                    "background",
-                                    background_language_order_list
-                                )
-                                process_fanart_items(
-                                    data.get("moviebackground", []),
-                                    "background",
-                                    background_language_order_list
-                                )
+                                add_fanart_item(data.get("showbackground"), "background", background_language_order_list)
+                                add_fanart_item(data.get("moviebackground"), "background", background_language_order_list)
 
-                            # ==========================
-                            # SEASONS (Uses PreferredSeasonLanguageOrder)
-                            # ==========================
                             elif request.asset_type == "season" and request.season_number:
-                                season_posters = data.get("seasonposter", [])
-                                filtered_seasons = []
-
-                                # First filter by season number
-                                for sp in season_posters:
-                                    # Fanart uses string "1", "2" for seasons
-                                    if str(sp.get("season")) == str(request.season_number):
-                                        filtered_seasons.append(sp)
-
-                                # Then process the matching ones with language filter
-                                process_fanart_items(
-                                    filtered_seasons,
-                                    "season_poster",
-                                    season_language_order_list
-                                )
-
-                        else:
-                            logger.warning(
-                                f" Fanart: Failed to fetch for {fanart_id}: {response.status_code}"
-                            )
+                                # Pre-filter season posters by season number
+                                raw_seasons = data.get("seasonposter", [])
+                                matched_seasons = [s for s in raw_seasons if str(s.get("season")) == str(request.season_number)]
+                                add_fanart_item(matched_seasons, "season_poster", season_language_order_list)
 
             except Exception as e:
                 logger.error(f"Error fetching Fanart assets: {e}")
 
-            logger.info(
-                f" Fanart: Collected {len(all_results)} images"
-            )
             return all_results
 
         # Fetch from all providers in parallel
