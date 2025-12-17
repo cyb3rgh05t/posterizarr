@@ -9700,6 +9700,10 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
             preferred_tc_language_order = flat_config.get(
                 "PreferredTCLanguageOrder", ""
             )
+            # Add LogoLanguageOrder retrieval
+            preferred_logo_language_order = flat_config.get(
+                "LogoLanguageOrder", ""
+            )
         else:
             api_part = grouped_config.get("ApiPart", {})
             tmdb_token = api_part.get("tmdbtoken", "")
@@ -9730,6 +9734,9 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
             preferred_tc_language_order = grouped_config.get(
                 "PreferredTCLanguageOrder", ""
             )
+            preferred_logo_language_order = grouped_config.get(
+                "LogoLanguageOrder", ""
+            )
 
             # If not found at root, try in ApiPart
             if not preferred_language_order and isinstance(
@@ -9756,6 +9763,12 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                 preferred_tc_language_order = grouped_config["ApiPart"].get(
                     "PreferredTCLanguageOrder", ""
                 )
+            if not preferred_logo_language_order and isinstance(
+                grouped_config.get("ApiPart"), dict
+            ):
+                preferred_logo_language_order = grouped_config["ApiPart"].get(
+                    "LogoLanguageOrder", ""
+                )
 
         # Parse language preferences (handle both string and list formats)
         def parse_language_order(value):
@@ -9778,9 +9791,10 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
             preferred_background_language_order
         )
         tc_language_order_list = parse_language_order(preferred_tc_language_order)
+        logo_language_order_list = parse_language_order(preferred_logo_language_order)
 
         logger.info(
-            f"Language preferences loaded - Standard: {language_order_list}, Season: {season_language_order_list}, Background: {background_language_order_list}, TitleCard: {tc_language_order_list}"
+            f"Language preferences loaded - Standard: {language_order_list}, Season: {season_language_order_list}, Background: {background_language_order_list}, TitleCard: {tc_language_order_list}, Logo: {logo_language_order_list}"
         )
 
         # Helper function to filter and sort by language preference
@@ -10466,7 +10480,7 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
                                     ):
                                         artwork_url = f"https://api4.thetvdb.com/v4/series/{tvdb_id}/artworks"
                                         artwork_params = {
-                                            "lang": "eng",
+                                            # "lang": "eng", # Removed to allow all languages for local filtering
                                             "type": "2",
                                         }  # type=2 for posters
 
@@ -10787,8 +10801,8 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
             results["fanart"] = filter_and_sort_by_language(
                 results["fanart"], season_language_order_list
             )
-        elif request.asset_type == "background" or request.asset_type == "titlecard":
-            # Filter backgrounds and titlecards by PreferredBackgroundLanguageOrder
+        elif request.asset_type == "background":
+            # Filter backgrounds by PreferredBackgroundLanguageOrder
             logger.info(
                 f"   Using background language order: {background_language_order_list}"
             )
@@ -10800,6 +10814,34 @@ async def fetch_asset_replacements(request: AssetReplaceRequest):
             )
             results["fanart"] = filter_and_sort_by_language(
                 results["fanart"], background_language_order_list
+            )
+        elif request.asset_type == "titlecard":
+            # Filter titlecards by PreferredTCLanguageOrder
+            logger.info(
+                f"   Using titlecard language order: {tc_language_order_list}"
+            )
+            results["tmdb"] = filter_and_sort_by_language(
+                results["tmdb"], tc_language_order_list
+            )
+            results["tvdb"] = filter_and_sort_by_language(
+                results["tvdb"], tc_language_order_list
+            )
+            results["fanart"] = filter_and_sort_by_language(
+                results["fanart"], tc_language_order_list
+            )
+        elif request.asset_type == "logo":
+            # Filter logos by LogoLanguageOrder
+            logger.info(
+                f"   Using logo language order: {logo_language_order_list}"
+            )
+            results["tmdb"] = filter_and_sort_by_language(
+                results["tmdb"], logo_language_order_list
+            )
+            results["tvdb"] = filter_and_sort_by_language(
+                results["tvdb"], logo_language_order_list
+            )
+            results["fanart"] = filter_and_sort_by_language(
+                results["fanart"], logo_language_order_list
             )
         else:
             # Filter standard posters by PreferredLanguageOrder
