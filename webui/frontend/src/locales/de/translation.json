@@ -581,7 +581,12 @@
       "missing": "Fehlt",
       "versionAbbr": "Ver.",
       "editConfig": "Konfig. bearbeiten",
-      "createConfig": "Konfig. erstellen"
+      "createConfig": "Konfig. erstellen",
+      "completed": "Abgeschlossen",
+      "upcoming": "Anstehend",
+      "ofDay": "des Tages",
+      "start": "Start",
+      "end": "Ende"
     },
     "banners": {
       "executionInProgress": "Skriptausführung läuft",

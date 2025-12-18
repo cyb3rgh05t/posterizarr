@@ -581,7 +581,12 @@
       "missing": "Manquant",
       "versionAbbr": "Ver.",
       "editConfig": "Modifier Config",
-      "createConfig": "Créer Config"
+      "createConfig": "Créer Config",
+      "completed": "Terminé",
+      "upcoming": "À venir",
+      "ofDay": "de la journée",
+      "start": "Début",
+      "end": "Fin"
     },
     "banners": {
       "executionInProgress": "Exécution du Script en Cours",

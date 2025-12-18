@@ -581,7 +581,12 @@
       "missing": "Missing",
       "versionAbbr": "Ver.",
       "editConfig": "Edit Config",
-      "createConfig": "Create Config"
+      "createConfig": "Create Config",
+      "completed": "Completed",
+      "upcoming": "Upcoming",
+      "ofDay": "of Day",
+      "start": "Start",
+      "end": "End"
     },
     "banners": {
       "executionInProgress": "Script Execution in Progress",
