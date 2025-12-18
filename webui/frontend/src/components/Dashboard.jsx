@@ -481,51 +481,60 @@ function Dashboard() {
 
            <div className="mt-auto">
               {schedulerStatus.enabled && schedulerStatus.next_run ? (() => {
-                const now = new Date().getTime();
-                const allTimes = schedulerStatus.schedules
-                    .map(s => new Date(s.next_run).getTime())
-                    .sort((a, b) => a - b);
+              const now = new Date().getTime();
 
-                const earliest = allTimes[0];
-                const latest = allTimes[allTimes.length - 1];
+              // Filter and map only if s.next_run exists, otherwise fallback to the main next_run
+              const allTimes = schedulerStatus.schedules
+                  .map(s => s.next_run ? new Date(s.next_run).getTime() : null)
+                  .filter(t => t !== null && !isNaN(t))
+                  .sort((a, b) => a - b);
 
-                let progress = 0;
-                if (latest !== earliest) {
-                    progress = ((now - earliest) / (latest - earliest)) * 100;
-                    progress = Math.max(0, Math.min(100, progress));
-                }
+              // If we don't have individual next_run dates, just use the main one
+              const displayNextRun = new Date(schedulerStatus.next_run);
+              const hasRange = allTimes.length > 0;
+              const earliest = hasRange ? allTimes[0] : displayNextRun.getTime();
+              const latest = hasRange ? allTimes[allTimes.length - 1] : displayNextRun.getTime();
 
-                return (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-medium">
-                          <span className="text-theme-muted">{t("dashboard.controlDeck.nextRun")}</span>
-                          <span className="text-blue-300 font-bold">
-                            {new Date(schedulerStatus.next_run).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                          </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-theme-hover rounded-full overflow-hidden flex" title={`${allTimes.length} total schedules`}>
-                          <div
-                            className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-1000 rounded-full"
-                            style={{ width: `${progress}%` }}
-                          ></div>
-                      </div>
-                      <div className="flex justify-between items-center mt-1">
-                          <div className="flex flex-col">
-                             <span className="text-[8px] uppercase text-theme-muted opacity-50 font-bold">Earliest</span>
-                             <span className="text-[10px] text-theme-muted font-mono">
-                                {new Date(earliest).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                             </span>
-                          </div>
-                          <div className="flex flex-col items-end">
-                             <span className="text-[8px] uppercase text-theme-muted opacity-50 font-bold">Latest</span>
-                             <span className="text-[10px] text-theme-muted font-mono">
-                                {new Date(latest).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                             </span>
-                          </div>
-                      </div>
+              let progress = 0;
+              if (hasRange && latest !== earliest) {
+                  progress = ((now - earliest) / (latest - earliest)) * 100;
+                  progress = Math.max(0, Math.min(100, progress));
+              }
+
+              return (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-medium">
+                        <span className="text-theme-muted">{t("dashboard.controlDeck.nextRun")}</span>
+                        <span className="text-blue-300 font-bold">
+                          {displayNextRun.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                        </span>
                     </div>
-                );
-              })() : (
+                    <div className="h-1.5 w-full bg-theme-hover rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-1000 rounded-full"
+                          style={{ width: `${progress}%` }}
+                        ></div>
+                    </div>
+                    {/* Only show the footer if we actually have a range of dates */}
+                    {hasRange && (
+                        <div className="flex justify-between items-center mt-1">
+                            <div className="flex flex-col">
+                              <span className="text-[8px] uppercase text-theme-muted opacity-50 font-bold">Earliest</span>
+                              <span className="text-[10px] text-theme-muted font-mono">
+                                  {new Date(earliest).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                              </span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="text-[8px] uppercase text-theme-muted opacity-50 font-bold">Latest</span>
+                              <span className="text-[10px] text-theme-muted font-mono">
+                                  {new Date(latest).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                              </span>
+                            </div>
+                        </div>
+                    )}
+                  </div>
+              );
+          })() : (
                 <div className="flex items-center gap-2 text-xs text-theme-muted h-full opacity-60">
                     <AlertCircle className="w-3 h-3" /> {t("dashboard.controlDeck.noSchedules")}
                 </div>
