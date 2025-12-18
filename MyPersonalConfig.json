@@ -149,6 +149,7 @@
     "4KDoViHDR10TC": "backgroundoverlay-innerglow.png",
     "SymbolsToKeepOnNewLine": [],
     "SkipAddTextAndOverlay": "false",
+    "SkipAddTextAndBorder": "false",
     "FileTestOnTrigger": "true",
     "SkipLocalPosterTextAdd": "false",
     "SkipLocalBackgroundTextAdd": "false",

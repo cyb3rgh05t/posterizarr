@@ -613,7 +613,7 @@ function ConfigEditor() {
         const useBGLogo = getValue("UseBGLogo");
         if (!useLogo && !useBGLogo) return true;
     }
-    
+
     if (key === "LogoFlatColor") {
         const useLogo = getValue("UseLogo");
         const useBGLogo = getValue("UseBGLogo");
@@ -782,7 +782,7 @@ function ConfigEditor() {
                                         {searchQuery ? (
                                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                                                 {fields.map(key => <SettingCard key={key} settingKey={key} groupName={groupName} config={config} usingFlatStructure={usingFlatStructure} webuiLogLevel={webuiLogLevel} updateWebuiLogLevel={updateWebuiLogLevel} useJellySync={useJellySync} setUseJellySync={setUseJellySync} useEmbySync={useEmbySync} setUseEmbySync={setUseEmbySync} updateValue={updateValue} getDisplayName={getDisplayName} tooltips={tooltips} commonInputClass={commonInputClass} handleJumpToSetting={handleJumpToSetting} searchQuery={searchQuery} isFieldDisabled={isFieldDisabled} overlayFiles={overlayFiles} fontFiles={fontFiles} uploadingOverlay={uploadingOverlay} uploadingFont={uploadingFont} handleOverlayFileUpload={handleOverlayFileUpload} handleFontFileUpload={handleFontFileUpload} setPreviewOverlay={setPreviewOverlay} setPreviewFont={setPreviewFont} showSuccess={showSuccess} showError={showError} setConfig={setConfig} setHasUnsavedChanges={setHasUnsavedChanges} />)}
-                                                
+
                                                 {/* API Key Manager (In Search) */}
                                                 {groupName === "WebUI Settings" && (
                                                     <div className="col-span-1 xl:col-span-2">
@@ -1098,7 +1098,7 @@ const ApiKeyManager = () => {
     const [loading, setLoading] = useState(false);
     const [newKeyName, setNewKeyName] = useState("");
     const [generatedKey, setGeneratedKey] = useState(null);
-    
+
     const [deleteId, setDeleteId] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -1136,19 +1136,19 @@ const ApiKeyManager = () => {
             try {
                 const textArea = document.createElement("textarea");
                 textArea.value = text;
-                
+
                 // Ensure it's not visible but part of the DOM
                 textArea.style.position = "fixed";
                 textArea.style.left = "-9999px";
                 textArea.style.top = "0";
-                
+
                 document.body.appendChild(textArea);
                 textArea.focus();
                 textArea.select();
-                
+
                 const successful = document.execCommand('copy');
                 document.body.removeChild(textArea);
-                
+
                 if (successful) {
                     showSuccess(`${label} copied to clipboard!`);
                 } else {
@@ -1191,8 +1191,8 @@ const ApiKeyManager = () => {
             await fetch(`/api/auth/keys/${deleteId}`, { method: "DELETE" });
             fetchKeys();
             showSuccess(t("apiKeys.toastRevoked"));
-        } catch (e) { 
-            showError(t("apiKeys.toastRevokeError")); 
+        } catch (e) {
+            showError(t("apiKeys.toastRevokeError"));
         } finally {
             setShowDeleteConfirm(false);
             setDeleteId(null);
@@ -1204,21 +1204,21 @@ const ApiKeyManager = () => {
             <h3 className="text-lg font-semibold text-theme-text flex items-center gap-2 mb-4">
                 <Key className="w-5 h-5 text-theme-primary" /> {t("apiKeys.title")}
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Generator Section */}
                 <div className="bg-theme-bg/50 p-4 rounded-xl border border-theme/50">
                     <h4 className="text-sm font-medium text-theme-text mb-3">{t("apiKeys.generateTitle")}</h4>
                     <div className="flex gap-2 mb-4">
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={newKeyName}
                             onChange={(e) => setNewKeyName(e.target.value)}
                             placeholder={t("apiKeys.namePlaceholder")}
                             className="bg-theme-card border border-theme/50 text-theme-text rounded-lg px-3 py-2 flex-1 text-sm focus:outline-none focus:border-theme-primary focus:ring-1 focus:ring-theme-primary"
                         />
-                        <button 
-                            onClick={handleCreate} 
+                        <button
+                            onClick={handleCreate}
                             disabled={!newKeyName || loading}
                             className="bg-theme-primary hover:bg-theme-primary/90 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -1231,9 +1231,9 @@ const ApiKeyManager = () => {
                             <p className="text-green-400 text-xs font-bold mb-2">{t("apiKeys.generatedSuccess")}</p>
                             <div className="flex items-center gap-2 bg-black/40 p-2 rounded border border-green-500/20">
                                 <code className="flex-1 text-green-300 font-mono text-sm break-all">{generatedKey}</code>
-                                <button 
+                                <button
                                     onClick={() => handleCopy(generatedKey, "API Key")}
-                                    className="text-gray-400 hover:text-white transition-colors" 
+                                    className="text-gray-400 hover:text-white transition-colors"
                                     title="Copy Key"
                                 >
                                     <Copy className="w-4 h-4" />
@@ -1241,7 +1241,7 @@ const ApiKeyManager = () => {
                             </div>
                         </div>
                     )}
-                    
+
                     {/* Dynamic URL Helpers */}
                     <div className="space-y-3 pt-2 border-t border-theme/20">
                         <div>
@@ -1250,7 +1250,7 @@ const ApiKeyManager = () => {
                                 <code className="flex-1 text-[10px] text-theme-text font-mono truncate">
                                     {origin}/api/webhook/arr?api_key={displayKey}
                                 </code>
-                                <button 
+                                <button
                                     onClick={() => handleCopy(`${origin}/api/webhook/arr?api_key=${displayKey}`, "Webhook URL")}
                                     className="text-theme-muted hover:text-theme-primary transition-colors"
                                 >
@@ -1264,7 +1264,7 @@ const ApiKeyManager = () => {
                                 <code className="flex-1 text-[10px] text-theme-text font-mono truncate">
                                     {origin}/api/webhook/tautulli?api_key={displayKey}
                                 </code>
-                                <button 
+                                <button
                                     onClick={() => handleCopy(`${origin}/api/webhook/tautulli?api_key=${displayKey}`, "Webhook URL")}
                                     className="text-theme-muted hover:text-theme-primary transition-colors"
                                 >
