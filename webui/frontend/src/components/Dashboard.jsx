@@ -467,74 +467,78 @@ function Dashboard() {
 
         {/* SECTION 2: SCHEDULER */}
         <div className="flex-1 p-6 relative group hover:bg-theme-hover/20 transition-colors border-t md:border-t-0 border-theme">
-           <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start justify-between mb-4">
               <div className="flex flex-col">
-                 <span className="text-[10px] font-bold uppercase tracking-widest text-theme-muted mb-1">{t("dashboard.controlDeck.scheduler")}</span>
-                 <span className={`text-xl font-bold tracking-tight ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`}>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-theme-muted mb-1">{t("dashboard.controlDeck.scheduler")}</span>
+                <span className={`text-xl font-bold tracking-tight ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`}>
                     {schedulerStatus.enabled ? (schedulerStatus.running ? t("dashboard.controlDeck.active") : t("dashboard.controlDeck.standby")) : t("dashboard.controlDeck.disabled")}
-                 </span>
+                </span>
               </div>
               <div className={`p-2 rounded-xl ${schedulerStatus.enabled ? "bg-blue-500/10" : "bg-theme-hover"}`}>
-                 <CalendarClock className={`w-6 h-6 ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`} />
+                <CalendarClock className={`w-6 h-6 ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`} />
               </div>
-           </div>
+          </div>
 
-           <div className="mt-auto">
-              {schedulerStatus.enabled && schedulerStatus.next_run ? (() => {
-              const now = new Date().getTime();
+          <div className="mt-auto">
+              {schedulerStatus.enabled && schedulerStatus.schedules?.length > 0 ? (() => {
+                const now = new Date();
+                const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                const totalMinutesInDay = 24 * 60;
+                const progressPercent = (currentMinutes / totalMinutesInDay) * 100;
 
-              // Filter and map only if s.next_run exists, otherwise fallback to the main next_run
-              const allTimes = schedulerStatus.schedules
-                  .map(s => s.next_run ? new Date(s.next_run).getTime() : null)
-                  .filter(t => t !== null && !isNaN(t))
-                  .sort((a, b) => a - b);
+                return (
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-xs font-medium">
+                          <span className="text-theme-muted">{t("dashboard.controlDeck.nextRun")}</span>
+                          <span className="text-blue-300 font-bold">
+                            {schedulerStatus.next_run ? new Date(schedulerStatus.next_run).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}
+                          </span>
+                      </div>
 
-              // If we don't have individual next_run dates, just use the main one
-              const displayNextRun = new Date(schedulerStatus.next_run);
-              const hasRange = allTimes.length > 0;
-              const earliest = hasRange ? allTimes[0] : displayNextRun.getTime();
-              const latest = hasRange ? allTimes[allTimes.length - 1] : displayNextRun.getTime();
+                      {/* Timeline Container */}
+                      <div className="relative h-3 w-full bg-theme-hover rounded-full overflow-visible flex items-center">
+                          {/* Background Progress (Current Time) */}
+                          <div
+                            className="absolute h-full bg-blue-500/20 rounded-full transition-all duration-1000"
+                            style={{ width: `${progressPercent}%` }}
+                          />
 
-              let progress = 0;
-              if (hasRange && latest !== earliest) {
-                  progress = ((now - earliest) / (latest - earliest)) * 100;
-                  progress = Math.max(0, Math.min(100, progress));
-              }
+                          {/* Current Time Indicator (Vertical Line) */}
+                          <div
+                            className="absolute h-4 w-0.5 bg-blue-400 z-10 shadow-[0_0_8px_rgba(96,165,250,0.8)]"
+                            style={{ left: `${progressPercent}%` }}
+                          />
 
-              return (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-medium">
-                        <span className="text-theme-muted">{t("dashboard.controlDeck.nextRun")}</span>
-                        <span className="text-blue-300 font-bold">
-                          {displayNextRun.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                        </span>
+                          {/* Schedule Ticks */}
+                          {schedulerStatus.schedules.map((s, idx) => {
+                            const [hours, minutes] = s.time.split(':').map(Number);
+                            const scheduleMinutes = hours * 60 + minutes;
+                            const position = (scheduleMinutes / totalMinutesInDay) * 100;
+                            const isPast = scheduleMinutes < currentMinutes;
+
+                            return (
+                              <div
+                                key={idx}
+                                className={`absolute w-1.5 h-1.5 rounded-full border-2 transform -translate-x-1/2 transition-colors ${
+                                  isPast
+                                    ? "bg-blue-500 border-blue-400/50" // Already run
+                                    : "bg-theme-card border-theme-muted" // Upcoming
+                                }`}
+                                style={{ left: `${position}%` }}
+                                title={`${s.time} - ${s.description}`}
+                              />
+                            );
+                          })}
+                      </div>
+
+                      <div className="flex justify-between items-center mt-1">
+                          <span className="text-[9px] text-theme-muted font-mono">00:00</span>
+                          <span className="text-[9px] text-theme-primary font-bold">{Math.round(progressPercent)}% of Day</span>
+                          <span className="text-[9px] text-theme-muted font-mono">23:59</span>
+                      </div>
                     </div>
-                    <div className="h-1.5 w-full bg-theme-hover rounded-full overflow-hidden flex">
-                        <div
-                          className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-1000 rounded-full"
-                          style={{ width: `${progress}%` }}
-                        ></div>
-                    </div>
-                    {/* Only show the footer if we actually have a range of dates */}
-                    {hasRange && (
-                        <div className="flex justify-between items-center mt-1">
-                            <div className="flex flex-col">
-                              <span className="text-[8px] uppercase text-theme-muted opacity-50 font-bold">Earliest</span>
-                              <span className="text-[10px] text-theme-muted font-mono">
-                                  {new Date(earliest).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                              </span>
-                            </div>
-                            <div className="flex flex-col items-end">
-                              <span className="text-[8px] uppercase text-theme-muted opacity-50 font-bold">Latest</span>
-                              <span className="text-[10px] text-theme-muted font-mono">
-                                  {new Date(latest).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                              </span>
-                            </div>
-                        </div>
-                    )}
-                  </div>
-              );
-          })() : (
+                );
+              })() : (
                 <div className="flex items-center gap-2 text-xs text-theme-muted h-full opacity-60">
                     <AlertCircle className="w-3 h-3" /> {t("dashboard.controlDeck.noSchedules")}
                 </div>
