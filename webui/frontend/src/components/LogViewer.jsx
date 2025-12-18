@@ -1,1092 +1,442 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useLocation } from "react-router-dom";
-import {
-  RefreshCw,
-  Download,
-  Trash2,
-  FileText,
-  CheckCircle,
-  Wifi,
-  WifiOff,
-  ChevronDown,
-  Activity,
-  Square,
-  Search,
-  Filter,
-  Database,
-  Loader2,
-  LifeBuoy,
-  X,
-} from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { 
+  Terminal, Search, FileText, ChevronDown, RefreshCw, 
+  Trash2, Download, AlertCircle, CheckCircle2, 
+  Settings, Filter, ArrowDown, Maximize2, Minimize2,
+  Clock, Activity, Shield, HardDrive, List, Info,
+  ExternalLink, Copy, ChevronRight, Folder, Hash,
+  Layout, Eye, EyeOff, Monitor, History, LifeBuoy, Square, Loader2
+} from 'lucide-react';
 import { useTranslation } from "react-i18next";
-import Notification from "./Notification";
 import { useToast } from "../context/ToastContext";
+import { useLocation } from "react-router-dom";
 
 const API_URL = "/api";
 const isDev = import.meta.env.DEV;
 
-const getWebSocketURL = (logFile) => {
-  // Check if the page is loaded via HTTPS or HTTP
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+// --- Sub-Component: LogStat ---
+const LogStat = ({ icon: Icon, label, value, color }) => (
+  <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/10 group hover:border-theme-primary/30 transition-all duration-300">
+    <div className={`p-2 rounded-lg bg-${color}-500/10 text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
+      <Icon className="w-4 h-4" />
+    </div>
+    <div className="flex flex-col">
+      <span className="text-[10px] text-theme-muted uppercase tracking-wider font-bold">{label}</span>
+      <span className="text-sm font-mono font-bold text-theme-text">{value}</span>
+    </div>
+  </div>
+);
 
-  const baseURL = isDev
-    ? `ws://localhost:3000/ws/logs`
-    : `${protocol}//${window.location.host}/ws/logs`; // Use the correct protocol
+// --- Sub-Component: AnsiLine ---
+const AnsiLine = React.memo(({ line }) => {
+  if (!line) return null;
+  
+  const parseAnsi = (text) => {
+    const parts = [];
+    let currentPart = { text: '', color: '', bg: '', bold: false };
+    const ansiRegex = /\x1b\[(([0-9]+;?)*)m/g;
+    let lastIndex = 0;
+    let match;
 
-  // Add log_file as query parameter
-  return `${baseURL}?log_file=${encodeURIComponent(logFile)}`;
-};
+    while ((match = ansiRegex.exec(text)) !== null) {
+      const plainText = text.substring(lastIndex, match.index);
+      if (plainText) parts.push({ ...currentPart, text: plainText });
 
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// ++ LOG LEVEL FILTER COMPONENT
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-const LogLevelFilter = ({ levelFilters, setLevelFilters }) => {
-  const { t } = useTranslation();
-  const filters = [
-    { key: "DEBUG", color: "text-purple-400", border: "border-purple-500/50" },
-    { key: "INFO", color: "text-blue-400", border: "border-blue-500/50" },
-    { key: "WARNING", color: "text-yellow-400", border: "border-yellow-500/50" },
-    { key: "ERROR", color: "text-red-400", border: "border-red-500/50" },
-  ];
+      const codes = match[1].split(';');
+      codes.forEach(code => {
+        if (code === '0') currentPart = { text: '', color: '', bg: '', bold: false };
+        else if (code === '1') currentPart.bold = true;
+        else if (code.startsWith('3')) {
+          const colors = ['text-zinc-400', 'text-red-400', 'text-green-400', 'text-yellow-400', 'text-blue-400', 'text-magenta-400', 'text-cyan-400', 'text-white'];
+          currentPart.color = colors[parseInt(code[1])] || '';
+        }
+      });
+      lastIndex = ansiRegex.lastIndex;
+    }
+    
+    const remainingText = text.substring(lastIndex);
+    if (remainingText) parts.push({ ...currentPart, text: remainingText });
+    
+    if (parts.length === 0) {
+      const lower = text.toLowerCase();
+      let color = 'text-theme-text/80';
+      if (lower.includes('error')) color = 'text-red-400 font-bold';
+      else if (lower.includes('warn')) color = 'text-yellow-400';
+      else if (lower.includes('info')) color = 'text-blue-400';
+      return <span className={color}>{text}</span>;
+    }
 
-  const toggleFilter = (key) => {
-    setLevelFilters((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
-
-  const allOn = Object.values(levelFilters).every((v) => v);
-  const allOff = Object.values(levelFilters).every((v) => !v);
-
-  const toggleAll = () => {
-    const newState = !allOn;
-    setLevelFilters({
-      INFO: newState,
-      WARNING: newState,
-      ERROR: newState,
-      DEBUG: newState,
-    });
+    return parts.map((p, i) => (
+      <span key={i} className={`${p.color} ${p.bold ? 'font-bold' : ''}`}>{p.text}</span>
+    ));
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <button
-        onClick={toggleAll}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-sm border ${
-          allOn
-            ? "bg-theme-primary/10 text-theme-primary border-theme-primary/50"
-            : "bg-theme-bg text-theme-muted border-theme hover:bg-theme-hover"
-        }`}
-      >
-        <Filter className="w-3.5 h-3.5" />
-        {allOn ? t("logViewer.allLevels") : t("logViewer.allLevels")}
-      </button>
-
-      {filters.map(({ key, color, border }) => (
-        <button
-          key={key}
-          onClick={() => toggleFilter(key)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-sm border ${
-            levelFilters[key]
-              ? `bg-theme-primary/10 ${color} ${border}`
-              : `bg-theme-bg text-theme-muted border-theme opacity-50 hover:opacity-100`
-          }`}
-        >
-          <span className={`font-bold ${levelFilters[key] ? color : ""}`}>
-            [{key}]
-          </span>
-        </button>
-      ))}
+    <div className="flex gap-4 px-4 py-0.5 hover:bg-white/5 transition-colors group border-l-2 border-transparent hover:border-theme-primary/40">
+      <span className="text-xs leading-relaxed break-all whitespace-pre-wrap font-medium">
+        {parseAnsi(line)}
+      </span>
     </div>
   );
-};
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// ++ END OF COMPONENT
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+});
 
+// --- Sub-Component: LogTreeItem ---
 const LogTreeItem = ({ item, onSelect, selectedLog, level = 0 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(level < 1);
   const isSelected = selectedLog === item.path;
 
-  // Render Directory
   if (item.type === "directory") {
     return (
       <div className="flex flex-col">
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen(!isOpen);
-          }}
-          className="w-full px-4 py-2 text-left text-xs hover:bg-theme-hover flex items-center gap-2 text-theme-muted font-bold border-b border-theme/10"
-          style={{ paddingLeft: `${level * 12 + 16}px` }}
+          onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+          className="w-full px-4 py-2 text-left text-[10px] hover:bg-white/5 flex items-center gap-2 text-theme-muted font-bold tracking-widest border-b border-white/5 transition-all"
+          style={{ paddingLeft: `${level * 16 + 12}px` }}
         >
-          <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? "" : "-rotate-90"}`} />
-          <span className="uppercase tracking-widest">{item.name}</span>
+          <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`} />
+          <Folder className="w-3 h-3 text-theme-primary opacity-60" />
+          <span className="uppercase">{item.name}</span>
         </button>
-        {isOpen && item.children?.map(child => (
-          <LogTreeItem 
-            key={child.path} 
-            item={child} 
-            onSelect={onSelect} 
-            selectedLog={selectedLog} 
-            level={level + 1} 
-          />
-        ))}
+        <div className={`overflow-hidden transition-all ${isOpen ? 'h-auto opacity-100' : 'max-h-0 opacity-0'}`}>
+          {item.children?.map(child => (
+            <LogTreeItem key={child.path} item={child} onSelect={onSelect} selectedLog={selectedLog} level={level + 1} />
+          ))}
+        </div>
       </div>
     );
   }
 
-  // Render File
   return (
     <button
       onClick={() => onSelect(item.path)}
-      className={`w-full px-4 py-2 text-left text-sm transition-all flex items-center justify-between border-b border-theme/5 ${
-        isSelected ? "bg-theme-primary text-white" : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
+      className={`w-full px-4 py-2 text-left text-sm transition-all flex items-center justify-between border-b border-white/5 group ${
+        isSelected ? "bg-theme-primary/20 text-theme-primary border-l-2 border-l-theme-primary" : "text-theme-text hover:bg-white/10"
       }`}
-      style={{ paddingLeft: `${level * 12 + 28}px` }}
+      style={{ paddingLeft: `${level * 16 + 28}px` }}
     >
-      <div className="flex items-center gap-2">
-        <FileText className={`w-3.5 h-3.5 ${isSelected ? "text-white" : "text-theme-muted"}`} />
-        <span>{item.name}</span>
+      <div className="flex items-center gap-2 text-xs">
+        <FileText className={`w-3.5 h-3.5 ${isSelected ? "text-theme-primary" : "text-theme-muted group-hover:text-theme-primary"}`} />
+        <span className="truncate">{item.name}</span>
       </div>
-      <span className="text-[10px] opacity-60">
-        {(item.size / 1024).toFixed(1)} KB
-      </span>
+      <span className="text-[9px] opacity-40 tabular-nums">{(item.size / 1024).toFixed(1)} KB</span>
     </button>
   );
 };
 
-function LogViewer() {
+const LogViewer = () => {
   const { t } = useTranslation();
   const { showSuccess, showError, showInfo } = useToast();
   const location = useLocation();
+  
   const [logs, setLogs] = useState([]);
   const [availableLogs, setAvailableLogs] = useState([]);
-
-  const [selectedLog, setSelectedLog] = useState(null); // Set to null initially
-
+  const [selectedLog, setSelectedLog] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGatheringSupportZip, setIsGatheringSupportZip] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
-  const [connected, setConnected] = useState(false);
-  const [isReconnecting, setIsReconnecting] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(""); 
+  const [logFilter, setLogFilter] = useState("");   
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isLoadingFullLog, setIsLoadingFullLog] = useState(false);
-  const [isGatheringSupportZip, setIsGatheringSupportZip] = useState(false); // Added
+  const [status, setStatus] = useState('disconnected');
+  const [scriptStatus, setScriptStatus] = useState({ running: false, current_mode: null });
+  const [maxLines, setMaxLines] = useState(1000);
+  const [wrapText, setWrapText] = useState(true);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
-  // --- NEW FILTER STATE ---
-  const [searchTerm, setSearchTerm] = useState("");
-  const [levelFilters, setLevelFilters] = useState({
-    INFO: true,
-    WARNING: true,
-    ERROR: true,
-    DEBUG: true,
-  });
-  // --- END NEW FILTER STATE ---
+  const scrollRef = useRef(null);
+  const ws = useRef(null);
+  const currentLogFileRef = useRef(null);
 
-  const [status, setStatus] = useState({
-    running: false,
-    current_mode: null,
-  });
-  const logContainerRef = useRef(null);
-  const wsRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
-  const currentLogFileRef = useRef(null); // Set to null initially
-  const isInitialLoad = useRef(true); // Prevent useEffect [selectedLog] from firing on init
-  const logBufferRef = useRef([]);
-  const parseLogLine = (line) => {
-    const cleanedLine = line.replace(/\x00/g, "").trim();
-    if (!cleanedLine) return { raw: null, level: null };
-
-    // Regex 1: New Backend/UI Log Format
-    // [2025-11-04 10:44:39] [INFO    ] [BACKEND:backend.main:lifespan:1894] - Scheduler initialized and started
-    const backendLogPattern =
-      /^\[([^\]]+)\]\s*\[([^\]\s]+)\s*\]\s+\[([^\]]+)\]\s+-\s+(.*)$/;
-    let match = cleanedLine.match(backendLogPattern);
-    if (match) {
-      return {
-        level: match[2].trim(), // e.g., "INFO"
-        raw: line, // Return the original line
-      };
-    }
-
-    // Regex 2: Old Scriptlog Format
-    // [timestamp] [INFO] |L.123| message
-    const scriptLogPattern =
-      /^\[([^\]]+)\]\s*\[([^\]]+)\]\s*\|L\.(\d+)\s*\|\s*(.*)$/;
-    match = cleanedLine.match(scriptLogPattern);
-    if (match) {
-      return {
-        level: match[2].trim(), // e.g., "INFO"
-        raw: line, // Return the original line
-      };
-    }
-
-    // Return as raw if no match
-    return { raw: line, level: null }; // level is null
+  // --- Helpers ---
+  const getWebSocketURL = (logFile) => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const baseURL = isDev
+      ? `ws://localhost:3000/ws/logs`
+      : `${protocol}//${window.location.host}/ws/logs`;
+    return `${baseURL}?log_file=${encodeURIComponent(logFile)}`;
   };
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/status`);
       const data = await response.json();
-      setStatus({
-        running: data.running || false,
-        current_mode: data.current_mode || null,
-      });
-    } catch (error) {
-      console.error("Error fetching status:", error);
-    }
-  };
+      setScriptStatus({ running: data.running || false, current_mode: data.current_mode || null });
+    } catch (error) { console.error("Error fetching status:", error); }
+  }, []);
 
   const stopScript = async () => {
-    setLoading(true);
+    setIsStopping(true);
     try {
-      const response = await fetch(`${API_URL}/stop`, {
-        method: "POST",
-      });
+      const response = await fetch(`${API_URL}/stop`, { method: "POST" });
       const data = await response.json();
       if (data.success) {
         showSuccess(t("logViewer.scriptStopped"));
         fetchStatus();
-      } else {
-        showError(t("logViewer.error", { message: data.message }));
-      }
-    } catch (error) {
-      showError(t("logViewer.error", { message: error.message }));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // This is only used to get the color, not for rendering
-  const LogLevel = ({ level }) => {
-    const levelLower = (level || "").toLowerCase().trim();
-    const colors = {
-      error: "#f87171",
-      warning: "#fbbf24",
-      warn: "#fbbf24",
-      info: "#42A5F5",
-      success: "#4ade80",
-      debug: "#c084fc",
-      default: "#9ca3af",
-    };
-    const color = colors[levelLower] || colors.default;
-    return <span style={{ color: color, fontWeight: "bold" }}>[{level}]</span>;
-  };
-
-  const getLogColor = (level) => {
-    const levelLower = (level || "").toLowerCase().trim();
-    const colors = {
-      error: "#f87171",
-      warning: "#fbbf24",
-      warn: "#fbbf24",
-      info: "#42A5F5",
-      success: "#4ade80",
-      debug: "#c084fc",
-      default: "#d1d5db", // Default color for raw/unknown
-    };
-    // Use default color if level is null/undefined
-    return colors[levelLower] || colors.default;
-  };
-
-  useEffect(() => {
-    const flushBuffer = () => {
-      // Read the logs to flush into a local constant FIRST.
-      const logsToFlush = logBufferRef.current;
-
-      // If there's nothing to flush, do nothing.
-      if (logsToFlush.length === 0) {
-        return;
-      }
-
-      // Clear the ref so new logs can start buffering.
-      logBufferRef.current = [];
-
-      // Pass the updater function to setLogs.
-      setLogs((prevLogs) => [...prevLogs, ...logsToFlush]);
-    };
-
-    // Flush the buffer every 500ms
-    const flushInterval = setInterval(flushBuffer, 500);
-
-    return () => {
-      clearInterval(flushInterval);
-      flushBuffer(); // Flush any remaining logs on unmount
-    };
-  }, []);
-
-  const fetchAvailableLogs = async (showToast = false) => {
-    setIsRefreshing(true);
-    try {
-      const response = await fetch(`${API_URL}/logs`);
-      const data = await response.json();
-      setAvailableLogs(data.logs);
-      if (showToast) {
-        showSuccess(t("logViewer.logsRefreshed"));
-      }
-      return data.logs; // Return logs for initial load check
-    } catch (error) {
-      console.error("Error fetching log files:", error);
-      if (showToast) {
-        showError(t("logViewer.refreshFailed"));
-      }
-      return []; // Return empty on error
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 500);
-    }
-  };
-
-  // NEW function to load the *entire* log
-  const fetchFullLogFile = async (logName) => {
-    if (!logName) {
-      showError(t("logViewer.noLogSelected"));
-      return;
-    }
-    setIsLoadingFullLog(true);
-    showInfo(t("logViewer.loadingFullLog", { name: logName }));
-    setAutoScroll(false); // Disable auto-scroll when loading full log
-    try {
-      const response = await fetch(`${API_URL}/logs/${logName}?tail=0`); // tail=0
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      const strippedContent = data.content.map((line) => line.trim());
-      // Parse all lines at once
-      const parsedLogs = strippedContent
-        .map(parseLogLine)
-        .filter((p) => p.raw !== null); // Filter out empty/invalid lines
-      setLogs(parsedLogs);
-      showSuccess(
-        t("logViewer.loadedFullLog", {
-          count: parsedLogs.length,
-          name: logName,
-        })
-      );
-    } catch (error) {
-      console.error("Error fetching full log:", error);
-      showError(t("logViewer.loadFailed", { name: logName }));
-    } finally {
-      setIsLoadingFullLog(false);
-    }
+      } else showError(t("logViewer.error", { message: data.message }));
+    } catch (error) { showError(t("logViewer.error", { message: error.message })); }
+    finally { setIsStopping(false); }
   };
 
   const gatherSupportZip = async () => {
     setIsGatheringSupportZip(true);
-    showInfo(t("logViewer.gatheringSupport", "Gathering support files... This may take a moment."));
+    showInfo(t("logViewer.gatheringSupport", "Gathering support files..."));
     try {
-      const response = await fetch(`${API_URL}/admin/support-zip`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        let errorMsg = `HTTP error! status: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMsg = errorData.detail || errorMsg;
-        } catch (e) {
-          // Response was not JSON
-        }
-        throw new Error(errorMsg);
-      }
-
-      // Get filename from Content-Disposition header
-      const contentDisposition = response.headers.get("content-disposition");
-      let downloadFilename = "posterizarr_support.zip"; // Default
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/i);
-        if (filenameMatch && filenameMatch[1]) {
-          downloadFilename = filenameMatch[1];
-        }
-      }
-
+      const response = await fetch(`${API_URL}/admin/support-zip`, { method: "POST" });
+      if (!response.ok) throw new Error("Failed to generate zip");
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = downloadFilename; //  Use dynamic filename
-      document.body.appendChild(a);
+      a.download = "posterizarr_support.zip";
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      showSuccess(t("logViewer.gatheringSupportSuccess", "Support files downloaded."));
-
-    } catch (error) {
-      console.error("Error gathering support zip:", error);
-      showError(t("logViewer.gatheringSupportFailed", "Failed to gather support files: {{message}}", { message: error.message }));
-    } finally {
-      setIsGatheringSupportZip(false);
-    }
+      showSuccess(t("logViewer.gatheringSupportSuccess"));
+    } catch (error) { showError(t("logViewer.gatheringSupportFailed", { message: error.message })); }
+    finally { setIsGatheringSupportZip(false); }
   };
 
-  const disconnectWebSocket = () => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-    if (wsRef.current) {
-      wsRef.current.onopen = null;
-      wsRef.current.onclose = null;
-      wsRef.current.onerror = null;
-      wsRef.current.onmessage = null;
-      if (
-        wsRef.current.readyState === WebSocket.OPEN ||
-        wsRef.current.readyState === WebSocket.CONNECTING
-      ) {
-        wsRef.current.close();
-      }
-      wsRef.current = null;
-    }
-    setConnected(false);
-    setIsReconnecting(false);
-  };
-
-  const connectWebSocket = (logFile) => {
-    if (!logFile) {
-      console.warn("WebSocket connection skipped: no log file selected.");
-      return;
-    }
-
-    if (
-      wsRef.current &&
-      (wsRef.current.readyState === WebSocket.OPEN ||
-        wsRef.current.readyState === WebSocket.CONNECTING)
-    ) {
-      if (currentLogFileRef.current === logFile) {
-        console.log(`Already connected to ${logFile}`);
-        return;
-      }
-    }
-
-    disconnectWebSocket();
-
+  const fetchAvailableLogs = useCallback(async (isManual = false) => {
     try {
-      const wsURL = getWebSocketURL(logFile);
-      console.log(`Connecting to WebSocket: ${wsURL}`);
-      const ws = new WebSocket(wsURL);
-      currentLogFileRef.current = logFile;
-
-      ws.onopen = () => {
-        console.log(`WebSocket connected to ${logFile}`);
-        setLogs([]); // <-- FIX: Clear logs on new connection
-        setConnected(true);
-        setIsReconnecting(false);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "log") {
-            const parsedLine = parseLogLine(data.content);
-            if (parsedLine.raw) {
-              logBufferRef.current.push(parsedLine);
-            }
-          } else if (data.type === "log_file_changed") {
-            console.log(`Backend wants to switch to: ${data.log_file}`);
-            if (selectedLog === currentLogFileRef.current) {
-              console.log(`Accepting backend log switch to: ${data.log_file}`);
-              setSelectedLog(data.log_file);
-              currentLogFileRef.current = data.log_file;
-              showInfo(t("logViewer.switchedTo", { file: data.log_file }));
-            } else {
-              console.log(
-                `Ignoring backend log switch - user manually selected ${selectedLog}`
-              );
-            }
-          } else if (data.type === "error") {
-            console.error("WebSocket error message:", data.message);
-            showError(data.message);
-          }
-        } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.warn("WebSocket error:", error);
-        setConnected(false);
-      };
-
-      ws.onclose = (event) => {
-        console.log(" WebSocket closed:", event.code);
-        setConnected(false);
-        if (!event.wasClean) {
-          setIsReconnecting(true);
-          showError(t("logViewer.disconnected"));
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log(`Reconnecting to ${currentLogFileRef.current}...`);
-            connectWebSocket(currentLogFileRef.current);
-          }, 2000);
-        }
-      };
-
-      wsRef.current = ws;
-    } catch (error) {
-      console.error("Failed to create WebSocket:", error);
-      setConnected(false);
-      setIsReconnecting(true);
-      reconnectTimeoutRef.current = setTimeout(() => {
-        connectWebSocket(logFile);
-      }, 3000);
+      const response = await fetch('/api/logs');
+      const data = await response.json();
+      setAvailableLogs(data.logs || []);
+      if (isManual) showSuccess(t("logViewer.logsRefreshed"));
+      return data.logs || [];
+    } catch (err) { 
+        console.error("Failed to fetch logs:", err);
+        if (isManual) showError(t("logViewer.refreshFailed"));
+        return [];
     }
+  }, [t, showSuccess, showError]);
+
+  const fetchFullLogFile = async (filename) => {
+    if (!filename) return;
+    setIsLoading(true);
+    showInfo(t("logViewer.loadingFullLog", { name: filename }));
+    try {
+      const response = await fetch(`/api/logs/${encodeURIComponent(filename)}?tail=0`);
+      if (!response.ok) throw new Error('Failed to fetch log file');
+      const data = await response.json();
+      const content = Array.isArray(data.content) ? data.content : data.content.split('\n');
+      setLogs(content);
+      showSuccess(t("logViewer.loadedFullLog", { count: content.length, name: filename }));
+    } catch (err) { showError(t("logViewer.loadFailed", { name: filename })); }
+    finally { setIsLoading(false); }
   };
 
-  // Initial load effect
+  // --- Initial Mount ---
   useEffect(() => {
     const initialize = async () => {
-      // 1. Fetch all available logs
-      const logsData = await fetchAvailableLogs();
+        const logsData = await fetchAvailableLogs();
+        const requestedLogFile = location.state?.logFile || "Scriptlog.log";
+        
+        // Flatten available logs for existence check
+        const findLog = (items) => {
+            for (const item of items) {
+                if (item.type === 'file' && item.path === requestedLogFile) return item;
+                if (item.children) {
+                    const found = findLog(item.children);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
 
-      // 2. Determine which log to load
-      const requestedLogFile = location.state?.logFile || "Scriptlog.log";
-      const logExists = logsData.some((log) => log.name === requestedLogFile);
-
-      let logToLoad = null;
-
-      if (logExists) {
-        logToLoad = requestedLogFile;
-      } else if (requestedLogFile === "Scriptlog.log" && logsData.length > 0) {
-        // If Scriptlog.log was default but missing, pick the first available log
-        logToLoad = logsData[0].name;
-        showInfo(t("logViewer.scriptlogMissing", { fallback: logToLoad }));
-      } else if (logsData.length === 0) {
-        // No logs exist at all
-        showInfo(t("logViewer.noLogsFound"));
-        setLogs([]);
-        return; // Do not fetch or connect
-      } else if (logsData.length > 0) {
-        // Requested log doesn't exist, and it wasn't the default Scriptlog
-        showError(t("logViewer.loadFailed", { name: requestedLogFile }));
-        logToLoad = logsData[0].name; // Fallback to first log
-      } else {
-        // This case should be covered by logsData.length === 0, but as a safety net:
-        return; // No logs to load
-      }
-
-      // 3. Set the log, fetch content, and connect
-      setSelectedLog(logToLoad);
-      currentLogFileRef.current = logToLoad; // Manually set ref to prevent re-connect
-      // await fetchLogFile(logToLoad); // <-- REMOVED to prevent duplicates
-      connectWebSocket(logToLoad);
-
-      isInitialLoad.current = false; // Mark initial load as complete
+        const logExists = findLog(logsData);
+        let logToLoad = logExists ? requestedLogFile : (logsData[0]?.path || "");
+        
+        if (logToLoad) setSelectedLog(logToLoad);
     };
 
     initialize();
     fetchStatus();
-
     const statusInterval = setInterval(fetchStatus, 3000);
+    return () => clearInterval(statusInterval);
+  }, [fetchAvailableLogs, fetchStatus, location.state]);
 
-    return () => {
-      clearInterval(statusInterval);
-      disconnectWebSocket();
-    };
-  }, []); // Empty dependency array, runs only once on mount
-
-  // Effect to handle manual log selection changes
+  // --- WebSocket Connection ---
   useEffect(() => {
-    if (isInitialLoad.current) {
-      // Don't run this on the very first load
-      return;
-    }
+    if (!selectedLog) return;
+    
+    // Cleanup previous
+    if (ws.current) ws.current.close();
+    setLogs([]); 
+    
+    const wsUrl = getWebSocketURL(selectedLog);
+    ws.current = new WebSocket(wsUrl);
+    currentLogFileRef.current = selectedLog;
 
-    if (selectedLog && selectedLog !== currentLogFileRef.current) {
-      console.log(`Selected log changed to: ${selectedLog}`);
-      // fetchLogFile(selectedLog); // <-- REMOVED
-      // Reconnect websocket to the new log file
-      disconnectWebSocket();
-      setTimeout(() => {
-        connectWebSocket(selectedLog);
-      }, 300);
-    }
-  }, [selectedLog]);
+    ws.current.onopen = () => setStatus('connected');
+    ws.current.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'log') {
+                setLogs(prev => [...prev, data.content].slice(-maxLines));
+            } else if (data.type === "log_file_changed") {
+                if (selectedLog === currentLogFileRef.current) {
+                    setSelectedLog(data.log_file);
+                    showInfo(t("logViewer.switchedTo", { file: data.log_file }));
+                }
+            }
+        } catch {
+            setLogs(prev => [...prev, e.data].slice(-maxLines));
+        }
+    };
+    ws.current.onerror = () => setStatus('error');
+    ws.current.onclose = () => setStatus('disconnected');
 
-
-  const filteredLogs = useMemo(() => {
-    const query = searchTerm.toLowerCase();
-
-    // 'logs' is now an array of { raw, level } objects
-    return logs.filter((parsed) => {
-      // We no longer need to call parseLogLine here!
-
-      const level = (parsed.level || "UNKNOWN").toUpperCase().trim();
-      const message = parsed.raw.toLowerCase(); // Filter against the raw line
-
-      let levelMatch = false;
-      if (parsed.level === null) {
-        // This is a raw line that didn't parse
-        levelMatch = !query || message.includes(query);
-      } else if (level === "INFO") {
-        levelMatch = levelFilters.INFO;
-      } else if (level === "WARNING" || level === "WARN") {
-        levelMatch = levelFilters.WARNING;
-      } else if (level === "ERROR") {
-        levelMatch = levelFilters.ERROR;
-      } else if (level === "DEBUG") {
-        levelMatch = levelFilters.DEBUG;
-      } else {
-        levelMatch = true; // Show other known levels by default
-      }
-
-      if (!levelMatch) return false;
-
-      // Search match is now the primary check
-      const searchMatch = !query || message.includes(query);
-
-      return searchMatch;
-    });
-  }, [logs, searchTerm, levelFilters]);
+    return () => ws.current?.close();
+  }, [selectedLog, maxLines, t, showInfo]);
 
   useEffect(() => {
-    if (autoScroll && logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    if (autoScroll && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [filteredLogs, autoScroll]);
+  }, [logs, autoScroll]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setDropdownOpen(false);
-      }
+  const filteredTree = useMemo(() => {
+    if (!searchTerm) return availableLogs;
+    const filterItems = (items) => {
+      return items.reduce((acc, item) => {
+        if (item.type === "directory") {
+          const filteredChildren = filterItems(item.children || []);
+          if (item.name.toLowerCase().includes(searchTerm.toLowerCase()) || filteredChildren.length > 0) {
+            acc.push({ ...item, children: filteredChildren });
+          }
+        } else if (item.name.toLowerCase().includes(searchTerm.toLowerCase())) acc.push(item);
+        return acc;
+      }, []);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  const clearLogs = () => {
-    setLogs([]);
-    showSuccess(t("logViewer.logsCleared"));
-  };
-
-  // UPDATED to download from state
-  const downloadLogs = () => {
-    if (!selectedLog) {
-      showError(t("logViewer.noLogSelected"));
-      return;
-    }
-
-    // Download the currently filtered logs from state
-    const logText = filteredLogs.map(p => p.raw).join("\n");
-    const blob = new Blob([logText], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-
-    const logNameWithoutExt = selectedLog.replace(/\.[^/.]+$/, "");
-    a.download = `${logNameWithoutExt}_${new Date()
-      .toISOString()
-      .replace(/[:.]/g, "-")}_(filtered).log`;
-
-    a.click();
-    URL.revokeObjectURL(url);
-
-    showSuccess(t("logViewer.downloaded", { count: filteredLogs.length }));
-  };
-
-  const getDisplayStatus = () => {
-    if (connected) {
-      return {
-        color: "bg-green-400",
-        icon: Wifi,
-        text: t("logViewer.status.live"),
-        ringColor: "ring-green-400/30",
-      };
-    } else if (isReconnecting) {
-      return {
-        color: "bg-yellow-400",
-        icon: Wifi,
-        text: t("logViewer.status.reconnecting"),
-        ringColor: "ring-yellow-400/30",
-      };
-    } else {
-      return {
-        color: "bg-red-400",
-        icon: WifiOff,
-        text: t("logViewer.status.disconnected"),
-        ringColor: "ring-red-400/30",
-      };
-    }
-  };
-
-  const displayStatus = getDisplayStatus();
-  const StatusIcon = displayStatus.icon;
+    return filterItems(availableLogs);
+  }, [availableLogs, searchTerm]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      {/* +++ MODIFIED: Added gap-4 and new button +++ */}
-      <div className="flex items-center justify-end gap-4">
-        {/* Gather Support Logs Button */}
-        <button
-          onClick={gatherSupportZip}
-          disabled={isGatheringSupportZip}
-          className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-primary/10 border border-theme-primary/50 rounded-lg text-theme-primary text-sm font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isGatheringSupportZip ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <LifeBuoy className="w-4 h-4" />
-          )}
-          {t("logViewer.gatherSupport", "Gather Support Logs")}
-        </button>
-
-        {/* Connection Status Badge */}
-        <div
-          className={`flex items-center gap-3 px-4 py-2 rounded-lg bg-theme-card border ${
-            connected
-              ? "border-green-500/50"
-              : isReconnecting
-              ? "border-yellow-500/50"
-              : "border-red-500/50"
-          } shadow-sm`}
-        >
-          <div className="relative">
-            <div
-              className={`w-3 h-3 rounded-full ${displayStatus.color} ${
-                connected || isReconnecting ? "animate-pulse" : ""
-              }`}
-            ></div>
-            {(connected || isReconnecting) && (
-              <div
-                className={`absolute inset-0 w-3 h-3 rounded-full ${
-                  displayStatus.color
-                } ${connected || isReconnecting ? "animate-ping" : ""}`}
-              ></div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <StatusIcon className="w-4 h-4 text-theme-muted" />
-            <span className="text-sm font-medium text-theme-text">
-              {displayStatus.text}
-            </span>
-          </div>
-        </div>
-      </div>
-      {/* +++ END MODIFICATION +++ */}
-
-
-      {status.running && (
-        <div className="bg-orange-950/40 rounded-xl p-4 border border-orange-600/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-600/20">
-                <Activity className="w-5 h-5 text-orange-400" />
-              </div>
-              <div>
-                <p className="font-medium text-orange-200">
-                  {t("logViewer.scriptRunning")}
-                </p>
-                <p className="text-sm text-orange-300/80">
-                  {status.current_mode && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-200 mr-2">
-                      {t("logViewer.mode")}: {status.current_mode}
-                    </span>
-                  )}
-                  {t("logViewer.stopBeforeRunning")}
-                </p>
-              </div>
+    <div className={`flex flex-col h-full bg-[#0a0a0b] text-theme-text font-mono relative overflow-hidden transition-all duration-500 ${isFullScreen ? 'fixed inset-0 z-[100]' : ''}`}>
+      
+      {/* Header Area */}
+      <div className="flex flex-col gap-6 px-8 py-6 bg-theme-card border-b border-theme-primary/20 shadow-2xl z-20 backdrop-blur-md">
+        
+        {/* Top Bar: Script Status & Support Buttons */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div className="flex items-center gap-4">
+                {scriptStatus.running && (
+                    <div className="flex items-center gap-3 px-4 py-2 bg-orange-500/10 border border-orange-500/20 rounded-xl animate-pulse">
+                        <Activity className="w-4 h-4 text-orange-400" />
+                        <span className="text-xs font-bold text-orange-400 uppercase tracking-widest">{t("logViewer.scriptRunning")}: {scriptStatus.current_mode}</span>
+                        <button onClick={stopScript} disabled={isStopping} className="ml-2 p-1 bg-red-500 hover:bg-red-600 rounded text-white transition-colors">
+                            {isStopping ? <Loader2 className="w-3 h-3 animate-spin" /> : <Square className="w-3 h-3" />}
+                        </button>
+                    </div>
+                )}
             </div>
-            <button
-              onClick={stopScript}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 rounded-lg font-medium transition-all shadow-sm"
-            >
-              {loading ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Square className="w-4 h-4" />
-              )}
-              {t("logViewer.stopScript")}
+            <button onClick={gatherSupportZip} disabled={isGatheringSupportZip} className="flex items-center gap-2 px-4 py-2 bg-theme-primary/10 hover:bg-theme-primary/20 border border-theme-primary/30 rounded-xl text-theme-primary text-xs font-bold transition-all">
+                {isGatheringSupportZip ? <Loader2 className="w-4 h-4 animate-spin" /> : <LifeBuoy className="w-4 h-4" />}
+                {t("logViewer.gatherSupport", "GATHER SUPPORT LOGS")}
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Controls Section */}
-      <div className="bg-theme-card rounded-xl p-6 border border-theme shadow-sm">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          {/* Log Selector */}
-          <div className="flex-1 w-full lg:max-w-md">
-            <label className="block text-sm font-medium text-theme-text mb-2">
-              {t("logViewer.selectLogFile")}
-            </label>
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="w-full px-4 py-3 bg-theme-bg border border-theme rounded-lg text-theme-text text-sm flex items-center justify-between hover:bg-theme-hover hover:border-theme-primary/50 transition-all shadow-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-theme-primary" />
-                  <span className="font-medium">
-                    {selectedLog || "Select a log"}
-                  </span>
-                  {selectedLog &&
-                    availableLogs.find((l) => l.name === selectedLog) && (
-                      <span className="text-theme-muted text-xs">
-                        (
-                        {(
-                          availableLogs.find((l) => l.name === selectedLog)
-                            .size / 1024
-                        ).toFixed(2)}{" "}
-                        KB)
-                      </span>
-                    )}
-                </div>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    dropdownOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {dropdownOpen && (
-                <div className="absolute z-10 w-full mt-2 bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-[400px] overflow-y-auto py-1">
-                  {availableLogs.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-theme-muted">No logs found</div>
-                  ) : (
-                    availableLogs.map((item) => (
-                      <LogTreeItem
-                        key={item.path}
-                        item={item}
-                        selectedLog={selectedLog}
-                        onSelect={(path) => {
-                          setSelectedLog(path);
-                          setDropdownOpen(false);
-                        }}
-                      />
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Auto-scroll Toggle Switch */}
-            <label className="flex items-center gap-3 px-4 py-2 bg-theme-bg border border-theme rounded-lg cursor-pointer hover:bg-theme-hover transition-all">
-              <span className="text-sm text-theme-text font-medium">
-                {t("logViewer.autoScroll")}
-              </span>
-              <div className="relative inline-block w-11 h-6">
-                <input
-                  type="checkbox"
-                  checked={autoScroll}
-                  onChange={(e) => setAutoScroll(e.target.checked)}
-                  className="peer sr-only"
-                />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-theme-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-primary"></div>
-              </div>
-            </label>
-
-            {/* Refresh Button */}
-            <button
-              onClick={() => fetchAvailableLogs(true)}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-bg hover:bg-theme-hover border border-theme disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-all hover:scale-[1.02] shadow-sm"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              {t("logViewer.refresh")}
-            </button>
-
-            {/* Load Full Log Button */}
-            <button
-              onClick={() => fetchFullLogFile(selectedLog)}
-              disabled={!selectedLog || isLoadingFullLog}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-bg hover:bg-theme-hover border border-theme disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-all hover:scale-[1.02] shadow-sm"
-            >
-              {isLoadingFullLog ? (
-                <Loader2 className="w-4 h-4 animate-spin text-theme-primary" />
-              ) : (
-                <Database className="w-4 h-4 text-theme-primary" />
-              )}
-              {t("logViewer.loadFull")}
-            </button>
-
-            {/* Download Button */}
-            <button
-              onClick={downloadLogs}
-              disabled={!selectedLog || filteredLogs.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text text-sm font-medium transition-all hover:scale-[1.02] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Download className="w-4 h-4 text-theme-primary" />
-              {t("logViewer.download")}
-            </button>
-
-            {/* +++ BUTTON REMOVED FROM HERE +++ */}
-
-            {/* Clear Button */}
-            <button
-              onClick={clearLogs}
-              className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-red-500/50 rounded-lg text-theme-text text-sm font-medium transition-all hover:scale-[1.02] shadow-sm"
-            >
-              <Trash2 className="w-4 h-4 text-red-400" />
-              {t("logViewer.clear")}
-            </button>
-          </div>
         </div>
 
-        {/* FILTER/SEARCH ROW */}
-        <div className="mt-4 pt-4 border-t border-theme-border flex flex-col md:flex-row gap-4">
-          {/* Search Bar */}
-          <div className="flex-grow">
-            <label className="block text-sm font-medium text-theme-text mb-2">
-              {t("logViewer.searchLogs")}
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-theme-muted" />
-              <input
-                type="text"
-                placeholder={t("logViewer.searchPlaceholder")}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 bg-theme-bg border border-theme rounded-lg text-theme-text placeholder-theme-muted focus:outline-none focus:ring-1 focus:ring-theme-primary focus:border-theme-primary transition-all"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-theme-muted hover:text-theme-text"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className="flex items-center gap-6 flex-1 w-full lg:w-auto">
+            <div className="flex items-center gap-3 bg-white/5 px-4 py-2.5 rounded-2xl border border-white/10 focus-within:border-theme-primary/50 w-full lg:w-72">
+              <Search className="w-4 h-4 text-theme-primary" />
+              <input type="text" placeholder={t("logViewer.searchPlaceholder", "Search folders/files...")} className="bg-transparent border-none outline-none text-xs w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
-          </div>
-          {/* Level Filters */}
-          <div className="flex-shrink-0">
-            <label className="block text-sm font-medium text-theme-text mb-2">
-              {t("logViewer.filterLevel")}
-            </label>
-            <LogLevelFilter
-              levelFilters={levelFilters}
-              setLevelFilters={setLevelFilters}
-            />
-          </div>
-        </div>
-      </div>
 
-      {/* Log Display Section */}
-      <div className="bg-theme-card rounded-xl border border-theme shadow-sm overflow-hidden">
-        {/* Log Container Header */}
-        <div className="bg-theme-bg px-6 py-3 border-b border-theme flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded bg-theme-primary/10">
-              <FileText className="w-4 h-4 text-theme-primary" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-theme-text">
-                {selectedLog || t("logViewer.noLogSelected")}
-              </h3>
-              <p className="text-xs text-theme-muted">
-                {selectedLog
-                  ? t("logViewer.showingLast")
-                  : t("logViewer.pleaseSelectLog")}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-theme-muted">
-            <span className="font-mono">
-              {t("logViewer.entries", { count: filteredLogs.length })}
-            </span>
-            {connected && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 border border-green-500/30 rounded text-green-400">
-                <CheckCircle className="w-3 h-3" />
-                <span>{t("logViewer.status.live")}</span>
-              </div>
-            )}
-            {isReconnecting && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400 animate-pulse">
-                <RefreshCw className="w-3 h-3 animate-spin" />
-                <span>{t("logViewer.status.reconnecting")}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Terminal-Style Log Container */}
-        <div
-          ref={logContainerRef}
-          className="h-[700px] overflow-y-auto bg-black p-4"
-          style={{ scrollbarWidth: "thin" }}
-        >
-          {filteredLogs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <FileText className="w-16 h-16 text-gray-700 mb-4" />
-              <p className="text-gray-500 font-medium mb-2">
-                {logs.length > 0 &&
-                (searchTerm || !Object.values(levelFilters).every((v) => v))
-                  ? t("logViewer.noMatchingLogs")
-                  : t("logViewer.noLogs")}
-              </p>
-              <p className="text-gray-600 text-sm">
-                {logs.length > 0 &&
-                (searchTerm || !Object.values(levelFilters).every((v) => v))
-                  ? t("logViewer.adjustFilters")
-                  : availableLogs.length > 0
-                  ? t("logViewer.startScript")
-                  : t("logViewer.noLogsAvailable")}
-              </p>
-            </div>
-          ) : (
-            <div className="font-mono text-[11px] leading-relaxed">
-              {filteredLogs.map((parsed, index) => { // 'parsed' is { raw, level }
-                // Get color based on parsed level
-                const logColor = getLogColor(parsed.level); // Use parsed.level
-
-                return (
-                  <div
-                    key={index}
-                    // ...
-                    style={{ color: logColor }}
-                  >
-                    {/* Render the raw line */}
-                    <pre className="whitespace-pre-wrap m-0 p-0">{parsed.raw}</pre>
+            <div className="relative flex-1 w-full lg:max-w-md">
+              <button onClick={() => setDropdownOpen(!dropdownOpen)} className="w-full flex items-center justify-between px-6 py-2.5 bg-white/5 rounded-2xl border border-white/10 hover:border-theme-primary/50 group">
+                <div className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-lg ${selectedLog ? 'bg-theme-primary/20 text-theme-primary' : 'bg-white/10 text-theme-muted'}`}><FileText className="w-4 h-4" /></div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-[10px] text-theme-muted uppercase tracking-tighter font-black opacity-50">{t("logViewer.activeStream", "Active Stream")}</span>
+                    <span className="text-sm font-bold truncate max-w-[200px]">{selectedLog ? selectedLog.split('/').pop() : t("logViewer.selectLogFile", 'Select Log Sequence')}</span>
                   </div>
-                );
-              })}
+                </div>
+                <ChevronDown className={`w-5 h-5 text-theme-primary transition-transform duration-500 ${dropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {dropdownOpen && (
+                <div className="absolute z-50 w-full mt-4 bg-theme-card/95 border border-theme-primary/30 rounded-3xl shadow-2xl max-h-[500px] overflow-y-auto py-3 backdrop-blur-xl custom-scrollbar">
+                  {filteredTree.map(item => <LogTreeItem key={item.path} item={item} selectedLog={selectedLog} onSelect={(p) => { setSelectedLog(p); setDropdownOpen(false); }} />)}
+                </div>
+              )}
             </div>
-          )}
+          </div>
+
+          <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
+             <div className="flex items-center gap-3 bg-white/5 px-4 py-2.5 rounded-2xl border border-white/10 focus-within:border-theme-primary/50 w-full lg:w-64">
+              <Filter className="w-4 h-4 text-theme-primary" />
+              <input type="text" placeholder={t("logViewer.filterPlaceholder", "Filter logs...")} className="bg-transparent border-none outline-none text-xs w-full" value={logFilter} onChange={(e) => setLogFilter(e.target.value)} />
+            </div>
+            <button onClick={() => fetchAvailableLogs(true)} className="p-3 bg-white/5 hover:bg-theme-primary/20 rounded-2xl border border-white/10 text-theme-primary transition-all">
+              <RefreshCw className="w-5 h-5" />
+            </button>
+            <button onClick={() => fetchFullLogFile(selectedLog)} disabled={isLoading} className="p-3 bg-white/5 hover:bg-theme-primary/20 rounded-2xl border border-white/10 text-theme-primary transition-all">
+              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Database className="w-5 h-5" />}
+            </button>
+            <button onClick={() => {
+                const filteredLogs = logs.filter(l => l.toLowerCase().includes(logFilter.toLowerCase()));
+                const blob = new Blob([filteredLogs.join('\n')], {type: 'text/plain'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${selectedLog.split('/').pop() || 'log'}_filtered.log`;
+                a.click();
+                showSuccess(t("logViewer.downloaded", { count: filteredLogs.length }));
+            }} className="p-3 bg-white/5 hover:bg-theme-primary/20 rounded-2xl border border-white/10 text-theme-primary transition-all">
+              <Download className="w-5 h-5" />
+            </button>
+            <button onClick={() => { setLogs([]); showSuccess(t("logViewer.logsCleared")); }} className="p-3 bg-white/5 hover:bg-red-500/20 rounded-2xl border border-white/10 text-red-400 transition-all">
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="bg-theme-bg px-6 py-3 border-t border-theme flex items-center justify-between text-xs text-theme-muted">
-          <div className="flex items-center gap-4">
-            <span className="font-mono">
-              {t("logViewer.logEntries", { count: filteredLogs.length })}
-              {logs.length !== filteredLogs.length &&
-                ` (filtered from ${logs.length})`}
-            </span>
-            <span>•</span>
-            <span>
-              {t("logViewer.autoScrollStatus", {
-                status: autoScroll ? t("logViewer.on") : t("logViewer.off"),
-              })}
-            </span>
-          </div>
-          {connected && (
-            <div className="flex items-center gap-2 text-green-400">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-              <span>{t("logViewer.receivingUpdates")}</span>
-            </div>
-          )}
-          {isReconnecting && (
-            <div className="flex items-center gap-2 text-yellow-400">
-              <RefreshCw className="w-3 h-3 animate-spin" />
-              <span>{t("logViewer.status.reconnecting")}</span>
+        <div className="flex flex-wrap items-center gap-4">
+          <LogStat icon={Activity} label={t("logViewer.status.label", "Stream Status")} value={status.toUpperCase()} color={status === 'connected' ? 'green' : 'red'} />
+          <LogStat icon={Hash} label={t("logViewer.entries", "Lines")} value={logs.length} color="blue" />
+          <LogStat icon={Clock} label={t("logViewer.bufferLimit", "Buffer Limit")} value={`${maxLines} L`} color="purple" />
+          {selectedLog && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-theme-primary/10 rounded-xl border border-theme-primary/20">
+              <History className="w-4 h-4 text-theme-primary" />
+              <span className="text-[10px] text-theme-primary font-bold tracking-widest uppercase">Path: {selectedLog}</span>
             </div>
           )}
         </div>
       </div>
+
+      <div className="flex-1 relative flex flex-col min-h-0">
+        <div ref={scrollRef} className={`flex-1 overflow-auto p-8 custom-scrollbar ${wrapText ? '' : 'whitespace-nowrap'}`}>
+          {logs.length > 0 ? (
+            <div className="space-y-0.5 min-w-full inline-block">
+              {logs.filter(l => l.toLowerCase().includes(logFilter.toLowerCase())).map((line, i) => (
+                <AnsiLine key={i} line={line} />
+              ))}
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-theme-muted/20">
+              <Terminal className="w-32 h-32 mb-6 animate-pulse" />
+              <p className="text-xl font-black tracking-[0.4em] uppercase opacity-50">{t("logViewer.noLogs", "System Idle")}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="absolute bottom-10 right-12 flex flex-col gap-4">
+          <button onClick={() => setAutoScroll(!autoScroll)} className={`flex items-center gap-3 px-6 py-3 rounded-2xl text-xs font-black tracking-widest transition-all duration-500 shadow-2xl border ${autoScroll ? 'bg-theme-primary text-white border-theme-primary scale-105' : 'bg-theme-card text-theme-muted border-white/10 grayscale'}`}>
+            <ArrowDown className={`w-4 h-4 ${autoScroll ? 'animate-bounce' : ''}`} />
+            {autoScroll ? t("logViewer.on", 'AUTO-SCROLL ON') : t("logViewer.off", 'SCROLL LOCKED')}
+          </button>
+          <div className="flex gap-3">
+            <button onClick={() => setWrapText(!wrapText)} className="p-4 bg-theme-card/80 backdrop-blur-xl border border-white/10 rounded-2xl text-theme-muted hover:text-theme-primary transition-all"><Layout className="w-5 h-5" /></button>
+            <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-4 bg-theme-card/80 backdrop-blur-xl border border-white/10 rounded-2xl text-theme-muted hover:text-theme-primary transition-all">{isFullScreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}</button>
+          </div>
+        </div>
+      </div>
+      <style jsx="true">{`
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(var(--color-primary-rgb), 0.2); border-radius: 4px; }
+      `}</style>
     </div>
   );
-}
+};
 
 export default LogViewer;

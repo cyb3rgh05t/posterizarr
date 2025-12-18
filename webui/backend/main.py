@@ -7343,9 +7343,10 @@ def get_directory_tree(root_path: Path, current_path: Path):
     """Recursive helper to build a folder/file tree."""
     items = []
     try:
-        # Sort so directories appear first, then files
+        # Sort so directories appear first, then files alphabetically
         for path in sorted(current_path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
-            rel_path = str(path.relative_to(root_path))
+            # Create a relative path for the frontend (e.g., 'rotatedlogs/tautulli.log')
+            rel_path = str(path.relative_to(root_path)).replace("\\", "/") 
             
             if path.is_dir():
                 items.append({
@@ -7354,7 +7355,7 @@ def get_directory_tree(root_path: Path, current_path: Path):
                     "path": rel_path,
                     "children": get_directory_tree(root_path, path)
                 })
-            elif path.suffix in ['.log', '.csv', '.json']:
+            elif path.suffix in ['.log', '.csv', '.json', '.txt']:
                 items.append({
                     "name": path.name,
                     "type": "file",
@@ -7371,7 +7372,6 @@ async def list_logs():
     if not LOGS_DIR.exists():
         return {"logs": []}
     
-    # This will now return a nested structure instead of a flat list
     tree = get_directory_tree(LOGS_DIR, LOGS_DIR)
     return {"logs": tree}
 
