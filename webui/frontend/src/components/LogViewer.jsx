@@ -105,6 +105,58 @@ const LogLevelFilter = ({ levelFilters, setLevelFilters }) => {
 // ++ END OF COMPONENT
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+const LogTreeItem = ({ item, onSelect, selectedLog, level = 0 }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const isSelected = selectedLog === item.path;
+
+  // Render Directory
+  if (item.type === "directory") {
+    return (
+      <div className="flex flex-col">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
+          className="w-full px-4 py-2 text-left text-xs hover:bg-theme-hover flex items-center gap-2 text-theme-muted font-bold border-b border-theme/10"
+          style={{ paddingLeft: `${level * 12 + 16}px` }}
+        >
+          <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+          <span className="uppercase tracking-widest">{item.name}</span>
+        </button>
+        {isOpen && item.children?.map(child => (
+          <LogTreeItem 
+            key={child.path} 
+            item={child} 
+            onSelect={onSelect} 
+            selectedLog={selectedLog} 
+            level={level + 1} 
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // Render File
+  return (
+    <button
+      onClick={() => onSelect(item.path)}
+      className={`w-full px-4 py-2 text-left text-sm transition-all flex items-center justify-between border-b border-theme/5 ${
+        isSelected ? "bg-theme-primary text-white" : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
+      }`}
+      style={{ paddingLeft: `${level * 12 + 28}px` }}
+    >
+      <div className="flex items-center gap-2">
+        <FileText className={`w-3.5 h-3.5 ${isSelected ? "text-white" : "text-theme-muted"}`} />
+        <span>{item.name}</span>
+      </div>
+      <span className="text-[10px] opacity-60">
+        {(item.size / 1024).toFixed(1)} KB
+      </span>
+    </button>
+  );
+};
+
 function LogViewer() {
   const { t } = useTranslation();
   const { showSuccess, showError, showInfo } = useToast();
@@ -794,29 +846,22 @@ function LogViewer() {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute z-10 w-full mt-2 bg-theme-card border border-theme-primary rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {availableLogs.map((log) => (
-                    <button
-                      key={log.name}
-                      onClick={() => {
-                        console.log(`User selected log: ${log.name}`);
-                        setSelectedLog(log.name);
-                        setDropdownOpen(false);
-                      }}
-                      className={`w-full px-4 py-3 text-left text-sm transition-all ${
-                        selectedLog === log.name
-                          ? "bg-theme-primary text-white"
-                          : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{log.name}</span>
-                        <span className="text-xs opacity-80">
-                          {(log.size / 1024).toFixed(2)} KB
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+                <div className="absolute z-10 w-full mt-2 bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-[400px] overflow-y-auto py-1">
+                  {availableLogs.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-theme-muted">No logs found</div>
+                  ) : (
+                    availableLogs.map((item) => (
+                      <LogTreeItem
+                        key={item.path}
+                        item={item}
+                        selectedLog={selectedLog}
+                        onSelect={(path) => {
+                          setSelectedLog(path);
+                          setDropdownOpen(false);
+                        }}
+                      />
+                    ))
+                  )}
                 </div>
               )}
             </div>
