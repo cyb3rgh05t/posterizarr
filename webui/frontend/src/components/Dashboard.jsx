@@ -509,7 +509,7 @@ function Dashboard() {
                             style={{ width: `${progressPercent}%` }}
                           />
 
-                          {/* Current Time Indicator */}
+                          {/* Current Time Indicator Line */}
                           <div
                             className="absolute h-4 w-0.5 bg-blue-400 z-10 shadow-[0_0_8px_rgba(96,165,250,0.8)]"
                             style={{ left: `${progressPercent}%` }}
@@ -525,20 +525,25 @@ function Dashboard() {
                             return (
                               <div
                                 key={idx}
-                                className={`group/tick absolute w-2 h-2 rounded-full border-2 transform -translate-x-1/2 z-20 transition-all cursor-help ${
+                                className={`group/tick absolute w-2 h-2 rounded-full border-2 transform -translate-x-1/2 z-20 transition-all cursor-pointer ${
                                   isPast
-                                    ? "bg-blue-500 border-blue-400 shadow-[0_0_5px_rgba(59,130,246,0.5)]"
+                                    ? "bg-blue-500 border-blue-400 shadow-[0_0_5px_rgba(59,130,246,0.3)]"
                                     : "bg-theme-card border-theme-muted hover:border-blue-400"
                                 }`}
                                 style={{ left: `${position}%` }}
                               >
-                                {/* Custom Hover Tooltip */}
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[10px] rounded pointer-events-none opacity-0 group-hover/tick:opacity-100 transition-opacity whitespace-nowrap z-30 border border-theme shadow-xl">
-                                    <div className="font-bold text-blue-400">{s.time}</div>
-                                    <div className="text-gray-300">{s.description}</div>
-                                    <div className="text-[8px] text-gray-500 mt-0.5 capitalize">{isPast ? 'Completed' : 'Upcoming'}</div>
+                                {/* Custom Hover Tooltip - Removed the help cursor logic */}
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 px-2.5 py-1.5 bg-gray-900 text-white text-[10px] rounded-lg pointer-events-none opacity-0 group-hover/tick:opacity-100 transition-all duration-200 whitespace-nowrap z-30 border border-theme shadow-2xl scale-95 group-hover/tick:scale-100">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${isPast ? 'bg-blue-400' : 'bg-gray-500'}`}></div>
+                                        <span className="font-bold text-blue-400">{s.time}</span>
+                                    </div>
+                                    <div className="text-gray-300 text-[9px]">{s.description}</div>
+                                    <div className="text-[7px] text-gray-500 mt-1 uppercase tracking-tighter font-bold">
+                                        {isPast ? t("dashboard.controlDeck.completed") || 'Completed' : t("dashboard.controlDeck.upcoming") || 'Upcoming'}
+                                    </div>
                                     {/* Small Arrow */}
-                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-900"></div>
                                 </div>
                               </div>
                             );
@@ -546,12 +551,12 @@ function Dashboard() {
                       </div>
 
                       <div className="flex justify-between items-center mt-1">
-                          <span className="text-[9px] text-theme-muted font-mono opacity-50">00:00</span>
+                          <span className="text-[9px] text-theme-muted font-mono opacity-50 uppercase">Start</span>
                           <div className="flex items-center gap-1.5">
                             <span className="text-[9px] text-theme-primary font-bold">{Math.round(progressPercent)}%</span>
-                            <span className="text-[8px] text-theme-muted uppercase tracking-tighter">of day</span>
+                            <span className="text-[8px] text-theme-muted uppercase tracking-tighter font-medium">{t("dashboard.controlDeck.ofDay") || 'of Day'}</span>
                           </div>
-                          <span className="text-[9px] text-theme-muted font-mono opacity-50">23:59</span>
+                          <span className="text-[9px] text-theme-muted font-mono opacity-50 uppercase">End</span>
                       </div>
                     </div>
                 );
