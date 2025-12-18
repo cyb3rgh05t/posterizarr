@@ -53,7 +53,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.2.13"
+$CurrentScriptVersion = "2.2.14"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -5721,7 +5721,6 @@ function MassDownloadPlexArtwork {
         try {
             if ($($entry.RootFoldername)) {
                 $SkippingText = 'false'
-                $SkipAddOverlay = 'false'
                 $global:posterurl = $null
                 $global:ImageMagickError = $null
                 $global:TMDBfallbackposterurl = $null
@@ -5787,7 +5786,6 @@ function MassDownloadPlexArtwork {
                     if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -5914,7 +5912,6 @@ function MassDownloadPlexArtwork {
                     if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -6025,7 +6022,6 @@ function MassDownloadPlexArtwork {
         if ($($entry.RootFoldername)) {
             # Define Global Variables
             $SkippingText = 'false'
-            $SkipAddOverlay = 'false'
             $global:tmdbid = $entry.tmdbid
             $global:tvdbid = $entry.tvdbid
             $global:imdbid = $entry.imdbid
@@ -6231,7 +6227,6 @@ function MassDownloadPlexArtwork {
                 if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                     # Define Global Variables
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:tmdbid = $entry.tmdbid
                     $global:tvdbid = $entry.tvdbid
                     $global:imdbid = $entry.imdbid
@@ -6339,7 +6334,6 @@ function MassDownloadPlexArtwork {
                 $global:PlexSeasonUrls = $entry.PlexSeasonUrls -split ','
                 for ($i = 0; $i -lt $global:seasonNames.Count; $i++) {
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:posterurl = $null
                     $global:seasontmp = $null
                     $global:IsFallback = $null
@@ -6475,7 +6469,6 @@ function MassDownloadPlexArtwork {
                 # Loop through each episode
                 foreach ($episode in $Episodedata) {
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:AssetTextLang = $null
                     $global:TMDBAssetTextLang = $null
                     $global:FANARTAssetTextLang = $null
@@ -6510,7 +6503,6 @@ function MassDownloadPlexArtwork {
                         $global:ImageMagickError = $null
                         for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:AssetTextLang = $null
                             $global:TMDBAssetTextLang = $null
                             $global:FANARTAssetTextLang = $null
@@ -10058,7 +10050,6 @@ Elseif ($Tautulli) {
                 }
                 Else {
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:posterurl = $null
                     $global:ImageMagickError = $null
                     $global:TextlessPoster = $null
@@ -10144,7 +10135,6 @@ Elseif ($Tautulli) {
                         if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -10770,7 +10760,6 @@ Elseif ($Tautulli) {
                         if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -11371,7 +11360,6 @@ Elseif ($Tautulli) {
             Else {
                 # Define Global Variables
                 $SkippingText = 'false'
-                $SkipAddOverlay = 'false'
                 $global:tmdbsearched = $null
                 $global:tmdbid = $entry.tmdbid
                 $global:tvdbid = $entry.tvdbid
@@ -12066,7 +12054,6 @@ Elseif ($Tautulli) {
                     if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -12639,7 +12626,6 @@ Elseif ($Tautulli) {
                     $global:PlexSeasonUrls = $entry.PlexSeasonUrls -split ','
                     for ($i = 0; $i -lt $global:seasonNames.Count; $i++) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbsearched = $null
                         $global:seasontmp = $null
                         $global:posterurl = $null
@@ -13362,7 +13348,6 @@ Elseif ($Tautulli) {
                     # Loop through each episode
                     foreach ($episode in $Episodedata) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:AssetTextLang = $null
                         $global:TMDBAssetTextLang = $null
                         $global:FANARTAssetTextLang = $null
@@ -13402,7 +13387,6 @@ Elseif ($Tautulli) {
                                 $global:ImageMagickError = $null
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
@@ -14037,7 +14021,6 @@ Elseif ($Tautulli) {
                             Else {
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
@@ -15665,7 +15648,6 @@ Elseif ($ArrTrigger) {
                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                 # Define Global Variables
                                 $SkippingText = 'false'
-                                $SkipAddOverlay = 'false'
                                 $global:tmdbid = $entry.tmdbid
                                 $global:tvdbid = $entry.tvdbid
                                 $global:imdbid = $entry.imdbid
@@ -16224,7 +16206,6 @@ Elseif ($ArrTrigger) {
                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                 # Define Global Variables
                                 $SkippingText = 'false'
-                                $SkipAddOverlay = 'false'
                                 $global:tmdbid = $entry.tmdbid
                                 $global:tvdbid = $entry.tvdbid
                                 $global:imdbid = $entry.imdbid
@@ -16763,7 +16744,6 @@ Elseif ($ArrTrigger) {
                 Else {
                     # Define Global Variables
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:tmdbsearched = $null
                     $global:tmdbid = $entry.tmdbid
                     $global:tvdbid = $entry.tvdbid
@@ -17390,7 +17370,6 @@ Elseif ($ArrTrigger) {
                         if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -17881,7 +17860,6 @@ Elseif ($ArrTrigger) {
                         # Loop through each Season
                         foreach ($season in $Episodedata) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbsearched = $null
                             $global:seasontmp = $null
                             $global:IsFallback = $null
@@ -18506,7 +18484,6 @@ Elseif ($ArrTrigger) {
                         # Loop through each episode
                         foreach ($episode in $Episodedata) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:AssetTextLang = $null
                             $global:TMDBAssetTextLang = $null
                             $global:FANARTAssetTextLang = $null
@@ -18545,7 +18522,6 @@ Elseif ($ArrTrigger) {
                                     $global:ImageMagickError = $null
                                     for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                         $SkippingText = 'false'
-                                        $SkipAddOverlay = 'false'
                                         $global:AssetTextLang = $null
                                         $global:TMDBAssetTextLang = $null
                                         $global:FANARTAssetTextLang = $null
@@ -19058,7 +19034,6 @@ Elseif ($ArrTrigger) {
                                 Else {
                                     for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                         $SkippingText = 'false'
-                                        $SkipAddOverlay = 'false'
                                         $global:AssetTextLang = $null
                                         $global:TMDBAssetTextLang = $null
                                         $global:FANARTAssetTextLang = $null
@@ -20053,7 +20028,6 @@ Elseif ($ArrTrigger) {
                     }
                     Else {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:posterurl = $null
                         $global:ImageMagickError = $null
                         $global:TextlessPoster = $null
@@ -20139,7 +20113,6 @@ Elseif ($ArrTrigger) {
                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                 # Define Global Variables
                                 $SkippingText = 'false'
-                                $SkipAddOverlay = 'false'
                                 $global:tmdbid = $entry.tmdbid
                                 $global:tvdbid = $entry.tvdbid
                                 $global:imdbid = $entry.imdbid
@@ -20763,7 +20736,6 @@ Elseif ($ArrTrigger) {
                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                 # Define Global Variables
                                 $SkippingText = 'false'
-                                $SkipAddOverlay = 'false'
                                 $global:tmdbid = $entry.tmdbid
                                 $global:tvdbid = $entry.tvdbid
                                 $global:imdbid = $entry.imdbid
@@ -21363,7 +21335,6 @@ Elseif ($ArrTrigger) {
                 Else {
                     # Define Global Variables
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:tmdbsearched = $null
                     $global:tmdbid = $entry.tmdbid
                     $global:tvdbid = $entry.tvdbid
@@ -22058,7 +22029,6 @@ Elseif ($ArrTrigger) {
                         if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -22631,7 +22601,6 @@ Elseif ($ArrTrigger) {
                         $global:PlexSeasonUrls = $entry.PlexSeasonUrls -split ','
                         for ($i = 0; $i -lt $global:seasonNames.Count; $i++) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbsearched = $null
                             $global:seasontmp = $null
                             $global:posterurl = $null
@@ -23353,7 +23322,6 @@ Elseif ($ArrTrigger) {
                         # Loop through each episode
                         foreach ($episode in $Episodedata) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:AssetTextLang = $null
                             $global:TMDBAssetTextLang = $null
                             $global:FANARTAssetTextLang = $null
@@ -23393,7 +23361,6 @@ Elseif ($ArrTrigger) {
                                     $global:ImageMagickError = $null
                                     for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                         $SkippingText = 'false'
-                                        $SkipAddOverlay = 'false'
                                         $global:AssetTextLang = $null
                                         $global:TMDBAssetTextLang = $null
                                         $global:FANARTAssetTextLang = $null
@@ -24028,7 +23995,6 @@ Elseif ($ArrTrigger) {
                                 Else {
                                     for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                         $SkippingText = 'false'
-                                        $SkipAddOverlay = 'false'
                                         $global:AssetTextLang = $null
                                         $global:TMDBAssetTextLang = $null
                                         $global:FANARTAssetTextLang = $null
@@ -26807,7 +26773,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -27367,7 +27332,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -27905,7 +27869,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
             Else {
                 # Define Global Variables
                 $SkippingText = 'false'
-                $SkipAddOverlay = 'false'
                 $global:tmdbsearched = $null
                 $global:tmdbid = $entry.tmdbid
                 $global:tvdbid = $entry.tvdbid
@@ -28533,7 +28496,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                     if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -29023,7 +28985,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                     # Loop through each Season
                     foreach ($season in $Episodedata) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbsearched = $null
                         $global:seasontmp = $null
                         $global:IsFallback = $null
@@ -29662,7 +29623,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                     # Loop through each episode
                     foreach ($episode in $Episodedata) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:AssetTextLang = $null
                         $global:TMDBAssetTextLang = $null
                         $global:FANARTAssetTextLang = $null
@@ -29701,7 +29661,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 $global:ImageMagickError = $null
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
@@ -30214,7 +30173,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                             Else {
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
@@ -31570,7 +31528,6 @@ else {
                 }
                 Else {
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:posterurl = $null
                     $global:ImageMagickError = $null
                     $global:TMDBfallbackposterurl = $null
@@ -31657,7 +31614,6 @@ else {
                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -32342,7 +32298,6 @@ else {
                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -33007,7 +32962,6 @@ else {
             Else {
                 # Define Global Variables
                 $SkippingText = 'false'
-                $SkipAddOverlay = 'false'
                 $global:tmdbsearched = $null
                 $global:tmdbid = $entry.tmdbid
                 $global:tvdbid = $entry.tvdbid
@@ -33774,7 +33728,6 @@ else {
                     if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -34409,7 +34362,6 @@ else {
                     $global:PlexSeasonUrls = $entry.PlexSeasonUrls -split ','
                     for ($i = 0; $i -lt $global:seasonNames.Count; $i++) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $Seasonpostersearchtext = $null
                         $global:seasontmp = $null
                         $global:TextlessPoster = $null
@@ -35250,7 +35202,6 @@ else {
                                 $global:ImageMagickError = $null
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
