@@ -468,12 +468,18 @@ function Dashboard() {
         {/* SECTION 2: SCHEDULER */}
         <div className="flex-1 p-6 relative group hover:bg-theme-hover/20 transition-colors border-t md:border-t-0 border-theme">
           <div className="flex items-start justify-between mb-4">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-theme-muted mb-1">{t("dashboard.controlDeck.scheduler")}</span>
-                <span className={`text-xl font-bold tracking-tight ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`}>
-                    {schedulerStatus.enabled ? (schedulerStatus.running ? t("dashboard.controlDeck.active") : t("dashboard.controlDeck.standby")) : t("dashboard.controlDeck.disabled")}
+              {/* Clickable Header for Redirection */}
+              <Link to="/scheduler" className="flex flex-col group/link">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-theme-muted mb-1 group-hover/link:text-theme-primary transition-colors">
+                    {t("dashboard.controlDeck.scheduler")}
                 </span>
-              </div>
+                <div className="flex items-center gap-1">
+                    <span className={`text-xl font-bold tracking-tight ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`}>
+                        {schedulerStatus.enabled ? (schedulerStatus.running ? t("dashboard.controlDeck.active") : t("dashboard.controlDeck.standby")) : t("dashboard.controlDeck.disabled")}
+                    </span>
+                    <ExternalLink className="w-3 h-3 text-theme-muted opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                </div>
+              </Link>
               <div className={`p-2 rounded-xl ${schedulerStatus.enabled ? "bg-blue-500/10" : "bg-theme-hover"}`}>
                 <CalendarClock className={`w-6 h-6 ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`} />
               </div>
@@ -496,14 +502,14 @@ function Dashboard() {
                       </div>
 
                       {/* Timeline Container */}
-                      <div className="relative h-3 w-full bg-theme-hover rounded-full overflow-visible flex items-center">
+                      <div className="relative h-3 w-full bg-theme-hover rounded-full flex items-center">
                           {/* Background Progress (Current Time) */}
                           <div
                             className="absolute h-full bg-blue-500/20 rounded-full transition-all duration-1000"
                             style={{ width: `${progressPercent}%` }}
                           />
 
-                          {/* Current Time Indicator (Vertical Line) */}
+                          {/* Current Time Indicator */}
                           <div
                             className="absolute h-4 w-0.5 bg-blue-400 z-10 shadow-[0_0_8px_rgba(96,165,250,0.8)]"
                             style={{ left: `${progressPercent}%` }}
@@ -519,22 +525,33 @@ function Dashboard() {
                             return (
                               <div
                                 key={idx}
-                                className={`absolute w-1.5 h-1.5 rounded-full border-2 transform -translate-x-1/2 transition-colors ${
+                                className={`group/tick absolute w-2 h-2 rounded-full border-2 transform -translate-x-1/2 z-20 transition-all cursor-help ${
                                   isPast
-                                    ? "bg-blue-500 border-blue-400/50" // Already run
-                                    : "bg-theme-card border-theme-muted" // Upcoming
+                                    ? "bg-blue-500 border-blue-400 shadow-[0_0_5px_rgba(59,130,246,0.5)]"
+                                    : "bg-theme-card border-theme-muted hover:border-blue-400"
                                 }`}
                                 style={{ left: `${position}%` }}
-                                title={`${s.time} - ${s.description}`}
-                              />
+                              >
+                                {/* Custom Hover Tooltip */}
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[10px] rounded pointer-events-none opacity-0 group-hover/tick:opacity-100 transition-opacity whitespace-nowrap z-30 border border-theme shadow-xl">
+                                    <div className="font-bold text-blue-400">{s.time}</div>
+                                    <div className="text-gray-300">{s.description}</div>
+                                    <div className="text-[8px] text-gray-500 mt-0.5 capitalize">{isPast ? 'Completed' : 'Upcoming'}</div>
+                                    {/* Small Arrow */}
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                                </div>
+                              </div>
                             );
                           })}
                       </div>
 
                       <div className="flex justify-between items-center mt-1">
-                          <span className="text-[9px] text-theme-muted font-mono">00:00</span>
-                          <span className="text-[9px] text-theme-primary font-bold">{Math.round(progressPercent)}% of Day</span>
-                          <span className="text-[9px] text-theme-muted font-mono">23:59</span>
+                          <span className="text-[9px] text-theme-muted font-mono opacity-50">00:00</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] text-theme-primary font-bold">{Math.round(progressPercent)}%</span>
+                            <span className="text-[8px] text-theme-muted uppercase tracking-tighter">of day</span>
+                          </div>
+                          <span className="text-[9px] text-theme-muted font-mono opacity-50">23:59</span>
                       </div>
                     </div>
                 );
