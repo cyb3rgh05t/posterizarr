@@ -7339,41 +7339,39 @@ async def force_kill_script():
                 scheduler.is_running = False
             return {"success": True, "message": "Script process cleared"}
 
-def get_directory_tree(root_path: Path, current_path: Path):
-    """Recursive helper to build a folder/file tree."""
-    items = []
-    try:
-        # Sort so directories appear first, then files alphabetically
-        for path in sorted(current_path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
-            # Create a relative path for the frontend (e.g., 'rotatedlogs/tautulli.log')
-            rel_path = str(path.relative_to(root_path)).replace("\\", "/") 
-            
-            if path.is_dir():
-                items.append({
-                    "name": path.name,
-                    "type": "directory",
-                    "path": rel_path,
-                    "children": get_directory_tree(root_path, path)
-                })
-            elif path.suffix in ['.log', '.csv', '.json', '.txt']:
-                items.append({
-                    "name": path.name,
-                    "type": "file",
-                    "path": rel_path,
-                    "size": path.stat().st_size
-                })
-    except Exception as e:
-        logger.error(f"Error scanning directory {current_path}: {e}")
-    return items
 
 @app.get("/api/logs")
-async def list_logs():
-    """Returns a recursive tree of all log directories."""
-    if not LOGS_DIR.exists():
-        return {"logs": []}
-    
-    tree = get_directory_tree(LOGS_DIR, LOGS_DIR)
-    return {"logs": tree}
+async def get_logs():
+    """Get available log files from both Logs and UILogs directories"""
+    log_files = []
+
+    # Get logs from main Logs directory
+    if LOGS_DIR.exists():
+        for log_file in LOGS_DIR.glob("*.log"):
+            stat = log_file.stat()
+            log_files.append(
+                {
+                    "name": log_file.name,
+                    "size": stat.st_size,
+                    "modified": stat.st_mtime,
+                    "directory": "Logs",
+                }
+            )
+
+    # Get logs from UILogs directory
+    if UI_LOGS_DIR.exists():
+        for log_file in UI_LOGS_DIR.glob("*.log"):
+            stat = log_file.stat()
+            log_files.append(
+                {
+                    "name": log_file.name,
+                    "size": stat.st_size,
+                    "modified": stat.st_mtime,
+                    "directory": "UILogs",
+                }
+            )
+
+    return {"logs": sorted(log_files, key=lambda x: x["modified"], reverse=True)}
 
 
 @app.get("/api/logs/{log_name}")
