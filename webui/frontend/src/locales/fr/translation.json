@@ -625,6 +625,7 @@
     "noSchedulesRegistered": "Aucun horaire enregistré",
     "run": "Lancer",
     "stopSuccess": "Arrêt du script...",
+    "assets": "Actifs à Afficher",
     "scriptFile": "Fichier script",
     "configFile": "Fichier de config",
     "cores": "Cœurs",

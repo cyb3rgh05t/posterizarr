@@ -677,6 +677,7 @@
     "noSchedulesRegistered": "No schedules registered",
     "run": "Run",
     "stopSuccess": "Script stopping...",
+    "assets": "Assets to Display",
     "cores": "Cores",
     "free": "Free"
   },

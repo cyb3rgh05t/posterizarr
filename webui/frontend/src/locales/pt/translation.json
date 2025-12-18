@@ -625,6 +625,7 @@
     "noSchedulesRegistered": "Nenhum horário registrado",
     "run": "Iniciar",
     "stopSuccess": "Parando o script...",
+    "assets": "Ativos a Exibir",
     "scriptFile": "Arquivo do script",
     "configFile": "Arquivo de configuração",
     "cores": "Núcleos",

@@ -677,6 +677,7 @@
     "noSchedulesRegistered": "Keine Zeitpläne registriert",
     "run": "Starten",
     "stopSuccess": "Skript wird gestoppt...",
+    "assets": "Anzuzeigende Assets",
     "cores": "Kerne",
     "free": "Frei"
   },
