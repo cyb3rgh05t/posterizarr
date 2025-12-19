@@ -15,6 +15,18 @@ export default {
         "theme-text": "var(--theme-text)",
         "theme-text-muted": "var(--theme-text-muted)",
       },
+      gridTemplateColumns: {
+        11: "repeat(11, minmax(0, 1fr))",
+        12: "repeat(12, minmax(0, 1fr))",
+        13: "repeat(13, minmax(0, 1fr))",
+        14: "repeat(14, minmax(0, 1fr))",
+        15: "repeat(15, minmax(0, 1fr))",
+        16: "repeat(16, minmax(0, 1fr))",
+        17: "repeat(17, minmax(0, 1fr))",
+        18: "repeat(18, minmax(0, 1fr))",
+        19: "repeat(19, minmax(0, 1fr))",
+        20: "repeat(20, minmax(0, 1fr))",
+      },
       keyframes: {
         slideIn: {
           "0%": { transform: "translateY(-10px)", opacity: "0" },
