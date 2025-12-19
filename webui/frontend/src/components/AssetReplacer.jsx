@@ -263,36 +263,36 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     }
 
     // Determine mediaType
-    const dbType = (dbData?.Type || dbData?.library_type || "").toLowerCase();
     const backendAssetType = (asset.type || "").toLowerCase();
-    const libName = (library_name || "").toLowerCase();
+    const dbType = (dbData?.Type || "").toLowerCase();
+    const libName = (libraryName || "").toLowerCase(); // Corrected variable name
 
     let mediaType = "movie"; // Default fallback
 
-    // 1. STRICT DATABASE CHECK (Source of Trust)
+    // 1. STRICT DATABASE CHECK (Primary Source of Trust)
     if (dbType.includes("movie")) {
       mediaType = "movie";
-      console.log("MediaType determined by DB: movie");
-    } else if (dbType.includes("show") || dbType.includes("series") || dbType.includes("tv")) {
+      console.log("MediaType strictly determined by DB: movie");
+    } else if (dbType.includes("show") || dbType.includes("series")) {
       mediaType = "tv";
-      console.log("MediaType determined by DB: tv");
+      console.log("MediaType strictly determined by DB: tv");
     }
-    // 2. HEURISTIC FALLBACK (Only if DB type is missing or unknown)
-    else {
-      if (
-        backendAssetType.includes("show") ||
-        backendAssetType.includes("season") ||
-        backendAssetType.includes("episode") ||
-        assetType === "season" ||
-        assetType === "titlecard" ||
-        libName.includes("tv") ||
-        libName.includes("show") ||
-        libName.includes("series") ||
-        libName.includes("serier")
-      ) {
-        mediaType = "tv";
-      }
-      console.log(`MediaType determined by Heuristics: ${mediaType}`);
+    // 2. HEURISTIC FALLBACK (Only used if DB data is missing/inconclusive)
+    else if (
+      backendAssetType.includes("show") ||
+      backendAssetType.includes("season") ||
+      backendAssetType.includes("episode") ||
+      assetType === "season" ||
+      assetType === "titlecard" ||
+      libName.includes("tv") ||
+      libName.includes("show") ||
+      libName.includes("series") ||
+      libName.includes("serier")
+    ) {
+      mediaType = "tv";
+      console.log(`MediaType determined by fallback heuristics: ${mediaType}`);
+    } else {
+      console.log(`Defaulting to: ${mediaType}`);
     }
 
     console.log(`Backend asset.type: '${backendAssetType}'`);
