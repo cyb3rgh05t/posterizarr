@@ -351,13 +351,26 @@ function RecentAssets({ refreshTrigger = 0 }) {
         </h2>
 
         <div className="flex items-center gap-3">
-          <CompactImageSizeSlider
-            value={assetCount}
-            onChange={handleAssetCountChange}
-            storageKey="recent-assets-count"
-            min={5}
-            max={10}
-          />
+          {/* Enhanced Slider with Badge */}
+          <div className="flex flex-col items-center mr-2 relative group">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter">
+                {t("dashboard.assets")}
+              </span>
+              {/* Dynamic Badge */}
+              <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-md bg-theme-primary text-white text-[10px] font-black shadow-sm shadow-theme-primary/20">
+                {assetCount}
+              </span>
+            </div>
+
+            <CompactImageSizeSlider
+              value={assetCount}
+              onChange={handleAssetCountChange}
+              storageKey="recent-assets-count"
+              min={5}
+              max={10}
+            />
+          </div>
 
           <button
             onClick={() => fetchRecentAssets()}

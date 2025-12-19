@@ -51,6 +51,11 @@ function FolderView() {
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const sortDropdownRef = useRef(null);
 
+  // Helper to encode path segments but keep slashes
+  const safeEncodePath = (path) => {
+    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  };
+
   useEffect(() => {
     localStorage.setItem("folder-sort-order", sortOrder);
   }, [sortOrder]);
@@ -217,7 +222,7 @@ function FolderView() {
       count: selectedAssets.size,
       onConfirm: async () => {
         try {
-          const response = await fetch(`${API_URL}/manual-assets/bulk-delete`, {
+          const response = await fetch(`${API_URL}/gallery/bulk-delete`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ paths: Array.from(selectedAssets) }),
@@ -246,19 +251,33 @@ function FolderView() {
       name: asset.name,
       onConfirm: async () => {
         try {
+          // FIX: Use safeEncodePath instead of encodeURIComponent
           const response = await fetch(
-            `${API_URL}/manual-assets/${encodeURIComponent(asset.path)}`,
+            `${API_URL}/gallery/${safeEncodePath(asset.path)}`,
             {
               method: "DELETE",
             }
           );
+
           if (!response.ok) {
-            const data = await response.json();
-            throw new Error(data.detail || "Failed to delete asset");
+            // Fix: Check for JSON content type before parsing to avoid syntax errors
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+              const data = await response.json();
+              throw new Error(data.detail || "Failed to delete asset");
+            } else {
+              throw new Error(`Server returned status ${response.status}`);
+            }
           }
+
           showSuccess(`Deleted "${asset.name}"`);
-          fetchData(currentPath); // Refresh list
+
+          // Refresh the data
+          if (currentPath) {
+             fetchData(currentPath);
+          }
         } catch (error) {
+          console.error(error);
           showError(`Failed to delete: ${error.message}`);
         }
       },

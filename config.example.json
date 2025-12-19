@@ -87,6 +87,7 @@
     "AssetPath": "/assets",
     "SkipAddText": "false",
     "SkipAddTextAndOverlay": "false",
+    "SkipAddTextAndBorder": "false",
     "SkipLocalPosterTextAdd": "false",
     "SkipLocalBackgroundTextAdd": "false",
     "SkipLocalSeasonTextAdd": "false",

@@ -222,6 +222,8 @@ function AppContent() {
                 <Route path="/scheduler" element={<SchedulerSettings />} />
                 <Route path="/assets-manager" element={<AssetsManager />} />
                 <Route path="/manual-assets" element={<ManualAssets />} />
+                {/* Route for Backup Assets - pointing to GalleryHub which handles the rendering */}
+                <Route path="/asset-backups" element={<GalleryHub />} />
                 <Route path="/asset-overview" element={<AssetOverview />} />
                 <Route path="/runtime-history" element={<RuntimeHistory />} />
                 <Route

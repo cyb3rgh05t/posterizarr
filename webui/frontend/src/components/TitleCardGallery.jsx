@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Film,
+  Clapperboard,
   Folder,
   Trash2,
   RefreshCw,
@@ -137,7 +137,7 @@ const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
 // ++ END OF PAGINATION COMPONENT
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-function SeasonGallery() {
+function TitleCardGallery() {
   const { t } = useTranslation();
   const { showSuccess, showError, showInfo } = useToast();
   const [folders, setFolders] = useState([]);
@@ -202,7 +202,7 @@ function SeasonGallery() {
   // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(() => {
-    const saved = localStorage.getItem("season-items-per-page");
+    const saved = localStorage.getItem("titlecard-items-per-page");
     return saved ? parseInt(saved) : 25;
   });
   // --- END PAGINATION STATE ---
@@ -215,8 +215,13 @@ function SeasonGallery() {
   const [replacerOpen, setReplacerOpen] = useState(false);
   const [assetToReplace, setAssetToReplace] = useState(null);
 
-  // Cache busting timestamp for force-reloading images after replacement
+  // Cache-busting state to force image reload after replacement
   const [cacheBuster, setCacheBuster] = useState(Date.now());
+
+  // Helper to encode path segments but keep slashes
+  const safeEncodePath = (path) => {
+    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  };
 
   // Dropdown state
   const [itemsPerPageDropdownOpen, setItemsPerPageDropdownOpen] =
@@ -224,14 +229,9 @@ function SeasonGallery() {
   const [itemsPerPageDropdownUp, setItemsPerPageDropdownUp] = useState(false);
   const itemsPerPageDropdownRef = useRef(null);
 
-  // Helper to encode path segments but keep slashes
-  const safeEncodePath = (path) => {
-    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
-  };
-
   // Image size state with localStorage (2-10 range, default 5)
   const [imageSize, setImageSize] = useState(() => {
-    const saved = localStorage.getItem("gallery-season-size");
+    const saved = localStorage.getItem("gallery-titlecard-size");
     return saved ? parseInt(saved) : 5;
   });
 
@@ -262,24 +262,24 @@ function SeasonGallery() {
       setFolders(data.folders || []);
 
       if (showNotification && data.folders) {
-        const totalSeasons = data.folders.reduce(
-          (sum, folder) => sum + (folder.season_count || 0),
+        const totalTitlecards = data.folders.reduce(
+          (sum, folder) => sum + (folder.titlecard_count || 0),
           0
         );
-        const foldersWithSeasons = data.folders.filter(
-          (f) => f.season_count > 0
+        const foldersWithTitlecards = data.folders.filter(
+          (f) => f.titlecard_count > 0
         ).length;
 
-        if (totalSeasons > 0) {
+        if (totalTitlecards > 0) {
           showSuccess(
-            t("seasonGallery.foldersLoaded", {
-              folderCount: foldersWithSeasons,
-              seasonCount: totalSeasons,
+            t("titleCardGallery.success.foldersLoaded", {
+              folders: foldersWithTitlecards,
+              titlecards: totalTitlecards,
             })
           );
         } else {
           showSuccess(
-            t("seasonGallery.foldersFoundNoSeasons", {
+            t("titleCardGallery.success.foldersFound", {
               count: data.folders.length,
             })
           );
@@ -287,14 +287,16 @@ function SeasonGallery() {
       }
 
       if (data.folders && data.folders.length > 0 && !activeFolder) {
-        const folderWithImages = data.folders.find((f) => f.season_count > 0);
+        const folderWithImages = data.folders.find(
+          (f) => f.titlecard_count > 0
+        );
         if (folderWithImages) {
           setActiveFolder(folderWithImages);
         }
       }
     } catch (error) {
       console.error("Error fetching folders:", error);
-      const errorMsg = error.message || t("seasonGallery.errors.loadFolders");
+      const errorMsg = error.message || "Failed to load folders";
       setError(errorMsg);
       showError(errorMsg);
     } finally {
@@ -310,7 +312,7 @@ function SeasonGallery() {
     }
     try {
       const response = await fetch(
-        `${API_URL}/assets-folder-images/seasons/${folder.path}`
+        `${API_URL}/assets-folder-images/titlecards/${folder.path}`
       );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -320,17 +322,16 @@ function SeasonGallery() {
 
       if (showNotification && data.images && data.images.length > 0) {
         showSuccess(
-          t("seasonGallery.seasonsLoaded", {
+          t("titleCardGallery.success.titleCardsLoaded", {
             count: data.images.length,
-            folderName: folder.name,
+            folder: folder.name,
           })
         );
       }
     } catch (error) {
       console.error("Error fetching images:", error);
       const errorMsg =
-        error.message ||
-        t("seasonGallery.errors.loadImages", { folderName: folder.name });
+        error.message || `Failed to load images from ${folder.name}`;
       setError(errorMsg);
       showError(errorMsg);
       setImages([]);
@@ -420,7 +421,7 @@ function SeasonGallery() {
     }
   };
 
-  const deleteSeason = async (imagePath, imageName, event) => {
+  const deleteTitleCard = async (imagePath, imageName, event) => {
     if (event) {
       event.stopPropagation();
     }
@@ -429,7 +430,7 @@ function SeasonGallery() {
     try {
       // FIX: Use safeEncodePath instead of encodeURIComponent
       const response = await fetch(
-        `${API_URL}/seasons/${safeEncodePath(imagePath)}`,
+        `${API_URL}/titlecards/${safeEncodePath(imagePath)}`,
         {
           method: "DELETE",
         }
@@ -437,13 +438,15 @@ function SeasonGallery() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.detail || "Failed to delete season");
+        throw new Error(data.detail || "Failed to delete title card");
       }
 
       const data = await response.json();
 
       if (data.success) {
-        showSuccess(t("seasonGallery.deleteSuccess", { name: imageName }));
+        showSuccess(
+          t("titleCardGallery.success.titleCardDeleted", { name: imageName })
+        );
 
         setImages(images.filter((img) => img.path !== imagePath));
 
@@ -453,24 +456,22 @@ function SeasonGallery() {
 
         fetchFolders(false);
       } else {
-        throw new Error(data.message || t("seasonGallery.errors.deleteSeason"));
+        throw new Error(data.message || "Failed to delete title card");
       }
     } catch (error) {
-      console.error("Error deleting season:", error);
-      showError(
-        t("seasonGallery.errors.deleteError", { message: error.message })
-      );
+      console.error("Error deleting title card:", error);
+      showError(`Error while deleting: ${error.message}`);
     } finally {
       setDeletingImage(null);
     }
   };
 
-  const bulkDeleteSeasons = async () => {
+  const bulkDeleteTitleCards = async () => {
     if (selectedImages.length === 0) return;
 
     setDeletingImage("bulk");
     try {
-      const response = await fetch(`${API_URL}/seasons/bulk-delete`, {
+      const response = await fetch(`${API_URL}/titlecards/bulk-delete`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -480,7 +481,7 @@ function SeasonGallery() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.detail || "Failed to delete seasons");
+        throw new Error(data.detail || "Failed to delete titlecards");
       }
 
       const data = await response.json();
@@ -491,14 +492,16 @@ function SeasonGallery() {
 
         if (failedCount > 0) {
           showError(
-            t("seasonGallery.bulkDeletePartial", {
-              deletedCount,
-              failedCount,
+            t("titleCardGallery.errors.bulkDeletePartial", {
+              deleted: deletedCount,
+              failed: failedCount,
             })
           );
         } else {
           showSuccess(
-            t("seasonGallery.bulkDeleteSuccess", { count: deletedCount })
+            t("titleCardGallery.success.bulkDeleteSuccess", {
+              count: deletedCount,
+            })
           );
         }
 
@@ -511,13 +514,11 @@ function SeasonGallery() {
 
         fetchFolders(false);
       } else {
-        throw new Error(data.message || t("seasonGallery.errors.bulkDelete"));
+        throw new Error(data.message || "Failed to delete titlecards");
       }
     } catch (error) {
-      console.error("Error deleting seasons:", error);
-      showError(
-        t("seasonGallery.errors.deleteError", { message: error.message })
-      );
+      console.error("Error deleting titlecards:", error);
+      showError(`Error while deleting: ${error.message}`);
     } finally {
       setDeletingImage(null);
     }
@@ -546,7 +547,7 @@ function SeasonGallery() {
 
   const handleItemsPerPageChange = (value) => {
     setItemsPerPage(value);
-    localStorage.setItem("season-items-per-page", value.toString());
+    localStorage.setItem("titlecard-items-per-page", value.toString());
     setCurrentPage(1); // Reset to first page
   };
 
@@ -559,18 +560,6 @@ function SeasonGallery() {
       fetchFolderImages(activeFolder, false);
     }
   }, [activeFolder]);
-
-  // Function to calculate dropdown position
-  const calculateDropdownPosition = (ref) => {
-    if (!ref.current) return false;
-
-    const rect = ref.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-
-    // If more space above than below, open upward
-    return spaceAbove > spaceBelow;
-  };
 
   // Click outside detection for dropdown
   useEffect(() => {
@@ -621,7 +610,7 @@ function SeasonGallery() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4">
             <h2 className="text-lg sm:text-xl font-semibold text-theme-text flex items-center gap-2">
               <Folder className="w-5 h-5 text-theme-primary" />
-              {t("seasonGallery.folders")}
+              {t("titleCardGallery.folders")}
             </h2>
 
             {/* Controls - wrap on small screens */}
@@ -630,7 +619,7 @@ function SeasonGallery() {
               <CompactImageSizeSlider
                 value={imageSize}
                 onChange={setImageSize}
-                storageKey="gallery-season-size"
+                storageKey="gallery-titlecard-size"
               />
               {/* Select Mode Toggle */}
               {activeFolder && images.length > 0 && (
@@ -652,20 +641,20 @@ function SeasonGallery() {
                     <>
                       <Square className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                       <span className="hidden sm:inline">
-                        {t("seasonGallery.cancelSelect")}
+                        {t("titleCardGallery.cancelSelect")}
                       </span>
                       <span className="sm:hidden">
-                        {t("seasonGallery.cancelSelect") || "Cancel"}
+                        {t("titleCardGallery.cancelSelect") || "Cancel"}
                       </span>
                     </>
                   ) : (
                     <>
                       <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                       <span className="hidden sm:inline">
-                        {t("seasonGallery.select")}
+                        {t("titleCardGallery.select")}
                       </span>
                       <span className="sm:hidden">
-                        {t("seasonGallery.select")}
+                        {t("titleCardGallery.select")}
                       </span>
                     </>
                   )}
@@ -735,28 +724,28 @@ function SeasonGallery() {
                   }`}
                 />
                 <span className="hidden sm:inline">
-                  {t("seasonGallery.refresh")}
+                  {t("titleCardGallery.refresh")}
                 </span>
               </button>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 mb-4">
             {folders
-              .filter((folder) => folder.season_count > 0)
+              .filter((folder) => folder.titlecard_count > 0)
               .map((folder) => (
                 <button
                   key={folder.path}
                   onClick={() => setActiveFolder(folder)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap shadow-sm ${
                     activeFolder?.path === folder.path
-                      ? "bg-theme-primary text-white scale-105"
-                      : "bg-theme-hover text-theme-text hover:bg-theme-primary/70 hover:scale-105"
+                      ? "bg-theme-primary text-white scale-105 border-2 border-theme-primary"
+                      : "bg-theme-card text-theme-text hover:bg-theme-hover border border-theme hover:border-theme-primary/50 hover:scale-105"
                   }`}
                 >
                   <Folder className="w-4 h-4 flex-shrink-0" />
                   {folder.name}
                   <span className="ml-1 px-2 py-0.5 bg-black/20 rounded-full text-xs font-semibold">
-                    {folder.season_count}
+                    {folder.titlecard_count}
                   </span>
                 </button>
               ))}
@@ -768,8 +757,8 @@ function SeasonGallery() {
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder={t("seasonGallery.searchPlaceholder", {
-                  folderName: activeFolder.name,
+                placeholder={t("titleCardGallery.searchPlaceholder", {
+                  folder: activeFolder.name,
                 })}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -792,7 +781,7 @@ function SeasonGallery() {
         <div className="flex flex-col items-center justify-center py-32 bg-theme-card rounded-xl border border-theme">
           <Loader2 className="w-12 h-12 animate-spin text-theme-primary mb-4" />
           <p className="text-theme-muted">
-            {t("seasonGallery.loadingFolders")}
+            {t("titleCardGallery.loadingFolders")}
           </p>
         </div>
       ) : error ? (
@@ -802,7 +791,7 @@ function SeasonGallery() {
               <ImageIcon className="w-12 h-12 text-red-400" />
             </div>
             <h3 className="text-2xl font-semibold text-red-300 mb-2">
-              {t("seasonGallery.errorLoadingTitle")}
+              {t("titleCardGallery.errorLoadingTitle")}
             </h3>
             <p className="text-red-200 text-sm mb-6 max-w-md">{error}</p>
             <button
@@ -815,7 +804,7 @@ function SeasonGallery() {
               className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-all shadow-lg hover:scale-105"
             >
               <RefreshCw className="w-5 h-5" />
-              {t("seasonGallery.tryAgain")}
+              {t("titleCardGallery.tryAgain")}
             </button>
           </div>
         </div>
@@ -826,10 +815,10 @@ function SeasonGallery() {
               <Folder className="w-12 h-12 text-theme-primary" />
             </div>
             <h3 className="text-2xl font-semibold text-theme-text mb-2">
-              {t("seasonGallery.noFoldersTitle")}
+              {t("titleCardGallery.noFoldersTitle")}
             </h3>
             <p className="text-theme-muted max-w-md">
-              {t("seasonGallery.noFoldersDescription")}
+              {t("titleCardGallery.noFoldersMessage")}
             </p>
           </div>
         </div>
@@ -837,7 +826,7 @@ function SeasonGallery() {
         <div className="flex flex-col items-center justify-center py-32 bg-theme-card rounded-xl border border-theme">
           <Loader2 className="w-12 h-12 animate-spin text-theme-primary mb-4" />
           <p className="text-theme-muted">
-            {t("seasonGallery.loadingSeasons")}
+            {t("titleCardGallery.loadingTitleCards")}
           </p>
         </div>
       ) : filteredImages.length === 0 ? (
@@ -848,14 +837,14 @@ function SeasonGallery() {
             </div>
             <h3 className="text-2xl font-semibold text-theme-text mb-2">
               {searchTerm
-                ? t("seasonGallery.noMatchingTitle")
-                : t("seasonGallery.noSeasonsTitle")}
+                ? t("titleCardGallery.noMatchingTitle")
+                : t("titleCardGallery.noTitleCardsTitle")}
             </h3>
             <p className="text-theme-muted max-w-md">
               {searchTerm
-                ? t("seasonGallery.noMatchingDescription")
-                : t("seasonGallery.noSeasonsDescription", {
-                    folderName: activeFolder.name,
+                ? t("titleCardGallery.noMatchingMessage")
+                : t("titleCardGallery.noTitleCardsMessage", {
+                    folder: activeFolder.name,
                   })}
             </p>
           </div>
@@ -869,22 +858,22 @@ function SeasonGallery() {
                 <div className="flex items-center gap-4">
                   <button
                     onClick={toggleSelectAll}
-                    className="flex items-center gap-2 px-4 py-2 bg-theme-primary hover:bg-theme-primary/90 rounded-lg font-medium transition-all"
+                    className="flex items-center gap-2 px-4 py-2 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-theme-text font-medium transition-all shadow-sm"
                   >
                     {selectedImages.length === displayedImages.length ? (
                       <>
-                        <Square className="w-5 h-5" />
-                        {t("seasonGallery.deselectAll")}
+                        <Square className="w-5 h-5 text-theme-primary" />
+                        {t("titleCardGallery.deselectAll")}
                       </>
                     ) : (
                       <>
-                        <CheckSquare className="w-5 h-5" />
-                        {t("seasonGallery.selectAll")}
+                        <CheckSquare className="w-5 h-5 text-theme-primary" />
+                        {t("titleCardGallery.selectAll")}
                       </>
                     )}
                   </button>
                   <span className="text-theme-text font-medium">
-                    {t("seasonGallery.selectedCount", {
+                    {t("titleCardGallery.selected", {
                       count: selectedImages.length,
                     })}
                   </span>
@@ -908,7 +897,7 @@ function SeasonGallery() {
                       deletingImage === "bulk" ? "animate-spin" : ""
                     }`}
                   />
-                  {t("seasonGallery.deleteSelected", {
+                  {t("titleCardGallery.deleteSelected", {
                     count: selectedImages.length,
                   })}
                 </button>
@@ -919,15 +908,15 @@ function SeasonGallery() {
           <div className="bg-theme-card rounded-xl p-4 border border-theme">
             <div className="flex items-center justify-between text-sm">
               <span className="text-theme-text font-medium">
-                {t("seasonGallery.showing", {
+                {t("titleCardGallery.showingCount", {
                   displayed: displayedImages.length,
                   total: filteredImages.length,
-                  folderName: activeFolder.name,
+                  folder: activeFolder.name,
                 })}
               </span>
               {images.length !== filteredImages.length && (
                 <span className="text-theme-primary font-semibold">
-                  {t("seasonGallery.filteredFrom", {
+                  {t("titleCardGallery.filteredFrom", {
                     total: images.length,
                   })}
                 </span>
@@ -971,7 +960,7 @@ function SeasonGallery() {
                     </div>
 
                     <div
-                      className="relative cursor-pointer aspect-[2/3] p-2"
+                      className="relative cursor-pointer aspect-[16/9] p-2"
                       onClick={() => toggleImageSelection(image.path)}
                     >
                       <img
@@ -997,6 +986,22 @@ function SeasonGallery() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setAssetToReplace({
+                          path: image.path,
+                          url: image.url,
+                          name: image.name,
+                          type: "titlecard",
+                        });
+                        setReplacerOpen(true);
+                      }}
+                      className="absolute top-2 left-2 z-10 p-2 rounded-lg bg-theme-primary/95 hover:bg-theme-primary opacity-0 group-hover:opacity-100 transition-all shadow-lg backdrop-blur-sm hover:scale-110 active:scale-95"
+                      title="Replace title card"
+                    >
+                      <RefreshCw className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setDeleteConfirm({
                           path: image.path,
                           name: image.name,
@@ -1008,7 +1013,7 @@ function SeasonGallery() {
                           ? "bg-theme-muted cursor-not-allowed opacity-70"
                           : "bg-red-600/95 hover:bg-red-700 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
                       }`}
-                      title={t("seasonGallery.deleteSeason")}
+                      title="Delete title card"
                     >
                       <Trash2
                         className={`w-4 h-4 text-white ${
@@ -1017,20 +1022,8 @@ function SeasonGallery() {
                       />
                     </button>
 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAssetToReplace({ ...image, type: "season" });
-                        setReplacerOpen(true);
-                      }}
-                      className="absolute top-2 left-2 z-10 p-2 rounded-lg bg-theme-primary/95 hover:bg-theme-primary opacity-0 group-hover:opacity-100 transition-all shadow-lg backdrop-blur-sm hover:scale-110 active:scale-95"
-                      title={t("seasonGallery.replaceAsset")}
-                    >
-                      <RefreshCw className="w-4 h-4 text-white" />
-                    </button>
-
                     <div
-                      className="relative cursor-pointer aspect-[2/3] p-2"
+                      className="relative cursor-pointer aspect-[16/9] p-2"
                       onClick={() => setSelectedImage(image)}
                     >
                       <img
@@ -1068,76 +1061,75 @@ function SeasonGallery() {
             ))}
           </div>
 
-          {/* --- PAGINATION AND ITEMS PER PAGE --- */}
+          {/* Pagination and Items Per Page Controls */}
           {(filteredImages.length > 25) && (
-             <div className="mt-8 space-y-6">
-             {/* Items per page selector */}
-             <div className="flex justify-center">
-               <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
-                 <label className="text-sm font-medium text-theme-text">
-                   {t("seasonGallery.itemsPerPage")}
-                 </label>
-                 <div className="relative" ref={itemsPerPageDropdownRef}>
-                   <button
-                     onClick={() => {
-                       const shouldOpenUp = calculateDropdownPosition(
-                         itemsPerPageDropdownRef
-                       );
-                       setItemsPerPageDropdownUp(shouldOpenUp);
-                       setItemsPerPageDropdownOpen(!itemsPerPageDropdownOpen);
-                     }}
-                     className="px-4 py-2 bg-theme-bg text-theme-text border border-theme-border rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all cursor-pointer shadow-sm flex items-center gap-2"
-                   >
-                     <span>{itemsPerPage}</span>
-                     <ChevronDown
-                       className={`w-4 h-4 transition-transform ${
-                         itemsPerPageDropdownOpen ? "rotate-180" : ""
-                       }`}
-                     />
-                   </button>
+            <div className="mt-8 space-y-6">
+              {/* Items per page selector */}
+              <div className="flex justify-center">
+                <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
+                  <label className="text-sm font-medium text-theme-text">
+                    {t("titleCardGallery.itemsPerPage")}
+                  </label>
+                  <div className="relative" ref={itemsPerPageDropdownRef}>
+                    <button
+                      onClick={() => {
+                        const shouldOpenUp = calculateDropdownPosition(
+                          itemsPerPageDropdownRef
+                        );
+                        setItemsPerPageDropdownUp(shouldOpenUp);
+                        setItemsPerPageDropdownOpen(!itemsPerPageDropdownOpen);
+                      }}
+                      className="px-4 py-2 bg-theme-bg text-theme-text border border-theme-border rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all cursor-pointer shadow-sm flex items-center gap-2"
+                    >
+                      <span>{itemsPerPage}</span>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${
+                          itemsPerPageDropdownOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
 
-                   {itemsPerPageDropdownOpen && (
-                     <div
-                       className={`absolute z-50 right-0 ${
-                         itemsPerPageDropdownUp
-                           ? "bottom-full mb-2"
-                           : "top-full mt-2"
-                       } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
-                     >
-                       {[25, 50, 100, 200, 500].map((value) => (
-                         <button
-                           key={value}
-                           onClick={() => {
-                             handleItemsPerPageChange(value);
-                             setItemsPerPageDropdownOpen(false);
-                           }}
-                           className={`w-full px-4 py-2 text-sm transition-all text-center ${
-                             itemsPerPage === value
-                               ? "bg-theme-primary text-white"
-                               : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
-                           }`}
-                         >
-                           {value}
-                         </button>
-                       ))}
-                     </div>
-                   )}
-                 </div>
-               </div>
-             </div>
+                    {itemsPerPageDropdownOpen && (
+                      <div
+                        className={`absolute z-50 right-0 ${
+                          itemsPerPageDropdownUp
+                            ? "bottom-full mb-2"
+                            : "top-full mt-2"
+                        } bg-theme-card border border-theme-primary rounded-lg shadow-xl overflow-hidden min-w-[80px] max-h-60 overflow-y-auto`}
+                      >
+                        {[25, 50, 100, 200, 500].map((value) => (
+                          <button
+                            key={value}
+                            onClick={() => {
+                              handleItemsPerPageChange(value);
+                              setItemsPerPageDropdownOpen(false);
+                            }}
+                            className={`w-full px-4 py-2 text-sm transition-all text-center ${
+                              itemsPerPage === value
+                                ? "bg-theme-primary text-white"
+                                : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
+                            }`}
+                          >
+                            {value}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-             {/* Pagination controls */}
-             <PaginationControls
-               currentPage={currentPage}
-               totalPages={totalPages}
-               onPageChange={(page) => {
-                 setCurrentPage(page);
-                 // You can add scroll-to-top logic here if desired
-               }}
-             />
-           </div>
+              {/* Pagination controls */}
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={(page) => {
+                  setCurrentPage(page);
+                  // You can add scroll-to-top logic here if desired
+                }}
+              />
+            </div>
           )}
-          {/* --- END OF PAGINATION --- */}
         </>
       )}
 
@@ -1152,7 +1144,12 @@ function SeasonGallery() {
           });
         }}
         onReplace={(image) => {
-          setAssetToReplace({ ...image, type: "season" });
+          setAssetToReplace({
+            path: image.path,
+            url: image.url,
+            name: image.name,
+            type: "titlecard",
+          });
           setReplacerOpen(true);
         }}
         isDeleting={deletingImage === selectedImage?.path}
@@ -1170,27 +1167,27 @@ function SeasonGallery() {
         onConfirm={() => {
           if (deleteConfirm) {
             if (deleteConfirm.bulk) {
-              bulkDeleteSeasons();
+              bulkDeleteTitleCards();
             } else {
-              deleteSeason(deleteConfirm.path, deleteConfirm.name);
+              deleteTitleCard(deleteConfirm.path, deleteConfirm.name);
             }
             setDeleteConfirm(null);
           }
         }}
         title={
           deleteConfirm?.bulk
-            ? t("seasonGallery.deleteMultipleTitle")
-            : t("seasonGallery.deleteSeasonTitle")
+            ? t("titleCardGallery.deleteMultipleTitle")
+            : t("titleCardGallery.deleteSingleTitle")
         }
         message={
           deleteConfirm?.bulk
-            ? t("seasonGallery.deleteMultipleMessage", {
+            ? t("titleCardGallery.deleteMultipleMessage", {
                 count: deleteConfirm.count,
               })
-            : t("seasonGallery.deleteSeasonMessage")
+            : t("titleCardGallery.deleteSingleMessage")
         }
         itemName={deleteConfirm?.bulk ? undefined : deleteConfirm?.name}
-        confirmText={t("seasonGallery.delete")}
+        confirmText={t("titleCardGallery.delete")}
         type="danger"
       />
 
@@ -1203,22 +1200,11 @@ function SeasonGallery() {
             setAssetToReplace(null);
           }}
           onSuccess={() => {
-            // Force cache refresh by updating timestamp
+            // Force cache-bust and refetch images
             setCacheBuster(Date.now());
-
-            // Update selectedImage if it's still open to show the new image
-            if (selectedImage && assetToReplace) {
-              setSelectedImage({
-                ...selectedImage,
-                url: `${selectedImage.url.split("?")[0]}?t=${Date.now()}`,
-              });
-            }
-
-            // Refresh the images after successful replacement
             setTimeout(() => {
-              fetchFolderImages(activeFolder, false, true);
+              fetchFolderImages(activeFolder, false, true); // Refetch images for the active folder
             }, 500);
-            showSuccess(t("seasonGallery.assetReplaced"));
           }}
         />
       )}
@@ -1226,4 +1212,4 @@ function SeasonGallery() {
   );
 }
 
-export default SeasonGallery;
+export default TitleCardGallery;

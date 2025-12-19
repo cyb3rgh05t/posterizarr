@@ -221,6 +221,11 @@ function BackgroundsGallery() {
   const [itemsPerPageDropdownUp, setItemsPerPageDropdownUp] = useState(false);
   const itemsPerPageDropdownRef = useRef(null);
 
+  // Helper to encode path segments but keep slashes
+  const safeEncodePath = (path) => {
+    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  };
+
   // Cache busting timestamp for force-reloading images after replacement
   const [cacheBuster, setCacheBuster] = useState(Date.now());
 
@@ -475,8 +480,9 @@ function BackgroundsGallery() {
 
     setDeletingImage(imagePath);
     try {
+      // FIX: Use safeEncodePath instead of encodeURIComponent
       const response = await fetch(
-        `${API_URL}/backgrounds/${encodeURIComponent(imagePath)}`,
+        `${API_URL}/backgrounds/${safeEncodePath(imagePath)}`,
         {
           method: "DELETE",
         }

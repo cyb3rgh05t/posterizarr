@@ -5,7 +5,7 @@ import {
   Activity, Play, Image, Settings, Clock, FileText, Info, Menu, X,
   ChevronDown, ChevronRight, Film, Layers, Tv, Database, Server,
   Palette, Bell, Lock, User, FileImage, Lightbulb, AlertTriangle,
-  TrendingUp, Zap, FolderKanban, GripVertical, TestTube,
+  TrendingUp, Zap, FolderKanban, GripVertical, TestTube, Archive
 } from "lucide-react";
 import VersionBadge from "./VersionBadge";
 import { useSidebar } from "../context/SidebarContext";
@@ -100,6 +100,7 @@ const Sidebar = () => {
         ? [
             { path: "/gallery/posters", label: t("assets.assetsFolders"), icon: FolderKanban },
             { path: "/manual-assets", label: "Manual Assets", icon: FileImage, badge: manualAssetsCount, badgeColor: "green" },
+            { path: "/asset-backups", label: t("backupAssets.title") || "Backups", icon: Archive },
             { path: "/asset-overview", label: t("nav.assetOverview"), icon: AlertTriangle, badge: missingAssetsCount, badgeColor: "red" },
             { path: "/assets-manager", label: t("nav.assetsManager", "Assets Manager"), icon: Layers },
             { path: "/test-gallery", label: t("nav.testGallery", "Test Gallery"), icon: TestTube },
@@ -110,6 +111,7 @@ const Sidebar = () => {
             { path: "/gallery/seasons", label: t("assets.seasons"), icon: Film },
             { path: "/gallery/titlecards", label: t("assets.titleCards"), icon: Tv },
             { path: "/manual-assets", label: "Manual Assets", icon: FileImage, badge: manualAssetsCount, badgeColor: "green" },
+            { path: "/asset-backups", label: t("backupAssets.title") || "Backups", icon: Archive },
             { path: "/asset-overview", label: t("nav.assetOverview"), icon: AlertTriangle, badge: missingAssetsCount, badgeColor: "red" },
             { path: "/assets-manager", label: t("nav.assetsManager", "Assets Manager"), icon: Layers },
             { path: "/test-gallery", label: t("nav.testGallery", "Test Gallery"), icon: TestTube },
@@ -152,7 +154,7 @@ const Sidebar = () => {
   const handleDragOver = (e, index) => { e.preventDefault(); if (draggedItem === null || draggedItem === index) return; const newOrder = [...navOrder]; const draggedId = newOrder[draggedItem]; newOrder.splice(draggedItem, 1); newOrder.splice(index, 0, draggedId); setDraggedItem(index); setNavOrder(newOrder); };
   const handleDragEnd = () => { if (draggedItem !== null) saveNavOrder(navOrder); setDraggedItem(null); };
 
-  const isInAssetsSection = location.pathname.startsWith("/gallery") || location.pathname.startsWith("/manual-assets") || location.pathname.startsWith("/asset-overview") || location.pathname.startsWith("/assets-manager") || location.pathname.startsWith("/test-gallery");
+  const isInAssetsSection = location.pathname.startsWith("/gallery") || location.pathname.startsWith("/manual-assets") || location.pathname.startsWith("/asset-backups") || location.pathname.startsWith("/asset-overview") || location.pathname.startsWith("/assets-manager") || location.pathname.startsWith("/test-gallery");
   const isInMediaServerSection = location.pathname.startsWith("/media-server-export");
   const isInConfigSection = location.pathname.startsWith("/config");
 

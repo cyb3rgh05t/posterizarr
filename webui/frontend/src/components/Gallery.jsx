@@ -158,6 +158,11 @@ function Gallery() {
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const sortDropdownRef = useRef(null);
 
+  // Helper to encode path segments but keep slashes
+  const safeEncodePath = (path) => {
+    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  };
+
   useEffect(() => {
     localStorage.setItem("gallery-sort-order", sortOrder);
   }, [sortOrder]);
@@ -458,8 +463,9 @@ function Gallery() {
 
     setDeletingImage(imagePath);
     try {
+      // FIX: Use safeEncodePath instead of encodeURIComponent
       const response = await fetch(
-        `${API_URL}/gallery/${encodeURIComponent(imagePath)}`,
+        `${API_URL}/gallery/${safeEncodePath(imagePath)}`,
         {
           method: "DELETE",
         }
