@@ -581,7 +581,12 @@
       "missing": "Manquant",
       "versionAbbr": "Ver.",
       "editConfig": "Modifier Config",
-      "createConfig": "Créer Config"
+      "createConfig": "Créer Config",
+      "completed": "Terminé",
+      "upcoming": "À venir",
+      "ofDay": "de la journée",
+      "start": "Début",
+      "end": "Fin"
     },
     "banners": {
       "executionInProgress": "Exécution du Script en Cours",
@@ -620,6 +625,7 @@
     "noSchedulesRegistered": "Aucun horaire enregistré",
     "run": "Lancer",
     "stopSuccess": "Arrêt du script...",
+    "assets": "Actifs à Afficher",
     "scriptFile": "Fichier script",
     "configFile": "Fichier de config",
     "cores": "Cœurs",

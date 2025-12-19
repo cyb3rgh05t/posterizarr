@@ -581,7 +581,12 @@
       "missing": "Mancante",
       "versionAbbr": "Ver.",
       "editConfig": "Modifica Config",
-      "createConfig": "Crea Config"
+      "createConfig": "Crea Config",
+      "completed": "Completato",
+      "upcoming": "In arrivo",
+      "ofDay": "del giorno",
+      "start": "Inizio",
+      "end": "Fine"
     },
     "banners": {
       "executionInProgress": "Esecuzione Script in Corso",
@@ -620,6 +625,7 @@
     "noSchedulesRegistered": "Nessun orario registrato",
     "run": "Avvia",
     "stopSuccess": "Arresto dello script...",
+    "assets": "Asset da Visualizzare",
     "scriptFile": "File script",
     "configFile": "File di configurazione",
     "cores": "Core",
