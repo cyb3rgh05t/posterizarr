@@ -49,7 +49,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
   const [assetCount, setAssetCount] = useState(() => {
     const saved = localStorage.getItem("recent-assets-count");
     const count = saved ? parseInt(saved) : 10;
-    return Math.min(Math.max(count, 5), 10);
+    return Math.min(Math.max(count, 5), 20);
   });
 
   const fetchRecentAssets = async (silent = false) => {

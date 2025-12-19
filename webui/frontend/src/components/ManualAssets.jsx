@@ -254,21 +254,6 @@ function ManualAssets() {
     localStorage.setItem("manual-assets-grid-size", imageSize);
   }, [imageSize]);
 
-  // Grid column classes based on size (2-10 columns)
-  const getGridClass = (size) => {
-    const classes = {
-      2: "grid-cols-2 md:grid-cols-2 lg:grid-cols-2",
-      3: "grid-cols-2 md:grid-cols-3 lg:grid-cols-3",
-      4: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-      5: "grid-cols-2 md:grid-cols-4 lg:grid-cols-5",
-      6: "grid-cols-2 md:grid-cols-4 lg:grid-cols-6",
-      7: "grid-cols-2 md:grid-cols-5 lg:grid-cols-7",
-      8: "grid-cols-2 md:grid-cols-5 lg:grid-cols-8",
-      9: "grid-cols-2 md:grid-cols-6 lg:grid-cols-9",
-      10: "grid-cols-2 md:grid-cols-6 lg:grid-cols-10",
-    };
-    return classes[size] || classes[5];
-  };
 
   // Fetch manual assets
   const fetchAssets = async (showToast = false) => {
@@ -959,7 +944,15 @@ function ManualAssets() {
             </div>
           </div>
           <div className="bg-theme-card border border-theme rounded-lg p-4">
-            <div className={`grid ${getGridClass(imageSize)} gap-4`}>
+            <div
+              className="grid grid-cols-2 md:grid-cols-4 gap-4"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: window.innerWidth > 1024
+                  ? `repeat(${imageSize}, minmax(0, 1fr))`
+                  : undefined
+              }}
+            >
               {displayedGridAssets.map((asset) => (
                 <div
                   key={asset.path}
@@ -1185,7 +1178,7 @@ function ManualAssets() {
                   value={imageSize}
                   onChange={setImageSize}
                   min={2}
-                  max={10}
+                  max={20}
                 />
               )}
 
@@ -1477,7 +1470,15 @@ function ManualAssets() {
               // Show assets grid
               return (
                 <>
-                  <div className={`grid ${getGridClass(imageSize)} gap-4`}>
+                  <div
+                    className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: window.innerWidth > 1024
+                        ? `repeat(${imageSize}, minmax(0, 1fr))`
+                        : undefined
+                    }}
+                  >
                     {displayedFolderAssets.map((asset) => (
                       <div
                         key={asset.path}

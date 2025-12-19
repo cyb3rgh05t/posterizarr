@@ -235,22 +235,6 @@ function TitleCardGallery() {
     return saved ? parseInt(saved) : 5;
   });
 
-  // Grid column classes based on size (2-10 columns)
-  // Mobile: 2 columns, Tablet (md): 3-4 columns depending on size, Desktop (lg): full size selection
-  const getGridClass = (size) => {
-    const classes = {
-      2: "grid-cols-2 md:grid-cols-2 lg:grid-cols-2",
-      3: "grid-cols-2 md:grid-cols-3 lg:grid-cols-3",
-      4: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-      5: "grid-cols-2 md:grid-cols-4 lg:grid-cols-5",
-      6: "grid-cols-2 md:grid-cols-4 lg:grid-cols-6",
-      7: "grid-cols-2 md:grid-cols-5 lg:grid-cols-7",
-      8: "grid-cols-2 md:grid-cols-5 lg:grid-cols-8",
-      9: "grid-cols-2 md:grid-cols-6 lg:grid-cols-9",
-      10: "grid-cols-2 md:grid-cols-6 lg:grid-cols-10",
-    };
-    return classes[size] || classes[5];
-  };
 
   const fetchFolders = async (showNotification = false) => {
     try {
@@ -615,12 +599,25 @@ function TitleCardGallery() {
 
             {/* Controls - wrap on small screens */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Compact Image Size Slider */}
-              <CompactImageSizeSlider
-                value={imageSize}
-                onChange={setImageSize}
-                storageKey="gallery-titlecard-size"
-              />
+              <div className="flex flex-col items-center mr-2 relative group">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter">
+                    {t("dashboard.assets")}
+                  </span>
+                  {/* Dynamic Badge */}
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-md bg-theme-primary text-white text-[10px] font-black shadow-sm shadow-theme-primary/20">
+                    {imageSize}
+                  </span>
+                </div>
+
+                <CompactImageSizeSlider
+                  value={imageSize}
+                  onChange={setImageSize} // or handleItemsPerPageChange
+                  storageKey="relevant-storage-key"
+                  min={5}
+                  max={20}
+                />
+              </div>
               {/* Select Mode Toggle */}
               {activeFolder && images.length > 0 && (
                 <button
@@ -924,7 +921,13 @@ function TitleCardGallery() {
             </div>
           </div>
 
-          <div className={`grid ${getGridClass(imageSize)} gap-4`}>
+          <div
+            className="grid gap-4"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${imageSize}, minmax(0, 1fr))`
+            }}
+          >
             {displayedImages.map((image, index) => (
               <div
                 key={index}
