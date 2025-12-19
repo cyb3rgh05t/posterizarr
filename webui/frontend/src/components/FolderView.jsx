@@ -23,6 +23,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import ImagePreviewModal from "./ImagePreviewModal";
 import ScrollToButtons from "./ScrollToButtons";
 import AssetReplacer from "./AssetReplacer";
+import { buildResponsiveGridClass } from "../utils/gridClass";
 
 const API_URL = "/api";
 
@@ -53,7 +54,10 @@ function FolderView() {
 
   // Helper to encode path segments but keep slashes
   const safeEncodePath = (path) => {
-    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    return path
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
   };
 
   useEffect(() => {
@@ -63,7 +67,10 @@ function FolderView() {
   // Click outside listener
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+      if (
+        sortDropdownRef.current &&
+        !sortDropdownRef.current.contains(event.target)
+      ) {
         setSortDropdownOpen(false);
       }
     };
@@ -102,7 +109,8 @@ function FolderView() {
   // Image size state
   const [imageSize, setImageSize] = useState(() => {
     const saved = localStorage.getItem("gallery-folder-size");
-    return saved ? parseInt(saved) : 5;
+    const parsed = saved ? parseInt(saved) : 5;
+    return Math.min(Math.max(parsed, 2), 20);
   });
 
   useEffect(() => {
@@ -110,7 +118,11 @@ function FolderView() {
   }, [imageSize]);
 
   // Fetch data from the new recursive API
-  const fetchData = async (path, showToast = false, keepScrollPosition = false) => {
+  const fetchData = async (
+    path,
+    showToast = false,
+    keepScrollPosition = false
+  ) => {
     if (!keepScrollPosition) {
       setLoading(true);
       // ONLY clear selection if this is a "hard" load (new folder/view)
@@ -228,7 +240,8 @@ function FolderView() {
             body: JSON.stringify({ paths: Array.from(selectedAssets) }),
           });
           const data = await response.json();
-          if (!response.ok) throw new Error(data.detail || "Bulk delete failed");
+          if (!response.ok)
+            throw new Error(data.detail || "Bulk delete failed");
           if (data.failed?.length > 0) {
             showError(
               `Deleted ${data.deleted.length}, but ${data.failed.length} failed.`
@@ -274,7 +287,7 @@ function FolderView() {
 
           // Refresh the data
           if (currentPath) {
-             fetchData(currentPath);
+            fetchData(currentPath);
           }
         } catch (error) {
           console.error(error);
@@ -313,21 +326,7 @@ function FolderView() {
     }
   };
 
-  // Grid column classes
-  const getGridClass = (size) => {
-    const classes = {
-      2: "grid-cols-2 md:grid-cols-2 lg:grid-cols-2",
-      3: "grid-cols-2 md:grid-cols-3 lg:grid-cols-3",
-      4: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-      5: "grid-cols-2 md:grid-cols-4 lg:grid-cols-5",
-      6: "grid-cols-2 md:grid-cols-4 lg:grid-cols-6",
-      7: "grid-cols-2 md:grid-cols-5 lg:grid-cols-7",
-      8: "grid-cols-2 md:grid-cols-5 lg:grid-cols-8",
-      9: "grid-cols-2 md:grid-cols-6 lg:grid-cols-9",
-      10: "grid-cols-2 md:grid-cols-6 lg:grid-cols-10",
-    };
-    return classes[size] || classes[5];
-  };
+  const getGridClass = (size) => buildResponsiveGridClass(size);
 
   // Filter items based on search
   const filteredItems = items.filter((item) =>
@@ -335,8 +334,12 @@ function FolderView() {
   );
 
   // Split AND Sort
-  const folderItems = sortItems(filteredItems.filter((item) => item.type === "folder"));
-  const assetItems = sortItems(filteredItems.filter((item) => item.type === "asset"));
+  const folderItems = sortItems(
+    filteredItems.filter((item) => item.type === "folder")
+  );
+  const assetItems = sortItems(
+    filteredItems.filter((item) => item.type === "asset")
+  );
 
   return (
     <div className="space-y-6">
@@ -418,7 +421,9 @@ function FolderView() {
                 ) : (
                   <CheckSquare className="w-4 h-4" />
                 )}
-                <span>{selectMode ? t("folderView.cancel") : t("folderView.select")}</span>
+                <span>
+                  {selectMode ? t("folderView.cancel") : t("folderView.select")}
+                </span>
               </button>
             )}
 
@@ -431,7 +436,9 @@ function FolderView() {
               >
                 <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
                 <span className="hidden sm:inline">
-                  {sortOrder.includes("date") ? t("common.date") : t("common.name")}
+                  {sortOrder.includes("date")
+                    ? t("common.date")
+                    : t("common.name")}
                 </span>
               </button>
 
@@ -439,27 +446,55 @@ function FolderView() {
                 <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
                   <div className="py-1">
                     <button
-                      onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      onClick={() => {
+                        setSortOrder("name_asc");
+                        setSortDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm ${
+                        sortOrder === "name_asc"
+                          ? "bg-theme-primary/20 text-theme-primary"
+                          : "text-theme-text hover:bg-theme-hover"
+                      }`}
                     >
                       {t("common.sorting.nameAsc")}
                     </button>
                     <button
-                      onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      onClick={() => {
+                        setSortOrder("name_desc");
+                        setSortDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm ${
+                        sortOrder === "name_desc"
+                          ? "bg-theme-primary/20 text-theme-primary"
+                          : "text-theme-text hover:bg-theme-hover"
+                      }`}
                     >
                       {t("common.sorting.nameDesc")}
                     </button>
                     <div className="border-t border-theme-border my-1"></div>
                     <button
-                      onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      onClick={() => {
+                        setSortOrder("date_newest");
+                        setSortDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm ${
+                        sortOrder === "date_newest"
+                          ? "bg-theme-primary/20 text-theme-primary"
+                          : "text-theme-text hover:bg-theme-hover"
+                      }`}
                     >
                       {t("common.sorting.dateNewest")}
                     </button>
                     <button
-                      onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                      onClick={() => {
+                        setSortOrder("date_oldest");
+                        setSortDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm ${
+                        sortOrder === "date_oldest"
+                          ? "bg-theme-primary/20 text-theme-primary"
+                          : "text-theme-text hover:bg-theme-hover"
+                      }`}
                     >
                       {t("common.sorting.dateOldest")}
                     </button>
@@ -525,8 +560,8 @@ function FolderView() {
       ) : error ? (
         <div className="text-center py-20 bg-theme-card border border-red-500/30 rounded-lg">
           <div className="flex justify-center mb-4">
-             {/* Using standard lucide icon here if AlertCircle isn't imported, but assuming standard imports */}
-             <Trash2 className="w-12 h-12 text-red-400" />
+            {/* Using standard lucide icon here if AlertCircle isn't imported, but assuming standard imports */}
+            <Trash2 className="w-12 h-12 text-red-400" />
           </div>
           <p className="text-red-400">{error}</p>
         </div>
@@ -694,7 +729,9 @@ function FolderView() {
           }
           message={
             deleteConfirm.bulk
-              ? t("gallery.deleteMultipleMessage", { count: deleteConfirm.count })
+              ? t("gallery.deleteMultipleMessage", {
+                  count: deleteConfirm.count,
+                })
               : t("gallery.deletePosterMessage")
           }
           itemName={deleteConfirm.bulk ? undefined : deleteConfirm.name}
@@ -733,7 +770,9 @@ function FolderView() {
             setReplacerOpen(false);
             setAssetToReplace(null);
             setSelectedImage(null);
-            showSuccess(t("gallery.assetReplaced") || "Asset replaced successfully.");
+            showSuccess(
+              t("gallery.assetReplaced") || "Asset replaced successfully."
+            );
             setTimeout(() => {
               fetchData(currentPath, false, true);
             }, 500);

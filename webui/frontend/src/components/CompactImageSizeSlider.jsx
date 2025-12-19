@@ -10,14 +10,14 @@ import { useTranslation } from "react-i18next";
  * @param {function} props.onChange - Callback when size changes
  * @param {string} props.storageKey - localStorage key for persistence (optional)
  * @param {number} props.min - Minimum value (default: 2)
- * @param {number} props.max - Maximum value (default: 10)
+ * @param {number} props.max - Maximum value (default: 20)
  */
 function CompactImageSizeSlider({
   value,
   onChange,
   storageKey,
   min = 2,
-  max = 10,
+  max = 20,
 }) {
   const handleChange = (e) => {
     const newValue = parseInt(e.target.value);

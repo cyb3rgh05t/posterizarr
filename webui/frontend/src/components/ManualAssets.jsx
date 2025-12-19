@@ -36,6 +36,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import AssetReplacer from "./AssetReplacer";
 import ScrollToButtons from "./ScrollToButtons";
 import ImagePreviewModal from "./ImagePreviewModal";
+import { buildResponsiveGridClass } from "../utils/gridClass";
 
 const API_URL = "/api";
 
@@ -178,7 +179,10 @@ function ManualAssets() {
   // Click outside listener for sorting
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+      if (
+        sortDropdownRef.current &&
+        !sortDropdownRef.current.contains(event.target)
+      ) {
         setSortDropdownOpen(false);
       }
     };
@@ -227,15 +231,19 @@ function ManualAssets() {
   const [currentLibrary, setCurrentLibrary] = useState(null);
   const [currentFolder, setCurrentFolder] = useState(null);
 
-  // Image size state with localStorage (2-10 range, default 5)
+  // Image size state with localStorage (2-20 range, default 5)
   const [imageSize, setImageSize] = useState(() => {
     const saved = localStorage.getItem("manual-assets-grid-size");
-    return saved ? parseInt(saved) : 5;
+    const parsed = saved ? parseInt(saved) : 5;
+    return Math.min(Math.max(parsed, 2), 20);
   });
 
   // Helper to encode path segments but keep slashes
   const safeEncodePath = (path) => {
-    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    return path
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
   };
 
   // Dropdown state
@@ -254,21 +262,7 @@ function ManualAssets() {
     localStorage.setItem("manual-assets-grid-size", imageSize);
   }, [imageSize]);
 
-  // Grid column classes based on size (2-10 columns)
-  const getGridClass = (size) => {
-    const classes = {
-      2: "grid-cols-2 md:grid-cols-2 lg:grid-cols-2",
-      3: "grid-cols-2 md:grid-cols-3 lg:grid-cols-3",
-      4: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-      5: "grid-cols-2 md:grid-cols-4 lg:grid-cols-5",
-      6: "grid-cols-2 md:grid-cols-4 lg:grid-cols-6",
-      7: "grid-cols-2 md:grid-cols-5 lg:grid-cols-7",
-      8: "grid-cols-2 md:grid-cols-5 lg:grid-cols-8",
-      9: "grid-cols-2 md:grid-cols-6 lg:grid-cols-9",
-      10: "grid-cols-2 md:grid-cols-6 lg:grid-cols-10",
-    };
-    return classes[size] || classes[5];
-  };
+  const getGridClass = (size) => buildResponsiveGridClass(size);
 
   // Fetch manual assets
   const fetchAssets = async (showToast = false) => {
@@ -632,7 +626,9 @@ function ManualAssets() {
     if (selectedAssets.size === displayedGridAssets.length) {
       clearSelection();
     } else {
-      setSelectedAssets(new Set(displayedGridAssets.map((asset) => asset.path)));
+      setSelectedAssets(
+        new Set(displayedGridAssets.map((asset) => asset.path))
+      );
     }
   };
   // --- END Grid View Pagination ---
@@ -764,7 +760,9 @@ function ManualAssets() {
                 >
                   <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
                   <span className="hidden sm:inline">
-                    {sortOrder.includes("date") ? t("common.date") : t("common.name")}
+                    {sortOrder.includes("date")
+                      ? t("common.date")
+                      : t("common.name")}
                   </span>
                 </button>
 
@@ -772,27 +770,55 @@ function ManualAssets() {
                   <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
                     <div className="py-1">
                       <button
-                        onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("name_asc");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "name_asc"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.nameAsc")}
                       </button>
                       <button
-                        onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("name_desc");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "name_desc"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.nameDesc")}
                       </button>
                       <div className="border-t border-theme-border my-1"></div>
                       <button
-                        onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("date_newest");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "date_newest"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.dateNewest")}
                       </button>
                       <button
-                        onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("date_oldest");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "date_oldest"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.dateOldest")}
                       </button>
@@ -885,13 +911,15 @@ function ManualAssets() {
                 onClick={toggleSelectAllGrid}
                 className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-theme-hover hover:bg-theme-primary/70 border border-theme-border rounded-lg transition-all font-medium text-sm"
               >
-                {selectedAssets.size === displayedGridAssets.length && displayedGridAssets.length > 0 ? (
+                {selectedAssets.size === displayedGridAssets.length &&
+                displayedGridAssets.length > 0 ? (
                   <Square className="w-4 h-4" />
                 ) : (
                   <CheckSquare className="w-4 h-4" />
                 )}
                 <span className="hidden sm:inline">
-                  {selectedAssets.size === displayedGridAssets.length && displayedGridAssets.length > 0
+                  {selectedAssets.size === displayedGridAssets.length &&
+                  displayedGridAssets.length > 0
                     ? "Deselect Page"
                     : "Select Page"}
                 </span>
@@ -946,9 +974,7 @@ function ManualAssets() {
                   displayed: displayedGridAssets.length,
                   total: allGridAssets.length,
                   folder:
-                    activeLibrary === "all"
-                      ? "all libraries"
-                      : activeLibrary,
+                    activeLibrary === "all" ? "all libraries" : activeLibrary,
                 })}
               </span>
               {allGridAssets.length !== totalAssets && (
@@ -1052,7 +1078,7 @@ function ManualAssets() {
             </div>
 
             {/* Pagination for Grid View */}
-            {(allGridAssets.length > 25) && (
+            {allGridAssets.length > 25 && (
               <div className="mt-8 space-y-6">
                 <div className="flex justify-center">
                   <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
@@ -1066,7 +1092,9 @@ function ManualAssets() {
                             itemsPerPageDropdownRef
                           );
                           setItemsPerPageDropdownUp(shouldOpenUp);
-                          setItemsPerPageDropdownOpen(!itemsPerPageDropdownOpen);
+                          setItemsPerPageDropdownOpen(
+                            !itemsPerPageDropdownOpen
+                          );
                         }}
                         className="px-4 py-2 bg-theme-bg text-theme-text border border-theme-border rounded-lg text-sm font-semibold hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary transition-all cursor-pointer shadow-sm flex items-center gap-2"
                       >
@@ -1185,7 +1213,7 @@ function ManualAssets() {
                   value={imageSize}
                   onChange={setImageSize}
                   min={2}
-                  max={10}
+                  max={20}
                 />
               )}
 
@@ -1229,7 +1257,8 @@ function ManualAssets() {
                                 )
                               : [];
                           return selectedAssets.size ===
-                            displayedFolderAssets.length && displayedFolderAssets.length > 0 ? (
+                            displayedFolderAssets.length &&
+                            displayedFolderAssets.length > 0 ? (
                             <Square className="w-5 h-5" />
                           ) : (
                             <CheckSquare className="w-5 h-5" />
@@ -1245,7 +1274,8 @@ function ManualAssets() {
                                 )
                               : [];
                           return selectedAssets.size ===
-                            displayedFolderAssets.length && displayedFolderAssets.length > 0
+                            displayedFolderAssets.length &&
+                            displayedFolderAssets.length > 0
                             ? "Deselect Page"
                             : "Select Page";
                         })()}
@@ -1305,7 +1335,9 @@ function ManualAssets() {
                 >
                   <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
                   <span className="hidden sm:inline">
-                    {sortOrder.includes("date") ? t("common.date") : t("common.name")}
+                    {sortOrder.includes("date")
+                      ? t("common.date")
+                      : t("common.name")}
                   </span>
                 </button>
 
@@ -1313,27 +1345,55 @@ function ManualAssets() {
                   <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
                     <div className="py-1">
                       <button
-                        onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("name_asc");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "name_asc"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.nameAsc")}
                       </button>
                       <button
-                        onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("name_desc");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "name_desc"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.nameDesc")}
                       </button>
                       <div className="border-t border-theme-border my-1"></div>
                       <button
-                        onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("date_newest");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "date_newest"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.dateNewest")}
                       </button>
                       <button
-                        onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("date_oldest");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "date_oldest"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.dateOldest")}
                       </button>
@@ -1431,9 +1491,8 @@ function ManualAssets() {
                               {library.folders.reduce(
                                 (sum, f) =>
                                   sum +
-                                  f.assets.filter(
-                                    (a) => a.type === "titlecard"
-                                  ).length,
+                                  f.assets.filter((a) => a.type === "titlecard")
+                                    .length,
                                 0
                               )}
                             </div>
@@ -1577,14 +1636,17 @@ function ManualAssets() {
                   </div>
 
                   {/* Pagination for Folder View Assets */}
-                  {(allFolderAssets.length > 25) && (
+                  {allFolderAssets.length > 25 && (
                     <div className="mt-8 space-y-6">
                       <div className="flex justify-center">
                         <div className="inline-flex items-center gap-3 px-6 py-3 bg-theme-card border border-theme-border rounded-xl shadow-md">
                           <label className="text-sm font-medium text-theme-text">
                             {t("gallery.itemsPerPage")}:
                           </label>
-                          <div className="relative" ref={itemsPerPageDropdownRef}>
+                          <div
+                            className="relative"
+                            ref={itemsPerPageDropdownRef}
+                          >
                             <button
                               onClick={() => {
                                 const shouldOpenUp = calculateDropdownPosition(
