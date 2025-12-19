@@ -53,7 +53,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.2.10"
+$CurrentScriptVersion = "2.2.14"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -5721,7 +5721,6 @@ function MassDownloadPlexArtwork {
         try {
             if ($($entry.RootFoldername)) {
                 $SkippingText = 'false'
-                $SkipAddOverlay = 'false'
                 $global:posterurl = $null
                 $global:ImageMagickError = $null
                 $global:TMDBfallbackposterurl = $null
@@ -5787,7 +5786,6 @@ function MassDownloadPlexArtwork {
                     if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -5914,7 +5912,6 @@ function MassDownloadPlexArtwork {
                     if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -6025,7 +6022,6 @@ function MassDownloadPlexArtwork {
         if ($($entry.RootFoldername)) {
             # Define Global Variables
             $SkippingText = 'false'
-            $SkipAddOverlay = 'false'
             $global:tmdbid = $entry.tmdbid
             $global:tvdbid = $entry.tvdbid
             $global:imdbid = $entry.imdbid
@@ -6231,7 +6227,6 @@ function MassDownloadPlexArtwork {
                 if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                     # Define Global Variables
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:tmdbid = $entry.tmdbid
                     $global:tvdbid = $entry.tvdbid
                     $global:imdbid = $entry.imdbid
@@ -6339,7 +6334,6 @@ function MassDownloadPlexArtwork {
                 $global:PlexSeasonUrls = $entry.PlexSeasonUrls -split ','
                 for ($i = 0; $i -lt $global:seasonNames.Count; $i++) {
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:posterurl = $null
                     $global:seasontmp = $null
                     $global:IsFallback = $null
@@ -6475,7 +6469,6 @@ function MassDownloadPlexArtwork {
                 # Loop through each episode
                 foreach ($episode in $Episodedata) {
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:AssetTextLang = $null
                     $global:TMDBAssetTextLang = $null
                     $global:FANARTAssetTextLang = $null
@@ -6510,7 +6503,6 @@ function MassDownloadPlexArtwork {
                         $global:ImageMagickError = $null
                         for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:AssetTextLang = $null
                             $global:TMDBAssetTextLang = $null
                             $global:FANARTAssetTextLang = $null
@@ -7502,6 +7494,7 @@ $SkipLocalBackgroundTextAdd = $config.PrerequisitePart.SkipLocalBackgroundTextAd
 $SkipLocalSeasonTextAdd = $config.PrerequisitePart.SkipLocalSeasonTextAdd.tolower()
 $SkipLocalTCTextAdd = $config.PrerequisitePart.SkipLocalTCTextAdd.tolower()
 $SkipAddTextAndOverlay = $config.PrerequisitePart.SkipAddTextAndOverlay.tolower()
+$SkipAddTextAndBorder = $config.PrerequisitePart.SkipAddTextAndBorder.tolower()
 $DisableHashValidation = $config.PrerequisitePart.DisableHashValidation.tolower()
 $global:DisableOnlineAssetFetch = $config.PrerequisitePart.DisableOnlineAssetFetch.tolower()
 $UseLogo = $config.PrerequisitePart.UseLogo.tolower()
@@ -10057,7 +10050,6 @@ Elseif ($Tautulli) {
                 }
                 Else {
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:posterurl = $null
                     $global:ImageMagickError = $null
                     $global:TextlessPoster = $null
@@ -10143,7 +10135,6 @@ Elseif ($Tautulli) {
                         if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -10388,19 +10379,32 @@ Elseif ($Tautulli) {
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
+
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBorder = 'false'
+                                            $AddOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -10636,7 +10640,7 @@ Elseif ($Tautulli) {
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -10756,7 +10760,6 @@ Elseif ($Tautulli) {
                         if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -10976,19 +10979,31 @@ Elseif ($Tautulli) {
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddBackgroundOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBackgroundBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBackgroundBorder = 'false'
+                                            $AddBackgroundOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -11226,7 +11241,7 @@ Elseif ($Tautulli) {
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -11345,7 +11360,6 @@ Elseif ($Tautulli) {
             Else {
                 # Define Global Variables
                 $SkippingText = 'false'
-                $SkipAddOverlay = 'false'
                 $global:tmdbsearched = $null
                 $global:tmdbid = $entry.tmdbid
                 $global:tvdbid = $entry.tvdbid
@@ -11653,19 +11667,31 @@ Elseif ($Tautulli) {
                                             Default { $Posteroverlay = $Posteroverlay }
                                         }
                                     }
+                                    # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                     if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                        $SkipAddOverlay = 'true'
+                                        $AddOverlay = 'false'
+                                    }
+
+                                    # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                    if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                        $AddBorder = 'false'
+                                    }
+
+                                    # Logic for "If both are true, only resize"
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        $AddBorder = 'false'
+                                        $AddOverlay = 'false'
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
@@ -11901,7 +11927,7 @@ Elseif ($Tautulli) {
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -12028,7 +12054,6 @@ Elseif ($Tautulli) {
                     if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -12252,19 +12277,31 @@ Elseif ($Tautulli) {
                                             Default { $Backgroundoverlay = $Backgroundoverlay }
                                         }
                                     }
+                                    # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                     if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                        $SkipAddOverlay = 'true'
+                                        $AddBackgroundOverlay = 'false'
+                                    }
+
+                                    # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                    if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                        $AddBorder = 'false'
+                                    }
+
+                                    # Logic for "If both are true, only resize"
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        $AddBackgroundBorder = 'false'
+                                        $AddBackgroundOverlay = 'false'
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
@@ -12506,7 +12543,7 @@ Elseif ($Tautulli) {
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -12589,7 +12626,6 @@ Elseif ($Tautulli) {
                     $global:PlexSeasonUrls = $entry.PlexSeasonUrls -split ','
                     for ($i = 0; $i -lt $global:seasonNames.Count; $i++) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbsearched = $null
                         $global:seasontmp = $null
                         $global:posterurl = $null
@@ -12964,19 +13000,31 @@ Elseif ($Tautulli) {
                                         $CommentlogEntry | Out-File $magickLog -Append
                                         InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                         if (!$global:ImageMagickError -eq 'true') {
+                                            # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                             if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                $SkipAddOverlay = 'true'
+                                                $AddSeasonOverlay = 'false'
+                                            }
+
+                                            # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                            if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                $AddSeasonBorder = 'false'
+                                            }
+
+                                            # Logic for "If both are true, only resize"
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                $AddSeasonBorder = 'false'
+                                                $AddSeasonOverlay = 'false'
                                             }
                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
@@ -13232,7 +13280,7 @@ Elseif ($Tautulli) {
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -13300,7 +13348,6 @@ Elseif ($Tautulli) {
                     # Loop through each episode
                     foreach ($episode in $Episodedata) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:AssetTextLang = $null
                         $global:TMDBAssetTextLang = $null
                         $global:FANARTAssetTextLang = $null
@@ -13340,7 +13387,6 @@ Elseif ($Tautulli) {
                                 $global:ImageMagickError = $null
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
@@ -13654,19 +13700,31 @@ Elseif ($Tautulli) {
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
+                                                                # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                                 if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                    $SkipAddOverlay = 'true'
+                                                                    $AddTitleCardOverlay = 'false'
+                                                                }
+
+                                                                # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                                if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                }
+
+                                                                # Logic for "If both are true, only resize"
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                    $AddTitleCardOverlay = 'false'
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
@@ -13892,7 +13950,7 @@ Elseif ($Tautulli) {
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -13963,7 +14021,6 @@ Elseif ($Tautulli) {
                             Else {
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
@@ -14297,19 +14354,31 @@ Elseif ($Tautulli) {
                                                                     Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                 }
                                                             }
+                                                            # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                             if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                $SkipAddOverlay = 'true'
+                                                                $AddTitleCardOverlay = 'false'
+                                                            }
+
+                                                            # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                            if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                $AddTitleCardBorder = 'false'
+                                                            }
+
+                                                            # Logic for "If both are true, only resize"
+                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                $AddTitleCardBorder = 'false'
+                                                                $AddTitleCardOverlay = 'false'
                                                             }
                                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                             }
-                                                            elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                            elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                             }
-                                                            elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                            elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                             }
@@ -14533,7 +14602,7 @@ Elseif ($Tautulli) {
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -15579,7 +15648,6 @@ Elseif ($ArrTrigger) {
                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                 # Define Global Variables
                                 $SkippingText = 'false'
-                                $SkipAddOverlay = 'false'
                                 $global:tmdbid = $entry.tmdbid
                                 $global:tvdbid = $entry.tvdbid
                                 $global:imdbid = $entry.imdbid
@@ -15794,19 +15862,31 @@ Elseif ($ArrTrigger) {
                                                     Default { $Posteroverlay = $Posteroverlay }
                                                 }
                                             }
+                                            # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                             if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                $SkipAddOverlay = 'true'
+                                                $AddOverlay = 'false'
+                                            }
+
+                                            # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                            if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                $AddBorder = 'false'
+                                            }
+
+                                            # Logic for "If both are true, only resize"
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                $AddBorder = 'false'
+                                                $AddOverlay = 'false'
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
@@ -16000,7 +16080,7 @@ Elseif ($ArrTrigger) {
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -16126,7 +16206,6 @@ Elseif ($ArrTrigger) {
                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                 # Define Global Variables
                                 $SkippingText = 'false'
-                                $SkipAddOverlay = 'false'
                                 $global:tmdbid = $entry.tmdbid
                                 $global:tvdbid = $entry.tvdbid
                                 $global:imdbid = $entry.imdbid
@@ -16319,19 +16398,31 @@ Elseif ($ArrTrigger) {
                                                     Default { $backgroundoverlay = $backgroundoverlay }
                                                 }
                                             }
+                                            # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                             if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                $SkipAddOverlay = 'true'
+                                                $AddBackgroundOverlay = 'false'
+                                            }
+
+                                            # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                            if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                $AddBackgroundBorder = 'false'
+                                            }
+
+                                            # Logic for "If both are true, only resize"
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                $AddBackgroundBorder = 'false'
+                                                $AddBackgroundOverlay = 'false'
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
@@ -16529,7 +16620,7 @@ Elseif ($ArrTrigger) {
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -16653,7 +16744,6 @@ Elseif ($ArrTrigger) {
                 Else {
                     # Define Global Variables
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:tmdbsearched = $null
                     $global:tmdbid = $entry.tmdbid
                     $global:tvdbid = $entry.tvdbid
@@ -16927,19 +17017,31 @@ Elseif ($ArrTrigger) {
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBorder = 'false'
+                                            $AddOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -17135,7 +17237,7 @@ Elseif ($ArrTrigger) {
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -17268,7 +17370,6 @@ Elseif ($ArrTrigger) {
                         if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -17465,19 +17566,31 @@ Elseif ($ArrTrigger) {
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddBackgroundOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBackgroundBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBackgroundBorder = 'false'
+                                            $AddBackgroundOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -17673,7 +17786,7 @@ Elseif ($ArrTrigger) {
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -17747,7 +17860,6 @@ Elseif ($ArrTrigger) {
                         # Loop through each Season
                         foreach ($season in $Episodedata) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbsearched = $null
                             $global:seasontmp = $null
                             $global:IsFallback = $null
@@ -18115,19 +18227,31 @@ Elseif ($ArrTrigger) {
                                                 $CommentlogEntry | Out-File $magickLog -Append
                                                 InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                                 if (!$global:ImageMagickError -eq 'True') {
+                                                    # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                     if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                        $SkipAddOverlay = 'true'
+                                                        $AddSeasonOverlay = 'false'
+                                                    }
+
+                                                    # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                    if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                        $AddSeasonBorder = 'false'
+                                                    }
+
+                                                    # Logic for "If both are true, only resize"
+                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                        $AddSeasonBorder = 'false'
+                                                        $AddSeasonOverlay = 'false'
                                                     }
                                                     # Resize Image to 2000x3000 and apply Border and overlay
-                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                    if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
                                                         $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                     }
-                                                    elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                    elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
                                                         $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                     }
-                                                    elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                    elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
                                                         $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                     }
@@ -18284,7 +18408,7 @@ Elseif ($ArrTrigger) {
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                 $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -18360,7 +18484,6 @@ Elseif ($ArrTrigger) {
                         # Loop through each episode
                         foreach ($episode in $Episodedata) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:AssetTextLang = $null
                             $global:TMDBAssetTextLang = $null
                             $global:FANARTAssetTextLang = $null
@@ -18399,7 +18522,6 @@ Elseif ($ArrTrigger) {
                                     $global:ImageMagickError = $null
                                     for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                         $SkippingText = 'false'
-                                        $SkipAddOverlay = 'false'
                                         $global:AssetTextLang = $null
                                         $global:TMDBAssetTextLang = $null
                                         $global:FANARTAssetTextLang = $null
@@ -18670,19 +18792,31 @@ Elseif ($ArrTrigger) {
                                                                             Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                         }
                                                                     }
+                                                                    # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                                     if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                        $SkipAddOverlay = 'true'
+                                                                        $AddTitleCardOverlay = 'false'
+                                                                    }
+
+                                                                    # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                                    if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                        $AddTitleCardBorder = 'false'
+                                                                    }
+
+                                                                    # Logic for "If both are true, only resize"
+                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                        $AddTitleCardBorder = 'false'
+                                                                        $AddTitleCardOverlay = 'false'
                                                                     }
                                                                     # Resize Image to 2000x3000 and apply Border and overlay
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                     }
-                                                                    elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                                    elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                                     }
-                                                                    elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                    elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                     }
@@ -18822,7 +18956,7 @@ Elseif ($ArrTrigger) {
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'True' } Else { 'False' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -18900,7 +19034,6 @@ Elseif ($ArrTrigger) {
                                 Else {
                                     for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                         $SkippingText = 'false'
-                                        $SkipAddOverlay = 'false'
                                         $global:AssetTextLang = $null
                                         $global:TMDBAssetTextLang = $null
                                         $global:FANARTAssetTextLang = $null
@@ -19192,19 +19325,31 @@ Elseif ($ArrTrigger) {
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
+                                                                # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                                 if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                    $SkipAddOverlay = 'true'
+                                                                    $AddTitleCardOverlay = 'false'
+                                                                }
+
+                                                                # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                                if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                }
+
+                                                                # Logic for "If both are true, only resize"
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                    $AddTitleCardOverlay = 'false'
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
@@ -19343,7 +19488,7 @@ Elseif ($ArrTrigger) {
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'True' } Else { 'False' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -19883,7 +20028,6 @@ Elseif ($ArrTrigger) {
                     }
                     Else {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:posterurl = $null
                         $global:ImageMagickError = $null
                         $global:TextlessPoster = $null
@@ -19969,7 +20113,6 @@ Elseif ($ArrTrigger) {
                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                 # Define Global Variables
                                 $SkippingText = 'false'
-                                $SkipAddOverlay = 'false'
                                 $global:tmdbid = $entry.tmdbid
                                 $global:tvdbid = $entry.tvdbid
                                 $global:imdbid = $entry.imdbid
@@ -20213,19 +20356,31 @@ Elseif ($ArrTrigger) {
                                                     Default { $Posteroverlay = $Posteroverlay }
                                                 }
                                             }
+                                            # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                             if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                $SkipAddOverlay = 'true'
+                                                $AddOverlay = 'false'
+                                            }
+
+                                            # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                            if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                $AddBorder = 'false'
+                                            }
+
+                                            # Logic for "If both are true, only resize"
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                $AddBorder = 'false'
+                                                $AddOverlay = 'false'
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                                 $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
@@ -20461,7 +20616,7 @@ Elseif ($ArrTrigger) {
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                            $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                             $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -20581,7 +20736,6 @@ Elseif ($ArrTrigger) {
                             if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                 # Define Global Variables
                                 $SkippingText = 'false'
-                                $SkipAddOverlay = 'false'
                                 $global:tmdbid = $entry.tmdbid
                                 $global:tvdbid = $entry.tvdbid
                                 $global:imdbid = $entry.imdbid
@@ -20801,19 +20955,31 @@ Elseif ($ArrTrigger) {
                                                     Default { $backgroundoverlay = $backgroundoverlay }
                                                 }
                                             }
+                                            # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                             if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                $SkipAddOverlay = 'true'
+                                                $AddBackgroundOverlay = 'false'
+                                            }
+
+                                            # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                            if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                $AddBackgroundBorder = 'false'
+                                            }
+
+                                            # Logic for "If both are true, only resize"
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                $AddBackgroundBorder = 'false'
+                                                $AddBackgroundOverlay = 'false'
                                             }
                                             # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                                 $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
@@ -21050,7 +21216,7 @@ Elseif ($ArrTrigger) {
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                            $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                             $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -21169,7 +21335,6 @@ Elseif ($ArrTrigger) {
                 Else {
                     # Define Global Variables
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:tmdbsearched = $null
                     $global:tmdbid = $entry.tmdbid
                     $global:tvdbid = $entry.tvdbid
@@ -21477,19 +21642,31 @@ Elseif ($ArrTrigger) {
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBorder = 'false'
+                                            $AddOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -21725,7 +21902,7 @@ Elseif ($ArrTrigger) {
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -21852,7 +22029,6 @@ Elseif ($ArrTrigger) {
                         if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -22076,19 +22252,31 @@ Elseif ($ArrTrigger) {
                                                 Default { $Backgroundoverlay = $Backgroundoverlay }
                                             }
                                         }
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddBackgroundOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBackgroundBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBackgroundBorder = 'false'
+                                            $AddBackgroundOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -22330,7 +22518,7 @@ Elseif ($ArrTrigger) {
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -22413,7 +22601,6 @@ Elseif ($ArrTrigger) {
                         $global:PlexSeasonUrls = $entry.PlexSeasonUrls -split ','
                         for ($i = 0; $i -lt $global:seasonNames.Count; $i++) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbsearched = $null
                             $global:seasontmp = $null
                             $global:posterurl = $null
@@ -22788,19 +22975,31 @@ Elseif ($ArrTrigger) {
                                             $CommentlogEntry | Out-File $magickLog -Append
                                             InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                             if (!$global:ImageMagickError -eq 'true') {
+                                                # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                 if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                    $SkipAddOverlay = 'true'
+                                                    $AddSeasonOverlay = 'false'
+                                                }
+
+                                                # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                    $AddSeasonBorder = 'false'
+                                                }
+
+                                                # Logic for "If both are true, only resize"
+                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                    $AddSeasonBorder = 'false'
+                                                    $AddSeasonOverlay = 'false'
                                                 }
                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                 }
-                                                elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                 }
-                                                elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                 }
@@ -23055,7 +23254,7 @@ Elseif ($ArrTrigger) {
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -23123,7 +23322,6 @@ Elseif ($ArrTrigger) {
                         # Loop through each episode
                         foreach ($episode in $Episodedata) {
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:AssetTextLang = $null
                             $global:TMDBAssetTextLang = $null
                             $global:FANARTAssetTextLang = $null
@@ -23163,7 +23361,6 @@ Elseif ($ArrTrigger) {
                                     $global:ImageMagickError = $null
                                     for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                         $SkippingText = 'false'
-                                        $SkipAddOverlay = 'false'
                                         $global:AssetTextLang = $null
                                         $global:TMDBAssetTextLang = $null
                                         $global:FANARTAssetTextLang = $null
@@ -23477,19 +23674,31 @@ Elseif ($ArrTrigger) {
                                                                             Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                         }
                                                                     }
+                                                                    # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                                     if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                        $SkipAddOverlay = 'true'
+                                                                        $AddTitleCardOverlay = 'false'
+                                                                    }
+
+                                                                    # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                                    if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                        $AddTitleCardBorder = 'false'
+                                                                    }
+
+                                                                    # Logic for "If both are true, only resize"
+                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                        $AddTitleCardBorder = 'false'
+                                                                        $AddTitleCardOverlay = 'false'
                                                                     }
                                                                     # Resize Image to 2000x3000 and apply Border and overlay
-                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                    if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                     }
-                                                                    elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                                    elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                                     }
-                                                                    elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                    elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                         $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                     }
@@ -23715,7 +23924,7 @@ Elseif ($ArrTrigger) {
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -23786,7 +23995,6 @@ Elseif ($ArrTrigger) {
                                 Else {
                                     for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                         $SkippingText = 'false'
-                                        $SkipAddOverlay = 'false'
                                         $global:AssetTextLang = $null
                                         $global:TMDBAssetTextLang = $null
                                         $global:FANARTAssetTextLang = $null
@@ -24120,19 +24328,31 @@ Elseif ($ArrTrigger) {
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
+                                                                # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                                 if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                    $SkipAddOverlay = 'true'
+                                                                    $AddTitleCardOverlay = 'false'
+                                                                }
+
+                                                                # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                                if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                }
+
+                                                                # Logic for "If both are true, only resize"
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                    $AddTitleCardOverlay = 'false'
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
@@ -24356,7 +24576,7 @@ Elseif ($ArrTrigger) {
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                            $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                             $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -26553,7 +26773,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -26768,19 +26987,31 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBorder = 'false'
+                                            $AddOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -26975,7 +27206,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -27101,7 +27332,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -27294,19 +27524,31 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddBackgroundOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBackgroundBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBackgroundBorder = 'false'
+                                            $AddBackgroundOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -27504,7 +27746,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -27627,7 +27869,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
             Else {
                 # Define Global Variables
                 $SkippingText = 'false'
-                $SkipAddOverlay = 'false'
                 $global:tmdbsearched = $null
                 $global:tmdbid = $entry.tmdbid
                 $global:tvdbid = $entry.tvdbid
@@ -27902,19 +28143,31 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             Default { $Posteroverlay = $Posteroverlay }
                                         }
                                     }
+                                    # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                     if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                        $SkipAddOverlay = 'true'
+                                        $AddOverlay = 'false'
+                                    }
+
+                                    # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                    if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                        $AddBorder = 'false'
+                                    }
+
+                                    # Logic for "If both are true, only resize"
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        $AddBorder = 'false'
+                                        $AddOverlay = 'false'
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
@@ -28110,7 +28363,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -28243,7 +28496,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                     if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -28440,19 +28692,31 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             Default { $backgroundoverlay = $backgroundoverlay }
                                         }
                                     }
+                                    # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                     if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                        $SkipAddOverlay = 'true'
+                                        $AddBackgroundOverlay = 'false'
+                                    }
+
+                                    # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                    if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                        $AddBackgroundBorder = 'false'
+                                    }
+
+                                    # Logic for "If both are true, only resize"
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        $AddBackgroundBorder = 'false'
+                                        $AddBackgroundOverlay = 'false'
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
@@ -28648,7 +28912,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -28721,7 +28985,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                     # Loop through each Season
                     foreach ($season in $Episodedata) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbsearched = $null
                         $global:seasontmp = $null
                         $global:IsFallback = $null
@@ -29104,19 +29367,31 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $CommentlogEntry | Out-File $magickLog -Append
                                             InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                             if (!$global:ImageMagickError -eq 'True') {
+                                                # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                 if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                    $SkipAddOverlay = 'true'
+                                                    $AddSeasonOverlay = 'false'
+                                                }
+
+                                                # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                    $AddSeasonBorder = 'false'
+                                                }
+
+                                                # Logic for "If both are true, only resize"
+                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                    $AddSeasonBorder = 'false'
+                                                    $AddSeasonOverlay = 'false'
                                                 }
                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                 }
-                                                elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                 }
-                                                elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
                                                     $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                 }
@@ -29273,7 +29548,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                            $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'True' } else { 'False' })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                             $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -29348,7 +29623,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                     # Loop through each episode
                     foreach ($episode in $Episodedata) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:AssetTextLang = $null
                         $global:TMDBAssetTextLang = $null
                         $global:FANARTAssetTextLang = $null
@@ -29387,7 +29661,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 $global:ImageMagickError = $null
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
@@ -29659,19 +29932,31 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
+                                                                # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                                 if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                    $SkipAddOverlay = 'true'
+                                                                    $AddTitleCardOverlay = 'false'
+                                                                }
+
+                                                                # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                                if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                }
+
+                                                                # Logic for "If both are true, only resize"
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                    $AddTitleCardOverlay = 'false'
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
@@ -29811,7 +30096,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'True' } Else { 'False' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -29888,7 +30173,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                             Else {
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
@@ -30181,19 +30465,31 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                 }
                                                             }
+                                                            # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                             if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                $SkipAddOverlay = 'true'
+                                                                $AddTitleCardOverlay = 'false'
+                                                            }
+
+                                                            # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                            if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                $AddTitleCardBorder = 'false'
+                                                            }
+
+                                                            # Logic for "If both are true, only resize"
+                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                $AddTitleCardBorder = 'false'
+                                                                $AddTitleCardOverlay = 'false'
                                                             }
                                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                             }
-                                                            elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                            elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                             }
-                                                            elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                            elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                             }
@@ -30332,7 +30628,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'True' } Else { 'False' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'True' } else { 'False' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -31232,7 +31528,6 @@ else {
                 }
                 Else {
                     $SkippingText = 'false'
-                    $SkipAddOverlay = 'false'
                     $global:posterurl = $null
                     $global:ImageMagickError = $null
                     $global:TMDBfallbackposterurl = $null
@@ -31319,7 +31614,6 @@ else {
                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -31564,19 +31858,31 @@ else {
                                                 Default { $Posteroverlay = $Posteroverlay }
                                             }
                                         }
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBorder = 'false'
+                                            $AddOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                             $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -31813,7 +32119,7 @@ else {
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $movietemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $movietemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -31992,7 +32298,6 @@ else {
                         if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                             # Define Global Variables
                             $SkippingText = 'false'
-                            $SkipAddOverlay = 'false'
                             $global:tmdbid = $entry.tmdbid
                             $global:tvdbid = $entry.tvdbid
                             $global:imdbid = $entry.imdbid
@@ -32218,19 +32523,31 @@ else {
                                                 Default { $backgroundoverlay = $backgroundoverlay }
                                             }
                                         }
+                                        # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                         if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                            $SkipAddOverlay = 'true'
+                                            $AddBackgroundOverlay = 'false'
+                                        }
+
+                                        # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                        if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                            $AddBackgroundBorder = 'false'
+                                        }
+
+                                        # Logic for "If both are true, only resize"
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            $AddBackgroundBorder = 'false'
+                                            $AddBackgroundOverlay = 'false'
                                         }
                                         # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                         }
-                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                        elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                             $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                             Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                         }
@@ -32469,7 +32786,7 @@ else {
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $moviebackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -32645,7 +32962,6 @@ else {
             Else {
                 # Define Global Variables
                 $SkippingText = 'false'
-                $SkipAddOverlay = 'false'
                 $global:tmdbsearched = $null
                 $global:tmdbid = $entry.tmdbid
                 $global:tvdbid = $entry.tvdbid
@@ -32963,19 +33279,31 @@ else {
                                             Default { $Posteroverlay = $Posteroverlay }
                                         }
                                     }
+                                    # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                     if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                        $SkipAddOverlay = 'true'
+                                        $AddOverlay = 'false'
+                                    }
+
+                                    # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                    if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                        $AddBorder = 'false'
+                                    }
+
+                                    # Logic for "If both are true, only resize"
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        $AddBorder = 'false'
+                                        $AddOverlay = 'false'
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    if ($AddBorder -eq 'true' -and $AddOverlay -eq 'true') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBorder -eq 'true' -and $AddOverlay -eq 'false') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$borderwidthsecond`"  -bordercolor `"$bordercolor`" -border `"$borderwidth`" `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBorder -eq 'false' -and $AddOverlay -eq 'true') {
                                         $Arguments = "`"$PosterImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Posteroverlay`" -gravity south -quality $global:outputQuality -composite `"$PosterImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
@@ -33213,7 +33541,7 @@ else {
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                    $showtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                     $showtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$PosterImage} Else {$global:posterurl})
@@ -33400,7 +33728,6 @@ else {
                     if (-not $directoryHashtable.ContainsKey("$hashtestpath")) {
                         # Define Global Variables
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $global:tmdbid = $entry.tmdbid
                         $global:tvdbid = $entry.tvdbid
                         $global:imdbid = $entry.imdbid
@@ -33632,19 +33959,31 @@ else {
                                             Default { $backgroundoverlay = $backgroundoverlay }
                                         }
                                     }
+                                    # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                     if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                        $SkipAddOverlay = 'true'
+                                        $AddBackgroundOverlay = 'false'
+                                    }
+
+                                    # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                    if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                        $AddBackgroundBorder = 'false'
+                                    }
+
+                                    # Logic for "If both are true, only resize"
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        $AddBackgroundBorder = 'false'
+                                        $AddBackgroundOverlay = 'false'
                                     }
                                     # Calculate the height to maintain the aspect ratio with a width of 1000 pixels
-                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    if ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'true') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBackgroundBorder -eq 'true' -and $AddBackgroundOverlay -eq 'false') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$Backgroundborderwidthsecond`"  -bordercolor `"$Backgroundbordercolor`" -border `"$Backgroundborderwidth`" `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                     }
-                                    elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                    elseif ($AddBackgroundBorder -eq 'false' -and $AddBackgroundOverlay -eq 'true') {
                                         $Arguments = "`"$backgroundImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$Backgroundoverlay`" -gravity south -quality $global:outputQuality -composite `"$backgroundImage`""
                                         Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                     }
@@ -33883,7 +34222,7 @@ else {
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                    $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                     $showbackgroundtemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$backgroundImage} Else {$global:posterurl})
@@ -34023,7 +34362,6 @@ else {
                     $global:PlexSeasonUrls = $entry.PlexSeasonUrls -split ','
                     for ($i = 0; $i -lt $global:seasonNames.Count; $i++) {
                         $SkippingText = 'false'
-                        $SkipAddOverlay = 'false'
                         $Seasonpostersearchtext = $null
                         $global:seasontmp = $null
                         $global:TextlessPoster = $null
@@ -34417,19 +34755,31 @@ else {
                                         $CommentlogEntry | Out-File $magickLog -Append
                                         InvokeMagickCommand -Command $magick -Arguments $CommentArguments
                                         if (!$global:ImageMagickError -eq 'true') {
+                                            # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                             if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                $SkipAddOverlay = 'true'
+                                                $AddSeasonOverlay = 'false'
+                                            }
+
+                                            # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                            if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                $AddSeasonBorder = 'false'
+                                            }
+
+                                            # Logic for "If both are true, only resize"
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                $AddSeasonBorder = 'false'
+                                                $AddSeasonOverlay = 'false'
                                             }
                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            if ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'true') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddSeasonBorder -eq 'true' -and $AddSeasonOverlay -eq 'false') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" -shave `"$Seasonborderwidthsecond`"  -bordercolor `"$Seasonbordercolor`" -border `"$Seasonborderwidth`" `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                             }
-                                            elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                            elseif ($AddSeasonBorder -eq 'false' -and $AddSeasonOverlay -eq 'true') {
                                                 $Arguments = "`"$SeasonImage`" -resize `"$PosterSize^`" -gravity center -extent `"$PosterSize`" `"$Seasonoverlay`" -gravity south -quality $global:outputQuality -composite `"$SeasonImage`""
                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                             }
@@ -34687,7 +35037,7 @@ else {
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                        $seasontemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback) { 'true' } else { 'false' })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                         $seasontemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$SeasonImage} Else {$global:posterurl})
@@ -34852,7 +35202,6 @@ else {
                                 $global:ImageMagickError = $null
                                 for ($i = 0; $i -lt $global:episode_numbers.Count; $i++) {
                                     $SkippingText = 'false'
-                                    $SkipAddOverlay = 'false'
                                     $global:AssetTextLang = $null
                                     $global:TMDBAssetTextLang = $null
                                     $global:FANARTAssetTextLang = $null
@@ -35170,19 +35519,31 @@ else {
                                                                         Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                     }
                                                                 }
+                                                                # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                                 if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                    $SkipAddOverlay = 'true'
+                                                                    $AddTitleCardOverlay = 'false'
+                                                                }
+
+                                                                # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                                if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                }
+
+                                                                # Logic for "If both are true, only resize"
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                    $AddTitleCardBorder = 'false'
+                                                                    $AddTitleCardOverlay = 'false'
                                                                 }
                                                                 # Resize Image to 2000x3000 and apply Border and overlay
-                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                                 }
-                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                                elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                     $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                     Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                                 }
@@ -35409,7 +35770,7 @@ else {
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})
@@ -35878,19 +36239,31 @@ else {
                                                                     Default { $TitleCardoverlay = $TitleCardoverlay }
                                                                 }
                                                             }
+                                                            # Logic for SkipAddTextAndOverlay (Skip Overlay, keep Border)
                                                             if (($SkipAddTextAndOverlay -eq 'true') -and $global:PosterWithText) {
-                                                                $SkipAddOverlay = 'true'
+                                                                $AddTitleCardOverlay = 'false'
+                                                            }
+
+                                                            # Logic for SkipAddTextAndBorder (Skip Border, keep Overlay)
+                                                            if (($SkipAddTextAndBorder -eq 'true') -and $global:PosterWithText) {
+                                                                $AddTitleCardBorder = 'false'
+                                                            }
+
+                                                            # Logic for "If both are true, only resize"
+                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                $AddTitleCardBorder = 'false'
+                                                                $AddTitleCardOverlay = 'false'
                                                             }
                                                             # Resize Image to 2000x3000 and apply Border and overlay
-                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                            if ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'true') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                             }
-                                                            elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false' -and $SkipAddOverlay -eq 'false') {
+                                                            elseif ($AddTitleCardBorder -eq 'true' -and $AddTitleCardOverlay -eq 'false') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" -shave `"$TitleCardborderwidthsecond`"  -bordercolor `"$TitleCardbordercolor`" -border `"$TitleCardborderwidth`" `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Borders" -Path $global:configLogging -Color White -log Info
                                                             }
-                                                            elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true' -and $SkipAddOverlay -eq 'false') {
+                                                            elseif ($AddTitleCardBorder -eq 'false' -and $AddTitleCardOverlay -eq 'true') {
                                                                 $Arguments = "`"$EpisodeImage`" -resize `"$BackgroundSize^`" -gravity center -extent `"$BackgroundSize`" `"$TitleCardoverlay`" -gravity south -quality $global:outputQuality -composite `"$EpisodeImage`""
                                                                 Write-Entry -Subtext "Resizing it | Adding Overlay" -Path $global:configLogging -Color White -log Info
                                                             }
@@ -36116,7 +36489,7 @@ else {
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Language" -Value $(if ($TakeLocal) {"false"} Else {if (!$global:AssetTextLang) { "Textless" }Else { $global:AssetTextLang }})
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Source" -Value  $(if ($global:LogoUrl) { $global:LogoUrl } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo Language" -Value $(if ($global:LogoLanguage) { $global:LogoLanguage } Else { "false" })
-                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if (ApplyTextInsteadOfLogo) { ApplyTextInsteadOfLogo } Else { "false" })
+                                                        $episodetemp | Add-Member -MemberType NoteProperty -Name "Logo TextFallback" -Value $(if ($ApplyTextInsteadOfLogo) { $ApplyTextInsteadOfLogo } Else { "false" })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Fallback" -Value $(if ($global:IsFallback -and $global:FallbackText) { $global:FallbackText } elseif ($global:IsFallback -and !$global:FallbackText) { 'true' } Else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "TextTruncated" -Value $(if ($global:IsTruncated) { 'true' } else { 'false' })
                                                         $episodetemp | Add-Member -MemberType NoteProperty -Name "Download Source" -Value $(if ($TakeLocal) {$EpisodeImage} Else {$global:posterurl})

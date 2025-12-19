@@ -45,7 +45,6 @@ const isDev = import.meta.env.DEV;
 
 const getLogFileForMode = (mode) => {
   const safeMode = (mode || "").toLowerCase();
-  
   const logMapping = {
     testing: "Testinglog.log",
     manual: "Manuallog.log",
@@ -156,7 +155,6 @@ function Dashboard() {
   const [draggedItem, setDraggedItem] = useState(null);
   const hasInitiallyLoaded = useRef(false);
 
-  // --- FETCH LOGIC ---
   const fetchDashboardData = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
@@ -244,7 +242,6 @@ function Dashboard() {
     } catch(e){}
   }
 
-  // --- WEBSOCKET LOGIC ---
   const connectDashboardWebSocket = () => {
     if (wsRef.current) return;
     try {
@@ -281,7 +278,6 @@ function Dashboard() {
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null; setWsConnected(false); }
   };
 
-  // --- EFFECTS ---
   useEffect(() => {
     startLoading("dashboard");
     fetchDashboardData(false);
@@ -324,7 +320,6 @@ function Dashboard() {
     });
   }, [allLogs, autoScroll]);
 
-   // Handle manual scroll detection to disable autoscroll
   useEffect(() => {
     const logContainer = logContainerRef.current;
     if (!logContainer) return;
@@ -334,13 +329,10 @@ function Dashboard() {
       const currentScrollTop = scrollTop;
       const isAtBottom = scrollHeight - scrollTop - clientHeight < 20;
 
-      // Detect upward scroll (user scrolling up manually)
       if (currentScrollTop < lastScrollTop.current - 5) {
         userHasScrolled.current = true;
         if (autoScroll) setAutoScroll(false);
       }
-
-      // If user scrolls to bottom manually, enable autoScroll again
       if (isAtBottom && !autoScroll) {
         setAutoScroll(true);
         userHasScrolled.current = false;
@@ -363,7 +355,6 @@ function Dashboard() {
     } catch (error) { showError(error.message); } finally { setLoading(false); }
   };
 
-  // --- UTILS ---
   const saveVisibilitySettings = (settings) => {
     setVisibleCards(settings);
     localStorage.setItem("dashboard_visible_cards", JSON.stringify(settings));
@@ -408,7 +399,6 @@ function Dashboard() {
     return { raw: cleanedLine };
   };
 
-  // Restored helper from Old Dashboard
   const LogLevel = ({ level }) => {
     const levelLower = (level || "").toLowerCase().trim();
     const colors = {
@@ -438,14 +428,13 @@ function Dashboard() {
     return colors[levelLower] || colors.default;
   };
 
-  // --- UNIFIED CONTROL DECK COMPONENT ---
   const UnifiedControlDeck = () => {
     if (!visibleCards.statusCards) return null;
 
     return (
       <div className="bg-theme-card rounded-3xl border border-theme shadow-lg overflow-hidden flex flex-col md:flex-row md:divide-x divide-theme">
 
-        {/* SECTION 1: SCRIPT ENGINE (The Core) */}
+        {/* SECTION 1: SCRIPT ENGINE */}
         <div className="flex-1 p-6 relative group hover:bg-theme-hover/20 transition-colors">
           <div className="flex items-start justify-between mb-4">
              <div className="flex flex-col">
@@ -476,48 +465,114 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* SECTION 2: SCHEDULER (The Clock) */}
+        {/* SECTION 2: SCHEDULER */}
         <div className="flex-1 p-6 relative group hover:bg-theme-hover/20 transition-colors border-t md:border-t-0 border-theme">
-           <div className="flex items-start justify-between mb-4">
-              <div className="flex flex-col">
-                 <span className="text-[10px] font-bold uppercase tracking-widest text-theme-muted mb-1">{t("dashboard.controlDeck.scheduler")}</span>
-                 <span className={`text-xl font-bold tracking-tight ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`}>
-                    {schedulerStatus.enabled ? (schedulerStatus.running ? t("dashboard.controlDeck.active") : t("dashboard.controlDeck.standby")) : t("dashboard.controlDeck.disabled")}
-                 </span>
-              </div>
+          <div className="flex items-start justify-between mb-4">
+              {/* Clickable Header for Redirection */}
+              <Link to="/scheduler" className="flex flex-col group/link">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-theme-muted mb-1 group-hover/link:text-theme-primary transition-colors">
+                    {t("dashboard.controlDeck.scheduler")}
+                </span>
+                <div className="flex items-center gap-1">
+                    <span className={`text-xl font-bold tracking-tight ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`}>
+                        {schedulerStatus.enabled ? (schedulerStatus.running ? t("dashboard.controlDeck.active") : t("dashboard.controlDeck.standby")) : t("dashboard.controlDeck.disabled")}
+                    </span>
+                    <ExternalLink className="w-3 h-3 text-theme-muted opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                </div>
+              </Link>
               <div className={`p-2 rounded-xl ${schedulerStatus.enabled ? "bg-blue-500/10" : "bg-theme-hover"}`}>
-                 <CalendarClock className={`w-6 h-6 ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`} />
+                <CalendarClock className={`w-6 h-6 ${schedulerStatus.enabled ? "text-blue-400" : "text-theme-muted"}`} />
               </div>
-           </div>
+          </div>
 
-           <div className="mt-auto">
-              {schedulerStatus.enabled && schedulerStatus.next_run ? (
-                 <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-medium">
-                       <span className="text-theme-muted">{t("dashboard.controlDeck.nextRun")}</span>
-                       <span className="text-blue-300">{new Date(schedulerStatus.next_run).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+          <div className="mt-auto">
+              {schedulerStatus.enabled && schedulerStatus.schedules?.length > 0 ? (() => {
+                const now = new Date();
+                const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                const totalMinutesInDay = 24 * 60;
+                const progressPercent = (currentMinutes / totalMinutesInDay) * 100;
+
+                return (
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-xs font-medium">
+                          <span className="text-theme-muted">{t("dashboard.controlDeck.nextRun")}</span>
+                          <span className="text-blue-300 font-bold">
+                            {schedulerStatus.next_run ? new Date(schedulerStatus.next_run).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}
+                          </span>
+                      </div>
+
+                      {/* Timeline Container */}
+                      <div className="relative h-3 w-full bg-theme-hover rounded-full flex items-center">
+                          {/* Background Progress (Current Time) */}
+                          <div
+                            className="absolute h-full bg-blue-500/20 rounded-full transition-all duration-1000"
+                            style={{ width: `${progressPercent}%` }}
+                          />
+
+                          {/* Current Time Indicator Line */}
+                          <div
+                            className="absolute h-4 w-0.5 bg-blue-400 z-10 shadow-[0_0_8px_rgba(96,165,250,0.8)]"
+                            style={{ left: `${progressPercent}%` }}
+                          />
+
+                          {/* Schedule Ticks */}
+                          {schedulerStatus.schedules.map((s, idx) => {
+                            const [hours, minutes] = s.time.split(':').map(Number);
+                            const scheduleMinutes = hours * 60 + minutes;
+                            const position = (scheduleMinutes / totalMinutesInDay) * 100;
+                            const isPast = scheduleMinutes < currentMinutes;
+
+                            return (
+                              <div
+                                key={idx}
+                                className={`group/tick absolute w-2 h-2 rounded-full border-2 transform -translate-x-1/2 z-20 transition-all cursor-pointer ${
+                                  isPast
+                                    ? "bg-blue-500 border-blue-400 shadow-[0_0_5px_rgba(59,130,246,0.3)]"
+                                    : "bg-theme-card border-theme-muted hover:border-blue-400"
+                                }`}
+                                style={{ left: `${position}%` }}
+                              >
+                                {/* Custom Hover Tooltip - Removed the help cursor logic */}
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 px-2.5 py-1.5 bg-gray-900 text-white text-[10px] rounded-lg pointer-events-none opacity-0 group-hover/tick:opacity-100 transition-all duration-200 whitespace-nowrap z-30 border border-theme shadow-2xl scale-95 group-hover/tick:scale-100">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${isPast ? 'bg-blue-400' : 'bg-gray-500'}`}></div>
+                                        <span className="font-bold text-blue-400">{s.time}</span>
+                                    </div>
+                                    <div className="text-gray-300 text-[9px]">{s.description}</div>
+                                    <div className="text-[7px] text-gray-500 mt-1 uppercase tracking-tighter font-bold">
+                                        {isPast ? t("dashboard.controlDeck.completed") || 'Completed' : t("dashboard.controlDeck.upcoming") || 'Upcoming'}
+                                    </div>
+                                    {/* Small Arrow */}
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-900"></div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                      <div className="flex justify-between items-center mt-1">
+                          <span className="text-[9px] text-theme-muted font-mono opacity-50 uppercase">Start</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] text-theme-primary font-bold">{Math.round(progressPercent)}%</span>
+                            <span className="text-[8px] text-theme-muted uppercase tracking-tighter font-medium">{t("dashboard.controlDeck.ofDay") || 'of Day'}</span>
+                          </div>
+                          <span className="text-[9px] text-theme-muted font-mono opacity-50 uppercase">End</span>
+                      </div>
                     </div>
-                    {/* Visual Timeline Bar */}
-                    <div className="h-1.5 w-full bg-theme-hover rounded-full overflow-hidden flex">
-                       <div className="h-full bg-blue-500/50 w-[70%] rounded-full"></div>
-                       <div className="h-full bg-transparent w-[30%] border-l border-theme/50"></div>
-                    </div>
-                 </div>
-              ) : (
-                 <div className="flex items-center gap-2 text-xs text-theme-muted h-full opacity-60">
+                );
+              })() : (
+                <div className="flex items-center gap-2 text-xs text-theme-muted h-full opacity-60">
                     <AlertCircle className="w-3 h-3" /> {t("dashboard.controlDeck.noSchedules")}
-                 </div>
+                </div>
               )}
-           </div>
+          </div>
         </div>
 
-        {/* SECTION 3: SYSTEM (The Hardware - FULL DETAILS RESTORED) */}
+        {/* SECTION 3: SYSTEM */}
         <div className="flex-[1.8] p-6 relative group hover:bg-theme-hover/20 transition-colors border-t md:border-t-0 border-theme">
            <div className="flex items-start justify-between mb-3">
               <div className="flex flex-col gap-1">
                  <span className="text-[10px] font-bold uppercase tracking-widest text-theme-muted">{t("dashboard.controlDeck.systemInfo")}</span>
-
-                 {/* OS Platform & Version */}
                  <div>
                     <div className="flex items-center gap-2">
                         <span className="text-base font-bold text-theme-text">{systemInfo.platform}</span>
@@ -534,9 +589,7 @@ function Dashboard() {
               </div>
               <Server className="w-6 h-6 text-purple-400 opacity-60" />
            </div>
-
            <div className="space-y-3 mt-4">
-              {/* CPU Info */}
               <div className="flex flex-col gap-0.5">
                   <div className="flex items-center justify-between text-[10px] text-theme-muted uppercase tracking-wider font-semibold">
                       <span>{t("dashboard.controlDeck.cpu")}</span>
@@ -547,8 +600,6 @@ function Dashboard() {
                       <span className="truncate" title={systemInfo.cpu_model}>{systemInfo.cpu_model || t("dashboard.controlDeck.genericCpu")}</span>
                   </div>
               </div>
-
-              {/* RAM Info - Full details */}
               <div className="pt-2 border-t border-theme/50">
                   <div className="flex justify-between items-end text-[10px] mb-1.5">
                       <div className="flex flex-col">
@@ -572,7 +623,7 @@ function Dashboard() {
            </div>
         </div>
 
-        {/* SECTION 4: CONFIG (The Brain) */}
+        {/* SECTION 4: CONFIG */}
         <div className="flex-1 p-6 relative group hover:bg-theme-hover/20 transition-colors border-t lg:border-t-0 border-theme">
            <div className="flex items-start justify-between mb-4">
               <div className="flex flex-col">
@@ -595,7 +646,6 @@ function Dashboard() {
                  <FileText className="w-6 h-6 text-theme-muted" />
               </div>
            </div>
-
            <div className="mt-auto space-y-3">
               {(version.local || version.remote) && (
                   <div className="flex items-center justify-between p-2 rounded bg-theme-hover/50 border border-theme">
@@ -623,21 +673,15 @@ function Dashboard() {
     );
   };
 
-
-  // --- RENDER MAIN LAYOUT ---
   const renderDashboardCards = () => {
     const cardComponents = {
       statusCards: <UnifiedControlDeck />,
-
       runtimeStats: visibleCards.runtimeStats && (
         <RuntimeStats key="runtimeStats" refreshTrigger={runtimeStatsRefreshTrigger} />
       ),
-
       recentAssets: visibleCards.recentAssets && (
         <RecentAssets key="recentAssets" refreshTrigger={runtimeStatsRefreshTrigger} />
       ),
-
-      // --- RESTORED OLD LOG VIEWER ---
       logViewer: visibleCards.logViewer && (
         <div
           key="logViewer"
@@ -652,7 +696,6 @@ function Dashboard() {
                   </div>
                   {t("dashboard.liveLogFeed")}
                 </h2>
-
                 {wsConnected && (
                   <span className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -661,7 +704,6 @@ function Dashboard() {
                   </span>
                 )}
               </div>
-
               {status.running && status.active_log && allLogs.length > 0 && (
                 <p
                   className="text-xs text-theme-muted mt-2"
@@ -689,12 +731,10 @@ function Dashboard() {
                     const newAutoScrollState = !autoScroll;
                     setAutoScroll(newAutoScrollState);
                     userHasScrolled.current = false;
-
                     if (newAutoScrollState && logContainerRef.current) {
                       setTimeout(() => {
                         if (logContainerRef.current) {
-                          logContainerRef.current.scrollTop =
-                            logContainerRef.current.scrollHeight;
+                          logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
                         }
                       }, 100);
                     }
@@ -702,11 +742,7 @@ function Dashboard() {
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                     autoScroll ? "bg-theme-primary" : "bg-theme-hover"
                   }`}
-                  title={
-                    autoScroll
-                      ? t("dashboard.autoScrollEnabled")
-                      : t("dashboard.autoScrollDisabled")
-                  }
+                  title={autoScroll ? t("dashboard.autoScrollEnabled") : t("dashboard.autoScrollDisabled")}
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -717,7 +753,6 @@ function Dashboard() {
               </label>
             </div>
           </div>
-
           <div className="bg-black rounded-lg overflow-hidden border-2 border-theme shadow-sm">
             {status.running && allLogs && allLogs.length > 0 ? (
               <div
@@ -726,11 +761,7 @@ function Dashboard() {
               >
                 {allLogs.map((line, index) => {
                   const parsed = parseLogLine(line);
-
-                  if (parsed.raw === null) {
-                    return null;
-                  }
-
+                  if (parsed.raw === null) return null;
                   if (parsed.raw) {
                     return (
                       <div
@@ -742,27 +773,15 @@ function Dashboard() {
                       </div>
                     );
                   }
-
                   const logColor = getLogColor(parsed.level);
-
                   return (
                     <div
                       key={`log-${index}`}
                       className="px-3 py-1.5 hover:bg-gray-900/50 transition-colors flex items-center gap-2 border-l-2 border-transparent hover:border-theme-primary/50"
                     >
-                      <span
-                        style={{ color: "#6b7280" }}
-                        className="text-[10px]"
-                      >
-                        [{parsed.timestamp}]
-                      </span>
+                      <span style={{ color: "#6b7280" }} className="text-[10px]">[{parsed.timestamp}]</span>
                       <LogLevel level={parsed.level} />
-                      <span
-                        style={{ color: "#4b5563" }}
-                        className="text-[10px]"
-                      >
-                        |L.{parsed.lineNum}|
-                      </span>
+                      <span style={{ color: "#4b5563" }} className="text-[10px]">|L.{parsed.lineNum}|</span>
                       <span style={{ color: logColor }}>{parsed.message}</span>
                     </div>
                   );
@@ -771,29 +790,20 @@ function Dashboard() {
             ) : (
               <div className="px-4 py-12 text-center">
                 <FileText className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm font-medium">
-                  {t("dashboard.noLogs")}
-                </p>
+                <p className="text-gray-500 text-sm font-medium">{t("dashboard.noLogs")}</p>
                 <p className="text-gray-600 text-xs mt-1">
-                  {status.running
-                    ? t("dashboard.waitingForLogs")
-                    : t("dashboard.startRunToSeeLogs")}
+                  {status.running ? t("dashboard.waitingForLogs") : t("dashboard.startRunToSeeLogs")}
                 </p>
               </div>
             )}
           </div>
-
           <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
             <span className="flex items-center gap-2">
               <Clock className="w-3 h-3" />
-              {t("dashboard.autoRefresh")}:{" "}
-              {wsConnected ? t("dashboard.live") : "1.5s"}
+              {t("dashboard.autoRefresh")}: {wsConnected ? t("dashboard.live") : "1.5s"}
             </span>
             <span className="text-gray-500">
-              {t("dashboard.lastEntries", { count: 25 })} •{" "}
-              {status.current_mode
-                ? getLogFileForMode(status.current_mode)
-                : status.active_log || t("dashboard.noActiveLog")}
+              {t("dashboard.lastEntries", { count: 25 })} • {status.current_mode ? getLogFileForMode(status.current_mode) : status.active_log || t("dashboard.noActiveLog")}
             </span>
           </div>
         </div>
@@ -802,18 +812,14 @@ function Dashboard() {
 
     return cardOrder.map((key) => {
         const component = cardComponents[key];
-
         if (key === "statusCards" && status.running) {
            return (
              <React.Fragment key={key}>
                 {component}
-                {/* Active Run Banner - Placed specifically after statusCards so it appears above the logs in standard order */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 p-6 flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
                    <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
                    <div className="flex items-center gap-4 relative z-10">
-                      <div className="p-3 bg-orange-500/20 rounded-xl animate-pulse">
-                         <Zap className="w-6 h-6 text-orange-400" />
-                      </div>
+                      <div className="p-3 bg-orange-500/20 rounded-xl animate-pulse"><Zap className="w-6 h-6 text-orange-400" /></div>
                       <div>
                          <h3 className="text-lg font-bold text-orange-100">{t("dashboard.banners.executionInProgress")}</h3>
                          <p className="text-orange-200/70 text-sm">{t("dashboard.banners.reviewLogs")}</p>
@@ -829,21 +835,16 @@ function Dashboard() {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Hero Section */}
       <div className="relative overflow-hidden rounded-3xl bg-theme-card border border-theme p-8 shadow-2xl">
          <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-theme-primary/5 rounded-full blur-3xl"></div>
          <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-64 h-64 bg-theme-primary/5 rounded-full blur-3xl"></div>
-
          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
              <div className="flex flex-col gap-2">
-                 <h1 className="text-3xl md:text-4xl font-black text-theme-primary tracking-tight">
-                    {t("dashboard.title")}
-                 </h1>
+                 <h1 className="text-3xl md:text-4xl font-black text-theme-primary tracking-tight">{t("dashboard.title")}</h1>
                  <p className="text-theme-muted font-medium text-sm md:text-base max-w-xl">
                     {t("dashboard.welcome")}. {t("dashboard.status")}: <span className={`font-bold ${status.running ? "text-green-400" : "text-theme-text"}`}>{status.running ? t("dashboard.controlDeck.active").toLowerCase() : t("dashboard.controlDeck.idle").toLowerCase()}</span>.
                  </p>
              </div>
-
              <div className="flex items-center gap-3 w-full md:w-auto">
                 {!status.running && (
                    <Link to="/run-modes" className="flex-1 md:flex-none group flex items-center justify-center gap-2 px-6 py-3 bg-theme-primary hover:bg-theme-primary/90 text-white rounded-xl font-bold shadow-lg shadow-theme-primary/20 transition-all hover:-translate-y-0.5 active:translate-y-0">
@@ -851,19 +852,12 @@ function Dashboard() {
                       <span>{t("dashboard.runScript")}</span>
                    </Link>
                 )}
-
-                <button
-                  onClick={() => setShowCardsModal(true)}
-                  className="px-4 py-3 bg-theme-hover border border-theme text-theme-text hover:text-theme-primary hover:border-theme-primary/30 rounded-xl transition-all"
-                  title={t("dashboard.customize")}
-                >
+                <button onClick={() => setShowCardsModal(true)} className="px-4 py-3 bg-theme-hover border border-theme text-theme-text hover:text-theme-primary hover:border-theme-primary/30 rounded-xl transition-all" title={t("dashboard.customize")}>
                    <Edit3 className="w-5 h-5" />
                 </button>
              </div>
          </div>
       </div>
-
-      {/* Already Running Alert */}
       {status.already_running_detected && (
         <div className="rounded-2xl bg-yellow-900/20 border border-yellow-500/30 p-5 flex items-start gap-4 backdrop-blur-sm animate-in fade-in slide-in-from-top-2">
            <AlertTriangle className="w-6 h-6 text-yellow-500 flex-shrink-0" />
@@ -876,15 +870,9 @@ function Dashboard() {
            </div>
         </div>
       )}
-
-      {/* Main Content Grid */}
       {renderDashboardCards()}
-
       <DangerZone status={status} loading={loading} onStatusUpdate={fetchStatus} onSuccess={showSuccess} onError={showError} />
-
       <ConfirmDialog isOpen={deleteConfirm} onClose={() => setDeleteConfirm(false)} onConfirm={deleteRunningFile} title={t("dashboard.deleteConfirmTitle")} message={t("dashboard.deleteConfirmMessage")} confirmText={t("common.delete")} type="warning" />
-
-      {/* Settings Modal */}
       {showCardsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-theme-card rounded-2xl border border-theme shadow-2xl max-w-md w-full overflow-hidden">
@@ -895,19 +883,10 @@ function Dashboard() {
             <div className="p-5 space-y-2">
                {cardOrder.map((key, idx) => (
                   <div key={key} draggable onDragStart={(e) => handleDragStart(e, idx)} onDragOver={(e) => handleDragOver(e, idx)} onDragEnd={handleDragEnd} className={`p-3 rounded-xl border border-theme bg-theme-card flex items-center justify-between hover:border-theme-primary/50 transition-all cursor-move ${draggedItem === idx ? "opacity-50" : ""}`}>
-                     <div className="flex items-center gap-3">
-                        <GripVertical className="w-5 h-5 text-theme-muted" />
-                        <span className="font-medium text-theme-text">{cardLabels[key]}</span>
-                     </div>
+                     <div className="flex items-center gap-3"><GripVertical className="w-5 h-5 text-theme-muted" /><span className="font-medium text-theme-text">{cardLabels[key]}</span></div>
                      <input type="checkbox" checked={visibleCards[key]} onChange={() => toggleCardVisibility(key)} className="w-5 h-5 accent-theme-primary rounded cursor-pointer" />
                   </div>
                ))}
-               <div className="pt-4 mt-4 border-t border-theme">
-                  <div className="flex items-center justify-between p-2">
-                     <span className="text-sm font-medium text-theme-text">{t("dashboard.hideScrollbars") || "Hide Scrollbars"}</span>
-                     <input type="checkbox" checked={hideScrollbars} onChange={toggleScrollbarVisibility} className="w-5 h-5 accent-theme-primary rounded cursor-pointer" />
-                  </div>
-               </div>
             </div>
             <div className="p-5 border-t border-theme bg-theme-hover/30 flex justify-end">
                <button onClick={() => setShowCardsModal(false)} className="px-5 py-2 bg-theme-primary text-white rounded-lg font-medium hover:bg-theme-primary/90 transition-colors">{t("common.done")}</button>
@@ -918,5 +897,4 @@ function Dashboard() {
     </div>
   );
 }
-
 export default Dashboard;
