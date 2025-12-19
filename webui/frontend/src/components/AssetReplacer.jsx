@@ -93,7 +93,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       // Find library name - usually the top-level folder like "4K" or "TV"
       for (let i = 0; i < pathSegments.length; i++) {
         // Common library folder names
-        if (pathSegments[i].match(/^(4K|TV|Movies|Series|anime)$/i)) {
+        if (pathSegments[i].match(/^(4K|TV|Movies|Series|Anime)$/i)) {
           libraryName = pathSegments[i];
           console.log(`Found library name: ${libraryName}`);
           break;
@@ -267,8 +267,9 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     const dbType = (dbData?.Type || "").toLowerCase();
     const libName = (libraryName || "").toLowerCase();
     let mediaType = "movie"; // Default
-
-    if (
+    if (dbType.includes("movie")) {
+      mediaType = "movie";
+    } else if (
       dbType.includes("show") ||
       backendAssetType.includes("show") ||
       backendAssetType.includes("season") ||
@@ -278,7 +279,8 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       libName.includes("tv") ||
       libName.includes("show") ||
       libName.includes("series") ||
-      libName.includes("serier")
+      libName.includes("serier") ||
+      libName.includes("anime")
     ) {
       mediaType = "tv";
     }
