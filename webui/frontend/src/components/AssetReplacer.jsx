@@ -266,11 +266,17 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     const backendAssetType = (asset.type || "").toLowerCase();
     const dbType = (dbData?.Type || "").toLowerCase();
     const libName = (libraryName || "").toLowerCase();
+
     let mediaType = "movie"; // Default
-    if (dbType.includes("movie")) {
+
+    // 1. Trust the database Type first if it exists
+    if (dbType === "movie") {
       mediaType = "movie";
-    } else if (
-      dbType.includes("show") ||
+    } else if (dbType === "show" || dbType === "series") {
+      mediaType = "tv";
+    }
+    // 2. If no DB type, fallback to path/folder/library heuristics
+    else if (
       backendAssetType.includes("show") ||
       backendAssetType.includes("season") ||
       backendAssetType.includes("episode") ||
@@ -279,8 +285,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       libName.includes("tv") ||
       libName.includes("show") ||
       libName.includes("series") ||
-      libName.includes("serier") ||
-      libName.includes("anime")
+      libName.includes("serier")
     ) {
       mediaType = "tv";
     }
