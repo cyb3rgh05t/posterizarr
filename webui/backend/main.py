@@ -922,9 +922,9 @@ def determine_media_type(filename: str, library_folder: str = None) -> str:
         # Guess from folder name if DB lookup failed
         if library_folder:
             folder_lower = library_folder.lower()
-            if any(k in folder_lower for k in ["show", "series", "tv", "serien", "anime"]):
+            if any(k in folder_lower for k in ["show", "series", "tv", "serien"]):
                 return "Show Background"
-            if any(k in folder_lower for k in ["movie", "film", "kino", "4k"]):
+            if any(k in folder_lower for k in ["movie", "film", "kino"]):
                 return "Movie Background"
 
         return "Background"
@@ -941,9 +941,9 @@ def determine_media_type(filename: str, library_folder: str = None) -> str:
         # Guess from folder name if DB lookup failed
         if library_folder:
             folder_lower = library_folder.lower()
-            if any(k in folder_lower for k in ["show", "series", "tv", "serien", "anime"]):
+            if any(k in folder_lower for k in ["show", "series", "tv", "serien"]):
                 return "Show"
-            if any(k in folder_lower for k in ["movie", "film", "kino", "4k"]):
+            if any(k in folder_lower for k in ["movie", "film", "kino"]):
                 return "Movie"
 
     # Default to Movie for unrecognized images
