@@ -263,31 +263,36 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     }
 
     // Determine mediaType
+    const dbType = (dbData?.Type || dbData?.library_type || "").toLowerCase();
     const backendAssetType = (asset.type || "").toLowerCase();
-    const dbType = (dbData?.Type || "").toLowerCase();
-    const libName = (libraryName || "").toLowerCase();
+    const libName = (library_name || "").toLowerCase();
 
-    let mediaType = "movie"; // Default
+    let mediaType = "movie"; // Default fallback
 
-    // 1. Trust the database Type first if it exists
-    if (dbType === "movie") {
+    // 1. STRICT DATABASE CHECK (Source of Trust)
+    if (dbType.includes("movie")) {
       mediaType = "movie";
-    } else if (dbType === "show" || dbType === "series") {
+      console.log("MediaType determined by DB: movie");
+    } else if (dbType.includes("show") || dbType.includes("series") || dbType.includes("tv")) {
       mediaType = "tv";
+      console.log("MediaType determined by DB: tv");
     }
-    // 2. If no DB type, fallback to path/folder/library heuristics
-    else if (
-      backendAssetType.includes("show") ||
-      backendAssetType.includes("season") ||
-      backendAssetType.includes("episode") ||
-      assetType === "season" ||
-      assetType === "titlecard" ||
-      libName.includes("tv") ||
-      libName.includes("show") ||
-      libName.includes("series") ||
-      libName.includes("serier")
-    ) {
-      mediaType = "tv";
+    // 2. HEURISTIC FALLBACK (Only if DB type is missing or unknown)
+    else {
+      if (
+        backendAssetType.includes("show") ||
+        backendAssetType.includes("season") ||
+        backendAssetType.includes("episode") ||
+        assetType === "season" ||
+        assetType === "titlecard" ||
+        libName.includes("tv") ||
+        libName.includes("show") ||
+        libName.includes("series") ||
+        libName.includes("serier")
+      ) {
+        mediaType = "tv";
+      }
+      console.log(`MediaType determined by Heuristics: ${mediaType}`);
     }
 
     console.log(`Backend asset.type: '${backendAssetType}'`);
