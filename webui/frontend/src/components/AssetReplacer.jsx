@@ -278,8 +278,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       libName.includes("tv") ||
       libName.includes("show") ||
       libName.includes("series") ||
-      libName.includes("serier") ||
-      libName.includes("anime")
+      libName.includes("serier")
     ) {
       mediaType = "tv";
     }
