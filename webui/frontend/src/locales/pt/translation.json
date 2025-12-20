@@ -314,33 +314,33 @@
   },
   "overlayAssets": {
     "tabs": {
-        "design": "Design",
-        "layers": "Camadas"
+      "design": "Design",
+      "layers": "Camadas"
     },
     "layers": {
-        "uploadTitle": "Carregar Camada",
-        "uploadDesc": "PNG, Logo, Adesivo",
-        "empty": "Nenhuma camada adicionada.",
-        "name": "Camada {{index}}",
-        "front": "FRENTE",
-        "behind": "TRÁS",
-        "dimmed": "Escurecido",
-        "bright": "Brilhante"
+      "uploadTitle": "Carregar Camada",
+      "uploadDesc": "PNG, Logo, Adesivo",
+      "empty": "Nenhuma camada adicionada.",
+      "name": "Camada {{index}}",
+      "front": "FRENTE",
+      "behind": "TRÁS",
+      "dimmed": "Escurecido",
+      "bright": "Brilhante"
     },
     "controls": {
-        "bringFront": "Trazer para frente",
-        "sendBack": "Enviar para trás",
-        "moveUp": "Mover para cima",
-        "moveDown": "Mover para baixo",
-        "delete": "Excluir",
-        "makeBright": "Clarear (100%)",
-        "makeDim": "Escurecer (50%)",
-        "adjustOpacity": "Ajustar Opacidade"
+      "bringFront": "Trazer para frente",
+      "sendBack": "Enviar para trás",
+      "moveUp": "Mover para cima",
+      "moveDown": "Mover para baixo",
+      "delete": "Excluir",
+      "makeBright": "Clarear (100%)",
+      "makeDim": "Escurecer (50%)",
+      "adjustOpacity": "Ajustar Opacidade"
     },
     "help": {
-        "title": "Controles",
-        "text": "• Arraste para mover, use a alça para redimensionar/girar",
-        "text2": "• Use os ícones para reordenar ou ajustar a opacidade."
+      "title": "Controles",
+      "text": "• Arraste para mover, use a alça para redimensionar/girar",
+      "text2": "• Use os ícones para reordenar ou ajustar a opacidade."
     },
     "showTextGuide": "Mostrar Guia de Área de Texto",
     "showTextGuideHint": "Exibe uma caixa vermelha baseada em 'MaxWidth', 'MaxHeight' e 'text_offset' de suas Configurações.",
@@ -596,12 +596,12 @@
       "systemControlDeck": "Painel de Controlo do Sistema"
     },
     "logViewerLabel": {
-        "reading": "A ler:",
-        "autoScrollOn": "Auto-Scroll Ligado",
-        "autoScrollOff": "Auto-Scroll Desligado",
-        "entries": "Entradas:",
-        "refreshesEvery": "Atualiza a cada",
-        "event": "Evento"
+      "reading": "A ler:",
+      "autoScrollOn": "Auto-Scroll Ligado",
+      "autoScrollOff": "Auto-Scroll Desligado",
+      "entries": "Entradas:",
+      "refreshesEvery": "Atualiza a cada",
+      "event": "Evento"
     },
     "title": "Painel",
     "welcome": "Monitore sua instância do Posterizarr",
@@ -625,7 +625,7 @@
     "noSchedulesRegistered": "Nenhum horário registrado",
     "run": "Iniciar",
     "stopSuccess": "Parando o script...",
-    "assets": "Ativos a Exibir",
+    "assets": "Assets para mostrar",
     "scriptFile": "Arquivo do script",
     "configFile": "Arquivo de configuração",
     "cores": "Núcleos",
@@ -813,7 +813,7 @@
     "currentOrder": "Ordem atual:"
   },
   "imageSizeSlider": {
-    "imageSize": "Tamanho da imagem"
+    "imageSize": "Assets para mostrar"
   },
   "galleryHub": {
     "viewMode": "Modo de visualização",
@@ -1045,7 +1045,7 @@
     "runMigration": "Executar migração",
     "importing": "Importando...",
     "importJson": "Importar JSON",
-	"loading": "Carregando...",
+    "loading": "Carregando...",
     "summary": "Resumo (Últimos {{days}} dias)",
     "days": "{{count}} dias",
     "totalRuns": "Execuções totais",
@@ -1454,7 +1454,7 @@
     "autoSaved": "{{count}} alteração(ões) salva(s) automaticamente",
     "savedSuccessfully": "Configuração salva com sucesso! ({{count}} alteração(ões))"
   },
-    "apiKeys": {
+  "apiKeys": {
     "title": "Chaves de API & Webhooks",
     "generateTitle": "Gerar Nova Chave",
     "namePlaceholder": "Nome da Chave (ex: Tautulli)",
