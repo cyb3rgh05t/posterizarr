@@ -609,12 +609,22 @@ function TitleCardGallery() {
 
             {/* Controls - wrap on small screens */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Compact Image Size Slider */}
-              <CompactImageSizeSlider
-                value={imageSize}
-                onChange={setImageSize}
-                storageKey="gallery-titlecard-size"
-              />
+              {/* Image Size Slider with count badge */}
+              <div className="flex flex-col items-center mr-2 relative group">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter">
+                    {t("imageSizeSlider.imageSize")}
+                  </span>
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-md bg-theme-primary text-white text-[10px] font-black shadow-sm shadow-theme-primary/20">
+                    {imageSize}
+                  </span>
+                </div>
+                <CompactImageSizeSlider
+                  value={imageSize}
+                  onChange={setImageSize}
+                  storageKey="gallery-titlecard-size"
+                />
+              </div>
               {/* Select Mode Toggle */}
               {activeFolder && images.length > 0 && (
                 <button

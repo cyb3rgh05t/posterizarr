@@ -719,12 +719,22 @@ function ManualAssets() {
             </h2>
             {/* Controls */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Compact Image Size Slider */}
-              <CompactImageSizeSlider
-                value={imageSize}
-                onChange={setImageSize}
-                storageKey="manual-assets-grid-size"
-              />
+              {/* Image Size Slider with count badge */}
+              <div className="flex flex-col items-center mr-2 relative group">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter">
+                    {t("imageSizeSlider.imageSize")}
+                  </span>
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-md bg-theme-primary text-white text-[10px] font-black shadow-sm shadow-theme-primary/20">
+                    {imageSize}
+                  </span>
+                </div>
+                <CompactImageSizeSlider
+                  value={imageSize}
+                  onChange={setImageSize}
+                  storageKey="manual-assets-grid-size"
+                />
+              </div>
               {/* Select Mode Toggle */}
               <button
                 onClick={() => {
@@ -1209,12 +1219,22 @@ function ManualAssets() {
 
               {/* Image Size Slider (only when showing assets) */}
               {currentPath.length === 2 && (
-                <CompactImageSizeSlider
-                  value={imageSize}
-                  onChange={setImageSize}
-                  min={2}
-                  max={20}
-                />
+                <div className="flex flex-col items-center mr-2 relative group">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter">
+                      {t("imageSizeSlider.imageSize")}
+                    </span>
+                    <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-md bg-theme-primary text-white text-[10px] font-black shadow-sm shadow-theme-primary/20">
+                      {imageSize}
+                    </span>
+                  </div>
+                  <CompactImageSizeSlider
+                    value={imageSize}
+                    onChange={setImageSize}
+                    min={2}
+                    max={20}
+                  />
+                </div>
               )}
 
               {/* Select Mode Controls */}

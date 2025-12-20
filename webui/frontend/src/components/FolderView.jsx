@@ -402,11 +402,21 @@ function FolderView() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <CompactImageSizeSlider
-              value={imageSize}
-              onChange={setImageSize}
-              storageKey="gallery-folder-size"
-            />
+            <div className="flex flex-col items-center mr-2 relative group">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter">
+                  {t("imageSizeSlider.imageSize")}
+                </span>
+                <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-md bg-theme-primary text-white text-[10px] font-black shadow-sm shadow-theme-primary/20">
+                  {imageSize}
+                </span>
+              </div>
+              <CompactImageSizeSlider
+                value={imageSize}
+                onChange={setImageSize}
+                storageKey="gallery-folder-size"
+              />
+            </div>
             {assetItems.length > 0 && (
               <button
                 onClick={toggleSelectMode}
