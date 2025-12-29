@@ -592,6 +592,14 @@ function TitleCardGallery() {
     currentPage * itemsPerPage
   );
 
+  // Helper to determine if dropdown should open upwards
+  const calculateDropdownPosition = (ref) => {
+    if (!ref.current) return false;
+    const rect = ref.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    // If less than 250px below, open upward
+    return spaceBelow < 250;
+  };
   return (
     <div className="space-y-6">
       <ScrollToButtons />
