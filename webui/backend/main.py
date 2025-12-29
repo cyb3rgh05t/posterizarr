@@ -11035,7 +11035,7 @@ async def upload_asset_replacement(
         is_replacement = full_asset_path.exists()
 
         # Delete old asset from alternate location if moving between folders
-        if asset_exists_in_alternate and not is_replacement:
+        if asset_exists_in_alternate:
             try:
                 logger.info(
                     f"Deleting old asset from alternate location: {alternate_asset_path}"
@@ -11573,7 +11573,7 @@ async def replace_asset_from_url(
         full_asset_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Delete old asset from alternate location if moving between folders
-        if asset_exists_in_alternate and not asset_exists_in_target:
+        if asset_exists_in_alternate:
             try:
                 logger.info(
                     f"Deleting old asset from alternate location: {alternate_asset_path}"
