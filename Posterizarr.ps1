@@ -53,7 +53,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.2.14"
+$CurrentScriptVersion = "2.2.15"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 $env:PSMODULE_ANALYSIS_CACHE_PATH = $null
@@ -4806,6 +4806,10 @@ function InvokeMagickCommand {
         [string]$Arguments
     )
 
+    if ([string]::IsNullOrWhiteSpace($Arguments)) {
+        Write-Entry -Subtext "Skipping: No arguments provided for magick command." -Path $global:configLogging -Color Cyan -log Debug
+        return
+    }
     function GetMagickErrorMessage {
         param (
             [string]$ErrorMessage
