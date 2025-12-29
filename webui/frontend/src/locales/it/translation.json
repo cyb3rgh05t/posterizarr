@@ -314,33 +314,33 @@
   },
   "overlayAssets": {
     "tabs": {
-        "design": "Design",
-        "layers": "Livelli"
+      "design": "Design",
+      "layers": "Livelli"
     },
     "layers": {
-        "uploadTitle": "Carica Livello",
-        "uploadDesc": "PNG, Logo, Adesivo",
-        "empty": "Nessun livello aggiunto.",
-        "name": "Livello {{index}}",
-        "front": "AVANTI",
-        "behind": "DIETRO",
-        "dimmed": "Oscurato",
-        "bright": "Chiaro"
+      "uploadTitle": "Carica Livello",
+      "uploadDesc": "PNG, Logo, Adesivo",
+      "empty": "Nessun livello aggiunto.",
+      "name": "Livello {{index}}",
+      "front": "AVANTI",
+      "behind": "DIETRO",
+      "dimmed": "Oscurato",
+      "bright": "Chiaro"
     },
     "controls": {
-        "bringFront": "Porta in primo piano",
-        "sendBack": "Manda dietro l'overlay",
-        "moveUp": "Sposta su",
-        "moveDown": "Sposta giù",
-        "delete": "Elimina",
-        "makeBright": "Rendi chiaro (100%)",
-        "makeDim": "Oscura (50%)",
-        "adjustOpacity": "Regola opacità"
+      "bringFront": "Porta in primo piano",
+      "sendBack": "Manda dietro l'overlay",
+      "moveUp": "Sposta su",
+      "moveDown": "Sposta giù",
+      "delete": "Elimina",
+      "makeBright": "Rendi chiaro (100%)",
+      "makeDim": "Oscura (50%)",
+      "adjustOpacity": "Regola opacità"
     },
     "help": {
-        "title": "Controlli",
-        "text": "• Trascina per muovere, usa la maniglia per ridimensionare/ruotare",
-        "text2": "• Usa le icone per riordinare o regolare l'opacità."
+      "title": "Controlli",
+      "text": "• Trascina per muovere, usa la maniglia per ridimensionare/ruotare",
+      "text2": "• Usa le icone per riordinare o regolare l'opacità."
     },
     "showTextGuide": "Mostra Guida Area Testo",
     "showTextGuideHint": "Mostra un riquadro rosso basato su 'MaxWidth', 'MaxHeight' e 'text_offset' dalle tue Impostazioni.",
@@ -596,12 +596,12 @@
       "systemControlDeck": "Pannello di Controllo Sistema"
     },
     "logViewerLabel": {
-        "reading": "Lettura:",
-        "autoScrollOn": "Auto-Scroll Attivo",
-        "autoScrollOff": "Auto-Scroll Spento",
-        "entries": "Voci:",
-        "refreshesEvery": "Aggiorna ogni",
-        "event": "Evento"
+      "reading": "Lettura:",
+      "autoScrollOn": "Auto-Scroll Attivo",
+      "autoScrollOff": "Auto-Scroll Spento",
+      "entries": "Voci:",
+      "refreshesEvery": "Aggiorna ogni",
+      "event": "Evento"
     },
     "title": "Pannello di controllo",
     "welcome": "Monitora la tua istanza Posterizarr",
@@ -625,7 +625,7 @@
     "noSchedulesRegistered": "Nessun orario registrato",
     "run": "Avvia",
     "stopSuccess": "Arresto dello script...",
-    "assets": "Asset da Visualizzare",
+    "assets": "Asset da mostrare",
     "scriptFile": "File script",
     "configFile": "File di configurazione",
     "cores": "Core",
@@ -813,7 +813,7 @@
     "currentOrder": "Ordine corrente:"
   },
   "imageSizeSlider": {
-    "imageSize": "Dimensione immagine"
+    "imageSize": "Asset da mostrare"
   },
   "galleryHub": {
     "viewMode": "Modalità di visualizzazione",
@@ -1045,7 +1045,7 @@
     "runMigration": "Esegui migrazione",
     "importing": "Importazione...",
     "importJson": "Importa JSON",
-	"loading": "Caricamento in corso...",
+    "loading": "Caricamento in corso...",
     "summary": "Riepilogo (ultimi {{days}} giorni)",
     "days": "{{count}} giorni",
     "totalRuns": "Esecuzioni totali",
@@ -1454,7 +1454,7 @@
     "autoSaved": "{{count}} modifica(he) salvata(e) automaticamente",
     "savedSuccessfully": "Configurazione salvata con successo! ({{count}} modifica(he))"
   },
-    "apiKeys": {
+  "apiKeys": {
     "title": "Chiavi API & Webhook",
     "generateTitle": "Genera Nuova Chiave",
     "namePlaceholder": "Nome Chiave (es. Tautulli)",

@@ -23,6 +23,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import AssetReplacer from "./AssetReplacer";
 import ScrollToButtons from "./ScrollToButtons";
 import ImagePreviewModal from "./ImagePreviewModal";
+import { buildResponsiveGridClass } from "../utils/gridClass";
 
 const API_URL = "/api";
 
@@ -220,7 +221,10 @@ function TitleCardGallery() {
 
   // Helper to encode path segments but keep slashes
   const safeEncodePath = (path) => {
-    return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    return path
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
   };
 
   // Dropdown state
@@ -229,28 +233,14 @@ function TitleCardGallery() {
   const [itemsPerPageDropdownUp, setItemsPerPageDropdownUp] = useState(false);
   const itemsPerPageDropdownRef = useRef(null);
 
-  // Image size state with localStorage (2-10 range, default 5)
+  // Image size state with localStorage (2-20 range, default 5)
   const [imageSize, setImageSize] = useState(() => {
     const saved = localStorage.getItem("gallery-titlecard-size");
-    return saved ? parseInt(saved) : 5;
+    const parsed = saved ? parseInt(saved) : 5;
+    return Math.min(Math.max(parsed, 2), 20);
   });
 
-  // Grid column classes based on size (2-10 columns)
-  // Mobile: 2 columns, Tablet (md): 3-4 columns depending on size, Desktop (lg): full size selection
-  const getGridClass = (size) => {
-    const classes = {
-      2: "grid-cols-2 md:grid-cols-2 lg:grid-cols-2",
-      3: "grid-cols-2 md:grid-cols-3 lg:grid-cols-3",
-      4: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-      5: "grid-cols-2 md:grid-cols-4 lg:grid-cols-5",
-      6: "grid-cols-2 md:grid-cols-4 lg:grid-cols-6",
-      7: "grid-cols-2 md:grid-cols-5 lg:grid-cols-7",
-      8: "grid-cols-2 md:grid-cols-5 lg:grid-cols-8",
-      9: "grid-cols-2 md:grid-cols-6 lg:grid-cols-9",
-      10: "grid-cols-2 md:grid-cols-6 lg:grid-cols-10",
-    };
-    return classes[size] || classes[5];
-  };
+  const getGridClass = (size) => buildResponsiveGridClass(size);
 
   const fetchFolders = async (showNotification = false) => {
     try {
@@ -304,7 +294,11 @@ function TitleCardGallery() {
     }
   };
 
-  const fetchFolderImages = async (folder, showNotification = false, keepScrollPosition = false) => {
+  const fetchFolderImages = async (
+    folder,
+    showNotification = false,
+    keepScrollPosition = false
+  ) => {
     if (!folder) return;
 
     if (!keepScrollPosition) {
@@ -598,6 +592,14 @@ function TitleCardGallery() {
     currentPage * itemsPerPage
   );
 
+  // Helper to determine if dropdown should open upwards
+  const calculateDropdownPosition = (ref) => {
+    if (!ref.current) return false;
+    const rect = ref.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    // If less than 250px below, open upward
+    return spaceBelow < 250;
+  };
   return (
     <div className="space-y-6">
       <ScrollToButtons />
@@ -615,12 +617,22 @@ function TitleCardGallery() {
 
             {/* Controls - wrap on small screens */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Compact Image Size Slider */}
-              <CompactImageSizeSlider
-                value={imageSize}
-                onChange={setImageSize}
-                storageKey="gallery-titlecard-size"
-              />
+              {/* Image Size Slider with count badge */}
+              <div className="flex flex-col items-center mr-2 relative group">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter">
+                    {t("imageSizeSlider.imageSize")}
+                  </span>
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-md bg-theme-primary text-white text-[10px] font-black shadow-sm shadow-theme-primary/20">
+                    {imageSize}
+                  </span>
+                </div>
+                <CompactImageSizeSlider
+                  value={imageSize}
+                  onChange={setImageSize}
+                  storageKey="gallery-titlecard-size"
+                />
+              </div>
               {/* Select Mode Toggle */}
               {activeFolder && images.length > 0 && (
                 <button
@@ -670,7 +682,9 @@ function TitleCardGallery() {
                 >
                   <ArrowUpDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-theme-primary" />
                   <span className="hidden sm:inline">
-                    {sortOrder.includes("date") ? t("common.date") : t("common.name")}
+                    {sortOrder.includes("date")
+                      ? t("common.date")
+                      : t("common.name")}
                   </span>
                 </button>
 
@@ -678,27 +692,55 @@ function TitleCardGallery() {
                   <div className="absolute z-50 right-0 top-full mt-2 w-48 bg-theme-card border border-theme-primary/50 rounded-lg shadow-xl overflow-hidden">
                     <div className="py-1">
                       <button
-                        onClick={() => { setSortOrder("name_asc"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_asc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("name_asc");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "name_asc"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.nameAsc")}
                       </button>
                       <button
-                        onClick={() => { setSortOrder("name_desc"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "name_desc" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("name_desc");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "name_desc"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.nameDesc")}
                       </button>
                       <div className="border-t border-theme-border my-1"></div>
                       <button
-                        onClick={() => { setSortOrder("date_newest"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_newest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("date_newest");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "date_newest"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.dateNewest")}
                       </button>
                       <button
-                        onClick={() => { setSortOrder("date_oldest"); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm ${sortOrder === "date_oldest" ? "bg-theme-primary/20 text-theme-primary" : "text-theme-text hover:bg-theme-hover"}`}
+                        onClick={() => {
+                          setSortOrder("date_oldest");
+                          setSortDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${
+                          sortOrder === "date_oldest"
+                            ? "bg-theme-primary/20 text-theme-primary"
+                            : "text-theme-text hover:bg-theme-hover"
+                        }`}
                       >
                         {t("common.sorting.dateOldest")}
                       </button>
@@ -1062,7 +1104,7 @@ function TitleCardGallery() {
           </div>
 
           {/* Pagination and Items Per Page Controls */}
-          {(filteredImages.length > 25) && (
+          {filteredImages.length > 25 && (
             <div className="mt-8 space-y-6">
               {/* Items per page selector */}
               <div className="flex justify-center">

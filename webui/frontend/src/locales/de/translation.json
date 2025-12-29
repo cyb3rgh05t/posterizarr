@@ -314,33 +314,33 @@
   },
   "overlayAssets": {
     "tabs": {
-        "design": "Design",
-        "layers": "Ebenen"
+      "design": "Design",
+      "layers": "Ebenen"
     },
     "layers": {
-        "uploadTitle": "Ebene hochladen",
-        "uploadDesc": "PNG, Logo, Sticker",
-        "empty": "Keine Ebenen hinzugefügt.",
-        "name": "Ebene {{index}}",
-        "front": "VORNE",
-        "behind": "HINTEN",
-        "dimmed": "Gedimmt",
-        "bright": "Hell"
+      "uploadTitle": "Ebene hochladen",
+      "uploadDesc": "PNG, Logo, Sticker",
+      "empty": "Keine Ebenen hinzugefügt.",
+      "name": "Ebene {{index}}",
+      "front": "VORNE",
+      "behind": "HINTEN",
+      "dimmed": "Gedimmt",
+      "bright": "Hell"
     },
     "controls": {
-        "bringFront": "In den Vordergrund",
-        "sendBack": "Hinter das Overlay",
-        "moveUp": "Nach oben",
-        "moveDown": "Nach unten",
-        "delete": "Löschen",
-        "makeBright": "Aufhellen (100%)",
-        "makeDim": "Abdunkeln (50%)",
-        "adjustOpacity": "Deckkraft anpassen"
+      "bringFront": "In den Vordergrund",
+      "sendBack": "Hinter das Overlay",
+      "moveUp": "Nach oben",
+      "moveDown": "Nach unten",
+      "delete": "Löschen",
+      "makeBright": "Aufhellen (100%)",
+      "makeDim": "Abdunkeln (50%)",
+      "adjustOpacity": "Deckkraft anpassen"
     },
     "help": {
-        "title": "Steuerung",
-        "text": "• Ziehen zum Bewegen, Griff zum Skalieren/Drehen",
-        "text2": "• Nutzen Sie die Icons zum Sortieren oder für die Deckkraft."
+      "title": "Steuerung",
+      "text": "• Ziehen zum Bewegen, Griff zum Skalieren/Drehen",
+      "text2": "• Nutzen Sie die Icons zum Sortieren oder für die Deckkraft."
     },
     "showTextGuide": "Textbereich-Hilfslinie anzeigen",
     "showTextGuideHint": "Zeigt eine rote Box basierend auf 'MaxWidth', 'MaxHeight' und 'text_offset' aus Ihren Einstellungen.",
@@ -596,12 +596,12 @@
       "systemControlDeck": "System-Kontrollfeld"
     },
     "logViewerLabel": {
-        "reading": "Lese:",
-        "autoScrollOn": "Auto-Scroll An",
-        "autoScrollOff": "Auto-Scroll Aus",
-        "entries": "Einträge:",
-        "refreshesEvery": "Aktualisiert alle",
-        "event": "Event"
+      "reading": "Lese:",
+      "autoScrollOn": "Auto-Scroll An",
+      "autoScrollOff": "Auto-Scroll Aus",
+      "entries": "Einträge:",
+      "refreshesEvery": "Aktualisiert alle",
+      "event": "Event"
     },
     "title": "Dashboard",
     "welcome": "Überwachen Sie Ihre Posterizarr-Instanz",
@@ -814,7 +814,7 @@
     "currentOrder": "Aktuelle Reihenfolge:"
   },
   "imageSizeSlider": {
-    "imageSize": "Bildgröße"
+    "imageSize": "Anzuzeigende Assets"
   },
   "galleryHub": {
     "viewMode": "Ansichtsmodus",
@@ -1046,7 +1046,7 @@
     "runMigration": "Migration ausführen",
     "importing": "Importiere...",
     "importJson": "JSON importieren",
-	"loading": "Wird geladen...",
+    "loading": "Wird geladen...",
     "summary": "Zusammenfassung (Letzte {{days}} Tage)",
     "days": "{{count}} Tage",
     "totalRuns": "Gesamtläufe",
@@ -1455,7 +1455,7 @@
     "autoSaved": "{{count}} Änderung(en) automatisch gespeichert",
     "savedSuccessfully": "Konfiguration erfolgreich gespeichert! ({{count}} Änderung(en))"
   },
-    "apiKeys": {
+  "apiKeys": {
     "title": "API-Schlüssel & Webhooks",
     "generateTitle": "Neuen Schlüssel generieren",
     "namePlaceholder": "Schlüsselname (z.B. Tautulli)",
