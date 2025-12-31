@@ -1,14 +1,33 @@
-<div id="PosterizarrConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+<div id="PosterizarrConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="scripts/pluginconfigurationpage">
     <div data-role="content">
         <div class="content-primary">
             <form id="PosterizarrConfigForm">
+                <div class="sectionTitle">Posterizarr Settings</div>
                 <div class="inputContainer">
                     <label class="inputLabel" for="AssetFolderPath">Root Asset Folder Path:</label>
-                    <input type="text" id="AssetFolderPath" name="AssetFolderPath" is="emby-input" />
+                    <input type="text" id="AssetFolderPath" name="AssetFolderPath" is="emby-input" required />
+                    <div class="fieldDescription">
+                        Enter the full path to your curated assets folder (e.g., /mnt/media/assets).
+                    </div>
                 </div>
-                <button is="emby-button" type="submit" class="raised button-submit block">Save</button>
+                <div class="flex align-items-center">
+                    <button is="emby-button" type="submit" class="raised button-submit block">
+                        <span>Save</span>
+                    </button>
+                </div>
             </form>
         </div>
     </div>
-    <script type="text/javascript" src="configPage.js"></script>
+    
+    <!-- We use a helper function to get the correct URL for the script from the plugin -->
+    <script type="text/javascript">
+        (function() {
+            const pluginId = "f62d8560-6123-4567-89ab-cdef12345678";
+            const scriptUrl = ApiClient.getUrl('Plugin/' + pluginId + '/Configuration/Scripts');
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = scriptUrl;
+            document.querySelector('#PosterizarrConfigPage').appendChild(script);
+        })();
+    </script>
 </div>
