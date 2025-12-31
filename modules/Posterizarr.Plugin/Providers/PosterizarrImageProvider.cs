@@ -28,61 +28,59 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
     }
 
     public string Name => "Posterizarr Local Middleware";
-    
-    // Runs before internet scrapers to prioritize local assets
     public int Order => -10; 
 
+    private void LogDebug(string message, params object[] args)
+    {
+        // Always log to Information so it's visible in the standard Jellyfin log 
+        // if EnableDebugMode is checked in your plugin config.
+        if (Plugin.Instance?.Configuration?.EnableDebugMode == true)
+        {
+            _logger.LogInformation("[Posterizarr DEBUG] " + message, args);
+        }
+    }
+
     public bool Supports(BaseItem item) => item is Movie || item is Series || item is Season || item is Episode;
-    
     public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
 
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
         var config = Plugin.Instance?.Configuration;
         
-        _logger.LogInformation("[Posterizarr] Checking assets for '{0}' (Type: {1})", item.Name, item.GetType().Name);
+        LogDebug("--- Starting Asset Search for: '{0}' ---", item.Name);
 
         if (config == null || string.IsNullOrEmpty(config.AssetFolderPath))
         {
-            _logger.LogWarning("[Posterizarr] Asset path is empty! Set it in the plugin configuration.");
+            _logger.LogWarning("[Posterizarr] Configuration is missing or AssetFolderPath is empty.");
             return Enumerable.Empty<RemoteImageInfo>();
         }
 
         var results = new List<RemoteImageInfo>();
 
-        // Lookup Primary and Backdrop images
         foreach (var type in new[] { ImageType.Primary, ImageType.Backdrop })
         {
             var path = FindFile(item, config, type);
             if (!string.IsNullOrEmpty(path))
             {
-                _logger.LogInformation("[Posterizarr] MATCH FOUND: {0} for {1} at {2}", type, item.Name, path);
-                results.Add(new RemoteImageInfo 
-                { 
-                    ProviderName = Name, 
-                    Url = path, 
-                    Type = type 
-                    // No checksum added here to allow Jellyfin to detect changes on disk
-                });
+                LogDebug("SUCCESS: Found {0} at {1}", type, path);
+                results.Add(new RemoteImageInfo { ProviderName = Name, Url = path, Type = type });
             }
         }
 
         if (results.Count == 0)
-            _logger.LogInformation("[Posterizarr] No assets found for '{0}'", item.Name);
+            LogDebug("FINISHED: No local assets found for '{0}'", item.Name);
 
         return results;
     }
 
     private string? FindFile(BaseItem item, Configuration.PluginConfiguration config, ImageType type)
     {
-        // 1. Resolve Library Name correctly (avoids /root issue)
-        // We find the ancestor that is a direct child of the hidden system root
+        // 1. Resolve Library Name
         var library = item.GetAncestorIds()
             .Select(id => _libraryManager.GetItemById(id))
             .FirstOrDefault(p => p != null && p.ParentId != Guid.Empty && _libraryManager.GetItemById(p.ParentId)?.ParentId == Guid.Empty)?
             .Name ?? "Unknown";
 
-        // Fallback for different Jellyfin versions
         if (library == "Unknown" || library == "root")
         {
             library = item.GetAncestorIds()
@@ -90,21 +88,22 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
                 .FirstOrDefault(p => p is CollectionFolder)?
                 .Name ?? "Unknown";
         }
+        
+        LogDebug("Resolved Library: {0}", library);
 
-        // 2. Resolve the exact Folder Name from the media disk
+        // 2. Resolve Exact Media Folder Name
         string subFolder = "";
         string fileNameBase = "";
 
         if (item is Movie || item is Series)
         {
-            // Gets the exact folder name on the drive (e.g., "Alien (1979) [imdb-tt0078748]")
             var directoryPath = item is Movie ? Path.GetDirectoryName(item.Path) : item.Path;
             subFolder = Path.GetFileName(directoryPath) ?? "";
             fileNameBase = type == ImageType.Primary ? "poster" : "background";
+            LogDebug("Detected Media Path: {0} | Extracted Folder Name: {1}", item.Path, subFolder);
         }
         else if (item is Season season)
         {
-            // Seasons look inside the parent Series folder
             subFolder = Path.GetFileName(season.Series.Path) ?? "";
             fileNameBase = type == ImageType.Primary ? $"season{season.IndexNumber ?? 0:D2}" : "background";
         }
@@ -115,28 +114,42 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
             fileNameBase = $"S{e.ParentIndexNumber ?? 0:D2}E{e.IndexNumber ?? 0:D2}";
         }
 
-        if (string.IsNullOrEmpty(subFolder)) return null;
-
-        // 3. Construct the exact asset path
-        var actualFolder = Path.Combine(config.AssetFolderPath, library, subFolder);
-        
-        if (!Directory.Exists(actualFolder))
+        if (string.IsNullOrEmpty(subFolder))
         {
-            // Log as debug to avoid cluttering main logs if many items lack assets
-            _logger.LogDebug("[Posterizarr] Folder not found in assets: {0}", actualFolder);
+            LogDebug("FAILURE: Could not extract subfolder name for item {0}", item.Name);
             return null;
         }
 
-        // 4. Case-insensitive File Lookup within the folder
+        // 3. Path Construction
+        var libraryDir = Path.Combine(config.AssetFolderPath, library);
+        var actualFolder = Path.Combine(libraryDir, subFolder);
+
+        LogDebug("Constructed Target Path: {0}", actualFolder);
+
+        if (!Directory.Exists(libraryDir))
+        {
+            LogDebug("FAILURE: Root Library directory does not exist: {0}", libraryDir);
+            return null;
+        }
+
+        if (!Directory.Exists(actualFolder))
+        {
+            LogDebug("FAILURE: Item folder does not exist in assets: {0}", actualFolder);
+            return null;
+        }
+
+        // 4. File Content Check
         var filesInFolder = Directory.GetFiles(actualFolder);
+        LogDebug("Files found in folder ({0}): {1}", actualFolder, string.Join(", ", filesInFolder.Select(Path.GetFileName)));
+
         foreach (var ext in config.SupportedExtensions)
         {
             var targetFile = fileNameBase + ext;
+            LogDebug("Checking for file: {0}", targetFile);
+
             var match = filesInFolder.FirstOrDefault(f => Path.GetFileName(f).Equals(targetFile, StringComparison.OrdinalIgnoreCase));
-            
             if (match != null) return match;
 
-            // Backdrop fallback to 'fanart'
             if (type == ImageType.Backdrop)
             {
                 var fanartMatch = filesInFolder.FirstOrDefault(f => Path.GetFileName(f).Equals("fanart" + ext, StringComparison.OrdinalIgnoreCase));
@@ -144,12 +157,9 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
             }
         }
 
+        LogDebug("FAILURE: No matching file found for {0} with extensions {1}", fileNameBase, string.Join("|", config.SupportedExtensions));
         return null;
     }
 
-    public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken) 
-    {
-        // Not implemented for local file paths
-        throw new NotImplementedException();
-    }
+    public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken) => throw new NotImplementedException();
 }
