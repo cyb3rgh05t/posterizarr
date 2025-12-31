@@ -4,7 +4,14 @@ namespace Posterizarr.Plugin.Configuration;
 
 public class PluginConfiguration : BasePluginConfiguration
 {
-    public string AssetFolderPath { get; set; } = string.Empty;
-    // Common extensions to check
-    public string[] SupportedExtensions { get; set; } = { ".jpg", ".jpeg", ".png", ".webp", ".bmp" };
+    public string AssetFolderPath { get; set; }
+    public string[] SupportedExtensions { get; set; }
+    public bool EnableDebugMode { get; set; }
+
+    public PluginConfiguration()
+    {
+        AssetFolderPath = string.Empty;
+        SupportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp" };
+        EnableDebugMode = false;
+    }
 }

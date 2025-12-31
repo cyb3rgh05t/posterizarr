@@ -5,48 +5,48 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Providers;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Posterizarr.Plugin.Providers;
 
 public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 {
     private readonly ILibraryManager _libraryManager;
+    private readonly ILogger<PosterizarrImageProvider> _logger;
 
-    public PosterizarrImageProvider(ILibraryManager libraryManager)
+    public PosterizarrImageProvider(ILibraryManager libraryManager, ILogger<PosterizarrImageProvider> logger)
     {
         _libraryManager = libraryManager;
+        _logger = logger;
     }
 
     public string Name => "Posterizarr Local Middleware";
     public int Order => -10; 
 
+    private void LogDebug(string message, params object[] args)
+    {
+        if (Plugin.Instance?.Configuration?.EnableDebugMode == true)
+            _logger.LogInformation("[Posterizarr] " + message, args);
+    }
+
+    public bool Supports(BaseItem item) => item is Movie || item is Series || item is Season || item is Episode;
+    public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
+
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
         var config = Plugin.Instance?.Configuration;
-        if (config == null || string.IsNullOrEmpty(config.AssetFolderPath))
-            return Enumerable.Empty<RemoteImageInfo>();
+        if (config == null || string.IsNullOrEmpty(config.AssetFolderPath)) return Enumerable.Empty<RemoteImageInfo>();
 
         var results = new List<RemoteImageInfo>();
-
-        var primaryPath = FindFile(item, config, ImageType.Primary);
-        if (!string.IsNullOrEmpty(primaryPath))
+        foreach (var type in new[] { ImageType.Primary, ImageType.Backdrop })
         {
-            results.Add(new RemoteImageInfo { ProviderName = Name, Url = primaryPath, Type = ImageType.Primary });
+            var path = FindFile(item, config, type);
+            if (!string.IsNullOrEmpty(path))
+            {
+                results.Add(new RemoteImageInfo { ProviderName = Name, Url = path, Type = type });
+                LogDebug("Found {Type} for {Name}: {Path}", type, item.Name, path);
+            }
         }
-
-        var backdropPath = FindFile(item, config, ImageType.Backdrop);
-        if (!string.IsNullOrEmpty(backdropPath))
-        {
-            results.Add(new RemoteImageInfo { ProviderName = Name, Url = backdropPath, Type = ImageType.Backdrop });
-        }
-
         return results;
     }
 
@@ -60,31 +60,21 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
         string subFolder = "";
         string fileNameBase = "";
 
-        if (item is Movie m) 
-        { 
-            subFolder = m.Name; 
-            fileNameBase = type == ImageType.Primary ? "poster" : "background"; 
-        }
-        else if (item is Series s) 
-        { 
-            subFolder = s.Name; 
-            fileNameBase = type == ImageType.Primary ? "poster" : "background"; 
-        }
+        if (item is Movie m) { subFolder = m.Name; fileNameBase = type == ImageType.Primary ? "poster" : "background"; }
+        else if (item is Series s) { subFolder = s.Name; fileNameBase = type == ImageType.Primary ? "poster" : "background"; }
         else if (item is Season season)
         {
             subFolder = season.SeriesName;
-            // Matches your requirement: season01, season2012, or season00
             fileNameBase = type == ImageType.Primary ? $"season{season.IndexNumber ?? 0:D2}" : "background";
         }
         else if (item is Episode e)
         {
-            if (type != ImageType.Primary) return null; 
+            if (type != ImageType.Primary) return null;
             subFolder = e.SeriesName;
             fileNameBase = $"S{e.ParentIndexNumber ?? 0:D2}E{e.IndexNumber ?? 0:D2}";
         }
 
         if (string.IsNullOrEmpty(subFolder)) return null;
-
         var directory = Path.Combine(config.AssetFolderPath, library, subFolder);
         if (!Directory.Exists(directory)) return null;
 
@@ -92,18 +82,11 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
         {
             var fullPath = Path.Combine(directory, fileNameBase + ext);
             if (File.Exists(fullPath)) return fullPath;
-            
-            if (type == ImageType.Backdrop)
-            {
-                var fanartPath = Path.Combine(directory, "fanart" + ext);
-                if (File.Exists(fanartPath)) return fanartPath;
-            }
+            if (type == ImageType.Backdrop && File.Exists(Path.Combine(directory, "fanart" + ext))) 
+                return Path.Combine(directory, "fanart" + ext);
         }
         return null;
     }
-
-    public bool Supports(BaseItem item) => item is Movie || item is Series || item is Season || item is Episode;
-    public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
 
     public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken) => throw new NotImplementedException();
 }

@@ -10,14 +10,15 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
     public override string Name => "Posterizarr";
     public override Guid Id => Guid.Parse("f62d8560-6123-4567-89ab-cdef12345678");
+    public override string Description => "Maps local assets to library items as posters, backgrounds, or titlecards.";
+
+    public static Plugin? Instance { get; private set; }
 
     public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
     }
-
-    public static Plugin? Instance { get; private set; }
 
     public IEnumerable<PluginPageInfo> GetPages()
     {
@@ -26,8 +27,8 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             new PluginPageInfo
             {
                 Name = "Posterizarr",
-                // Corrected path to ensure JS/HTML loads and saves correctly
-                EmbeddedResourcePath = "Posterizarr.Plugin.Web.configPage.html"
+                // Assuming your folder structure is Web/configPage.html
+                EmbeddedResourcePath = string.Format("{0}.Web.configPage.html", GetType().Namespace)
             }
         };
     }
