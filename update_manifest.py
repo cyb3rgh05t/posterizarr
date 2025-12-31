@@ -16,8 +16,8 @@ def update_manifest():
     manifest_path = "manifest.json"
     plugin_name = "Posterizarr.Plugin"
     
+    # These variables are passed from the GitHub Action workflow
     event_name = os.getenv("GITHUB_EVENT_NAME")
-    ref_name = os.getenv("GITHUB_REF_NAME")
     repo = os.getenv("GITHUB_REPOSITORY")
     version_str = os.getenv("VERSION")
     
@@ -30,6 +30,7 @@ def update_manifest():
 
     checksum = get_md5(zip_path)
     
+    # Load existing manifest or create a new structure if it doesn't exist
     if os.path.exists(manifest_path):
         with open(manifest_path, "r") as f:
             manifest = json.load(f)
@@ -38,6 +39,7 @@ def update_manifest():
             "name": "Posterizarr",
             "guid": "f62d8560-6123-4567-89ab-cdef12345678",
             "description": "Middleware for asset lookup. Maps local assets to library items as posters, backgrounds, or titlecards.",
+            "overview": "A custom plugin for Posterizarr that acts as a local asset proxy for Jellyfin and Emby.",
             "owner": "Posterizarr",
             "category": "Metadata",
             "versions": []
@@ -46,11 +48,11 @@ def update_manifest():
     plugin = manifest[0]
 
     if event_name == "release":
-        # Production: Points to GitHub Releases
+        # Production builds: Point to the official GitHub Release ZIP
         source_url = f"https://github.com/{repo}/releases/download/v{version_str}/{zip_name}"
         changelog = f"Official Release {version_str}"
     else:
-        # Dev: Points to builds branch (naming matches release style)
+        # Dev builds: Point to the 'builds' branch raw content
         source_url = f"https://raw.githubusercontent.com/{repo}/builds/{zip_name}"
         changelog = f"Dev build: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
@@ -62,14 +64,19 @@ def update_manifest():
         "checksum": checksum
     }
 
-    # Maintain dev builds as 0.0.* and stable as fixed versions
-    if version_str.startswith("0.0."):
-        plugin["versions"] = [v for v in plugin["versions"] if not v["version"].startswith("0.0.")]
+    # If this is a Dev build (starts with 99.0), remove any previous 99.0 builds 
+    # from the list to keep the manifest clean and ensure the latest one is at the top.
+    if version_str.startswith("99.0."):
+        plugin["versions"] = [v for v in plugin["versions"] if not v["version"].startswith("99.0.")]
     
+    # Insert the newest version at the beginning of the list
     plugin["versions"].insert(0, new_version)
 
+    # Save the updated manifest back to disk
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
+    
+    print(f"Successfully updated manifest with version {version_str}")
 
 if __name__ == "__main__":
     update_manifest()

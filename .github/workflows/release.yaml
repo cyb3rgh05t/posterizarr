@@ -121,8 +121,8 @@ jobs:
           if [ "${{ github.event_name }}" == "release" ]; then
             V_STR=$(echo ${{ github.ref_name }} | sed 's/[vV]//')
           else
-            # For dev: 0.0.MonthDay.HourMinute format
-            V_STR="0.0.$(date +%m%d.%H%M)"
+            # Changed from 0.0 to 99.0 to ensure dev builds outrank stable versions
+            V_STR="99.0.$(date +%m%d.%H%M)"
           fi
           echo "VERSION=$V_STR" >> $GITHUB_OUTPUT
 
