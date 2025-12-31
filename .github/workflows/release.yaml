@@ -96,12 +96,12 @@ jobs:
     name: Build Jellyfin Plugin
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required to push to branches and upload to Releases
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Required to push changes back to the repo
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -114,52 +114,60 @@ jobs:
       - name: Build Plugin
         run: dotnet build modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj --configuration Release --no-restore
 
-      # Jellyfin requires a ZIP archive for the Installation Manager to function
-      - name: Zip Plugin
+      # Generate a numeric version string
+      - name: Set Version String
+        id: vars
         run: |
-          cd modules/Posterizarr.Plugin/bin/Release/net8.0
-          zip Posterizarr.Plugin.zip Posterizarr.Plugin.dll
+          if [ "${{ github.event_name }}" == "release" ]; then
+            V_STR=$(echo ${{ github.ref_name }} | sed 's/[vV]//')
+          else
+            # For dev: 0.0.MonthDay.HourMinute format
+            V_STR="0.0.$(date +%m%d.%H%M)"
+          fi
+          echo "VERSION=$V_STR" >> $GITHUB_OUTPUT
 
-      # Pushes the ZIP to the 'builds' branch so 'raw.githubusercontent' links work
-      - name: Push ZIP to builds branch
-        if: github.event_name == 'push' && github.ref_name == 'dev'
+      # Create the versioned ZIP package
+      - name: Prepare Package
+        run: |
+          mkdir -p release_package
+          cp modules/Posterizarr.Plugin/bin/Release/net8.0/Posterizarr.Plugin.dll release_package/
+          cd release_package
+          zip -r ../Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip *
+          cd ..
+          # Move ZIP back into folder for the push action to find it
+          mv Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip release_package/
+
+      # DEV TEST: Push versioned ZIP to builds branch
+      - name: Push to Builds Branch (Dev Only)
+        if: github.event_name != 'release'
         uses: s0/git-publish-subdir-action@develop
         env:
           REPO: self
           BRANCH: builds
-          FOLDER: modules/Posterizarr.Plugin/bin/Release/net8.0
+          FOLDER: release_package
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MESSAGE: "build: update dev zip for {sha}"
+          MESSAGE: "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
 
-      # Updates version, checksum (of the ZIP), and URLs in manifest.json
+      # Updates version, MD5 checksum, and URLs in manifest.json
       - name: Run Manifest Update Script
         run: python3 update_manifest.py
         env:
+          VERSION: ${{ steps.vars.outputs.VERSION }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
-      # Commits the manifest.json changes back to your source branch
       - name: Commit and Push Manifest Changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update manifest.json [skip ci]" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update manifest v${{ steps.vars.outputs.VERSION }} [skip ci]" && git push)
 
-      # Standard GitHub artifact for manual downloads in the Actions tab
-      - name: Upload Artifact for Testing
-        if: github.event_name != 'release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Posterizarr-Plugin-DevBuild
-          path: "modules/Posterizarr.Plugin/bin/Release/net8.0/Posterizarr.Plugin.zip"
-
-      # Attaches the ZIP to the official GitHub Release page
-      - name: Upload ZIP to GitHub Release
+      # PRODUCTION: Upload versioned ZIP to the official GitHub Release page
+      - name: Upload to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: "modules/Posterizarr.Plugin/bin/Release/net8.0/Posterizarr.Plugin.zip"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: release_package/Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
