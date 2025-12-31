@@ -40,14 +40,14 @@ def update_manifest():
     plugin = manifest[0]
     
     if event_name == "release":
-        # Production version from Tag
+        # Production version from Tag (ensure your tags are numeric like v1.0.0)
         version_str = ref_name.lstrip('vV')
         source_url = f"https://github.com/{repo}/releases/download/{ref_name}/Posterizarr.Plugin.dll"
         changelog = f"Official Release {ref_name}"
     else:
-        # Development version
-        version_str = "0.0.0.1-dev" 
-        # Points to the raw DLL file on the dev branch
+        # Development version - MUST BE PURELY NUMERIC
+        # Example: 0.0.0.1 or use a timestamp-like version
+        version_str = "0.0.0.1" 
         source_url = f"https://raw.githubusercontent.com/{repo}/builds/Posterizarr.Plugin.dll"
         changelog = "Development build from latest dev branch push."
 

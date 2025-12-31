@@ -8,7 +8,7 @@
     "category": "Metadata",
     "versions": [
       {
-        "version": "0.0.0.1-dev",
+        "version": "0.0.0.1",
         "changelog": "Development build from latest dev branch push.",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/fscorrupt/posterizarr/builds/Posterizarr.Plugin.dll",
