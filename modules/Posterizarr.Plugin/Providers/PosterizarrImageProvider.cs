@@ -1,7 +1,7 @@
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
-using MediaBrowser.Controller.Library; // Added for ILibraryManager if needed
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Providers;
@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,8 +17,18 @@ namespace Posterizarr.Plugin.Providers;
 
 public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 {
+    private readonly ILibraryManager _libraryManager;
+
+    // Dependency injection of the Library Manager to resolve root collections
+    public PosterizarrImageProvider(ILibraryManager libraryManager)
+    {
+        _libraryManager = libraryManager;
+    }
+
     public string Name => "Posterizarr Local Middleware";
-    public int Order => -10; // Highest priority to override internet providers
+    
+    // Ensures this provider runs before internet-based scrapers
+    public int Order => -10; 
 
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
@@ -27,18 +38,28 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 
         var results = new List<RemoteImageInfo>();
 
-        // Check for Primary (Poster / Titlecard)
+        // Lookup Primary Image (Poster or Title Card)
         var primaryPath = FindFile(item, config, ImageType.Primary);
         if (!string.IsNullOrEmpty(primaryPath))
         {
-            results.Add(new RemoteImageInfo { ProviderName = Name, Url = primaryPath, Type = ImageType.Primary });
+            results.Add(new RemoteImageInfo 
+            { 
+                ProviderName = Name, 
+                Url = primaryPath, 
+                Type = ImageType.Primary 
+            });
         }
 
-        // Check for Backdrop (Background)
+        // Lookup Backdrop Image (Background)
         var backdropPath = FindFile(item, config, ImageType.Backdrop);
         if (!string.IsNullOrEmpty(backdropPath))
         {
-            results.Add(new RemoteImageInfo { ProviderName = Name, Url = backdropPath, Type = ImageType.Backdrop });
+            results.Add(new RemoteImageInfo 
+            { 
+                ProviderName = Name, 
+                Url = backdropPath, 
+                Type = ImageType.Backdrop 
+            });
         }
 
         return results;
@@ -46,9 +67,9 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 
     private string? FindFile(BaseItem item, Configuration.PluginConfiguration config, ImageType type)
     {
-        // Robust Library Name Lookup: Find the top-level collection folder name
+        // Resolves the Library name by finding the top-level folder (Collection)
         var library = item.GetAncestorIds()
-            .Select(id => item.GetLibraryManager().GetItemById(id))
+            .Select(id => _libraryManager.GetItemById(id))
             .FirstOrDefault(p => p is Folder && p.ParentId == Guid.Empty)?
             .Name ?? "Unknown";
 
@@ -58,18 +79,21 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
         if (item is Movie m) 
         { 
             subFolder = m.Name; 
-            fileNameBase = (type == ImageType.Primary) ? "poster" : "background"; 
+            fileNameBase = type == ImageType.Primary ? "poster" : "background"; 
         }
         else if (item is Series s) 
         { 
             subFolder = s.Name; 
-            fileNameBase = (type == ImageType.Primary) ? "poster" : "background"; 
+            fileNameBase = type == ImageType.Primary ? "poster" : "background"; 
         }
         else if (item is Episode e)
         {
+            // Middleware only provides Primary (Title Card) for episodes
             if (type != ImageType.Primary) return null; 
+            
             subFolder = e.SeriesName;
-            fileNameBase = $"S{(e.ParentIndexNumber ?? 0):D2}E{(e.IndexNumber ?? 0):D2}";
+            // Cleaned parentheses for IDE0047
+            fileNameBase = $"S{e.ParentIndexNumber ?? 0:D2}E{e.IndexNumber ?? 0:D2}";
         }
 
         if (string.IsNullOrEmpty(subFolder)) return null;
@@ -77,13 +101,13 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
         var directory = Path.Combine(config.AssetFolderPath, library, subFolder);
         if (!Directory.Exists(directory)) return null;
 
-        // Iterative search for extensions without hardcoding
+        // Check each supported extension from the plugin configuration
         foreach (var ext in config.SupportedExtensions)
         {
             var fullPath = Path.Combine(directory, fileNameBase + ext);
             if (File.Exists(fullPath)) return fullPath;
             
-            // Fallback check for alternate backdrop naming
+            // Allow "fanart" as an alias for backdrops
             if (type == ImageType.Backdrop)
             {
                 var fanartPath = Path.Combine(directory, "fanart" + ext);
@@ -95,9 +119,12 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
     }
 
     public bool Supports(BaseItem item) => item is Movie || item is Series || item is Episode;
-    public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
     
-    // This is required for IRemoteImageProvider but not used for local file serving
-    public Task<HttpResponseInfo> GetImageResponse(string url, CancellationToken cancellationToken) 
-        => throw new NotImplementedException();
+    public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
+
+    public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken) 
+    {
+        // Not implemented because we return local file paths (Url) instead of remote URLs
+        throw new NotImplementedException();
+    }
 }
