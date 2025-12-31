@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import hashlib
+from datetime import datetime
 
 def get_sha256(file_path):
     """Calculates the SHA256 checksum of a file."""
@@ -50,15 +51,16 @@ def update_manifest():
         changelog = f"Official Release {ref_name}"
     else:
         # Development version - MUST BE PURELY NUMERIC to avoid FormatException
-        version_str = "0.0.0.1" 
+        timestamp = datetime.now().strftime("%m%d.%H%M")
+        version_str = f"0.0.{timestamp}"
         # Points to the ZIP file on the 'builds' branch
         source_url = f"https://raw.githubusercontent.com/{repo}/builds/Posterizarr.Plugin.zip"
         changelog = "Development build from latest dev branch push."
 
     new_version = {
         "version": version_str,
-        "changelog": changelog,
-        "targetAbi": "10.9.0.0", #
+        "changelog": f"Dev build: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "targetAbi": "10.9.0.0",
         "sourceUrl": source_url,
         "checksum": checksum
     }
