@@ -12,7 +12,7 @@
         "changelog": "Development build from latest dev branch push.",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/fscorrupt/posterizarr/builds/Posterizarr.Plugin.dll",
-        "checksum": "371bac0331ee94e39a8206ec69f855ac01c9d0f59361afcc710400ff754612b7"
+        "checksum": "6d6882ae117f620d82e0801140211fe92aebbbed920167be5b4dd726c4ed9aa3"
       },
       {
         "version": "1.0.0.0",
