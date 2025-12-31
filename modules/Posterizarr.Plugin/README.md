@@ -28,8 +28,12 @@ The Posterizarr Plugin acts as a local asset proxy for Jellyfin and Emby. It is 
 
 ## Configuration
 
-1.  Go to your **Dashboard** -> **Libraries**.
-2.  Manage a library (e.g., Movies).
-3.  Enable **Posterizarr** under the **Image Fetchers** settings.
-4.  Ensure it is prioritized according to your preferences.
-5.  Refresh metadata for your library to pick up local assets.
+1. After restarting, go to **Plugins** → **Installed Plugins** and click **Posterizarr**.
+1. Click on **"Settings"**
+1. Configure your Asset Root Path (the directory where your curated images are stored).
+1. Safe it
+1. Go to your **Dashboard** -> **Libraries**.
+1. Manage a library (e.g., Movies).
+1. Enable **Posterizarr** under the **Image Fetchers** settings.
+1. Ensure it is prioritized according to your preferences.
+1. Refresh metadata for your library to pick up local assets.
