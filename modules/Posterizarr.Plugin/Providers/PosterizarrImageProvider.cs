@@ -32,8 +32,6 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 
     private void LogDebug(string message, params object[] args)
     {
-        // Always log to Information so it's visible in the standard Jellyfin log 
-        // if EnableDebugMode is checked in your plugin config.
         if (Plugin.Instance?.Configuration?.EnableDebugMode == true)
         {
             _logger.LogInformation("[Posterizarr DEBUG] " + message, args);
@@ -46,17 +44,15 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
         var config = Plugin.Instance?.Configuration;
-        
         LogDebug("--- Starting Asset Search for: '{0}' ---", item.Name);
 
         if (config == null || string.IsNullOrEmpty(config.AssetFolderPath))
         {
-            _logger.LogWarning("[Posterizarr] Configuration is missing or AssetFolderPath is empty.");
+            _logger.LogWarning("[Posterizarr] Configuration missing or AssetFolderPath empty.");
             return Enumerable.Empty<RemoteImageInfo>();
         }
 
         var results = new List<RemoteImageInfo>();
-
         foreach (var type in new[] { ImageType.Primary, ImageType.Backdrop })
         {
             var path = FindFile(item, config, type);
@@ -66,32 +62,46 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
                 results.Add(new RemoteImageInfo { ProviderName = Name, Url = path, Type = type });
             }
         }
-
-        if (results.Count == 0)
-            LogDebug("FINISHED: No local assets found for '{0}'", item.Name);
-
         return results;
     }
 
     private string? FindFile(BaseItem item, Configuration.PluginConfiguration config, ImageType type)
     {
-        // 1. Resolve Library Name
-        var library = item.GetAncestorIds()
+        // 1. Resolve Library Name (the internal name Jellyfin uses)
+        var libraryName = item.GetAncestorIds()
             .Select(id => _libraryManager.GetItemById(id))
             .FirstOrDefault(p => p != null && p.ParentId != Guid.Empty && _libraryManager.GetItemById(p.ParentId)?.ParentId == Guid.Empty)?
             .Name ?? "Unknown";
 
-        if (library == "Unknown" || library == "root")
+        if (libraryName == "Unknown" || libraryName == "root")
         {
-            library = item.GetAncestorIds()
+            libraryName = item.GetAncestorIds()
                 .Select(id => _libraryManager.GetItemById(id))
                 .FirstOrDefault(p => p is CollectionFolder)?
                 .Name ?? "Unknown";
         }
         
-        LogDebug("Resolved Library: {0}", library);
+        LogDebug("Internal Library Name: {0}", libraryName);
 
-        // 2. Resolve Exact Media Folder Name
+        // 2. Resolve Library Folder in /assets (Fuzzy Match for spaces/case)
+        if (!Directory.Exists(config.AssetFolderPath))
+        {
+            LogDebug("FAILURE: Root Asset Folder does not exist: {0}", config.AssetFolderPath);
+            return null;
+        }
+
+        var libraryDir = Directory.GetDirectories(config.AssetFolderPath)
+            .FirstOrDefault(d => string.Equals(Path.GetFileName(d).Replace(" ", ""), libraryName.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
+
+        if (libraryDir == null)
+        {
+            LogDebug("FAILURE: Could not find a folder in {0} matching library '{1}'", config.AssetFolderPath, libraryName);
+            return null;
+        }
+        
+        LogDebug("Resolved Physical Library Path: {0}", libraryDir);
+
+        // 3. Resolve Media Folder Name
         string subFolder = "";
         string fileNameBase = "";
 
@@ -100,7 +110,6 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
             var directoryPath = item is Movie ? Path.GetDirectoryName(item.Path) : item.Path;
             subFolder = Path.GetFileName(directoryPath) ?? "";
             fileNameBase = type == ImageType.Primary ? "poster" : "background";
-            LogDebug("Detected Media Path: {0} | Extracted Folder Name: {1}", item.Path, subFolder);
         }
         else if (item is Season season)
         {
@@ -114,39 +123,20 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
             fileNameBase = $"S{e.ParentIndexNumber ?? 0:D2}E{e.IndexNumber ?? 0:D2}";
         }
 
-        if (string.IsNullOrEmpty(subFolder))
-        {
-            LogDebug("FAILURE: Could not extract subfolder name for item {0}", item.Name);
-            return null;
-        }
-
-        // 3. Path Construction
-        var libraryDir = Path.Combine(config.AssetFolderPath, library);
         var actualFolder = Path.Combine(libraryDir, subFolder);
-
-        LogDebug("Constructed Target Path: {0}", actualFolder);
-
-        if (!Directory.Exists(libraryDir))
-        {
-            LogDebug("FAILURE: Root Library directory does not exist: {0}", libraryDir);
-            return null;
-        }
+        LogDebug("Constructed Item Path: {0}", actualFolder);
 
         if (!Directory.Exists(actualFolder))
         {
-            LogDebug("FAILURE: Item folder does not exist in assets: {0}", actualFolder);
+            LogDebug("FAILURE: Item folder not found: {0}", actualFolder);
             return null;
         }
 
-        // 4. File Content Check
+        // 4. File Lookup
         var filesInFolder = Directory.GetFiles(actualFolder);
-        LogDebug("Files found in folder ({0}): {1}", actualFolder, string.Join(", ", filesInFolder.Select(Path.GetFileName)));
-
         foreach (var ext in config.SupportedExtensions)
         {
             var targetFile = fileNameBase + ext;
-            LogDebug("Checking for file: {0}", targetFile);
-
             var match = filesInFolder.FirstOrDefault(f => Path.GetFileName(f).Equals(targetFile, StringComparison.OrdinalIgnoreCase));
             if (match != null) return match;
 
@@ -157,7 +147,6 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
             }
         }
 
-        LogDebug("FAILURE: No matching file found for {0} with extensions {1}", fileNameBase, string.Join("|", config.SupportedExtensions));
         return null;
     }
 
