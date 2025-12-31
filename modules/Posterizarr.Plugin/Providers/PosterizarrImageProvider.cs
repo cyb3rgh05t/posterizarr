@@ -58,7 +58,7 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
             var path = FindFile(item, config, type);
             if (!string.IsNullOrEmpty(path))
             {
-                LogDebug("SUCCESS: Found {0} at {1}", type, path);
+                // We return the local absolute path as the URL
                 results.Add(new RemoteImageInfo { ProviderName = Name, Url = path, Type = type });
             }
         }
@@ -67,7 +67,6 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 
     private string? FindFile(BaseItem item, Configuration.PluginConfiguration config, ImageType type)
     {
-        // 1. Resolve Library Name (the internal name Jellyfin uses)
         var libraryName = item.GetAncestorIds()
             .Select(id => _libraryManager.GetItemById(id))
             .FirstOrDefault(p => p != null && p.ParentId != Guid.Empty && _libraryManager.GetItemById(p.ParentId)?.ParentId == Guid.Empty)?
@@ -80,28 +79,14 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
                 .FirstOrDefault(p => p is CollectionFolder)?
                 .Name ?? "Unknown";
         }
-        
-        LogDebug("Internal Library Name: {0}", libraryName);
 
-        // 2. Resolve Library Folder in /assets (Fuzzy Match for spaces/case)
-        if (!Directory.Exists(config.AssetFolderPath))
-        {
-            LogDebug("FAILURE: Root Asset Folder does not exist: {0}", config.AssetFolderPath);
-            return null;
-        }
+        if (!Directory.Exists(config.AssetFolderPath)) return null;
 
         var libraryDir = Directory.GetDirectories(config.AssetFolderPath)
             .FirstOrDefault(d => string.Equals(Path.GetFileName(d).Replace(" ", ""), libraryName.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
 
-        if (libraryDir == null)
-        {
-            LogDebug("FAILURE: Could not find a folder in {0} matching library '{1}'", config.AssetFolderPath, libraryName);
-            return null;
-        }
-        
-        LogDebug("Resolved Physical Library Path: {0}", libraryDir);
+        if (libraryDir == null) return null;
 
-        // 3. Resolve Media Folder Name
         string subFolder = "";
         string fileNameBase = "";
 
@@ -124,15 +109,8 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
         }
 
         var actualFolder = Path.Combine(libraryDir, subFolder);
-        LogDebug("Constructed Item Path: {0}", actualFolder);
+        if (!Directory.Exists(actualFolder)) return null;
 
-        if (!Directory.Exists(actualFolder))
-        {
-            LogDebug("FAILURE: Item folder not found: {0}", actualFolder);
-            return null;
-        }
-
-        // 4. File Lookup
         var filesInFolder = Directory.GetFiles(actualFolder);
         foreach (var ext in config.SupportedExtensions)
         {
@@ -150,5 +128,21 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
         return null;
     }
 
-    public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken) => throw new NotImplementedException();
+    // CRITICAL FIX: Implement this so Jellyfin can "download" the local file into its cache
+    public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
+    {
+        LogDebug("GetImageResponse called for local path: {0}", url);
+
+        if (File.Exists(url))
+        {
+            var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StreamContent(File.OpenRead(url))
+            };
+            return Task.FromResult(response);
+        }
+
+        _logger.LogError("[Posterizarr] GetImageResponse failed. File not found: {0}", url);
+        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+    }
 }
