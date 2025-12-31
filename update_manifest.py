@@ -54,7 +54,7 @@ def update_manifest():
         timestamp = datetime.now().strftime("%m%d.%H%M")
         version_str = f"0.0.{timestamp}"
         # Points to the ZIP file on the 'builds' branch
-        source_url = f"https://raw.githubusercontent.com/{repo}/builds/Posterizarr.Plugin.zip"
+        source_url = f"https://raw.githubusercontent.com/{repo}/builds/Posterizarr.Plugin.zip?v={timestamp}"
         changelog = "Development build from latest dev branch push."
 
     new_version = {
