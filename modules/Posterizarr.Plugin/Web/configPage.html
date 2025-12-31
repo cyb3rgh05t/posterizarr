@@ -4,15 +4,15 @@
             <form id="PosterizarrConfigForm">
                 <div class="verticalSection">
                     <div class="sectionTitleContainer">
-                        <h2 class="sectionTitle">Posterizarr Settings</h2>
-                        <p class="sectionDescription">Map your local asset folder to Jellyfin metadata.</p>
+                        <h2 class="sectionTitle">Posterizarr Local Middleware</h2>
+                        <p class="sectionDescription">Map your local /assets folder to your libraries using fuzzy folder matching.</p>
                     </div>
                 </div>
 
                 <div class="inputContainer">
                     <label class="inputLabel" for="txtAssetPath">Root Asset Folder Path</label>
                     <input type="text" id="txtAssetPath" name="txtAssetPath" is="emby-input" required />
-                    <div class="fieldDescription">Example: /mnt/media/assets</div>
+                    <div class="fieldDescription">The path where your '4K Movies' and '4K TV Shows' folders live (e.g., /assets).</div>
                 </div>
 
                 <div class="inputContainer">
@@ -20,14 +20,9 @@
                         <input type="checkbox" id="chkDebugMode" name="chkDebugMode" is="emby-checkbox" />
                         <span>Enable Debug Mode</span>
                     </label>
-                    <div class="fieldDescription">Logs asset lookups to the Jellyfin console.</div>
                 </div>
 
-                <div>
-                    <button is="emby-button" type="submit" class="raised button-submit block">
-                        <span>Save</span>
-                    </button>
-                </div>
+                <button is="emby-button" type="submit" class="raised button-submit block">Save Settings</button>
             </form>
         </div>
     </div>
@@ -56,22 +51,21 @@
                 view.addEventListener('viewshow', function () { configLoaded = false; loadConfig(this); });
                 view.addEventListener('pageshow', function () { configLoaded = false; loadConfig(this); });
 
-                const form = view.querySelector('#PosterizarrConfigForm');
-                if (form) {
-                    form.addEventListener('submit', function (e) {
-                        e.preventDefault();
-                        Dashboard.showLoadingMsg();
-                        const assetPath = view.querySelector('#txtAssetPath').value;
-                        const debugMode = view.querySelector('#chkDebugMode').checked;
-
-                        ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                            config.AssetFolderPath = assetPath;
-                            config.EnableDebugMode = debugMode;
-                            ApiClient.updatePluginConfiguration(pluginId, config).then(Dashboard.processPluginConfigurationUpdateResult);
+                view.querySelector('#PosterizarrConfigForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    const form = this;
+                    
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.AssetFolderPath = view.querySelector('#txtAssetPath').value;
+                        config.EnableDebugMode = view.querySelector('#chkDebugMode').checked;
+                        
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function(result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
                         });
-                        return false;
                     });
-                }
+                    return false;
+                });
             }
 
             if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } 
