@@ -13,7 +13,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Web\configPage.html" />
-    <EmbeddedResource Include="Web\configPage.js" />
+    <EmbeddedResource Include="Web\*" />
   </ItemGroup>
 </Project>

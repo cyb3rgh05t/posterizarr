@@ -19,15 +19,12 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 {
     private readonly ILibraryManager _libraryManager;
 
-    // Dependency injection of the Library Manager to resolve root collections
     public PosterizarrImageProvider(ILibraryManager libraryManager)
     {
         _libraryManager = libraryManager;
     }
 
     public string Name => "Posterizarr Local Middleware";
-    
-    // Ensures this provider runs before internet-based scrapers
     public int Order => -10; 
 
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
@@ -38,28 +35,16 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 
         var results = new List<RemoteImageInfo>();
 
-        // Lookup Primary Image (Poster or Title Card)
         var primaryPath = FindFile(item, config, ImageType.Primary);
         if (!string.IsNullOrEmpty(primaryPath))
         {
-            results.Add(new RemoteImageInfo 
-            { 
-                ProviderName = Name, 
-                Url = primaryPath, 
-                Type = ImageType.Primary 
-            });
+            results.Add(new RemoteImageInfo { ProviderName = Name, Url = primaryPath, Type = ImageType.Primary });
         }
 
-        // Lookup Backdrop Image (Background)
         var backdropPath = FindFile(item, config, ImageType.Backdrop);
         if (!string.IsNullOrEmpty(backdropPath))
         {
-            results.Add(new RemoteImageInfo 
-            { 
-                ProviderName = Name, 
-                Url = backdropPath, 
-                Type = ImageType.Backdrop 
-            });
+            results.Add(new RemoteImageInfo { ProviderName = Name, Url = backdropPath, Type = ImageType.Backdrop });
         }
 
         return results;
@@ -67,7 +52,6 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 
     private string? FindFile(BaseItem item, Configuration.PluginConfiguration config, ImageType type)
     {
-        // Resolves the Library name by finding the top-level folder (Collection)
         var library = item.GetAncestorIds()
             .Select(id => _libraryManager.GetItemById(id))
             .FirstOrDefault(p => p is Folder && p.ParentId == Guid.Empty)?
@@ -86,13 +70,16 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
             subFolder = s.Name; 
             fileNameBase = type == ImageType.Primary ? "poster" : "background"; 
         }
+        else if (item is Season season)
+        {
+            subFolder = season.SeriesName;
+            // Matches your requirement: season01, season2012, or season00
+            fileNameBase = type == ImageType.Primary ? $"season{season.IndexNumber ?? 0:D2}" : "background";
+        }
         else if (item is Episode e)
         {
-            // Middleware only provides Primary (Title Card) for episodes
             if (type != ImageType.Primary) return null; 
-            
             subFolder = e.SeriesName;
-            // Cleaned parentheses for IDE0047
             fileNameBase = $"S{e.ParentIndexNumber ?? 0:D2}E{e.IndexNumber ?? 0:D2}";
         }
 
@@ -101,30 +88,22 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
         var directory = Path.Combine(config.AssetFolderPath, library, subFolder);
         if (!Directory.Exists(directory)) return null;
 
-        // Check each supported extension from the plugin configuration
         foreach (var ext in config.SupportedExtensions)
         {
             var fullPath = Path.Combine(directory, fileNameBase + ext);
             if (File.Exists(fullPath)) return fullPath;
             
-            // Allow "fanart" as an alias for backdrops
             if (type == ImageType.Backdrop)
             {
                 var fanartPath = Path.Combine(directory, "fanart" + ext);
                 if (File.Exists(fanartPath)) return fanartPath;
             }
         }
-
         return null;
     }
 
-    public bool Supports(BaseItem item) => item is Movie || item is Series || item is Episode;
-    
+    public bool Supports(BaseItem item) => item is Movie || item is Series || item is Season || item is Episode;
     public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
 
-    public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken) 
-    {
-        // Not implemented because we return local file paths (Url) instead of remote URLs
-        throw new NotImplementedException();
-    }
+    public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken) => throw new NotImplementedException();
 }

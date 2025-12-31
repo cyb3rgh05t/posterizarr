@@ -26,7 +26,8 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             new PluginPageInfo
             {
                 Name = "Posterizarr",
-                EmbeddedResourcePath = GetType().Namespace + ".Web.configPage.html"
+                // Corrected path to ensure JS/HTML loads and saves correctly
+                EmbeddedResourcePath = "Posterizarr.Plugin.Web.configPage.html"
             }
         };
     }

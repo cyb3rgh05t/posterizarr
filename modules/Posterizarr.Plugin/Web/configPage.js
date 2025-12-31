@@ -3,17 +3,32 @@
 
     function loadConfig(page) {
         Dashboard.showLoadingMsg();
+        
+        console.log("[Posterizarr] Attempting to load configuration...");
+        
         ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-            page.querySelector('#AssetFolderPath').value = config.AssetFolderPath || '';
+            console.log("[Posterizarr] Configuration received:", config);
+            
+            const pathInput = page.querySelector('#AssetFolderPath');
+            
+            if (config && config.AssetFolderPath !== undefined) {
+                pathInput.value = config.AssetFolderPath;
+                console.log("[Posterizarr] Field populated with:", config.AssetFolderPath);
+            } else {
+                console.warn("[Posterizarr] Configuration object is empty or AssetFolderPath is missing.");
+            }
+            
             Dashboard.hideLoadingMsg();
-        }).catch(function() {
+        }).catch(function (err) {
+            console.error("[Posterizarr] Error loading configuration:", err);
             Dashboard.hideLoadingMsg();
             Dashboard.alert({
-                message: "Failed to load configuration."
+                message: "Failed to load configuration. Check the browser console for details."
             });
         });
     }
 
+    // Ensure the script runs when the page is shown
     document.querySelector('#PosterizarrConfigPage').addEventListener('pageshow', function () {
         loadConfig(this);
     });
@@ -23,12 +38,19 @@
         Dashboard.showLoadingMsg();
 
         const form = this;
+        const newPath = form.querySelector('#AssetFolderPath').value;
+
         ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-            config.AssetFolderPath = form.querySelector('#AssetFolderPath').value;
+            // Update the existing config object
+            config.AssetFolderPath = newPath;
+            
+            console.log("[Posterizarr] Saving new configuration:", config);
 
             ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                console.log("[Posterizarr] Save result:", result);
                 Dashboard.processPluginConfigurationUpdateResult(result);
-            }).catch(function() {
+            }).catch(function (err) {
+                console.error("[Posterizarr] Error saving configuration:", err);
                 Dashboard.hideLoadingMsg();
                 Dashboard.alert({
                     message: "Failed to save configuration."
