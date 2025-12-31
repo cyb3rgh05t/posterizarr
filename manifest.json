@@ -8,6 +8,13 @@
         "category": "Metadata",
         "versions": [
             {
+                "version": "0.0.1231.0907",
+                "changelog": "Dev build: 2025-12-31 09:07",
+                "targetAbi": "10.9.0.0",
+                "sourceUrl": "https://raw.githubusercontent.com/fscorrupt/posterizarr/builds/Posterizarr.Plugin.zip?v=1231.0907",
+                "checksum": "5bbf02503c9c9d3351500ec836bc4a0f5b0517f554e783bba0efd66e35165864"
+            },
+            {
                 "version": "0.0.1231.0903",
                 "changelog": "Dev build: 2025-12-31 09:03",
                 "targetAbi": "10.9.0.0",
