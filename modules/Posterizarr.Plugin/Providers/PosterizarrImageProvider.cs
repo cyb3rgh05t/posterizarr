@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -44,11 +45,11 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
     public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
         var config = Plugin.Instance?.Configuration;
-        LogDebug("--- Starting Asset Search for: '{0}' ---", item.Name);
+        LogDebug(">>> Starting Search for: '{0}' (ID: {1})", item.Name, item.Id);
 
         if (config == null || string.IsNullOrEmpty(config.AssetFolderPath))
         {
-            _logger.LogWarning("[Posterizarr] Configuration missing or AssetFolderPath empty.");
+            _logger.LogWarning("[Posterizarr] ABORT: AssetFolderPath is empty.");
             return Enumerable.Empty<RemoteImageInfo>();
         }
 
@@ -58,7 +59,7 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
             var path = FindFile(item, config, type);
             if (!string.IsNullOrEmpty(path))
             {
-                // We return the local absolute path as the URL
+                LogDebug("FOUND {0}: {1}", type, path);
                 results.Add(new RemoteImageInfo { ProviderName = Name, Url = path, Type = type });
             }
         }
@@ -67,26 +68,31 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
 
     private string? FindFile(BaseItem item, Configuration.PluginConfiguration config, ImageType type)
     {
-        var libraryName = item.GetAncestorIds()
+        // 1. Library Mapping
+        var internalName = item.GetAncestorIds()
             .Select(id => _libraryManager.GetItemById(id))
             .FirstOrDefault(p => p != null && p.ParentId != Guid.Empty && _libraryManager.GetItemById(p.ParentId)?.ParentId == Guid.Empty)?
             .Name ?? "Unknown";
 
-        if (libraryName == "Unknown" || libraryName == "root")
+        if (internalName == "Unknown" || internalName == "root")
         {
-            libraryName = item.GetAncestorIds()
+            internalName = item.GetAncestorIds()
                 .Select(id => _libraryManager.GetItemById(id))
                 .FirstOrDefault(p => p is CollectionFolder)?
                 .Name ?? "Unknown";
         }
 
-        if (!Directory.Exists(config.AssetFolderPath)) return null;
-
+        // Fuzzy match for physical folder
         var libraryDir = Directory.GetDirectories(config.AssetFolderPath)
-            .FirstOrDefault(d => string.Equals(Path.GetFileName(d).Replace(" ", ""), libraryName.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(d => string.Equals(Path.GetFileName(d).Replace(" ", ""), internalName.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
 
-        if (libraryDir == null) return null;
+        if (libraryDir == null)
+        {
+            LogDebug("FAIL: No asset folder found matching library '{0}'", internalName);
+            return null;
+        }
 
+        // 2. Folder Extraction
         string subFolder = "";
         string fileNameBase = "";
 
@@ -109,18 +115,25 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
         }
 
         var actualFolder = Path.Combine(libraryDir, subFolder);
-        if (!Directory.Exists(actualFolder)) return null;
+        if (!Directory.Exists(actualFolder))
+        {
+            LogDebug("FAIL: Path not found: {0}", actualFolder);
+            return null;
+        }
 
+        // 3. Extension Hunt
         var filesInFolder = Directory.GetFiles(actualFolder);
         foreach (var ext in config.SupportedExtensions)
         {
-            var targetFile = fileNameBase + ext;
-            var match = filesInFolder.FirstOrDefault(f => Path.GetFileName(f).Equals(targetFile, StringComparison.OrdinalIgnoreCase));
+            var target = fileNameBase + ext;
+            var match = filesInFolder.FirstOrDefault(f => Path.GetFileName(f).Equals(target, StringComparison.OrdinalIgnoreCase));
+            
             if (match != null) return match;
 
             if (type == ImageType.Backdrop)
             {
-                var fanartMatch = filesInFolder.FirstOrDefault(f => Path.GetFileName(f).Equals("fanart" + ext, StringComparison.OrdinalIgnoreCase));
+                var fanart = "fanart" + ext;
+                var fanartMatch = filesInFolder.FirstOrDefault(f => Path.GetFileName(f).Equals(fanart, StringComparison.OrdinalIgnoreCase));
                 if (fanartMatch != null) return fanartMatch;
             }
         }
@@ -128,21 +141,34 @@ public class PosterizarrImageProvider : IRemoteImageProvider, IHasOrder
         return null;
     }
 
-    // CRITICAL FIX: Implement this so Jellyfin can "download" the local file into its cache
     public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
     {
-        LogDebug("GetImageResponse called for local path: {0}", url);
+        LogDebug("GetImageResponse serving: {0}", url);
 
-        if (File.Exists(url))
+        try
         {
-            var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            if (File.Exists(url))
             {
-                Content = new StreamContent(File.OpenRead(url))
-            };
-            return Task.FromResult(response);
-        }
+                var stream = File.OpenRead(url);
+                var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StreamContent(stream)
+                };
 
-        _logger.LogError("[Posterizarr] GetImageResponse failed. File not found: {0}", url);
-        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+                var ext = Path.GetExtension(url).ToLowerInvariant();
+                string mimeType = ext switch { ".png" => "image/png", ".webp" => "image/webp", ".bmp" => "image/bmp", _ => "image/jpeg" };
+                response.Content.Headers.ContentType = new MediaTypeHeaderValue(mimeType);
+                
+                return Task.FromResult(response);
+            }
+            
+            _logger.LogError("[Posterizarr] File disappeared during serving: {0}", url);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Posterizarr] CRITICAL: Permission denied or IO error reading: {0}", url);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
+        }
     }
 }
