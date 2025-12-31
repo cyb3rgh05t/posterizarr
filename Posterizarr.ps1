@@ -8845,7 +8845,7 @@ if ($Manual) {
                     $isLogo = $false
                 }
             }
-            if (($AddText -eq 'true' -or $AddSeasonText -eq 'true' -or $AddTitleCardEPTitleText -eq 'true' -or $AddTitleCardEPText -eq 'true' -or $AddCollectionText -eq 'true' -or $AddBackgroundText -eq 'true') -and -not [string]::IsNullOrWhiteSpace($joinedTitle)) {
+            if (($isLogo -or $AddText -eq 'true' -or $AddSeasonText -eq 'true' -or $AddTitleCardEPTitleText -eq 'true' -or $AddTitleCardEPText -eq 'true' -or $AddCollectionText -eq 'true' -or $AddBackgroundText -eq 'true') -and -not [string]::IsNullOrWhiteSpace($joinedTitle)) {
                 $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                 if ($AddShowTitletoSeason -eq 'true' -and $SeasonPoster) {
                     $ShowjoinedTitle = $ShowjoinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -9066,7 +9066,7 @@ if ($Manual) {
                     $logEntry | Out-File $magickLog -Append
                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                 }
-                Elseif ($AddText -eq 'true') {
+                Elseif ($AddText -eq 'true' -or $isLogo) {
                     if ($isLogo){
                         $Arguments = "`"$PosterImage`" `( `"$LogoSource`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                         Write-Entry -Subtext "    Applying logo..." -Path $global:configLogging -Color White -log Info
