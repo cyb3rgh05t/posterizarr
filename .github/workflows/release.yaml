@@ -92,3 +92,39 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+  build-plugin:
+    name: Build Jellyfin Plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to upload to Releases
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj
+
+      - name: Build Plugin
+        run: dotnet build modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj --configuration Release --no-restore
+
+      # TEST LOGIC: Save the DLL as a zip in the Actions tab (Visible on dev/manual runs)
+      - name: Upload Artifact for Testing
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Posterizarr-Plugin-DevBuild
+          path: "modules/Posterizarr.Plugin/bin/Release/net8.0/Posterizarr.Plugin.dll"
+
+      # PRODUCTION LOGIC: Attach the DLL to the GitHub Release page
+      - name: Upload DLL to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "modules/Posterizarr.Plugin/bin/Release/net8.0/Posterizarr.Plugin.dll"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
