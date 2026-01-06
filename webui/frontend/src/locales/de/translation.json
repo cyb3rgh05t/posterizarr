@@ -1098,6 +1098,12 @@
   },
   "schedulerSettings": {
     "loading": "Lade Zeitplaner-Einstellungen...",
+    "modes": {
+      "normal": "Standard-Durchlauf",
+      "syncjelly": "Jellyfin synchronisieren",
+      "syncemby": "Emby synchronisieren",
+      "backup": "System-Backup"
+    },
     "updating": "Aktualisiere...",
     "enabled": "Aktiviert",
     "disabled": "Deaktiviert",

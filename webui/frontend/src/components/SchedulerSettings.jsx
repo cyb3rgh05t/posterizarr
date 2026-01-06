@@ -869,18 +869,25 @@ const SchedulerSettings = () => {
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-1 min-w-[140px]">
-            <label className="text-xs text-theme-muted ml-1">Run Mode</label>
-            <select
-              value={newMode}
-              onChange={(e) => setNewMode(e.target.value)}
-              className="bg-theme-input border border-theme rounded-lg px-3 py-2 text-sm text-theme-text focus:outline-none focus:ring-2 focus:ring-theme-primary"
-            >
-              <option value="normal">Normal Run</option>
-              <option value="syncjelly">Sync Jellyfin</option>
-              <option value="syncemby">Sync Emby</option>
-              <option value="backup">Backup Mode</option>
-            </select>
+          <div className="flex flex-col gap-1 min-w-[150px]">
+            <label className="text-xs font-medium text-theme-muted ml-1 uppercase tracking-wider">
+              {t("schedulerSettings.runMode")}
+            </label>
+            <div className="relative">
+              <select
+                value={newMode}
+                onChange={(e) => setNewMode(e.target.value)}
+                className="w-full appearance-none bg-theme-input border border-theme rounded-xl px-4 py-2.5 text-sm text-theme-text focus:outline-none focus:ring-2 focus:ring-theme-primary/50 transition-all cursor-pointer hover:border-theme-primary/30"
+              >
+                <option value="normal">{t("schedulerSettings.modes.normal")}</option>
+                <option value="syncjelly">{t("schedulerSettings.modes.syncjelly")}</option>
+                <option value="syncemby">{t("schedulerSettings.modes.syncemby")}</option>
+                <option value="backup">{t("schedulerSettings.modes.backup")}</option>
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-theme-muted">
+                <ChevronDown className="w-4 h-4" />
+              </div>
+            </div>
           </div>
           <input
             type="text"

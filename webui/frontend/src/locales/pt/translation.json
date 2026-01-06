@@ -1097,6 +1097,12 @@
   },
   "schedulerSettings": {
     "loading": "Carregando configurações do agendador...",
+    "modes": {
+      "normal": "Execução padrão",
+      "syncjelly": "Sincronizar Jellyfin",
+      "syncemby": "Sincronizar Emby",
+      "backup": "Backup do sistema"
+    },
     "updating": "Atualizando...",
     "enabled": "Ativado",
     "disabled": "Desativado",

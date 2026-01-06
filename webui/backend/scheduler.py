@@ -473,7 +473,7 @@ class PosterizarrScheduler:
                     self.run_script,
                     trigger=trigger,
                     id=job_id,
-                    name=f"Posterizarr {mode.capitalize()} Mode @ {time_str}",
+                    name=f"Posterizarr {mode.replace('sync', 'Sync ').title()} @ {time_str}",
                     args=[mode],  # This passes the mode string to run_script
                     replace_existing=True,
                 )

@@ -1097,6 +1097,12 @@
   },
   "schedulerSettings": {
     "loading": "Chargement des paramètres du planificateur...",
+    "modes": {
+      "normal": "Exécution standard",
+      "syncjelly": "Synchroniser Jellyfin",
+      "syncemby": "Synchroniser Emby",
+      "backup": "Sauvegarde système"
+    },
     "updating": "Mise à jour...",
     "enabled": "Activé",
     "disabled": "Désactivé",

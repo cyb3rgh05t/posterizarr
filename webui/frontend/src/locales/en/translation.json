@@ -1105,6 +1105,12 @@
   },
   "schedulerSettings": {
     "loading": "Loading scheduler settings...",
+    "modes": {
+      "normal": "Standard Run",
+      "syncjelly": "Sync Jellyfin",
+      "syncemby": "Sync Emby",
+      "backup": "System Backup"
+    },
     "updating": "Updating...",
     "enabled": "Enabled",
     "disabled": "Disabled",
