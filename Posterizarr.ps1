@@ -10697,8 +10697,6 @@ Elseif ($Tautulli) {
                                 }
                                 # Export the array to a CSV file
                                 $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -11297,8 +11295,6 @@ Elseif ($Tautulli) {
                                 }
                                 # Export the array to a CSV file
                                 $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -11983,8 +11979,6 @@ Elseif ($Tautulli) {
                             }
                             # Export the array to a CSV file
                             $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
@@ -12599,8 +12593,6 @@ Elseif ($Tautulli) {
                             }
                             # Export the array to a CSV file
                             $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
@@ -13336,8 +13328,6 @@ Elseif ($Tautulli) {
                                 }
                                 # Export the array to a CSV file
                                 $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -16137,8 +16127,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -16676,8 +16664,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -17293,8 +17279,6 @@ Elseif ($ArrTrigger) {
                                 }
                                 # Export the array to a CSV file
                                 $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -17842,8 +17826,6 @@ Elseif ($ArrTrigger) {
                                 }
                                 # Export the array to a CSV file
                                 $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -18464,8 +18446,6 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                     }
                                 }
                                 else {
@@ -20673,8 +20653,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -21272,8 +21250,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -21958,8 +21934,6 @@ Elseif ($ArrTrigger) {
                                 }
                                 # Export the array to a CSV file
                                 $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -22574,8 +22548,6 @@ Elseif ($ArrTrigger) {
                                 }
                                 # Export the array to a CSV file
                                 $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -23310,8 +23282,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -27262,8 +27232,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 }
                                 # Export the array to a CSV file
                                 $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -27801,8 +27769,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 }
                                 # Export the array to a CSV file
                                 $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -28418,8 +28384,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                             }
                             # Export the array to a CSV file
                             $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
@@ -28967,8 +28931,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                             }
                             # Export the array to a CSV file
                             $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
@@ -29603,8 +29565,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     }
                                     # Export the array to a CSV file
                                     $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -32175,8 +32135,6 @@ else {
                                 }
                                 # Export the array to a CSV file
                                 $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -32841,8 +32799,6 @@ else {
                                 }
                                 # Export the array to a CSV file
                                 $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -33596,8 +33552,6 @@ else {
                             }
                             # Export the array to a CSV file
                             $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
