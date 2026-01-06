@@ -51,10 +51,19 @@ def update_manifest():
         # Production builds: Point to the official GitHub Release ZIP
         source_url = f"https://github.com/{repo}/releases/download/v{version_str}/{zip_name}"
         changelog = f"Official Release {version_str}"
+        
+        # CLEANUP: Remove ALL dev versions (starting with 99.0) from the manifest
+        # This keeps the production manifest clean of development clutter.
+        plugin["versions"] = [v for v in plugin["versions"] if not v["version"].startswith("99.0.")]
     else:
         # Dev builds: Point to the 'builds' branch raw content
         source_url = f"https://raw.githubusercontent.com/{repo}/builds/{zip_name}"
         changelog = f"Dev build: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        
+        # If this is a Dev build, remove ONLY the previous 99.0 builds 
+        # so the dev list doesn't grow indefinitely.
+        if version_str.startswith("99.0."):
+            plugin["versions"] = [v for v in plugin["versions"] if not v["version"].startswith("99.0.")]
 
     new_version = {
         "version": version_str,
@@ -63,11 +72,6 @@ def update_manifest():
         "sourceUrl": source_url,
         "checksum": checksum
     }
-
-    # If this is a Dev build (starts with 99.0), remove any previous 99.0 builds 
-    # from the list to keep the manifest clean and ensure the latest one is at the top.
-    if version_str.startswith("99.0."):
-        plugin["versions"] = [v for v in plugin["versions"] if not v["version"].startswith("99.0.")]
     
     # Insert the newest version at the beginning of the list
     plugin["versions"].insert(0, new_version)

@@ -111,22 +111,28 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj
 
-      - name: Build Plugin
-        run: dotnet build modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj --configuration Release --no-restore
-
-      # Generate a numeric version string
+      # 1. Generate the version string FIRST so we can use it in the build
       - name: Set Version String
         id: vars
         run: |
           if [ "${{ github.event_name }}" == "release" ]; then
+            # Strips 'v' or 'V' from the tag (e.g., v1.0.0 -> 1.0.0)
             V_STR=$(echo ${{ github.ref_name }} | sed 's/[vV]//')
           else
-            # Changed from 0.0 to 99.0 to ensure dev builds outrank stable versions
+            # Generates a high version number for dev builds (e.g., 99.0.0106.0921)
             V_STR="99.0.$(date +%m%d.%H%M)"
           fi
           echo "VERSION=$V_STR" >> $GITHUB_OUTPUT
 
-      # Create the versioned ZIP package
+      # 2. Build the Plugin with the version injected into the DLL
+      - name: Build Plugin
+        run: |
+          dotnet build modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj \
+            --configuration Release \
+            --no-restore \
+            -p:Version=${{ steps.vars.outputs.VERSION }}
+
+      # 3. Create the versioned ZIP package
       - name: Prepare Package
         run: |
           mkdir -p release_package
@@ -134,10 +140,9 @@ jobs:
           cd release_package
           zip -r ../Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip *
           cd ..
-          # Move ZIP back into folder for the push action to find it
           mv Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip release_package/
 
-      # DEV TEST: Push versioned ZIP to builds branch
+      # 4. DEV ONLY: Push ZIP to the builds branch
       - name: Push to Builds Branch (Dev Only)
         if: github.event_name != 'release'
         uses: s0/git-publish-subdir-action@develop
@@ -148,7 +153,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MESSAGE: "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
 
-      # Updates version, MD5 checksum, and URLs in manifest.json
+      # 5. Run the Python script to update manifest.json
       - name: Run Manifest Update Script
         run: python3 update_manifest.py
         env:
@@ -157,6 +162,7 @@ jobs:
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
+      # 6. Commit changes back to the main/dev branch
       - name: Commit and Push Manifest Changes
         run: |
           git config --global user.name "github-actions[bot]"
@@ -164,7 +170,7 @@ jobs:
           git add manifest.json
           git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update manifest v${{ steps.vars.outputs.VERSION }} [skip ci]" && git push)
 
-      # PRODUCTION: Upload versioned ZIP to the official GitHub Release page
+      # 7. PRODUCTION ONLY: Upload ZIP to the GitHub Release page
       - name: Upload to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
