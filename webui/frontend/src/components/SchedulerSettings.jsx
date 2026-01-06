@@ -14,6 +14,9 @@ import {
   Settings,
   Zap,
   ChevronDown,
+  Database,
+  Share2,
+  HardDrive,
 } from "lucide-react";
 import Notification from "./Notification";
 import { useToast } from "../context/ToastContext";
@@ -163,6 +166,33 @@ const SchedulerSettings = () => {
     { id: "syncemby", label: t("schedulerSettings.modes.syncemby") || "Sync Emby" },
     { id: "backup", label: t("schedulerSettings.modes.backup") || "System Backup" },
   ];
+
+  const modeConfigs = {
+    normal: {
+      icon: Clock,
+      color: "text-theme-primary",
+      bgColor: "bg-theme-primary/10",
+      label: t("schedulerSettings.modes.normal")
+    },
+    syncjelly: {
+      icon: RefreshCw,
+      color: "text-blue-400",
+      bgColor: "bg-blue-400/10",
+      label: "Jellyfin Sync"
+    },
+    syncemby: {
+      icon: RefreshCw,
+      color: "text-green-500",
+      bgColor: "bg-green-500/10",
+      label: "Emby Sync"
+    },
+    backup: {
+      icon: Database,
+      color: "text-amber-500",
+      bgColor: "bg-amber-500/10",
+      label: "Backup"
+    }
+  };
 
   useEffect(() => {
     fetchSchedulerData();
@@ -898,22 +928,18 @@ const SchedulerSettings = () => {
                 disabled={isUpdating}
                 className="w-full px-4 py-3 bg-theme-bg border border-theme rounded-lg text-theme-text hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-between"
               >
-                <span>
-                  {runModes.find((m) => m.id === newMode)?.label || t("schedulerSettings.modes.normal")}
-                </span>
-                <ChevronDown
-                  className={`w-5 h-5 text-theme-muted transition-transform ${
-                    modeDropdownOpen ? "rotate-180" : ""
-                  }`}
-                />
+                <div className="flex items-center gap-2">
+                  {/* Shows the icon of the currently selected mode */}
+                  {React.createElement(modeConfigs[newMode]?.icon || Clock, { 
+                    className: `w-4 h-4 ${modeConfigs[newMode]?.color || 'text-theme-primary'}` 
+                  })}
+                  <span>{runModes.find((m) => m.id === newMode)?.label}</span>
+                </div>
+                <ChevronDown className={`w-5 h-5 text-theme-muted transition-transform ${modeDropdownOpen ? "rotate-180" : ""}`} />
               </button>
 
               {modeDropdownOpen && !isUpdating && (
-                <div
-                  className={`absolute z-50 left-0 right-0 ${
-                    modeDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
-                  } bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-60 overflow-y-auto`}
-                >
+                <div className={`absolute z-50 left-0 right-0 ${modeDropdownUp ? "bottom-full mb-2" : "top-full mt-2"} bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-60 overflow-y-auto`}>
                   {runModes.map((mode) => (
                     <button
                       key={mode.id}
@@ -922,12 +948,11 @@ const SchedulerSettings = () => {
                         setNewMode(mode.id);
                         setModeDropdownOpen(false);
                       }}
-                      className={`w-full px-4 py-3 text-sm transition-all text-left ${
-                        newMode === mode.id
-                          ? "bg-theme-primary text-white"
-                          : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
+                      className={`w-full px-4 py-3 text-sm transition-all text-left flex items-center gap-3 ${
+                        newMode === mode.id ? "bg-theme-primary text-white" : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
                       }`}
                     >
+                      {React.createElement(modeConfigs[mode.id].icon, { className: "w-4 h-4" })}
                       {mode.label}
                     </button>
                   ))}
@@ -960,36 +985,43 @@ const SchedulerSettings = () => {
         {/* Schedule List */}
         {config?.schedules?.length > 0 ? (
           <div className="space-y-3">
-            {config.schedules.map((schedule, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-4 bg-theme-bg rounded-lg hover:bg-theme-hover transition-all border border-theme hover:border-theme-primary/50 group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-lg bg-theme-primary/10 group-hover:bg-theme-primary/20 transition-all">
-                    <Clock className="w-5 h-5 text-theme-primary" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-theme-text text-lg">
-                      {schedule.time}
+            {config.schedules.map((schedule, index) => {
+              const mode = schedule.mode || "normal";
+              const mConfig = modeConfigs[mode] || modeConfigs.normal;
+              const Icon = mConfig.icon;
+
+              return (
+                <div key={index} className="flex items-center justify-between p-4 bg-theme-bg rounded-lg hover:bg-theme-hover transition-all border border-theme hover:border-theme-primary/50 group">
+                  <div className="flex items-center gap-4">
+                    {/* Visual Indicator Container */}
+                    <div className={`p-2.5 rounded-lg ${mConfig.bgColor} transition-all`}>
+                      <Icon className={`w-5 h-5 ${mConfig.color}`} />
                     </div>
-                    {schedule.description && (
-                      <div className="text-sm text-theme-muted mt-0.5">
-                        {schedule.description}
+                    
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-theme-text text-lg">{schedule.time}</span>
+                        {/* Specialized Mode Badge */}
+                        <span className={`text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded border ${mConfig.color} ${mConfig.bgColor} border-current opacity-80`}>
+                          {mConfig.label}
+                        </span>
                       </div>
-                    )}
+                      {schedule.description && (
+                        <div className="text-sm text-theme-muted mt-0.5">{schedule.description}</div>
+                      )}
+                    </div>
                   </div>
+                  
+                  <button
+                    onClick={() => removeSchedule(schedule.time)}
+                    disabled={isUpdating}
+                    className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => removeSchedule(schedule.time)}
-                  disabled={isUpdating}
-                  className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={t("schedulerSettings.removeSchedule")}
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-12 bg-theme-bg rounded-lg border border-theme">
