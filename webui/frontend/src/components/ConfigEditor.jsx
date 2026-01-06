@@ -606,7 +606,7 @@ function ConfigEditor() {
     // Text Formatting
     if (key === "SymbolsToKeepOnNewLine" && !getValue("NewLineOnSpecificSymbols")) return true;
     if (key === "NewLineSymbols" && !getValue("NewLineOnSpecificSymbols")) return true;
-
+    if (key === "NewLineWords" && !getValue("NewLineOnSpecificWords")) return true;
     // Logo Logic
     if (["UseClearlogo", "UseClearart", "LogoTextFallback", "ConvertLogoColor"].includes(key)) {
         const useLogo = getValue("UseLogo");
@@ -891,7 +891,68 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
         if (settingKey === "tmdbtoken") return renderValidate("tmdb", "Enter TMDB Token");
         if (settingKey === "tvdbapi") return renderValidate("tvdb", "Enter TVDB API Key");
         if (settingKey === "FanartTvAPIKey") return renderValidate("fanart", "Enter Fanart API Key");
+        if (settingKey === "NewLineWords") {
+            const dictValue = value && typeof value === 'object' ? value : {};
+            
+            const handleUpdatePair = (oldKey, newKey, newVal) => {
+                const newDict = { ...dictValue };
+                if (oldKey !== newKey) {
+                    delete newDict[oldKey];
+                }
+                newDict[newKey] = newVal;
+                updateValue(fieldKey, newDict);
+            };
 
+            const handleRemovePair = (keyToRemove) => {
+                const newDict = { ...dictValue };
+                delete newDict[keyToRemove];
+                updateValue(fieldKey, newDict);
+            };
+
+            const handleAddPair = () => {
+                const newDict = { ...dictValue, "NEW_WORD": "NEW-\\nWORD" };
+                updateValue(fieldKey, newDict);
+            };
+
+            return (
+                <div className="space-y-2">
+                    {Object.entries(dictValue).map(([k, v], idx) => (
+                        <div key={idx} className="flex gap-2 items-start">
+                            <input 
+                                className={`${commonInputClass} font-mono text-xs`}
+                                value={k}
+                                placeholder="Word"
+                                onChange={(e) => handleUpdatePair(k, e.target.value, v)}
+                                disabled={disabled}
+                            />
+                            <ArrowRight className="w-8 h-8 text-theme-muted mt-1 flex-shrink-0" />
+                            <textarea 
+                                className={`${commonInputClass} font-mono text-xs h-[42px] min-h-[42px] resize-none`}
+                                value={v}
+                                placeholder="Replacement"
+                                onChange={(e) => handleUpdatePair(k, k, e.target.value)}
+                                disabled={disabled}
+                            />
+                            <button 
+                                onClick={() => handleRemovePair(k)}
+                                className="p-2.5 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20"
+                                disabled={disabled}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ))}
+                    <button 
+                        onClick={handleAddPair}
+                        className="w-full py-2 border-2 border-dashed border-theme rounded-lg text-theme-muted hover:text-theme-primary hover:border-theme-primary transition-all flex items-center justify-center gap-2 text-sm"
+                        disabled={disabled}
+                    >
+                        <Plus className="w-4 h-4" /> Add Word Mapping
+                    </button>
+                </div>
+            );
+        }
+        
         // Passwords & Other Secrets (No validate button, just PasswordInput)
         if (settingKey.toLowerCase().includes("password") || settingKey.toLowerCase().includes("secret")) {
              return <PasswordInput value={stringValue} onChange={(e) => updateValue(fieldKey, e.target.value)} disabled={disabled} placeholder="Enter value" />;
@@ -908,7 +969,7 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
              );
         }
 
-        // Standard File/Select/Bool rendering (Same as before)
+        // Standard File/Select/Bool rendering
         // File Uploads
         if (["overlayfile", "seasonoverlayfile", "backgroundoverlayfile", "titlecardoverlayfile", "collectionoverlayfile", "poster4k", "Poster1080p", "Background4k", "Background1080p", "TC4k", "TC1080p", "4KDoVi", "4KHDR10", "4KDoViHDR10", "4KDoViBackground", "4KHDR10Background", "4KDoViHDR10Background", "4KDoViTC", "4KHDR10TC", "4KDoViHDR10TC"].includes(settingKey)) {
              return (

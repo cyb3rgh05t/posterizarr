@@ -139,6 +139,13 @@
     "NewLineSymbols": [
       " - "
     ],
+    "NewLineOnSpecificWords": "false",
+    "NewLineWords": {
+        "WEIHNACHTSGESCHICHTE": "WEIHNACHTS-\nGESCHICHTE",
+        "SCHOKOLADENFABRIK": "SCHOKOLADEN-\nFABRIK",
+        "FEUERZANGENBOWLE": "FEUERZANGEN-\nBOWLE",
+        "AHNUNGSLOSIGKEIT": "AHNUNGS-\nLOSIGKEIT"
+    },
     "SymbolsToKeepOnNewLine": [],
     "SkipTBA": "false",
     "SkipJapTitle": "false",

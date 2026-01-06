@@ -7560,15 +7560,11 @@ $global:TitleCards = $config.PrerequisitePart.TitleCards.tolower()
 $SkipTBA = $config.PrerequisitePart.SkipTBA.tolower()
 $SkipJapTitle = $config.PrerequisitePart.SkipJapTitle.tolower()
 $AssetCleanup = $config.PrerequisitePart.AssetCleanup.tolower()
-$NewLineOnSpecificSymbols = $config.PrerequisitePart.NewLineOnSpecificSymbols
-if ($NewLineOnSpecificSymbols) {
-    $NewLineOnSpecificSymbols = $NewLineOnSpecificSymbols.tolower()
-}
-$SymbolsToKeepOnNewLine = $config.PrerequisitePart.SymbolsToKeepOnNewLine
-if ($SymbolsToKeepOnNewLine) {
-    $SymbolsToKeepOnNewLine = $SymbolsToKeepOnNewLine.tolower()
-}
+$NewLineOnSpecificSymbols = $config.PrerequisitePart.NewLineOnSpecificSymbols.tolower()
+$SymbolsToKeepOnNewLine = $config.PrerequisitePart.SymbolsToKeepOnNewLine.tolower()
 $NewLineSymbols = $config.PrerequisitePart.NewLineSymbols
+$NewLineOnSpecificWords = $config.PrerequisitePart.NewLineOnSpecificWords.toLower()
+$NewLineWords = $config.PrerequisitePart.NewLineWords
 
 # Resolution Part
 $UsePosterResolutionOverlays = $config.PrerequisitePart.UsePosterResolutionOverlays.tolower()
@@ -8876,6 +8872,19 @@ if ($Manual) {
                             $ShowjoinedTitle = $ShowjoinedTitle -replace [regex]::Escape($symbol), $replacementString
                         }
                     }
+                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                        $properties = $NewLineWords.PSObject.Properties.Name
+                        
+                        # Check if properties exist and the list is not empty
+                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                            foreach ($wordKey in $properties) {
+                                $replacementValue = $NewLineWords.$wordKey
+                                
+                                # Using [regex]::Escape handles any special characters in the word keys
+                                $ShowjoinedTitle = $ShowjoinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                            }
+                        }
+                    }
                     $ShowjoinedTitlePointSize = $ShowjoinedTitle -replace '""', '""""'
                     $showoptimalFontSize = Get-OptimalPointSize -text $ShowjoinedTitlePointSize -font $fontImagemagick -box_width $ShowOnSeasonMaxWidth  -box_height $ShowOnSeasonMaxHeight -min_pointsize $ShowOnSeasonminPointSize -max_pointsize $ShowOnSeasonmaxPointSize -lineSpacing $ShowOnSeasonlineSpacing
                     Write-Entry -Subtext ("Optimal Show font size set to: '{0}' [{1}]" -f $showoptimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
@@ -8908,6 +8917,19 @@ if ($Manual) {
                                 $replacementString = $symbol + "`n"
                             }
                             $CollectionjoinedTitle = $CollectionjoinedTitle -replace [regex]::Escape($symbol), $replacementString
+                        }
+                    }
+                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                        $properties = $NewLineWords.PSObject.Properties.Name
+                        
+                        # Check if properties exist and the list is not empty
+                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                            foreach ($wordKey in $properties) {
+                                $replacementValue = $NewLineWords.$wordKey
+                                
+                                # Using [regex]::Escape handles any special characters in the word keys
+                                $CollectionjoinedTitle = $CollectionjoinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                            }
                         }
                     }
                     $CollectionjoinedTitlePointSize = $CollectionjoinedTitle -replace '""', '""""'
@@ -8947,6 +8969,19 @@ if ($Manual) {
                             $replacementString = $symbol + "`n"
                         }
                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                    }
+                }
+                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                    $properties = $NewLineWords.PSObject.Properties.Name
+                    
+                    # Check if properties exist and the list is not empty
+                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                        foreach ($wordKey in $properties) {
+                            $replacementValue = $NewLineWords.$wordKey
+                            
+                            # Using [regex]::Escape handles any special characters in the word keys
+                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                        }
                     }
                 }
 
@@ -10543,6 +10578,19 @@ Elseif ($Tautulli) {
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if (!$global:IsTruncated) {
@@ -11139,6 +11187,19 @@ Elseif ($Tautulli) {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -11826,6 +11887,19 @@ Elseif ($Tautulli) {
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                    
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+                                                            
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
+                                                    }
+                                                }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                 if (!$global:IsTruncated) {
@@ -12432,6 +12506,19 @@ Elseif ($Tautulli) {
                                                             $replacementString = $symbol + "`n"
                                                         }
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                    
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+                                                            
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -13071,6 +13158,22 @@ Elseif ($Tautulli) {
                                                         $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                         if ($AddShowTitletoSeason -eq 'true') {
                                                             $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                    
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+                                                            
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            if ($AddShowTitletoSeason -eq 'true') {
+                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -13769,6 +13872,19 @@ Elseif ($Tautulli) {
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                                        
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                                
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
+                                                                        }
+                                                                    }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                     if (!$global:IsTruncated) {
@@ -14421,6 +14537,19 @@ Elseif ($Tautulli) {
                                                                             $replacementString = $symbol + "`n"
                                                                         }
                                                                         $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                    }
+                                                                }
+                                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                                    
+                                                                    # Check if properties exist and the list is not empty
+                                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                        foreach ($wordKey in $properties) {
+                                                                            $replacementValue = $NewLineWords.$wordKey
+                                                                            
+                                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                        }
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -16013,6 +16142,19 @@ Elseif ($ArrTrigger) {
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                             }
                                                         }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+                                                            
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+                                                                    
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
+                                                            }
+                                                        }
                                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                         if (!$global:IsTruncated) {
@@ -16546,6 +16688,19 @@ Elseif ($ArrTrigger) {
                                                                     $replacementString = $symbol + "`n"
                                                                 }
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+                                                            
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+                                                                    
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
                                                             }
                                                         }
                                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -17165,6 +17320,19 @@ Elseif ($ArrTrigger) {
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if (!$global:IsTruncated) {
@@ -17710,6 +17878,19 @@ Elseif ($ArrTrigger) {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -18291,6 +18472,22 @@ Elseif ($ArrTrigger) {
                                                                 }
                                                             }
                                                         }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+                                                            
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+                                                                    
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                    if ($AddShowTitletoSeason -eq 'true') {
+                                                                        $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                         $joinedTitlePointSize = $global:seasonTitle -replace '""', '""""'
                                                         $joinedShowTitlePointSize = $global:ShowTitleOnSeason -replace '""', '""""'
                                                         if ($AddShowTitletoSeason -eq 'true') {
@@ -18850,6 +19047,19 @@ Elseif ($ArrTrigger) {
                                                                                 $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                             }
                                                                         }
+                                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                            $properties = $NewLineWords.PSObject.Properties.Name
+                                                                            
+                                                                            # Check if properties exist and the list is not empty
+                                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                                foreach ($wordKey in $properties) {
+                                                                                    $replacementValue = $NewLineWords.$wordKey
+                                                                                    
+                                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                                    $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                                }
+                                                                            }
+                                                                        }
                                                                         $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                         if (!$global:IsTruncated) {
@@ -19381,6 +19591,19 @@ Elseif ($ArrTrigger) {
                                                                                 $replacementString = $symbol + "`n"
                                                                             }
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                        }
+                                                                    }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                                        
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                                
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -20499,6 +20722,19 @@ Elseif ($ArrTrigger) {
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                             }
                                                         }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+                                                            
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+                                                                    
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
+                                                            }
+                                                        }
                                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                         if (!$global:IsTruncated) {
@@ -21094,6 +21330,19 @@ Elseif ($ArrTrigger) {
                                                                     $replacementString = $symbol + "`n"
                                                                 }
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+                                                            
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+                                                                    
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
                                                             }
                                                         }
                                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -21781,6 +22030,19 @@ Elseif ($ArrTrigger) {
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if (!$global:IsTruncated) {
@@ -22387,6 +22649,19 @@ Elseif ($ArrTrigger) {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -23026,6 +23301,22 @@ Elseif ($ArrTrigger) {
                                                             $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                             if ($AddShowTitletoSeason -eq 'true') {
                                                                 $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                if ($AddShowTitletoSeason -eq 'true') {
+                                                                    $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -23723,6 +24014,19 @@ Elseif ($ArrTrigger) {
                                                                                 $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                             }
                                                                         }
+                                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                            $properties = $NewLineWords.PSObject.Properties.Name
+                                                                            
+                                                                            # Check if properties exist and the list is not empty
+                                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                                foreach ($wordKey in $properties) {
+                                                                                    $replacementValue = $NewLineWords.$wordKey
+                                                                                    
+                                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                                    $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                                }
+                                                                            }
+                                                                        }
                                                                         $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                         if (!$global:IsTruncated) {
@@ -24375,6 +24679,19 @@ Elseif ($ArrTrigger) {
                                                                                 $replacementString = $symbol + "`n"
                                                                             }
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                        }
+                                                                    }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                                        
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                                
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -27119,6 +27436,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if (!$global:IsTruncated) {
@@ -27652,6 +27982,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -28271,6 +28614,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                    
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+                                                            
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
+                                                    }
+                                                }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                 if (!$global:IsTruncated) {
@@ -28816,6 +29172,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             $replacementString = $symbol + "`n"
                                                         }
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                    
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+                                                            
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -29411,6 +29780,22 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             }
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                if ($AddShowTitletoSeason -eq 'true') {
+                                                                    $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $global:seasonTitle -replace '""', '""""'
                                                     $joinedShowTitlePointSize = $global:ShowTitleOnSeason -replace '""', '""""'
                                                     if ($AddShowTitletoSeason -eq 'true') {
@@ -29970,6 +30355,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                                        
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                                
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
+                                                                        }
+                                                                    }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                     if (!$global:IsTruncated) {
@@ -30501,6 +30899,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                             $replacementString = $symbol + "`n"
                                                                         }
                                                                         $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                    }
+                                                                }
+                                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                                    
+                                                                    # Check if properties exist and the list is not empty
+                                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                        foreach ($wordKey in $properties) {
+                                                                            $replacementValue = $NewLineWords.$wordKey
+                                                                            
+                                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                        }
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -31980,6 +32391,19 @@ else {
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if (!$global:IsTruncated) {
@@ -32642,6 +33066,19 @@ else {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                        
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -33398,6 +33835,19 @@ else {
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                    
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+                                                            
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
+                                                    }
+                                                }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                 if (!$global:IsTruncated) {
@@ -34074,6 +34524,19 @@ else {
                                                             $replacementString = $symbol + "`n"
                                                         }
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                    
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+                                                            
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -34788,6 +35251,22 @@ else {
                                                         $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                         if ($AddShowTitletoSeason -eq 'true') {
                                                             $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                    
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+                                                            
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            if ($AddShowTitletoSeason -eq 'true') {
+                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -35552,6 +36031,19 @@ else {
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
                                                                         }
                                                                     }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+                                                                        
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+                                                                                
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
+                                                                        }
+                                                                    }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
                                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $TitleCardfontImagemagick -box_width $TitleCardEPTitleMaxWidth  -box_height $TitleCardEPTitleMaxHeight -min_pointsize $TitleCardEPTitleminPointSize -max_pointsize $TitleCardEPTitlemaxPointSize -lineSpacing $TitleCardEPTitlelineSpacing
                                                                     if (!$global:IsTruncated) {
@@ -36269,6 +36761,19 @@ else {
                                                                             $replacementString = $symbol + "`n"
                                                                         }
                                                                         $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                    }
+                                                                }
+                                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                    $properties = $NewLineWords.PSObject.Properties.Name
+                                                                    
+                                                                    # Check if properties exist and the list is not empty
+                                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                        foreach ($wordKey in $properties) {
+                                                                            $replacementValue = $NewLineWords.$wordKey
+                                                                            
+                                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                        }
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""' -replace '`', ''
