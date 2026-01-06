@@ -885,9 +885,6 @@ const SchedulerSettings = () => {
             )}
           </div>
           <div className="flex-1 space-y-2">
-            <label className="block text-sm font-medium text-theme-text">
-              {t("schedulerSettings.runMode") || "Run Mode"}
-            </label>
             <div className="relative" ref={modeDropdownRef}>
               <button
                 type="button"
