@@ -1097,6 +1097,7 @@
   },
   "schedulerSettings": {
     "loading": "Caricamento impostazioni pianificatore...",
+    "runMode": "Modalità di esecuzione",
     "modes": {
       "normal": "Esecuzione standard",
       "syncjelly": "Sincronizza Jellyfin",

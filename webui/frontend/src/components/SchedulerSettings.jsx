@@ -152,6 +152,18 @@ const SchedulerSettings = () => {
     "Africa/Nairobi", // Kenya
   ];
 
+  const [modeDropdownOpen, setModeDropdownOpen] = useState(false);
+  const [modeDropdownUp, setModeDropdownUp] = useState(false);
+  const modeDropdownRef = useRef(null);
+
+  // Define the available modes for the dropdown
+  const runModes = [
+    { id: "normal", label: t("schedulerSettings.modes.normal") },
+    { id: "syncjelly", label: t("schedulerSettings.modes.syncjelly") || "Sync Jellyfin" },
+    { id: "syncemby", label: t("schedulerSettings.modes.syncemby") || "Sync Emby" },
+    { id: "backup", label: t("schedulerSettings.modes.backup") || "System Backup" },
+  ];
+
   useEffect(() => {
     fetchSchedulerData();
     const interval = setInterval(fetchSchedulerData, 30000);
@@ -184,6 +196,9 @@ const SchedulerSettings = () => {
         !timePickerRef.current.contains(event.target)
       ) {
         setTimePickerOpen(false);
+      }
+      if (modeDropdownRef.current && !modeDropdownRef.current.contains(event.target)) {
+        setModeDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -869,24 +884,58 @@ const SchedulerSettings = () => {
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-1 min-w-[150px]">
-            <label className="text-xs font-medium text-theme-muted ml-1 uppercase tracking-wider">
-              {t("schedulerSettings.runMode")}
+          <div className="flex-1 space-y-2">
+            <label className="block text-sm font-medium text-theme-text">
+              {t("schedulerSettings.runMode") || "Run Mode"}
             </label>
-            <div className="relative">
-              <select
-                value={newMode}
-                onChange={(e) => setNewMode(e.target.value)}
-                className="w-full appearance-none bg-theme-input border border-theme rounded-xl px-4 py-2.5 text-sm text-theme-text focus:outline-none focus:ring-2 focus:ring-theme-primary/50 transition-all cursor-pointer hover:border-theme-primary/30"
+            <div className="relative" ref={modeDropdownRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isUpdating) {
+                    const shouldOpenUp = calculateDropdownPosition(modeDropdownRef);
+                    setModeDropdownUp(shouldOpenUp);
+                    setModeDropdownOpen(!modeDropdownOpen);
+                  }
+                }}
+                disabled={isUpdating}
+                className="w-full px-4 py-3 bg-theme-bg border border-theme rounded-lg text-theme-text hover:bg-theme-hover hover:border-theme-primary/50 focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-between"
               >
-                <option value="normal">{t("schedulerSettings.modes.normal")}</option>
-                <option value="syncjelly">{t("schedulerSettings.modes.syncjelly")}</option>
-                <option value="syncemby">{t("schedulerSettings.modes.syncemby")}</option>
-                <option value="backup">{t("schedulerSettings.modes.backup")}</option>
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-theme-muted">
-                <ChevronDown className="w-4 h-4" />
-              </div>
+                <span>
+                  {runModes.find((m) => m.id === newMode)?.label || t("schedulerSettings.modes.normal")}
+                </span>
+                <ChevronDown
+                  className={`w-5 h-5 text-theme-muted transition-transform ${
+                    modeDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {modeDropdownOpen && !isUpdating && (
+                <div
+                  className={`absolute z-50 left-0 right-0 ${
+                    modeDropdownUp ? "bottom-full mb-2" : "top-full mt-2"
+                  } bg-theme-card border border-theme-primary rounded-lg shadow-xl max-h-60 overflow-y-auto`}
+                >
+                  {runModes.map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => {
+                        setNewMode(mode.id);
+                        setModeDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-3 text-sm transition-all text-left ${
+                        newMode === mode.id
+                          ? "bg-theme-primary text-white"
+                          : "text-theme-text hover:bg-theme-hover hover:text-theme-primary"
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <input

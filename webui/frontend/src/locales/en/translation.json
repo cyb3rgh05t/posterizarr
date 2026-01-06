@@ -1105,6 +1105,7 @@
   },
   "schedulerSettings": {
     "loading": "Loading scheduler settings...",
+    "runMode": "Run Mode",
     "modes": {
       "normal": "Standard Run",
       "syncjelly": "Sync Jellyfin",

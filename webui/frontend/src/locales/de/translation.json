@@ -1098,6 +1098,7 @@
   },
   "schedulerSettings": {
     "loading": "Lade Zeitplaner-Einstellungen...",
+    "runMode": "Ausführungsmodus",
     "modes": {
       "normal": "Standard-Durchlauf",
       "syncjelly": "Jellyfin synchronisieren",
