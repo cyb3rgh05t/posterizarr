@@ -64,6 +64,7 @@ const SchedulerSettings = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   const [clearAllConfirm, setClearAllConfirm] = useState(false);
+  const [newMode, setNewMode] = useState("normal");
 
   // Time picker state
   const [timePickerOpen, setTimePickerOpen] = useState(false);
@@ -299,6 +300,7 @@ const SchedulerSettings = () => {
         body: JSON.stringify({
           time: newTime,
           description: newDescription,
+          mode: newMode,
         }),
       });
 
@@ -867,7 +869,19 @@ const SchedulerSettings = () => {
               </div>
             )}
           </div>
-
+          <div className="flex flex-col gap-1 min-w-[140px]">
+            <label className="text-xs text-theme-muted ml-1">Run Mode</label>
+            <select
+              value={newMode}
+              onChange={(e) => setNewMode(e.target.value)}
+              className="bg-theme-input border border-theme rounded-lg px-3 py-2 text-sm text-theme-text focus:outline-none focus:ring-2 focus:ring-theme-primary"
+            >
+              <option value="normal">Normal Run</option>
+              <option value="syncjelly">Sync Jellyfin</option>
+              <option value="syncemby">Sync Emby</option>
+              <option value="backup">Backup Mode</option>
+            </select>
+          </div>
           <input
             type="text"
             value={newDescription}
