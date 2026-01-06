@@ -10395,7 +10395,7 @@ Elseif ($Tautulli) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -10994,7 +10994,7 @@ Elseif ($Tautulli) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -11682,7 +11682,7 @@ Elseif ($Tautulli) {
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBorder = 'false'
                                         $AddOverlay = 'false'
                                     }
@@ -12292,7 +12292,7 @@ Elseif ($Tautulli) {
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBackgroundBorder = 'false'
                                         $AddBackgroundOverlay = 'false'
                                     }
@@ -13015,7 +13015,7 @@ Elseif ($Tautulli) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddSeasonBorder = 'false'
                                                 $AddSeasonOverlay = 'false'
                                             }
@@ -13715,7 +13715,7 @@ Elseif ($Tautulli) {
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -14369,7 +14369,7 @@ Elseif ($Tautulli) {
                                                             }
 
                                                             # Logic for "If both are true, only resize"
-                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                 $AddTitleCardBorder = 'false'
                                                                 $AddTitleCardOverlay = 'false'
                                                             }
@@ -15877,7 +15877,7 @@ Elseif ($ArrTrigger) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddBorder = 'false'
                                                 $AddOverlay = 'false'
                                             }
@@ -16413,7 +16413,7 @@ Elseif ($ArrTrigger) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddBackgroundBorder = 'false'
                                                 $AddBackgroundOverlay = 'false'
                                             }
@@ -17032,7 +17032,7 @@ Elseif ($ArrTrigger) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -17581,7 +17581,7 @@ Elseif ($ArrTrigger) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -18242,7 +18242,7 @@ Elseif ($ArrTrigger) {
                                                     }
 
                                                     # Logic for "If both are true, only resize"
-                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                         $AddSeasonBorder = 'false'
                                                         $AddSeasonOverlay = 'false'
                                                     }
@@ -18807,7 +18807,7 @@ Elseif ($ArrTrigger) {
                                                                     }
 
                                                                     # Logic for "If both are true, only resize"
-                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                         $AddTitleCardBorder = 'false'
                                                                         $AddTitleCardOverlay = 'false'
                                                                     }
@@ -19340,7 +19340,7 @@ Elseif ($ArrTrigger) {
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -20371,7 +20371,7 @@ Elseif ($ArrTrigger) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddBorder = 'false'
                                                 $AddOverlay = 'false'
                                             }
@@ -20970,7 +20970,7 @@ Elseif ($ArrTrigger) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddBackgroundBorder = 'false'
                                                 $AddBackgroundOverlay = 'false'
                                             }
@@ -21657,7 +21657,7 @@ Elseif ($ArrTrigger) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -22267,7 +22267,7 @@ Elseif ($ArrTrigger) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -22990,7 +22990,7 @@ Elseif ($ArrTrigger) {
                                                 }
 
                                                 # Logic for "If both are true, only resize"
-                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                     $AddSeasonBorder = 'false'
                                                     $AddSeasonOverlay = 'false'
                                                 }
@@ -23689,7 +23689,7 @@ Elseif ($ArrTrigger) {
                                                                     }
 
                                                                     # Logic for "If both are true, only resize"
-                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                         $AddTitleCardBorder = 'false'
                                                                         $AddTitleCardOverlay = 'false'
                                                                     }
@@ -24343,7 +24343,7 @@ Elseif ($ArrTrigger) {
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -27002,7 +27002,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -27539,7 +27539,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -28158,7 +28158,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBorder = 'false'
                                         $AddOverlay = 'false'
                                     }
@@ -28707,7 +28707,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBackgroundBorder = 'false'
                                         $AddBackgroundOverlay = 'false'
                                     }
@@ -29382,7 +29382,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 }
 
                                                 # Logic for "If both are true, only resize"
-                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                     $AddSeasonBorder = 'false'
                                                     $AddSeasonOverlay = 'false'
                                                 }
@@ -29947,7 +29947,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -30480,7 +30480,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             }
 
                                                             # Logic for "If both are true, only resize"
-                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                 $AddTitleCardBorder = 'false'
                                                                 $AddTitleCardOverlay = 'false'
                                                             }
@@ -31873,7 +31873,7 @@ else {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -32538,7 +32538,7 @@ else {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -33294,7 +33294,7 @@ else {
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBorder = 'false'
                                         $AddOverlay = 'false'
                                     }
@@ -33974,7 +33974,7 @@ else {
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBackgroundBorder = 'false'
                                         $AddBackgroundOverlay = 'false'
                                     }
@@ -34770,7 +34770,7 @@ else {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddSeasonBorder = 'false'
                                                 $AddSeasonOverlay = 'false'
                                             }
@@ -35534,7 +35534,7 @@ else {
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -36254,7 +36254,7 @@ else {
                                                             }
 
                                                             # Logic for "If both are true, only resize"
-                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                 $AddTitleCardBorder = 'false'
                                                                 $AddTitleCardOverlay = 'false'
                                                             }
