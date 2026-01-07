@@ -1103,7 +1103,7 @@
       "normal": "Standard-Durchlauf",
       "syncjelly": "Jellyfin synchronisieren",
       "syncemby": "Emby synchronisieren",
-      "backup": "System-Backup"
+      "backup": "Plex Backup"
     },
     "updating": "Aktualisiere...",
     "enabled": "Aktiviert",

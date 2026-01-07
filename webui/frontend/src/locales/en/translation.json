@@ -1110,7 +1110,7 @@
       "normal": "Standard Run",
       "syncjelly": "Sync Jellyfin",
       "syncemby": "Sync Emby",
-      "backup": "System Backup"
+      "backup": "Plex Backup"
     },
     "updating": "Updating...",
     "enabled": "Enabled",
