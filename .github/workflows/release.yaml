@@ -17,10 +17,19 @@ on:
         description: 'Version to use for testing (e.g., test-1.0.0)'
         required: true
         default: 'test-1.0.0'
+      run_docker:
+        description: 'Build Docker Image?'
+        type: boolean
+        default: true
+      run_plugin:
+        description: 'Build Jellyfin Plugin?'
+        type: boolean
+        default: true
 
 jobs:
   release:
     name: Build and Push Docker Image
+    if: github.event_name != 'workflow_dispatch' || inputs.run_docker == true
     runs-on: ubuntu-latest
 
     permissions:
@@ -98,6 +107,7 @@ jobs:
           cache-to: type=gha,scope=${{ github.ref_name }},mode=max
   build-plugin:
     name: Build Jellyfin Plugin
+    if: github.event_name != 'workflow_dispatch' || inputs.run_plugin == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
