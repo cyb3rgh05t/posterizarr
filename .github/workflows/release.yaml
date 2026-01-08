@@ -173,9 +173,11 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
-          # Only commit and push if there are changes
-          if ! git diff --quiet || ! git diff --staged --quiet; then
+          
+          # Check for changes to avoid failing on empty commits
+          if ! git diff --cached --quiet; then
             git commit -m "chore: update manifest v${{ steps.vars.outputs.VERSION }} [skip ci]"
+            # Force the push from the current HEAD to the branch that triggered the run
             git push origin HEAD:${{ github.ref_name }}
           else
             echo "No changes to manifest.json"
