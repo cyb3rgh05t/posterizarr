@@ -14,6 +14,8 @@ The Posterizarr Plugin acts as a local asset proxy for Jellyfin and Emby. It is 
 
 ## Installation
 
+!!! important Only use this if you are not syncing from Plex, as it will overwrite your synced items with locally created assets from Posterizarr.
+
 ### Via Repository (Recommended)
 
 1.  Open your Jellyfin or Emby **Dashboard**.
