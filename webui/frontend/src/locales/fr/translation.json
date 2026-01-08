@@ -314,33 +314,33 @@
   },
   "overlayAssets": {
     "tabs": {
-        "design": "Design",
-        "layers": "Calques"
+      "design": "Design",
+      "layers": "Calques"
     },
     "layers": {
-        "uploadTitle": "Ajouter un calque",
-        "uploadDesc": "PNG, Logo, Sticker",
-        "empty": "Aucun calque ajouté.",
-        "name": "Calque {{index}}",
-        "front": "DEVANT",
-        "behind": "DERRIÈRE",
-        "dimmed": "Atténué",
-        "bright": "Clair"
+      "uploadTitle": "Ajouter un calque",
+      "uploadDesc": "PNG, Logo, Sticker",
+      "empty": "Aucun calque ajouté.",
+      "name": "Calque {{index}}",
+      "front": "DEVANT",
+      "behind": "DERRIÈRE",
+      "dimmed": "Atténué",
+      "bright": "Clair"
     },
     "controls": {
-        "bringFront": "Mettre au premier plan",
-        "sendBack": "Mettre à l'arrière-plan",
-        "moveUp": "Monter",
-        "moveDown": "Descendre",
-        "delete": "Supprimer",
-        "makeBright": "Rendre clair (100%)",
-        "makeDim": "Atténuer (50%)",
-        "adjustOpacity": "Régler l'opacité"
+      "bringFront": "Mettre au premier plan",
+      "sendBack": "Mettre à l'arrière-plan",
+      "moveUp": "Monter",
+      "moveDown": "Descendre",
+      "delete": "Supprimer",
+      "makeBright": "Rendre clair (100%)",
+      "makeDim": "Atténuer (50%)",
+      "adjustOpacity": "Régler l'opacité"
     },
     "help": {
-        "title": "Contrôles",
-        "text": "• Glisser pour déplacer, poignée pour redimensionner/pivoter",
-        "text2": "• Utilisez les icônes pour réorganiser ou régler l'opacité."
+      "title": "Contrôles",
+      "text": "• Glisser pour déplacer, poignée pour redimensionner/pivoter",
+      "text2": "• Utilisez les icônes pour réorganiser ou régler l'opacité."
     },
     "showTextGuide": "Afficher le guide de zone de texte",
     "showTextGuideHint": "Affiche une boîte rouge basée sur 'MaxWidth', 'MaxHeight' et 'text_offset' de vos paramètres.",
@@ -596,12 +596,12 @@
       "systemControlDeck": "Panneau de Contrôle Système"
     },
     "logViewerLabel": {
-        "reading": "Lecture:",
-        "autoScrollOn": "Défilement Auto Activé",
-        "autoScrollOff": "Défilement Auto Désactivé",
-        "entries": "Entrées:",
-        "refreshesEvery": "Actualise chaque",
-        "event": "Événement"
+      "reading": "Lecture:",
+      "autoScrollOn": "Défilement Auto Activé",
+      "autoScrollOff": "Défilement Auto Désactivé",
+      "entries": "Entrées:",
+      "refreshesEvery": "Actualise chaque",
+      "event": "Événement"
     },
     "title": "Tableau de bord",
     "welcome": "Surveillez votre instance Posterizarr",
@@ -625,7 +625,7 @@
     "noSchedulesRegistered": "Aucun horaire enregistré",
     "run": "Lancer",
     "stopSuccess": "Arrêt du script...",
-    "assets": "Actifs à Afficher",
+    "assets": "Éléments à afficher",
     "scriptFile": "Fichier script",
     "configFile": "Fichier de config",
     "cores": "Cœurs",
@@ -813,7 +813,7 @@
     "currentOrder": "Ordre actuel :"
   },
   "imageSizeSlider": {
-    "imageSize": "Taille de l'image"
+    "imageSize": "Éléments à afficher"
   },
   "galleryHub": {
     "viewMode": "Mode d'affichage",
@@ -1045,7 +1045,7 @@
     "runMigration": "Lancer la migration",
     "importing": "Importation...",
     "importJson": "Importer JSON",
-	"loading": "Chargement en cours...",
+    "loading": "Chargement en cours...",
     "summary": "Résumé ({{days}} derniers jours)",
     "days": "{{count}} jours",
     "totalRuns": "Exécutions totales",
@@ -1097,6 +1097,13 @@
   },
   "schedulerSettings": {
     "loading": "Chargement des paramètres du planificateur...",
+    "runMode": "Mode d'exécution",
+    "modes": {
+      "normal": "Exécution standard",
+      "syncjelly": "Synchroniser Jellyfin",
+      "syncemby": "Synchroniser Emby",
+      "backup": "Sauvegarde Plex"
+    },
     "updating": "Mise à jour...",
     "enabled": "Activé",
     "disabled": "Désactivé",
@@ -1454,7 +1461,7 @@
     "autoSaved": "{{count}} modification(s) enregistrée(s) automatiquement",
     "savedSuccessfully": "Configuration enregistrée avec succès ! ({{count}} modification(s))"
   },
-    "apiKeys": {
+  "apiKeys": {
     "title": "Clés API et Webhooks",
     "generateTitle": "Générer une nouvelle clé",
     "namePlaceholder": "Nom de la clé (ex: Tautulli)",

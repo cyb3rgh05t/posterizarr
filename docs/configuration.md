@@ -135,6 +135,8 @@
     - `NewLineOnSpecificSymbols`: Set to `true` to enable automatic insertion of a newline character at each occurrence of specific symbols in `NewLineSymbols` within the title text.
     - `NewLineSymbols`: A list of symbols that will trigger a newline insertion when `NewLineOnSpecificSymbols` is set to `true`. Separate each symbol with a comma (e.g., " - ", ":").
     - `SymbolsToKeepOnNewLine`: A list of symbols that trigger a newline insertion but are not replaced by the newline character. This only applies if the symbol is also included in `NewLineSymbols`. Separate each symbol with a comma (e.g., "-", ":").
+    - `NewLineOnSpecificWords`: Set to true to enable the automatic replacement of specific words with formatted versions (such as hyphenated breaks) as defined in `NewLineWords`.
+    - `NewLineWords`: A mapping of specific words to their desired replacement format. Each entry consists of a "Key": "Value" pair (e.g., "FEUERZANGENBOWLE": "FEUERZANGEN-\nBOWLE"). This is used to manually force newlines or hyphens into long words for better visual layout.
     - `SeasonPosters`: Set to `true` to also create season posters.
     - `BackgroundPosters`: Set to `true` to also create background posters.
     - `TitleCards` : Set to `true` to also create title cards.

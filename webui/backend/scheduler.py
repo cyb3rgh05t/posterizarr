@@ -248,7 +248,7 @@ class PosterizarrScheduler:
             # If we can't check, assume it might be running to be safe
             return True
 
-    async def run_script(self, force_run: bool = False):
+    async def run_script(self, mode: str = "normal", force_run: bool = False):
         """
         Execute Posterizarr script in normal mode (non-blocking)
         This async method uses the thread-safe lock for critical state changes.
@@ -310,9 +310,17 @@ class PosterizarrScheduler:
             else:
                 ps_command = "pwsh"
 
-            command = [ps_command, "-File", str(self.script_path), "-UISchedule"]
-
-            logger.info(f"Executing scheduled run: {' '.join(command)}")
+            mode_switches = {
+                "normal": ["-UISchedule"],
+                "syncjelly": ["-UISchedule", "-SyncJelly"],
+                "syncemby": ["-UISchedule", "-SyncEmby"],
+                "backup": ["-UISchedule", "-Backup"]
+            }
+            
+            switches = mode_switches.get(mode.lower(), ["-UISchedule"])
+            command = [ps_command, "-File", str(self.script_path)] + switches
+            
+            logger.info(f"Executing scheduled run ({mode}): {' '.join(command)}")
 
             def run_in_thread():
                 """Run subprocess in a separate thread to avoid blocking"""
@@ -442,13 +450,16 @@ class PosterizarrScheduler:
             # Add jobs for each schedule
             for idx, schedule in enumerate(schedules):
                 time_str = schedule.get("time", "")
+                # Get the execution mode (normal, syncjelly, syncemby, backup), default to normal
+                mode = schedule.get("mode", "normal") 
                 hour, minute = self.parse_schedule_time(time_str)
 
                 if hour is None or minute is None:
                     logger.error(f"Invalid schedule time: {time_str}")
                     continue
 
-                job_id = f"posterizarr_normal_{idx}"
+                # Include mode in job_id to distinguish between different task types at the same time
+                job_id = f"posterizarr_{mode}_{idx}"
 
                 # Create cron trigger for daily execution
                 trigger = CronTrigger(
@@ -457,15 +468,18 @@ class PosterizarrScheduler:
                     timezone=timezone,
                 )
 
+                # Add the job and pass the mode as an argument to run_script
                 self.scheduler.add_job(
                     self.run_script,
                     trigger=trigger,
                     id=job_id,
-                    name=f"Posterizarr Normal Mode @ {time_str}",
+                    # This creates the clean "Posterizarr Normal @ 22:30" string
+                    name=f"Posterizarr {mode.replace('sync', 'Sync ').title()} @ {time_str}",
+                    args=[mode],
                     replace_existing=True,
                 )
 
-                logger.info(f"Added schedule: {time_str} (Job ID: {job_id})")
+                logger.info(f"Added schedule: {time_str} (Mode: {mode}, Job ID: {job_id})")
 
             self.update_next_run()
 
@@ -650,22 +664,20 @@ class PosterizarrScheduler:
                 self.save_config(config)
                 logger.warning("No valid next runs calculated")
 
-    def add_schedule(self, time_str: str, description: str = "") -> bool:
-        """Add a new schedule (Thread-safe)"""
+    def add_schedule(self, time_str: str, description: str = "", mode: str = "normal") -> bool:
         with self._lock:
-            hour, minute = self.parse_schedule_time(time_str)
-            if hour is None or minute is None:
-                return False
-
             config = self.load_config()
             schedules = config.get("schedules", [])
 
-            # Check for duplicates
             if any(s.get("time") == time_str for s in schedules):
-                logger.warning(f"Schedule {time_str} already exists")
                 return False
 
-            schedules.append({"time": time_str, "description": description})
+            # Store the mode in the schedule object
+            schedules.append({
+                "time": time_str, 
+                "description": description, 
+                "mode": mode 
+            })
             config["schedules"] = schedules
             self.save_config(config)
 

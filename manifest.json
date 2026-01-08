@@ -1,0 +1,19 @@
+[
+  {
+    "guid": "f62d8560-6123-4567-89ab-cdef12345678",
+    "name": "Posterizarr",
+    "description": "Middleware for asset lookup. Maps local assets to library items as posters, backgrounds, or titlecards.",
+    "overview": "A custom plugin for Posterizarr that acts as a local asset proxy for Jellyfin and Emby.",
+    "owner": "Posterizarr",
+    "category": "Metadata",
+    "versions": [
+      {
+        "version": "99.0.0108.0714",
+        "changelog": "Dev build: 2026-01-08 07:15",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/fscorrupt/posterizarr/builds/Posterizarr.Plugin_v99.0.0108.0714.zip",
+        "checksum": "CBA6E291AC40659631A4918D8C35AF2F"
+      }
+    ]
+  }
+]

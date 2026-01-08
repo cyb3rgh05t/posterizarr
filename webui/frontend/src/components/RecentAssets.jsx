@@ -49,7 +49,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
   const [assetCount, setAssetCount] = useState(() => {
     const saved = localStorage.getItem("recent-assets-count");
     const count = saved ? parseInt(saved) : 10;
-    return Math.min(Math.max(count, 5), 10);
+    return Math.min(Math.max(count, 5), 20);
   });
 
   const fetchRecentAssets = async (silent = false) => {
@@ -157,7 +157,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
   }, []);
 
   const handleAssetCountChange = (newCount) => {
-    const validCount = Math.min(Math.max(newCount, 5), 10);
+    const validCount = Math.min(Math.max(newCount, 5), 20);
     setAssetCount(validCount);
     localStorage.setItem("recent-assets-count", validCount.toString());
     setPageOffset(0);
@@ -199,7 +199,12 @@ function RecentAssets({ refreshTrigger = 0 }) {
 
       switch (activeTab) {
         case "Posters":
-          return type === "movie" || type === "poster" || type === "show" || type === "collection";
+          return (
+            type === "movie" ||
+            type === "poster" ||
+            type === "show" ||
+            type === "collection"
+          );
         case "Collections":
           return type === "collection";
         case "Backgrounds":
@@ -368,7 +373,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
               onChange={handleAssetCountChange}
               storageKey="recent-assets-count"
               min={5}
-              max={10}
+              max={20}
             />
           </div>
 
@@ -562,7 +567,12 @@ function RecentAssets({ refreshTrigger = 0 }) {
           {/* Modern Footer */}
           <div className="mt-2 pt-4 border-t border-theme/50 flex items-center justify-between">
             <div className="text-xs text-theme-muted font-medium">
-              Showing <span className="text-theme-text">{pageOffset + 1}-{Math.min(pageOffset + assetCount, filteredAssets.length)}</span> of{" "}
+              Showing{" "}
+              <span className="text-theme-text">
+                {pageOffset + 1}-
+                {Math.min(pageOffset + assetCount, filteredAssets.length)}
+              </span>{" "}
+              of{" "}
               <span className="text-theme-text">{filteredAssets.length}</span>{" "}
               {activeTab !== "All" && `${activeTab.toLowerCase()} `}
               {filteredAssets.length === 1 ? "asset" : "assets"}
@@ -580,7 +590,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
                 </button>
 
                 <span className="text-xs text-theme-muted font-medium px-2">
-                  Page <span className="text-theme-text">{currentPage}</span> / {totalPages}
+                  Page <span className="text-theme-text">{currentPage}</span> /{" "}
+                  {totalPages}
                 </span>
 
                 <button
@@ -649,10 +660,12 @@ function RecentAssets({ refreshTrigger = 0 }) {
               {/* Info Side */}
               <div className="md:w-[400px] bg-theme-card border-l border-theme flex flex-col h-full">
                 <div className="p-6 border-b border-theme bg-theme-hover/10">
-                    <h3 className="text-xl font-bold text-theme-text leading-tight">
+                  <h3 className="text-xl font-bold text-theme-text leading-tight">
                     Asset Details
-                    </h3>
-                    <p className="text-xs text-theme-muted mt-1 uppercase tracking-wider font-semibold">Metadata & Properties</p>
+                  </h3>
+                  <p className="text-xs text-theme-muted mt-1 uppercase tracking-wider font-semibold">
+                    Metadata & Properties
+                  </p>
                 </div>
 
                 <div className="p-6 overflow-y-auto space-y-6 flex-1">
@@ -681,31 +694,35 @@ function RecentAssets({ refreshTrigger = 0 }) {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-theme-muted uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {t("common.created")}
+                      </label>
+                      <p className="text-theme-text text-sm">
+                        {selectedAsset.created
+                          ? new Date(selectedAsset.created * 1000)
+                              .toLocaleString("sv-SE")
+                              .replace("T", " ")
+                          : "Unknown"}
+                      </p>
+                    </div>
+
+                    {selectedAsset.modified && (
                       <div>
                         <label className="text-xs font-bold text-theme-muted uppercase tracking-wider flex items-center gap-1.5 mb-1">
                           <Calendar className="w-3.5 h-3.5" />
-                          {t("common.created")}
+                          {t("common.modified")}
                         </label>
                         <p className="text-theme-text text-sm">
-                          {selectedAsset.created
-                            ? new Date(selectedAsset.created * 1000).toLocaleString("sv-SE").replace("T", " ")
+                          {selectedAsset.modified
+                            ? new Date(selectedAsset.modified * 1000)
+                                .toLocaleString("sv-SE")
+                                .replace("T", " ")
                             : "Unknown"}
                         </p>
                       </div>
-
-                      {selectedAsset.modified && (
-                        <div>
-                          <label className="text-xs font-bold text-theme-muted uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                            <Calendar className="w-3.5 h-3.5" />
-                            {t("common.modified")}
-                          </label>
-                          <p className="text-theme-text text-sm">
-                            {selectedAsset.modified
-                              ? new Date(selectedAsset.modified * 1000).toLocaleString("sv-SE").replace("T", " ")
-                              : "Unknown"}
-                          </p>
-                        </div>
-                      )}
+                    )}
                   </div>
 
                   <div>
@@ -740,7 +757,8 @@ function RecentAssets({ refreshTrigger = 0 }) {
                     </p>
                   </div>
 
-                  {selectedAsset.language && selectedAsset.language !== "N/A" && (
+                  {selectedAsset.language &&
+                    selectedAsset.language !== "N/A" && (
                       <div>
                         <label className="text-xs font-bold text-theme-muted uppercase tracking-wider block mb-2">
                           Language
@@ -753,7 +771,7 @@ function RecentAssets({ refreshTrigger = 0 }) {
                           {selectedAsset.language}
                         </span>
                       </div>
-                  )}
+                    )}
 
                   {(selectedAsset.is_manually_created ||
                     selectedAsset.fallback ||
@@ -784,18 +802,18 @@ function RecentAssets({ refreshTrigger = 0 }) {
                 </div>
 
                 {selectedAsset.provider_link && (
-                    <div className="p-6 border-t border-theme bg-theme-hover/5 mt-auto">
-                      <a
-                        href={selectedAsset.provider_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-theme-primary hover:bg-theme-primary/90 text-white rounded-xl font-bold transition-all shadow-lg shadow-theme-primary/20 hover:-translate-y-0.5"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        View on Provider
-                      </a>
-                    </div>
-                  )}
+                  <div className="p-6 border-t border-theme bg-theme-hover/5 mt-auto">
+                    <a
+                      href={selectedAsset.provider_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-theme-primary hover:bg-theme-primary/90 text-white rounded-xl font-bold transition-all shadow-lg shadow-theme-primary/20 hover:-translate-y-0.5"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      View on Provider
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -813,7 +831,10 @@ function RecentAssets({ refreshTrigger = 0 }) {
         .poster-grid > div {
           display: flex;
           flex-direction: column;
-          flex: 0 0 calc((100% - (var(--poster-count) - 1) * 1rem) / var(--poster-count));
+          flex: 0 0
+            calc(
+              (100% - (var(--poster-count) - 1) * 1rem) / var(--poster-count)
+            );
           min-width: 0;
         }
 

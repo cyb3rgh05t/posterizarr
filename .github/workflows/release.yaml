@@ -90,5 +90,94 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Look for cache in the current branch AND specifically in the dev branch
+          cache-from: |
+            type=gha,scope=${{ github.ref_name }}
+            type=gha,scope=dev
+          # Always save the latest successful build cache to the current branch scope
+          cache-to: type=gha,scope=${{ github.ref_name }},mode=max
+  build-plugin:
+    name: Build Jellyfin Plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj
+
+      # 1. Generate the version string FIRST so we can use it in the build
+      - name: Set Version String
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            # Strips 'v' or 'V' from the tag (e.g., v1.0.0 -> 1.0.0)
+            V_STR=$(echo ${{ github.ref_name }} | sed 's/[vV]//')
+          else
+            # Generates a high version number for dev builds (e.g., 99.0.0106.0921)
+            V_STR="99.0.$(date +%m%d.%H%M)"
+          fi
+          echo "VERSION=$V_STR" >> $GITHUB_OUTPUT
+
+      # 2. Build the Plugin with the version injected into the DLL
+      - name: Build Plugin
+        run: |
+          dotnet build modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj \
+            --configuration Release \
+            --no-restore \
+            -p:Version=${{ steps.vars.outputs.VERSION }}
+
+      # 3. Create the versioned ZIP package
+      - name: Prepare Package
+        run: |
+          mkdir -p release_package
+          cp modules/Posterizarr.Plugin/bin/Release/net8.0/Posterizarr.Plugin.dll release_package/
+          cd release_package
+          zip -r ../Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip *
+          cd ..
+          mv Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip release_package/
+
+      # 4. DEV ONLY: Push ZIP to the builds branch
+      - name: Push to Builds Branch (Dev Only)
+        if: github.event_name != 'release'
+        uses: s0/git-publish-subdir-action@develop
+        env:
+          REPO: self
+          BRANCH: builds
+          FOLDER: release_package
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MESSAGE: "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
+
+      # 5. Run the Python script to update manifest.json
+      - name: Run Manifest Update Script
+        run: python3 update_manifest.py
+        env:
+          VERSION: ${{ steps.vars.outputs.VERSION }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      # 6. Commit changes back to the main/dev branch
+      - name: Commit and Push Manifest Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update manifest v${{ steps.vars.outputs.VERSION }} [skip ci]" && git push)
+
+      # 7. PRODUCTION ONLY: Upload ZIP to the GitHub Release page
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release_package/Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -2124,6 +2124,7 @@ class UILogBatch(BaseModel):
 class ScheduleCreate(BaseModel):
     time: str  # Format: "HH:MM"
     description: Optional[str] = ""
+    mode: Optional[str] = "normal"
 
 
 class ScheduleUpdate(BaseModel):
@@ -9294,10 +9295,8 @@ async def update_scheduler_config(data: ScheduleUpdate):
 
 @app.post("/api/scheduler/schedule")
 async def add_schedule(data: ScheduleCreate):
-    """Add a new schedule (time must be in HH:MM format, 00:00-23:59)"""
     if not SCHEDULER_AVAILABLE or not scheduler:
         raise HTTPException(status_code=503, detail="Scheduler not available")
-
     try:
         # Validate time format before adding
         hour, minute = scheduler.parse_schedule_time(data.time)
@@ -9307,7 +9306,7 @@ async def add_schedule(data: ScheduleCreate):
                 detail=f"Invalid time format '{data.time}'. Must be HH:MM (00:00-23:59)",
             )
 
-        success = scheduler.add_schedule(data.time, data.description)
+        success = scheduler.add_schedule(data.time, data.description, data.mode)
         if success:
             return {"success": True, "message": f"Schedule added: {data.time}"}
         else:
@@ -11035,7 +11034,7 @@ async def upload_asset_replacement(
         is_replacement = full_asset_path.exists()
 
         # Delete old asset from alternate location if moving between folders
-        if asset_exists_in_alternate and not is_replacement:
+        if asset_exists_in_alternate:
             try:
                 logger.info(
                     f"Deleting old asset from alternate location: {alternate_asset_path}"
@@ -11573,7 +11572,7 @@ async def replace_asset_from_url(
         full_asset_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Delete old asset from alternate location if moving between folders
-        if asset_exists_in_alternate and not asset_exists_in_target:
+        if asset_exists_in_alternate:
             try:
                 logger.info(
                     f"Deleting old asset from alternate location: {alternate_asset_path}"

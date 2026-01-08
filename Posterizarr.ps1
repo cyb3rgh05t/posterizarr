@@ -31,8 +31,6 @@ param (
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ExtraArgs # Required for Arrtrigger
 )
-# Disable command history saving
-Set-PSReadLineOption -HistorySaveStyle SaveNothing
 
 # Parse ExtraArgs into a hashtable
 $arrTriggers = @{}
@@ -53,11 +51,9 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.2.14"
+$CurrentScriptVersion = "2.2.15"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
-$env:PSMODULE_ANALYSIS_CACHE_PATH = $null
-$env:PSMODULE_ANALYSIS_CACHE_ENABLED = $false
 
 #################
 # What you need #
@@ -4806,6 +4802,10 @@ function InvokeMagickCommand {
         [string]$Arguments
     )
 
+    if ([string]::IsNullOrWhiteSpace($Arguments)) {
+        Write-Entry -Subtext "Skipping: No arguments provided for magick command." -Path $global:configLogging -Color Cyan -log Debug
+        return
+    }
     function GetMagickErrorMessage {
         param (
             [string]$ErrorMessage
@@ -7556,15 +7556,11 @@ $global:TitleCards = $config.PrerequisitePart.TitleCards.tolower()
 $SkipTBA = $config.PrerequisitePart.SkipTBA.tolower()
 $SkipJapTitle = $config.PrerequisitePart.SkipJapTitle.tolower()
 $AssetCleanup = $config.PrerequisitePart.AssetCleanup.tolower()
-$NewLineOnSpecificSymbols = $config.PrerequisitePart.NewLineOnSpecificSymbols
-if ($NewLineOnSpecificSymbols) {
-    $NewLineOnSpecificSymbols = $NewLineOnSpecificSymbols.tolower()
-}
-$SymbolsToKeepOnNewLine = $config.PrerequisitePart.SymbolsToKeepOnNewLine
-if ($SymbolsToKeepOnNewLine) {
-    $SymbolsToKeepOnNewLine = $SymbolsToKeepOnNewLine.tolower()
-}
+$NewLineOnSpecificSymbols = $config.PrerequisitePart.NewLineOnSpecificSymbols.tolower()
+$SymbolsToKeepOnNewLine = $config.PrerequisitePart.SymbolsToKeepOnNewLine.tolower()
 $NewLineSymbols = $config.PrerequisitePart.NewLineSymbols
+$NewLineOnSpecificWords = $config.PrerequisitePart.NewLineOnSpecificWords.toLower()
+$NewLineWords = $config.PrerequisitePart.NewLineWords
 
 # Resolution Part
 $UsePosterResolutionOverlays = $config.PrerequisitePart.UsePosterResolutionOverlays.tolower()
@@ -8841,7 +8837,7 @@ if ($Manual) {
                     $isLogo = $false
                 }
             }
-            if (($AddText -eq 'true' -or $AddSeasonText -eq 'true' -or $AddTitleCardEPTitleText -eq 'true' -or $AddTitleCardEPText -eq 'true' -or $AddCollectionText -eq 'true' -or $AddBackgroundText -eq 'true') -and -not [string]::IsNullOrWhiteSpace($joinedTitle)) {
+            if (($isLogo -or $AddText -eq 'true' -or $AddSeasonText -eq 'true' -or $AddTitleCardEPTitleText -eq 'true' -or $AddTitleCardEPText -eq 'true' -or $AddCollectionText -eq 'true' -or $AddBackgroundText -eq 'true') -and -not [string]::IsNullOrWhiteSpace($joinedTitle)) {
                 $joinedTitle = $joinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
                 if ($AddShowTitletoSeason -eq 'true' -and $SeasonPoster) {
                     $ShowjoinedTitle = $ShowjoinedTitle -replace '„', '"' -replace '”', '"' -replace '“', '"' -replace '"', '""' -replace '`', ''
@@ -8870,6 +8866,19 @@ if ($Manual) {
                                 $replacementString = $symbol + "`n"
                             }
                             $ShowjoinedTitle = $ShowjoinedTitle -replace [regex]::Escape($symbol), $replacementString
+                        }
+                    }
+                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                        # Check if properties exist and the list is not empty
+                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                            foreach ($wordKey in $properties) {
+                                $replacementValue = $NewLineWords.$wordKey
+
+                                # Using [regex]::Escape handles any special characters in the word keys
+                                $ShowjoinedTitle = $ShowjoinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                            }
                         }
                     }
                     $ShowjoinedTitlePointSize = $ShowjoinedTitle -replace '""', '""""'
@@ -8904,6 +8913,19 @@ if ($Manual) {
                                 $replacementString = $symbol + "`n"
                             }
                             $CollectionjoinedTitle = $CollectionjoinedTitle -replace [regex]::Escape($symbol), $replacementString
+                        }
+                    }
+                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                        # Check if properties exist and the list is not empty
+                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                            foreach ($wordKey in $properties) {
+                                $replacementValue = $NewLineWords.$wordKey
+
+                                # Using [regex]::Escape handles any special characters in the word keys
+                                $CollectionjoinedTitle = $CollectionjoinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                            }
                         }
                     }
                     $CollectionjoinedTitlePointSize = $CollectionjoinedTitle -replace '""', '""""'
@@ -8943,6 +8965,19 @@ if ($Manual) {
                             $replacementString = $symbol + "`n"
                         }
                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                    }
+                }
+                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                    # Check if properties exist and the list is not empty
+                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                        foreach ($wordKey in $properties) {
+                            $replacementValue = $NewLineWords.$wordKey
+
+                            # Using [regex]::Escape handles any special characters in the word keys
+                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                        }
                     }
                 }
 
@@ -9062,7 +9097,7 @@ if ($Manual) {
                     $logEntry | Out-File $magickLog -Append
                     InvokeMagickCommand -Command $magick -Arguments $Arguments
                 }
-                Elseif ($AddText -eq 'true') {
+                Elseif ($AddText -eq 'true' -or $isLogo) {
                     if ($isLogo){
                         $Arguments = "`"$PosterImage`" `( `"$LogoSource`" -resize `"$boxsize`" -background none `) -gravity `"$textgravity`" -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
                         Write-Entry -Subtext "    Applying logo..." -Path $global:configLogging -Color White -log Info
@@ -10391,7 +10426,7 @@ Elseif ($Tautulli) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -10537,6 +10572,19 @@ Elseif ($Tautulli) {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -10693,8 +10741,6 @@ Elseif ($Tautulli) {
                                 }
                                 # Export the array to a CSV file
                                 $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -10990,7 +11036,7 @@ Elseif ($Tautulli) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -11137,6 +11183,19 @@ Elseif ($Tautulli) {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -11293,8 +11352,6 @@ Elseif ($Tautulli) {
                                 }
                                 # Export the array to a CSV file
                                 $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -11678,7 +11735,7 @@ Elseif ($Tautulli) {
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBorder = 'false'
                                         $AddOverlay = 'false'
                                     }
@@ -11824,6 +11881,19 @@ Elseif ($Tautulli) {
                                                             $replacementString = $symbol + "`n"
                                                         }
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -11979,8 +12049,6 @@ Elseif ($Tautulli) {
                             }
                             # Export the array to a CSV file
                             $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
@@ -12288,7 +12356,7 @@ Elseif ($Tautulli) {
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBackgroundBorder = 'false'
                                         $AddBackgroundOverlay = 'false'
                                     }
@@ -12434,6 +12502,19 @@ Elseif ($Tautulli) {
                                                             $replacementString = $symbol + "`n"
                                                         }
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -12595,8 +12676,6 @@ Elseif ($Tautulli) {
                             }
                             # Export the array to a CSV file
                             $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
@@ -13011,7 +13090,7 @@ Elseif ($Tautulli) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddSeasonBorder = 'false'
                                                 $AddSeasonOverlay = 'false'
                                             }
@@ -13075,6 +13154,22 @@ Elseif ($Tautulli) {
                                                         $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                         if ($AddShowTitletoSeason -eq 'true') {
                                                             $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            if ($AddShowTitletoSeason -eq 'true') {
+                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -13332,8 +13427,6 @@ Elseif ($Tautulli) {
                                 }
                                 # Export the array to a CSV file
                                 $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -13711,7 +13804,7 @@ Elseif ($Tautulli) {
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -13773,6 +13866,19 @@ Elseif ($Tautulli) {
                                                                                 $replacementString = $symbol + "`n"
                                                                             }
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                        }
+                                                                    }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -14365,7 +14471,7 @@ Elseif ($Tautulli) {
                                                             }
 
                                                             # Logic for "If both are true, only resize"
-                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                 $AddTitleCardBorder = 'false'
                                                                 $AddTitleCardOverlay = 'false'
                                                             }
@@ -14427,6 +14533,19 @@ Elseif ($Tautulli) {
                                                                             $replacementString = $symbol + "`n"
                                                                         }
                                                                         $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                    }
+                                                                }
+                                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                    # Check if properties exist and the list is not empty
+                                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                        foreach ($wordKey in $properties) {
+                                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                        }
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -15873,7 +15992,7 @@ Elseif ($ArrTrigger) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddBorder = 'false'
                                                 $AddOverlay = 'false'
                                             }
@@ -16019,6 +16138,19 @@ Elseif ($ArrTrigger) {
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                             }
                                                         }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
+                                                            }
+                                                        }
                                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                         if (!$global:IsTruncated) {
@@ -16133,8 +16265,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -16409,7 +16539,7 @@ Elseif ($ArrTrigger) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddBackgroundBorder = 'false'
                                                 $AddBackgroundOverlay = 'false'
                                             }
@@ -16556,6 +16686,19 @@ Elseif ($ArrTrigger) {
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                             }
                                                         }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
+                                                            }
+                                                        }
                                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                         if (!$global:IsTruncated) {
@@ -16672,8 +16815,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -17028,7 +17169,7 @@ Elseif ($ArrTrigger) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -17175,6 +17316,19 @@ Elseif ($ArrTrigger) {
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if (!$global:IsTruncated) {
@@ -17289,8 +17443,6 @@ Elseif ($ArrTrigger) {
                                 }
                                 # Export the array to a CSV file
                                 $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -17577,7 +17729,7 @@ Elseif ($ArrTrigger) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -17724,6 +17876,19 @@ Elseif ($ArrTrigger) {
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                     if (!$global:IsTruncated) {
@@ -17838,8 +18003,6 @@ Elseif ($ArrTrigger) {
                                 }
                                 # Export the array to a CSV file
                                 $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -18238,7 +18401,7 @@ Elseif ($ArrTrigger) {
                                                     }
 
                                                     # Logic for "If both are true, only resize"
-                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                         $AddSeasonBorder = 'false'
                                                         $AddSeasonOverlay = 'false'
                                                     }
@@ -18302,6 +18465,22 @@ Elseif ($ArrTrigger) {
                                                                 $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                                 if ($AddShowTitletoSeason -eq 'true') {
                                                                     $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
+                                                                }
+                                                            }
+                                                        }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                    if ($AddShowTitletoSeason -eq 'true') {
+                                                                        $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -18460,8 +18639,6 @@ Elseif ($ArrTrigger) {
                                         }
                                         # Export the array to a CSV file
                                         $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                     }
                                 }
                                 else {
@@ -18803,7 +18980,7 @@ Elseif ($ArrTrigger) {
                                                                     }
 
                                                                     # Logic for "If both are true, only resize"
-                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                         $AddTitleCardBorder = 'false'
                                                                         $AddTitleCardOverlay = 'false'
                                                                     }
@@ -18864,6 +19041,19 @@ Elseif ($ArrTrigger) {
                                                                                     $replacementString = $symbol + "`n"
                                                                                 }
                                                                                 $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                            }
+                                                                        }
+                                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                            $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                            # Check if properties exist and the list is not empty
+                                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                                foreach ($wordKey in $properties) {
+                                                                                    $replacementValue = $NewLineWords.$wordKey
+
+                                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                                    $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                                }
                                                                             }
                                                                         }
                                                                         $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -19336,7 +19526,7 @@ Elseif ($ArrTrigger) {
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -19397,6 +19587,19 @@ Elseif ($ArrTrigger) {
                                                                                 $replacementString = $symbol + "`n"
                                                                             }
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                        }
+                                                                    }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -20367,7 +20570,7 @@ Elseif ($ArrTrigger) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddBorder = 'false'
                                                 $AddOverlay = 'false'
                                             }
@@ -20513,6 +20716,19 @@ Elseif ($ArrTrigger) {
                                                                     $replacementString = $symbol + "`n"
                                                                 }
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
                                                             }
                                                         }
                                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -20669,8 +20885,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -20966,7 +21180,7 @@ Elseif ($ArrTrigger) {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddBackgroundBorder = 'false'
                                                 $AddBackgroundOverlay = 'false'
                                             }
@@ -21112,6 +21326,19 @@ Elseif ($ArrTrigger) {
                                                                     $replacementString = $symbol + "`n"
                                                                 }
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                            $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                            # Check if properties exist and the list is not empty
+                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                foreach ($wordKey in $properties) {
+                                                                    $replacementValue = $NewLineWords.$wordKey
+
+                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                    $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
                                                             }
                                                         }
                                                         $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -21268,8 +21495,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -21653,7 +21878,7 @@ Elseif ($ArrTrigger) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -21799,6 +22024,19 @@ Elseif ($ArrTrigger) {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -21954,8 +22192,6 @@ Elseif ($ArrTrigger) {
                                 }
                                 # Export the array to a CSV file
                                 $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -22263,7 +22499,7 @@ Elseif ($ArrTrigger) {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -22409,6 +22645,19 @@ Elseif ($ArrTrigger) {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -22570,8 +22819,6 @@ Elseif ($ArrTrigger) {
                                 }
                                 # Export the array to a CSV file
                                 $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -22986,7 +23233,7 @@ Elseif ($ArrTrigger) {
                                                 }
 
                                                 # Logic for "If both are true, only resize"
-                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                     $AddSeasonBorder = 'false'
                                                     $AddSeasonOverlay = 'false'
                                                 }
@@ -23050,6 +23297,22 @@ Elseif ($ArrTrigger) {
                                                             $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                             if ($AddShowTitletoSeason -eq 'true') {
                                                                 $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                if ($AddShowTitletoSeason -eq 'true') {
+                                                                    $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -23306,8 +23569,6 @@ Elseif ($ArrTrigger) {
                                     }
                                     # Export the array to a CSV file
                                     $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -23685,7 +23946,7 @@ Elseif ($ArrTrigger) {
                                                                     }
 
                                                                     # Logic for "If both are true, only resize"
-                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                         $AddTitleCardBorder = 'false'
                                                                         $AddTitleCardOverlay = 'false'
                                                                     }
@@ -23747,6 +24008,19 @@ Elseif ($ArrTrigger) {
                                                                                     $replacementString = $symbol + "`n"
                                                                                 }
                                                                                 $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                            }
+                                                                        }
+                                                                        if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                            $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                            # Check if properties exist and the list is not empty
+                                                                            if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                                foreach ($wordKey in $properties) {
+                                                                                    $replacementValue = $NewLineWords.$wordKey
+
+                                                                                    # Using [regex]::Escape handles any special characters in the word keys
+                                                                                    $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                                }
                                                                             }
                                                                         }
                                                                         $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -24339,7 +24613,7 @@ Elseif ($ArrTrigger) {
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -24401,6 +24675,19 @@ Elseif ($ArrTrigger) {
                                                                                 $replacementString = $symbol + "`n"
                                                                             }
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                        }
+                                                                    }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -26998,7 +27285,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -27145,6 +27432,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if (!$global:IsTruncated) {
@@ -27258,8 +27558,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 }
                                 # Export the array to a CSV file
                                 $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -27535,7 +27833,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -27682,6 +27980,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                         }
                                                     }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
+                                                        }
+                                                    }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                     if (!$global:IsTruncated) {
@@ -27797,8 +28108,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                 }
                                 # Export the array to a CSV file
                                 $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -28154,7 +28463,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBorder = 'false'
                                         $AddOverlay = 'false'
                                     }
@@ -28301,6 +28610,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
+                                                    }
+                                                }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                 if (!$global:IsTruncated) {
@@ -28414,8 +28736,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                             }
                             # Export the array to a CSV file
                             $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
@@ -28703,7 +29023,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBackgroundBorder = 'false'
                                         $AddBackgroundOverlay = 'false'
                                     }
@@ -28850,6 +29170,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
                                                     }
                                                 }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
+                                                    }
+                                                }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                 if (!$global:IsTruncated) {
@@ -28963,8 +29296,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                             }
                             # Export the array to a CSV file
                             $showbackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
@@ -29378,7 +29709,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 }
 
                                                 # Logic for "If both are true, only resize"
-                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                     $AddSeasonBorder = 'false'
                                                     $AddSeasonOverlay = 'false'
                                                 }
@@ -29442,6 +29773,22 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                             if ($AddShowTitletoSeason -eq 'true') {
                                                                 $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                if ($AddShowTitletoSeason -eq 'true') {
+                                                                    $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -29599,8 +29946,6 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     }
                                     # Export the array to a CSV file
                                     $seasontemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                                 }
                             }
                             else {
@@ -29943,7 +30288,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -30004,6 +30349,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                                 $replacementString = $symbol + "`n"
                                                                             }
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                        }
+                                                                    }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -30476,7 +30834,7 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                             }
 
                                                             # Logic for "If both are true, only resize"
-                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                 $AddTitleCardBorder = 'false'
                                                                 $AddTitleCardOverlay = 'false'
                                                             }
@@ -30537,6 +30895,19 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                             $replacementString = $symbol + "`n"
                                                                         }
                                                                         $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                    }
+                                                                }
+                                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                    # Check if properties exist and the list is not empty
+                                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                        foreach ($wordKey in $properties) {
+                                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                        }
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -31869,7 +32240,7 @@ else {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBorder = 'false'
                                             $AddOverlay = 'false'
                                         }
@@ -32014,6 +32385,19 @@ else {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -32171,8 +32555,6 @@ else {
                                 }
                                 # Export the array to a CSV file
                                 $movietemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -32534,7 +32916,7 @@ else {
                                         }
 
                                         # Logic for "If both are true, only resize"
-                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                        if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                             $AddBackgroundBorder = 'false'
                                             $AddBackgroundOverlay = 'false'
                                         }
@@ -32680,6 +33062,19 @@ else {
                                                                 $replacementString = $symbol + "`n"
                                                             }
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                        # Check if properties exist and the list is not empty
+                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                            foreach ($wordKey in $properties) {
+                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -32837,8 +33232,6 @@ else {
                                 }
                                 # Export the array to a CSV file
                                 $moviebackgroundtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                             }
                         }
                         else {
@@ -33290,7 +33683,7 @@ else {
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBorder = 'false'
                                         $AddOverlay = 'false'
                                     }
@@ -33436,6 +33829,19 @@ else {
                                                             $replacementString = $symbol + "`n"
                                                         }
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -33592,8 +33998,6 @@ else {
                             }
                             # Export the array to a CSV file
                             $showtemp | Export-Csv -Path "$global:ScriptRoot\Logs\ImageChoices.csv" -NoTypeInformation -Delimiter ';' -Encoding UTF8 -Force -Append
-
-
                         }
                     }
                     else {
@@ -33970,7 +34374,7 @@ else {
                                     }
 
                                     # Logic for "If both are true, only resize"
-                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                    if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                         $AddBackgroundBorder = 'false'
                                         $AddBackgroundOverlay = 'false'
                                     }
@@ -34116,6 +34520,19 @@ else {
                                                             $replacementString = $symbol + "`n"
                                                         }
                                                         $joinedTitle = $joinedTitle -replace [regex]::Escape($symbol), $replacementString
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                        }
                                                     }
                                                 }
                                                 $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
@@ -34766,7 +35183,7 @@ else {
                                             }
 
                                             # Logic for "If both are true, only resize"
-                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                 $AddSeasonBorder = 'false'
                                                 $AddSeasonOverlay = 'false'
                                             }
@@ -34830,6 +35247,22 @@ else {
                                                         $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($symbol), $replacementString
                                                         if ($AddShowTitletoSeason -eq 'true') {
                                                             $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($symbol), $replacementString
+                                                        }
+                                                    }
+                                                }
+                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                    # Check if properties exist and the list is not empty
+                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                        foreach ($wordKey in $properties) {
+                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                            $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                            if ($AddShowTitletoSeason -eq 'true') {
+                                                                $global:ShowTitleOnSeason = $global:ShowTitleOnSeason -replace [regex]::Escape($wordKey), $replacementValue
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -35530,7 +35963,7 @@ else {
                                                                 }
 
                                                                 # Logic for "If both are true, only resize"
-                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                                if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                     $AddTitleCardBorder = 'false'
                                                                     $AddTitleCardOverlay = 'false'
                                                                 }
@@ -35592,6 +36025,19 @@ else {
                                                                                 $replacementString = $symbol + "`n"
                                                                             }
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                        }
+                                                                    }
+                                                                    if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                        $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                        # Check if properties exist and the list is not empty
+                                                                        if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                            foreach ($wordKey in $properties) {
+                                                                                $replacementValue = $NewLineWords.$wordKey
+
+                                                                                # Using [regex]::Escape handles any special characters in the word keys
+                                                                                $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                            }
                                                                         }
                                                                     }
                                                                     $joinedTitlePointSize = $global:EPTitle -replace '""', '""""'
@@ -36250,7 +36696,7 @@ else {
                                                             }
 
                                                             # Logic for "If both are true, only resize"
-                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true') {
+                                                            if ($SkipAddTextAndOverlay -eq 'true' -and $SkipAddTextAndBorder -eq 'true' -and $global:PosterWithText) {
                                                                 $AddTitleCardBorder = 'false'
                                                                 $AddTitleCardOverlay = 'false'
                                                             }
@@ -36311,6 +36757,19 @@ else {
                                                                             $replacementString = $symbol + "`n"
                                                                         }
                                                                         $global:EPTitle = $global:EPTitle -replace [regex]::Escape($symbol), $replacementString
+                                                                    }
+                                                                }
+                                                                if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
+                                                                    $properties = $NewLineWords.PSObject.Properties.Name
+
+                                                                    # Check if properties exist and the list is not empty
+                                                                    if ($null -ne $properties -and $properties.Count -gt 0) {
+                                                                        foreach ($wordKey in $properties) {
+                                                                            $replacementValue = $NewLineWords.$wordKey
+
+                                                                            # Using [regex]::Escape handles any special characters in the word keys
+                                                                            $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
+                                                                        }
                                                                     }
                                                                 }
                                                                 $joinedTitlePointSize = $global:EPTitle -replace '""', '""""' -replace '`', ''

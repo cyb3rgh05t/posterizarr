@@ -314,33 +314,33 @@
   },
   "overlayAssets": {
     "tabs": {
-        "design": "Design",
-        "layers": "Layers"
+      "design": "Design",
+      "layers": "Layers"
     },
     "layers": {
-        "uploadTitle": "Upload Layer",
-        "uploadDesc": "PNG, Logo, Sticker",
-        "empty": "No layers added.",
-        "name": "Layer {{index}}",
-        "front": "FRONT",
-        "behind": "BEHIND",
-        "dimmed": "Dimmed",
-        "bright": "Bright"
+      "uploadTitle": "Upload Layer",
+      "uploadDesc": "PNG, Logo, Sticker",
+      "empty": "No layers added.",
+      "name": "Layer {{index}}",
+      "front": "FRONT",
+      "behind": "BEHIND",
+      "dimmed": "Dimmed",
+      "bright": "Bright"
     },
     "controls": {
-        "bringFront": "Bring to Front",
-        "sendBack": "Send Behind Overlay",
-        "moveUp": "Move Up",
-        "moveDown": "Move Down",
-        "delete": "Delete",
-        "makeBright": "Make Bright (100%)",
-        "makeDim": "Make Dim (50%)",
-        "adjustOpacity": "Adjust Opacity"
+      "bringFront": "Bring to Front",
+      "sendBack": "Send Behind Overlay",
+      "moveUp": "Move Up",
+      "moveDown": "Move Down",
+      "delete": "Delete",
+      "makeBright": "Make Bright (100%)",
+      "makeDim": "Make Dim (50%)",
+      "adjustOpacity": "Adjust Opacity"
     },
     "help": {
-        "title": "Controls",
-        "text": "• Drag to Move, Handle to Resize/Rotate",
-        "text2": "• Use the icons to reorder or adjust opacity."
+      "title": "Controls",
+      "text": "• Drag to Move, Handle to Resize/Rotate",
+      "text2": "• Use the icons to reorder or adjust opacity."
     },
     "showTextGuide": "Show Text Area Guide",
     "showTextGuideHint": "Renders a red box based on 'MaxWidth', 'MaxHeight' and 'text_offset' from your Settings.",
@@ -596,12 +596,12 @@
       "systemControlDeck": "System Control Deck"
     },
     "logViewerLabel": {
-        "reading": "Reading:",
-        "autoScrollOn": "Auto-Scroll On",
-        "autoScrollOff": "Auto-Scroll Off",
-        "entries": "Entries:",
-        "refreshesEvery": "Refreshes every",
-        "event": "Event"
+      "reading": "Reading:",
+      "autoScrollOn": "Auto-Scroll On",
+      "autoScrollOff": "Auto-Scroll Off",
+      "entries": "Entries:",
+      "refreshesEvery": "Refreshes every",
+      "event": "Event"
     },
     "title": "Dashboard",
     "welcome": "Monitor your Posterizarr instance",
@@ -677,7 +677,7 @@
     "noSchedulesRegistered": "No schedules registered",
     "run": "Run",
     "stopSuccess": "Script stopping...",
-    "assets": "Assets to Display",
+    "assets": "Assets to Show",
     "cores": "Cores",
     "free": "Free"
   },
@@ -821,7 +821,7 @@
     "currentOrder": "Current Order:"
   },
   "imageSizeSlider": {
-    "imageSize": "Image Size"
+    "imageSize": "Assets to Show"
   },
   "galleryHub": {
     "viewMode": "View Mode",
@@ -1053,7 +1053,7 @@
     "runMigration": "Run Migration",
     "importing": "Importing...",
     "importJson": "Import JSON",
-	"loading": "Loading...",
+    "loading": "Loading...",
     "summary": "Summary (Last {{days}} Days)",
     "days": "{{count}} Days",
     "totalRuns": "Total Runs",
@@ -1105,6 +1105,13 @@
   },
   "schedulerSettings": {
     "loading": "Loading scheduler settings...",
+    "runMode": "Run Mode",
+    "modes": {
+      "normal": "Standard Run",
+      "syncjelly": "Sync Jellyfin",
+      "syncemby": "Sync Emby",
+      "backup": "Plex Backup"
+    },
     "updating": "Updating...",
     "enabled": "Enabled",
     "disabled": "Disabled",
@@ -1462,7 +1469,7 @@
     "autoSaved": "Auto-saved {{count}} change(s)",
     "savedSuccessfully": "Configuration saved successfully! ({{count}} change(s))"
   },
-    "apiKeys": {
+  "apiKeys": {
     "title": "API Keys & Webhooks",
     "generateTitle": "Generate New Key",
     "namePlaceholder": "Key Name (e.g. Tautulli)",

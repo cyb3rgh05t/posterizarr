@@ -539,8 +539,6 @@ function Ensure-WebUIConfig {
     }
 }
 
-Set-PSReadLineOption -HistorySaveStyle SaveNothing
-
 $Header = @"
 ----------------------------------------------------
 Ideas for the container were taken from:
@@ -571,6 +569,33 @@ if (!$env:APP_DATA) {
 
 $ProgressPreference = 'Continue'
 
+# Permission & User Check
+$CurrentUID = sh -c "id -u" 2>$null
+
+# User tried to use PUID/PGID (Unsupported - EXIT)
+if ($env:PUID -or $env:PGID) {
+    Write-Host "------------------------------------------------------------" -ForegroundColor Red
+    Write-Host "ERROR: PUID/PGID DETECTED" -ForegroundColor Red
+    Write-Host "Posterizarr does not support PUID/PGID environment variables." -ForegroundColor Yellow
+    Write-Host "To set permissions, you MUST use the 'user:' directive in your" -ForegroundColor White
+    Write-Host "docker-compose.yml or docker run command." -ForegroundColor White
+    Write-Host ""
+    Write-Host "Example: user: `"1000:1000`"" -ForegroundColor Cyan
+    Write-Host "------------------------------------------------------------" -ForegroundColor Red
+    exit 1
+}
+
+# Running as root without PUID/PGID (WARNING ONLY)
+if ($CurrentUID -eq "0") {
+    Write-Host "------------------------------------------------------------" -ForegroundColor Yellow
+    Write-Host "WARNING: RUNNING AS ROOT" -ForegroundColor Red
+    Write-Host "The container is running as root. This is generally discouraged." -ForegroundColor White
+    Write-Host "If this was not intentional, please use the 'user:' directive." -ForegroundColor White
+    Write-Host ""
+    Write-Host "Example: user: `"1000:1000`"" -ForegroundColor Cyan
+    Write-Host "------------------------------------------------------------" -ForegroundColor Yellow
+}
+
 # Check script version
 CompareScriptVersion
 
@@ -581,9 +606,27 @@ $allPresent = $true
 
 foreach ($folder in $folders) {
     if (-not (Test-Path $folder)) {
-        $null = New-Item -Path $folder -ItemType Directory -ErrorAction SilentlyContinue
-        $createdFolders += $folder
-        $allPresent = $false
+        try {
+            $null = New-Item -Path $folder -ItemType Directory -ErrorAction Stop
+            $createdFolders += $folder
+            $allPresent = $false
+        }
+        catch {
+            $ErrorMessage = $_.Exception.Message
+            Write-Host "------------------------------------------------------------" -ForegroundColor Red
+            if ($ErrorMessage -match "Access to the path|Permission denied") {
+                Write-Host "CRITICAL ERROR: PERMISSION DENIED" -ForegroundColor Red
+                Write-Host "The current user (UID: $CurrentUID) does not have write access" -ForegroundColor White
+                Write-Host "to the volume mounted at $env:APP_DATA." -ForegroundColor White
+            }
+            else {
+                Write-Host "CRITICAL ERROR: SYSTEM ERROR" -ForegroundColor Red
+                Write-Host "An unexpected error occurred: $ErrorMessage" -ForegroundColor White
+            }
+            Write-Host "Failed to create folder: $folder" -ForegroundColor Yellow
+            Write-Host "------------------------------------------------------------" -ForegroundColor Red
+            exit 1
+        }
     }
 }
 

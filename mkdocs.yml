@@ -45,6 +45,7 @@ nav:
   - 'Usage & Guides':
     - 'Usage & Modes': 'modes.md'
     - 'Manual UI Installation': 'uiinstallation.md'
+    - 'Jellyfin & Emby Plugin': 'plugin.md'
   - 'Advanced':
     - 'Search Order': 'searchorder.md'
     - 'Naming Convention': 'namingconvention.md'

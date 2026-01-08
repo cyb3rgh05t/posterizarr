@@ -1,3 +1,6 @@
+# ==========================================
+# Posterizarr General & Media
+# ==========================================
 /images
 *.gif
 *.jpg
@@ -5,30 +8,58 @@
 *.otf
 *.db
 
-#
+# ==========================================
+# C# / .NET (Posterizarr.Plugin)
+# ==========================================
+# Exclude the folders that were cluttering your commit
+**/[Bb]in/
+**/[Oo]bj/
+# Visual Studio specific
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+
+# ==========================================
+# Python (Modules & Backend)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
 .env
 .env.dev
-
-__pycache__
-.vscode
 coverage.*
+.pytest_cache/
 
-# mounted volumes
+# ==========================================
+# IDE & System
+# ==========================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# Mounted Volumes & App Data (Keep out of Git)
+# ==========================================
 config/
-4k.png
 config.json
-posteroverlay_0.7.png
-/Logs
-/magick
-/RotatedLogs
-/temp
 scheduler.json
-/test
-/UILogs
-/assets
-/uploads
-/Overlayfiles
-/webui tests-infos
-/devUtils
-/Cache
+MyPersonalConfig.json
+/Logs/
+/magick/
+/RotatedLogs/
+/temp/
+/test/
+/UILogs/
+/assets/
+/uploads/
+/Overlayfiles/
+/webui tests-infos/
+/devUtils/
+/Cache/
+
+# Specific Asset files
+4k.png
+posteroverlay_0.7.png
 webui/backend/config_tooltips.py.backup
