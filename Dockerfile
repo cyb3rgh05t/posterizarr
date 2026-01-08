@@ -26,8 +26,8 @@ ENV TZ="Europe/Berlin" \
     APP_DATA="/config" \
     FONTCONFIG_CACHE_DIR="/var/cache/fontconfig" \
     PSMODULE_ANALYSIS_CACHE_ENABLED="false" \
-    XDG_DATA_HOME="/tmp" \
-    XDG_CACHE_HOME="/tmp" \
+    XDG_DATA_HOME="/usr/local/share/powershell" \
+    XDG_CACHE_HOME="/usr/local/share/powershell" \
     UMASK="0002"
 
 # Install runtime dependencies + PowerShell + ImageMagick
@@ -58,6 +58,7 @@ RUN echo @edge http://dl-cdn.alpinelinux.org/alpine/edge/community >> /etc/apk/r
         Set-PSReadLineOption -HistorySaveStyle SaveNothing" \
     && mkdir -p /app /usr/share/fonts/custom /var/cache/fontconfig \
     && chmod -R 755 /app /usr/local/share/powershell \
+    && touch /usr/local/share/powershell/ConsoleHost_history.txt \
     && chmod -R 777 /usr/share/fonts/custom /var/cache/fontconfig
 
 # Copy backend requirements file first to leverage Docker cache
