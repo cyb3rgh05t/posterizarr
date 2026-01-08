@@ -52,13 +52,15 @@ RUN echo @edge http://dl-cdn.alpinelinux.org/alpine/edge/community >> /etc/apk/r
         bash \
         shadow \
         git \
-    && pwsh -NoProfile -Command "Register-PSRepository -Default; \
+    && pwsh -NoProfile -Command " \
+        Register-PSRepository -Default; \
         Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop; \
         Install-Module -Name FanartTvAPI -Scope AllUsers -Force -ErrorAction Stop; \
-        Set-PSReadLineOption -HistorySaveStyle SaveNothing" \
+        if (!(Test-Path (Split-Path \$PROFILE.AllUsersAllHosts))) { New-Item -ItemType Directory -Force (Split-Path \$PROFILE.AllUsersAllHosts) }; \
+        'Set-PSReadLineOption -HistorySaveStyle SaveNothing' | Out-File -FilePath \$PROFILE.AllUsersAllHosts -Encoding utf8" \
     && mkdir -p /app /usr/share/fonts/custom /var/cache/fontconfig \
     && chmod -R 755 /app /usr/local/share/powershell \
-    && touch /usr/local/share/powershell/ConsoleHost_history.txt \
+    && echo 'Set-PSReadLineOption -HistorySaveStyle SaveNothing' >> /usr/local/share/powershell/Microsoft.PowerShell_profile.ps1 \
     && chmod -R 777 /usr/share/fonts/custom /var/cache/fontconfig
 
 # Copy backend requirements file first to leverage Docker cache

@@ -90,8 +90,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Look for cache in the current branch AND specifically in the dev branch
+          cache-from: |
+            type=gha,scope=${{ github.ref_name }}
+            type=gha,scope=dev
+          # Always save the latest successful build cache to the current branch scope
+          cache-to: type=gha,scope=${{ github.ref_name }},mode=max
   build-plugin:
     name: Build Jellyfin Plugin
     runs-on: ubuntu-latest
