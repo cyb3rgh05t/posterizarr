@@ -60,7 +60,6 @@ RUN echo @edge http://dl-cdn.alpinelinux.org/alpine/edge/community >> /etc/apk/r
         'Set-PSReadLineOption -HistorySaveStyle SaveNothing' | Out-File -FilePath \$PROFILE.AllUsersAllHosts -Encoding utf8" \
     && mkdir -p /app /usr/share/fonts/custom /var/cache/fontconfig \
     && chmod -R 755 /app /usr/local/share/powershell \
-    && echo 'Set-PSReadLineOption -HistorySaveStyle SaveNothing' >> /usr/local/share/powershell/Microsoft.PowerShell_profile.ps1 \
     && chmod -R 777 /usr/share/fonts/custom /var/cache/fontconfig
 
 # Copy backend requirements file first to leverage Docker cache
