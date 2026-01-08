@@ -31,8 +31,6 @@ param (
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ExtraArgs # Required for Arrtrigger
 )
-# Disable command history saving
-Set-PSReadLineOption -HistorySaveStyle SaveNothing
 
 # Parse ExtraArgs into a hashtable
 $arrTriggers = @{}
@@ -56,8 +54,6 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
 $CurrentScriptVersion = "2.2.15"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
-$env:PSMODULE_ANALYSIS_CACHE_PATH = $null
-$env:PSMODULE_ANALYSIS_CACHE_ENABLED = $false
 
 #################
 # What you need #
@@ -8874,12 +8870,12 @@ if ($Manual) {
                     }
                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                         $properties = $NewLineWords.PSObject.Properties.Name
-                        
+
                         # Check if properties exist and the list is not empty
                         if ($null -ne $properties -and $properties.Count -gt 0) {
                             foreach ($wordKey in $properties) {
                                 $replacementValue = $NewLineWords.$wordKey
-                                
+
                                 # Using [regex]::Escape handles any special characters in the word keys
                                 $ShowjoinedTitle = $ShowjoinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                             }
@@ -8921,12 +8917,12 @@ if ($Manual) {
                     }
                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                         $properties = $NewLineWords.PSObject.Properties.Name
-                        
+
                         # Check if properties exist and the list is not empty
                         if ($null -ne $properties -and $properties.Count -gt 0) {
                             foreach ($wordKey in $properties) {
                                 $replacementValue = $NewLineWords.$wordKey
-                                
+
                                 # Using [regex]::Escape handles any special characters in the word keys
                                 $CollectionjoinedTitle = $CollectionjoinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                             }
@@ -8973,12 +8969,12 @@ if ($Manual) {
                 }
                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                     $properties = $NewLineWords.PSObject.Properties.Name
-                    
+
                     # Check if properties exist and the list is not empty
                     if ($null -ne $properties -and $properties.Count -gt 0) {
                         foreach ($wordKey in $properties) {
                             $replacementValue = $NewLineWords.$wordKey
-                            
+
                             # Using [regex]::Escape handles any special characters in the word keys
                             $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                         }
@@ -10580,12 +10576,12 @@ Elseif ($Tautulli) {
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -11191,12 +11187,12 @@ Elseif ($Tautulli) {
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -11889,12 +11885,12 @@ Elseif ($Tautulli) {
                                                 }
                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                    
+
                                                     # Check if properties exist and the list is not empty
                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                         foreach ($wordKey in $properties) {
                                                             $replacementValue = $NewLineWords.$wordKey
-                                                            
+
                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                         }
@@ -12510,12 +12506,12 @@ Elseif ($Tautulli) {
                                                 }
                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                    
+
                                                     # Check if properties exist and the list is not empty
                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                         foreach ($wordKey in $properties) {
                                                             $replacementValue = $NewLineWords.$wordKey
-                                                            
+
                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                         }
@@ -13163,12 +13159,12 @@ Elseif ($Tautulli) {
                                                 }
                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                    
+
                                                     # Check if properties exist and the list is not empty
                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                         foreach ($wordKey in $properties) {
                                                             $replacementValue = $NewLineWords.$wordKey
-                                                            
+
                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                             $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             if ($AddShowTitletoSeason -eq 'true') {
@@ -13874,12 +13870,12 @@ Elseif ($Tautulli) {
                                                                     }
                                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                                        
+
                                                                         # Check if properties exist and the list is not empty
                                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                             foreach ($wordKey in $properties) {
                                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                                
+
                                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                                 $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                             }
@@ -14541,12 +14537,12 @@ Elseif ($Tautulli) {
                                                                 }
                                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                                    
+
                                                                     # Check if properties exist and the list is not empty
                                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                         foreach ($wordKey in $properties) {
                                                                             $replacementValue = $NewLineWords.$wordKey
-                                                                            
+
                                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                         }
@@ -16144,12 +16140,12 @@ Elseif ($ArrTrigger) {
                                                         }
                                                         if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                             $properties = $NewLineWords.PSObject.Properties.Name
-                                                            
+
                                                             # Check if properties exist and the list is not empty
                                                             if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                 foreach ($wordKey in $properties) {
                                                                     $replacementValue = $NewLineWords.$wordKey
-                                                                    
+
                                                                     # Using [regex]::Escape handles any special characters in the word keys
                                                                     $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                 }
@@ -16692,12 +16688,12 @@ Elseif ($ArrTrigger) {
                                                         }
                                                         if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                             $properties = $NewLineWords.PSObject.Properties.Name
-                                                            
+
                                                             # Check if properties exist and the list is not empty
                                                             if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                 foreach ($wordKey in $properties) {
                                                                     $replacementValue = $NewLineWords.$wordKey
-                                                                    
+
                                                                     # Using [regex]::Escape handles any special characters in the word keys
                                                                     $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                 }
@@ -17322,12 +17318,12 @@ Elseif ($ArrTrigger) {
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -17882,12 +17878,12 @@ Elseif ($ArrTrigger) {
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -18474,12 +18470,12 @@ Elseif ($ArrTrigger) {
                                                         }
                                                         if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                             $properties = $NewLineWords.PSObject.Properties.Name
-                                                            
+
                                                             # Check if properties exist and the list is not empty
                                                             if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                 foreach ($wordKey in $properties) {
                                                                     $replacementValue = $NewLineWords.$wordKey
-                                                                    
+
                                                                     # Using [regex]::Escape handles any special characters in the word keys
                                                                     $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                     if ($AddShowTitletoSeason -eq 'true') {
@@ -19049,12 +19045,12 @@ Elseif ($ArrTrigger) {
                                                                         }
                                                                         if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                             $properties = $NewLineWords.PSObject.Properties.Name
-                                                                            
+
                                                                             # Check if properties exist and the list is not empty
                                                                             if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                                 foreach ($wordKey in $properties) {
                                                                                     $replacementValue = $NewLineWords.$wordKey
-                                                                                    
+
                                                                                     # Using [regex]::Escape handles any special characters in the word keys
                                                                                     $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                                 }
@@ -19595,12 +19591,12 @@ Elseif ($ArrTrigger) {
                                                                     }
                                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                                        
+
                                                                         # Check if properties exist and the list is not empty
                                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                             foreach ($wordKey in $properties) {
                                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                                
+
                                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                                 $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                             }
@@ -20724,12 +20720,12 @@ Elseif ($ArrTrigger) {
                                                         }
                                                         if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                             $properties = $NewLineWords.PSObject.Properties.Name
-                                                            
+
                                                             # Check if properties exist and the list is not empty
                                                             if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                 foreach ($wordKey in $properties) {
                                                                     $replacementValue = $NewLineWords.$wordKey
-                                                                    
+
                                                                     # Using [regex]::Escape handles any special characters in the word keys
                                                                     $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                 }
@@ -21334,12 +21330,12 @@ Elseif ($ArrTrigger) {
                                                         }
                                                         if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                             $properties = $NewLineWords.PSObject.Properties.Name
-                                                            
+
                                                             # Check if properties exist and the list is not empty
                                                             if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                 foreach ($wordKey in $properties) {
                                                                     $replacementValue = $NewLineWords.$wordKey
-                                                                    
+
                                                                     # Using [regex]::Escape handles any special characters in the word keys
                                                                     $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                 }
@@ -22032,12 +22028,12 @@ Elseif ($ArrTrigger) {
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -22653,12 +22649,12 @@ Elseif ($ArrTrigger) {
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -23306,12 +23302,12 @@ Elseif ($ArrTrigger) {
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                 if ($AddShowTitletoSeason -eq 'true') {
@@ -24016,12 +24012,12 @@ Elseif ($ArrTrigger) {
                                                                         }
                                                                         if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                             $properties = $NewLineWords.PSObject.Properties.Name
-                                                                            
+
                                                                             # Check if properties exist and the list is not empty
                                                                             if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                                 foreach ($wordKey in $properties) {
                                                                                     $replacementValue = $NewLineWords.$wordKey
-                                                                                    
+
                                                                                     # Using [regex]::Escape handles any special characters in the word keys
                                                                                     $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                                 }
@@ -24683,12 +24679,12 @@ Elseif ($ArrTrigger) {
                                                                     }
                                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                                        
+
                                                                         # Check if properties exist and the list is not empty
                                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                             foreach ($wordKey in $properties) {
                                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                                
+
                                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                                 $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                             }
@@ -27438,12 +27434,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -27986,12 +27982,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -28616,12 +28612,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 }
                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                    
+
                                                     # Check if properties exist and the list is not empty
                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                         foreach ($wordKey in $properties) {
                                                             $replacementValue = $NewLineWords.$wordKey
-                                                            
+
                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                         }
@@ -29176,12 +29172,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 }
                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                    
+
                                                     # Check if properties exist and the list is not empty
                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                         foreach ($wordKey in $properties) {
                                                             $replacementValue = $NewLineWords.$wordKey
-                                                            
+
                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                         }
@@ -29782,12 +29778,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                 if ($AddShowTitletoSeason -eq 'true') {
@@ -30357,12 +30353,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                     }
                                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                                        
+
                                                                         # Check if properties exist and the list is not empty
                                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                             foreach ($wordKey in $properties) {
                                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                                
+
                                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                                 $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                             }
@@ -30903,12 +30899,12 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                                 }
                                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                                    
+
                                                                     # Check if properties exist and the list is not empty
                                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                         foreach ($wordKey in $properties) {
                                                                             $replacementValue = $NewLineWords.$wordKey
-                                                                            
+
                                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                         }
@@ -32393,12 +32389,12 @@ else {
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -33070,12 +33066,12 @@ else {
                                                     }
                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                        
+
                                                         # Check if properties exist and the list is not empty
                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                             foreach ($wordKey in $properties) {
                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                
+
                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                 $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             }
@@ -33837,12 +33833,12 @@ else {
                                                 }
                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                    
+
                                                     # Check if properties exist and the list is not empty
                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                         foreach ($wordKey in $properties) {
                                                             $replacementValue = $NewLineWords.$wordKey
-                                                            
+
                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                         }
@@ -34528,12 +34524,12 @@ else {
                                                 }
                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                    
+
                                                     # Check if properties exist and the list is not empty
                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                         foreach ($wordKey in $properties) {
                                                             $replacementValue = $NewLineWords.$wordKey
-                                                            
+
                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                             $joinedTitle = $joinedTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                         }
@@ -35256,12 +35252,12 @@ else {
                                                 }
                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                    
+
                                                     # Check if properties exist and the list is not empty
                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                         foreach ($wordKey in $properties) {
                                                             $replacementValue = $NewLineWords.$wordKey
-                                                            
+
                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                             $global:seasonTitle = $global:seasonTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                             if ($AddShowTitletoSeason -eq 'true') {
@@ -36033,12 +36029,12 @@ else {
                                                                     }
                                                                     if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                         $properties = $NewLineWords.PSObject.Properties.Name
-                                                                        
+
                                                                         # Check if properties exist and the list is not empty
                                                                         if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                             foreach ($wordKey in $properties) {
                                                                                 $replacementValue = $NewLineWords.$wordKey
-                                                                                
+
                                                                                 # Using [regex]::Escape handles any special characters in the word keys
                                                                                 $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                             }
@@ -36765,12 +36761,12 @@ else {
                                                                 }
                                                                 if ($NewLineOnSpecificWords -eq 'true' -and $null -ne $NewLineWords) {
                                                                     $properties = $NewLineWords.PSObject.Properties.Name
-                                                                    
+
                                                                     # Check if properties exist and the list is not empty
                                                                     if ($null -ne $properties -and $properties.Count -gt 0) {
                                                                         foreach ($wordKey in $properties) {
                                                                             $replacementValue = $NewLineWords.$wordKey
-                                                                            
+
                                                                             # Using [regex]::Escape handles any special characters in the word keys
                                                                             $global:EPTitle = $global:EPTitle -replace [regex]::Escape($wordKey), $replacementValue
                                                                         }

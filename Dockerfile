@@ -25,6 +25,9 @@ ENV TZ="Europe/Berlin" \
     APP_ROOT="/app" \
     APP_DATA="/config" \
     FONTCONFIG_CACHE_DIR="/var/cache/fontconfig" \
+    PSMODULE_ANALYSIS_CACHE_ENABLED="false" \
+    XDG_DATA_HOME="/tmp" \
+    XDG_CACHE_HOME="/tmp" \
     UMASK="0002"
 
 # Install runtime dependencies + PowerShell + ImageMagick
@@ -49,7 +52,10 @@ RUN echo @edge http://dl-cdn.alpinelinux.org/alpine/edge/community >> /etc/apk/r
         bash \
         shadow \
         git \
-    && pwsh -NoProfile -Command "Register-PSRepository -Default; Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop; Install-Module -Name FanartTvAPI -Scope AllUsers -Force -ErrorAction Stop" \
+    && pwsh -NoProfile -Command "Register-PSRepository -Default; \
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop; \
+        Install-Module -Name FanartTvAPI -Scope AllUsers -Force -ErrorAction Stop; \
+        Set-PSReadLineOption -HistorySaveStyle SaveNothing" \
     && mkdir -p /app /usr/share/fonts/custom /var/cache/fontconfig \
     && chmod -R 755 /app /usr/local/share/powershell \
     && chmod -R 777 /usr/share/fonts/custom /var/cache/fontconfig
