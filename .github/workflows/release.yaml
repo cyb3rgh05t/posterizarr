@@ -174,13 +174,13 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
           
-          # Check for changes to avoid failing on empty commits
+          # Only proceed if manifest.json actually has changes
           if ! git diff --cached --quiet; then
             git commit -m "chore: update manifest v${{ steps.vars.outputs.VERSION }} [skip ci]"
-            # Force the push from the current HEAD to the branch that triggered the run
+            # Explicitly push the local HEAD to the remote branch name
             git push origin HEAD:${{ github.ref_name }}
           else
-            echo "No changes to manifest.json"
+            echo "No changes to manifest.json. Skipping push."
           fi
           
       # 7. PRODUCTION ONLY: Upload ZIP to the GitHub Release page
