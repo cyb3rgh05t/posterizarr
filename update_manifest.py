@@ -49,7 +49,7 @@ def update_manifest():
 
     if event_name == "release":
         # Production builds: Point to the official GitHub Release ZIP
-        source_url = f"https://github.com/{repo}/releases/download/v{version_str}/{zip_name}"
+        source_url = f"https://github.com/{repo}/releases/download/{version_str}/{zip_name}"
         changelog = f"Official Release {version_str}"
         
         # CLEANUP: Remove ALL dev versions (starting with 99.0) from the manifest

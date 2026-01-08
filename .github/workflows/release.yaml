@@ -184,11 +184,18 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
           
-          # Only proceed if manifest.json actually has changes
           if ! git diff --cached --quiet; then
             git commit -m "chore: update manifest v${{ steps.vars.outputs.VERSION }} [skip ci]"
-            # Explicitly push the local HEAD to the remote branch name
-            git push origin HEAD:${{ github.ref_name }}
+            
+            # Determine target: if on a tag (release), push to main. Otherwise push to current branch.
+            if [ "${{ github.event_name }}" == "release" ]; then
+              TARGET_BRANCH="main"
+            else
+              TARGET_BRANCH=${{ github.ref_name }}
+            fi
+            
+            echo "Pushing manifest update to $TARGET_BRANCH"
+            git push origin HEAD:$TARGET_BRANCH
           else
             echo "No changes to manifest.json. Skipping push."
           fi
