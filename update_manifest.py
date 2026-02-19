@@ -75,7 +75,7 @@ def update_manifest():
     new_version = {
         "version": version_str,
         "changelog": changelog,
-        "targetAbi": "10.9.0.0",
+        "targetAbi": "10.11.0.0",
         "sourceUrl": source_url,
         "checksum": checksum
     }
