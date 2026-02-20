@@ -16,9 +16,7 @@
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.6.0",
     "react-i18next": "^13.5.0",
-    "react-router-dom": "^6.20.0",
-    "highcharts": "^12.5.0",
-    "highcharts-react-official": "^3.2.1"
+    "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.2",

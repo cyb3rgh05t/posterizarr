@@ -1,143 +1,570 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Clock, RefreshCw, Loader2, Image, AlertTriangle, Film, Tv, Globe, ImageOff, Type, Scissors, Database, HardDrive, Bell, CheckCircle2 } from "lucide-react";
+import {
+  Clock,
+  RefreshCw,
+  Loader2,
+  Image,
+  AlertTriangle,
+  Film,
+  Tv,
+  Globe,
+  ImageOff,
+  Type,
+  Scissors,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useDashboardLoading } from "../context/DashboardLoadingContext";
 
 const API_URL = "/api";
 
+let cachedRuntimeStats = null;
+
 function RuntimeStats({ refreshTrigger = 0 }) {
   const { t } = useTranslation();
-  const [runtimeStats, setRuntimeStats] = useState({
-      runtime: null, total_images: 0, posters: 0, seasons: 0, backgrounds: 0, titlecards: 0, 
-      collections: 0, errors: 0, tba_skipped: 0, jap_chines_skipped: 0, notification_sent: false,
-      uptime_kuma: null, images_cleared: 0, folders_cleared: 0, space_saved: null,
-      script_version: null, im_version: null, start_time: null, end_time: null, mode: null,
-      fallbacks: 0, textless: 0, truncated: 0, text: 0,
-  });
+  const { startLoading, finishLoading } = useDashboardLoading();
+  const hasInitiallyLoaded = useRef(false);
+  const [runtimeStats, setRuntimeStats] = useState(
+    cachedRuntimeStats || {
+      runtime: null,
+      total_images: 0,
+      posters: 0,
+      seasons: 0,
+      backgrounds: 0,
+      titlecards: 0,
+      collections: 0,
+      errors: 0,
+      tba_skipped: 0,
+      jap_chines_skipped: 0,
+      notification_sent: false,
+      uptime_kuma: null,
+      images_cleared: 0,
+      folders_cleared: 0,
+      space_saved: null,
+      script_version: null,
+      im_version: null,
+      start_time: null,
+      end_time: null,
+      mode: null,
+      timestamp: null,
+      source: null,
+      fallbacks: 0,
+      textless: 0,
+      truncated: 0,
+      text: 0,
+    }
+  );
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState(null);
 
-  const fetchRuntimeStats = async (silent = false) => {
-    if (!silent) setRefreshing(true);
+  const fetchMigrationStatus = async () => {
     try {
-      const response = await fetch(`${API_URL}/runtime-stats`);
-      const data = await response.json();
-      if (data.success) setRuntimeStats(data);
-    } catch (error) { console.error(error); } finally { setRefreshing(false); }
+      const response = await fetch(
+        `${API_URL}/runtime-history/migration-status`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMigrationStatus(data);
+        }
+      }
+    } catch (error) {
+      console.debug("Could not fetch migration status:", error);
+    }
   };
 
-  useEffect(() => { fetchRuntimeStats(true); }, [refreshTrigger]);
+  const fetchRuntimeStats = async (silent = false) => {
+    if (!silent) {
+      setRefreshing(true);
+    }
 
-  if (!runtimeStats.runtime) return null;
+    try {
+      const response = await fetch(`${API_URL}/runtime-stats`);
+      if (!response.ok) {
+        console.error("Failed to fetch runtime stats:", response.status);
+        if (!hasInitiallyLoaded.current) {
+          hasInitiallyLoaded.current = true;
+          finishLoading("runtime-stats");
+        }
+        return;
+      }
+      const data = await response.json();
+
+      if (!hasInitiallyLoaded.current) {
+        hasInitiallyLoaded.current = true;
+        finishLoading("runtime-stats");
+      }
+
+      if (data.success) {
+        cachedRuntimeStats = data;
+        setRuntimeStats(data);
+      } else {
+        cachedRuntimeStats = data;
+        setRuntimeStats(data);
+      }
+    } catch (error) {
+      console.error("Error fetching runtime stats:", error);
+      if (!hasInitiallyLoaded.current) {
+        hasInitiallyLoaded.current = true;
+        finishLoading("runtime-stats");
+      }
+    } finally {
+      setLoading(false);
+      if (!silent) {
+        setTimeout(() => {
+          setRefreshing(false);
+        }, 500);
+      }
+    }
+  };
+
+  useEffect(() => {
+    startLoading("runtime-stats");
+
+    if (cachedRuntimeStats) {
+      setRuntimeStats(cachedRuntimeStats);
+      setLoading(false);
+      if (!hasInitiallyLoaded.current) {
+        hasInitiallyLoaded.current = true;
+        finishLoading("runtime-stats");
+      }
+    } else {
+      fetchRuntimeStats(true);
+    }
+
+    fetchMigrationStatus();
+
+    const interval = setInterval(() => {
+      fetchRuntimeStats(true);
+    }, 30 * 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      fetchRuntimeStats(true);
+    }
+  }, [refreshTrigger]);
+
+  if (loading) {
+    return (
+      <div className="bg-theme-card rounded-xl p-6 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin text-theme-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  const hasData = runtimeStats.runtime !== null;
+
+  if (!hasData) {
+    return null;
+  }
 
   return (
-    <div className="space-y-6 bg-background p-1">
-      {/* HEADER SECTION */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-primary/10 rounded-2xl border border-primary/20"><Clock className="w-5 h-5 text-primary" /></div>
-            <div>
-                <h2 className="text-xl font-bold tracking-tight">{t("dashboard.runtimeStats")}</h2>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-bold text-primary uppercase">{runtimeStats.mode}</span>
-                    <span>•</span>
-                    <span>{new Date(runtimeStats.start_time).toLocaleString("sv-SE").replace("T", " ")}</span>
-                </div>
-            </div>
-        </div>
-        <button onClick={() => fetchRuntimeStats()} disabled={refreshing} className="p-2 hover:bg-muted rounded-xl transition-all border border-transparent hover:border-border">
-            <RefreshCw className={`w-5 h-5 text-muted-foreground ${refreshing ? "animate-spin" : ""}`} />
+    <div className="bg-theme-card rounded-xl p-5 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+      {/* Header with Refresh Button */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-theme-text flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-theme-primary/10">
+            <Clock className="w-5 h-5 text-theme-primary" />
+          </div>
+          {t("dashboard.runtimeStats")}
+        </h2>
+        <button
+          onClick={() => fetchRuntimeStats()}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3 py-1.5 bg-theme-card hover:bg-theme-hover border border-theme hover:border-theme-primary/50 rounded-lg text-sm font-medium transition-all shadow-sm"
+          title={t("runtimeStats.refreshTooltip")}
+        >
+          <RefreshCw
+            className={`w-4 h-4 text-theme-primary ${
+              refreshing ? "animate-spin" : ""
+            }`}
+          />
+          <span className="text-xs font-medium">{t("common.refresh")}</span>
         </button>
       </div>
 
-      {/* HIGHLIGHT KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <HighlightCard label={t("runtimeStats.executionTime")} value={runtimeStats.runtime} icon={<Clock />} color="hsl(262, 83%, 58%)" />
-          <HighlightCard label={t("runtimeStats.totalImages")} value={runtimeStats.total_images} icon={<Image />} color="hsl(221, 83%, 53%)" />
-          <HighlightCard label={t("runtimeStats.spaceSaved")} value={runtimeStats.space_saved || "0 B"} icon={<Database />} color="hsl(142, 76%, 36%)" />
-      </div>
-
-      {/* DETAILED STATS GRID */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <MiniStat label={t("assets.posters")} value={runtimeStats.posters} icon={<Film />} color="#10b981" />
-        <MiniStat label={t("assets.seasons")} value={runtimeStats.seasons} icon={<Tv />} color="#f59e0b" />
-        <MiniStat label={t("assets.backgrounds")} value={runtimeStats.backgrounds} icon={<Image />} color="#8b5cf6" />
-        <MiniStat label={t("assets.titleCards")} value={runtimeStats.titlecards} icon={<Tv />} color="#06b6d4" />
-        <MiniStat label={t("runtimeStats.fallbacks")} value={runtimeStats.fallbacks} icon={<ImageOff />} color="#f97316" />
-        <MiniStat label="Errors" value={runtimeStats.errors} icon={<AlertTriangle />} color={runtimeStats.errors > 0 ? "#ef4444" : "#10b981"} />
-        
-        <MiniStat label="Textless" value={runtimeStats.textless} icon={<Image />} color="#6366f1" />
-        <MiniStat label="Truncated" value={runtimeStats.truncated} icon={<Scissors />} color="#ec4899" />
-        <MiniStat label="Text Overlay" value={runtimeStats.text} icon={<Type />} color="#14b8a6" />
-        <MiniStat label="TBA Skipped" value={runtimeStats.tba_skipped} icon={<Film />} color="#64748b" />
-        <MiniStat label="Foreign Skipped" value={runtimeStats.jap_chines_skipped} icon={<Globe />} color="#64748b" />
-        <MiniStat label="Collections" value={runtimeStats.collections} icon={<Film />} color="#eab308" />
-      </div>
-
-      {/* SYSTEM & MAINTENANCE INFO */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-card rounded-2xl border p-5 shadow-sm">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">{t("runtimeStats.additionalInfo")}</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <BooleanStat label="Notify" active={runtimeStats.notification_sent} icon={<Bell />} />
-                  <BooleanStat label="Uptime" active={runtimeStats.uptime_kuma} icon={<CheckCircle2 />} />
-                  <InfoStat label="Images Cleared" value={runtimeStats.images_cleared} />
-                  <InfoStat label="Folders Cleared" value={runtimeStats.folders_cleared} />
+      {/* Run Info - Mode and Start Time */}
+      {(runtimeStats.mode || runtimeStats.start_time) && (
+        <div className="mb-4 p-2 bg-theme-hover rounded-lg border border-theme">
+          <div className="flex items-center justify-between text-xs sm:text-sm">
+            {runtimeStats.mode && (
+              <div className="flex items-center gap-2">
+                <span className="text-theme-muted">{t("dashboard.mode")}:</span>
+                <span className="font-medium text-theme-primary capitalize">
+                  {runtimeStats.mode}
+                </span>
               </div>
+            )}
+            {runtimeStats.start_time && (
+              <div className="flex items-center gap-2">
+                <span className="text-theme-muted">
+                  {t("dashboard.lastRun")}:
+                </span>
+                <span className="font-medium text-theme-text">
+                  {new Date(runtimeStats.start_time).toLocaleString("sv-SE").replace("T", " ")}
+                </span>
+              </div>
+            )}
           </div>
+        </div>
+      )}
 
-          <div className="bg-card rounded-2xl border p-5 shadow-sm flex items-center justify-around">
-              <div className="text-center">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Script</p>
-                  <p className="text-sm font-mono font-bold text-primary">{runtimeStats.script_version}</p>
-              </div>
-              <div className="h-8 w-px bg-border"></div>
-              <div className="text-center">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Magick</p>
-                  <p className="text-sm font-mono font-bold text-primary">{runtimeStats.im_version}</p>
-              </div>
+      {/* Runtime Card - Compacted */}
+      <div className="bg-theme-card rounded-xl p-4 border border-theme hover:border-theme-primary/50 transition-all shadow-sm mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-theme-muted text-xs mb-1 font-medium">
+              {t("runtimeStats.executionTime")}
+            </p>
+            <p className="text-2xl font-bold text-theme-primary">
+              {runtimeStats.runtime}
+            </p>
           </div>
+          <div className="p-2 rounded-lg bg-theme-primary/10">
+            <Clock className="w-10 h-10 text-purple-400" />
+          </div>
+        </div>
       </div>
+
+      {/* Stats Grid - High Density: up to 6 columns */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+        {/* Total Images */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("runtimeStats.totalImages")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.total_images}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-blue-500/10 shrink-0 ml-2">
+              <Image className="w-6 h-6 text-blue-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Posters */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("assets.posters")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.posters}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-green-500/10 shrink-0 ml-2">
+              <Film className="w-6 h-6 text-green-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Seasons */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("assets.seasons")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.seasons}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-orange-500/10 shrink-0 ml-2">
+              <Tv className="w-6 h-6 text-orange-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Backgrounds */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("assets.backgrounds")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.backgrounds}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-purple-500/10 shrink-0 ml-2">
+              <Image className="w-6 h-6 text-purple-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* TitleCards */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("assets.titleCards")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.titlecards}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-cyan-500/10 shrink-0 ml-2">
+              <Tv className="w-6 h-6 text-cyan-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Collections */}
+        {runtimeStats.collections > 0 && (
+          <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                  {t("assets.collections")}
+                </p>
+                <p className="text-xl font-bold text-theme-text">
+                  {runtimeStats.collections}
+                </p>
+              </div>
+              <div className="p-1.5 rounded-lg bg-yellow-500/10 shrink-0 ml-2">
+                <Film className="w-6 h-6 text-yellow-400" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Fallbacks */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("runtimeStats.fallbacks")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.fallbacks}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-amber-500/10 shrink-0 ml-2">
+              <ImageOff className="w-6 h-6 text-amber-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Textless */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("runtimeStats.textless")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.textless}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-indigo-500/10 shrink-0 ml-2">
+              <Image className="w-6 h-6 text-indigo-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Truncated */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("runtimeStats.truncated")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.truncated}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-pink-500/10 shrink-0 ml-2">
+              <Scissors className="w-6 h-6 text-pink-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Text */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("runtimeStats.text")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.text}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-teal-500/10 shrink-0 ml-2">
+              <Type className="w-6 h-6 text-teal-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* TBA Skipped */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("runtimeStats.tbaSkipped")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.tba_skipped}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-slate-500/10 shrink-0 ml-2">
+              <Film className="w-6 h-6 text-slate-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Jap/Chines Skipped */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                {t("runtimeStats.japChinesSkipped")}
+              </p>
+              <p className="text-xl font-bold text-theme-text">
+                {runtimeStats.jap_chines_skipped}
+              </p>
+            </div>
+            <div className="p-1.5 rounded-lg bg-gray-500/10 shrink-0 ml-2">
+              <Globe className="w-6 h-6 text-gray-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Errors */}
+        <div className="bg-theme-card rounded-xl p-3 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 font-semibold truncate">
+                Script Errors
+              </p>
+              <p
+                className={`text-xl font-bold ${
+                  runtimeStats.errors > 0 ? "text-red-400" : "text-green-400"
+                }`}
+              >
+                {runtimeStats.errors}
+              </p>
+            </div>
+            <div
+              className={`p-1.5 rounded-lg shrink-0 ml-2 ${
+                runtimeStats.errors > 0 ? "bg-red-500/10" : "bg-green-500/10"
+              }`}
+            >
+              <AlertTriangle
+                className={`w-6 h-6 ${
+                  runtimeStats.errors > 0 ? "text-red-400" : "text-green-400"
+                }`}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Info Section - Compacted */}
+      <div className="mt-4 bg-theme-card rounded-xl p-4 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+        <h3 className="text-sm font-semibold text-theme-text mb-3 uppercase tracking-wider">
+          {t("runtimeStats.additionalInfo")}
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          <div className="p-2 bg-theme-hover rounded-lg">
+            <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 truncate">
+              {t("runtimeStats.notificationSent")}
+            </p>
+            <p
+              className={`text-lg font-bold ${
+                runtimeStats.notification_sent
+                  ? "text-green-400"
+                  : "text-red-400"
+              }`}
+            >
+              {runtimeStats.notification_sent
+                ? t("common.yes").toUpperCase()
+                : t("common.no").toUpperCase()}
+            </p>
+          </div>
+          <div className="p-2 bg-theme-hover rounded-lg">
+            <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 truncate">Uptime Kuma</p>
+            <p
+              className={`text-lg font-bold ${
+                runtimeStats.uptime_kuma ? "text-green-400" : "text-red-400"
+              }`}
+            >
+              {runtimeStats.uptime_kuma
+                ? t("common.yes").toUpperCase()
+                : t("common.no").toUpperCase()}
+            </p>
+          </div>
+          <div className="p-2 bg-theme-hover rounded-lg">
+            <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 truncate">
+              {t("runtimeStats.imagesCleared")}
+            </p>
+            <p className="text-lg font-bold text-theme-text">
+              {runtimeStats.images_cleared}
+            </p>
+          </div>
+          <div className="p-2 bg-theme-hover rounded-lg">
+            <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 truncate">
+              {t("runtimeStats.foldersCleared")}
+            </p>
+            <p className="text-lg font-bold text-theme-text">
+              {runtimeStats.folders_cleared}
+            </p>
+          </div>
+          <div className="p-2 bg-theme-hover rounded-lg">
+            <p className="text-theme-muted text-[10px] uppercase tracking-wider mb-0.5 truncate">
+              {t("runtimeStats.spaceSaved")}
+            </p>
+            <p className="text-lg font-bold text-green-400">
+              {runtimeStats.space_saved || "0"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Version Information - Compacted */}
+      {(runtimeStats.script_version || runtimeStats.im_version) && (
+        <div className="mt-4 bg-theme-card rounded-xl p-4 border border-theme hover:border-theme-primary/50 transition-all shadow-sm">
+          <h3 className="text-sm font-semibold text-theme-text mb-3 uppercase tracking-wider">
+            {t("runtimeStats.versionInfo")}
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            {runtimeStats.script_version && (
+              <div className="p-2 bg-theme-hover rounded-lg flex items-center justify-between">
+                <p className="text-theme-muted text-[10px] uppercase tracking-wider">
+                  {t("runtimeStats.scriptVersion")}
+                </p>
+                <p className="text-sm font-bold text-theme-primary">
+                  {runtimeStats.script_version}
+                </p>
+              </div>
+            )}
+            {runtimeStats.im_version && (
+              <div className="p-2 bg-theme-hover rounded-lg flex items-center justify-between">
+                <p className="text-theme-muted text-[10px] uppercase tracking-wider">
+                  {t("runtimeStats.imVersion")}
+                </p>
+                <p className="text-sm font-bold text-theme-primary">
+                  {runtimeStats.im_version}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-const HighlightCard = ({ label, value, icon, color }) => (
-    <div className="relative overflow-hidden bg-card rounded-2xl border p-6 shadow-sm group hover:border-primary/40 transition-all">
-        <div className="relative z-10 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
-            <span className="text-3xl font-bold tracking-tight" style={{ color }}>{value}</span>
-        </div>
-        <div className="absolute -bottom-2 -right-2 text-muted-foreground/5 group-hover:text-primary/10 transition-colors">
-            {React.cloneElement(icon, { size: 90 })}
-        </div>
-    </div>
-);
-
-const MiniStat = ({ label, value, icon, color }) => (
-    <div className="bg-muted/20 rounded-2xl p-3.5 border border-transparent hover:border-border transition-colors">
-        <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 rounded-lg" style={{ backgroundColor: `${color}1A`, color: color }}>
-                {React.cloneElement(icon, { size: 14 })}
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground truncate">{label}</span>
-        </div>
-        <div className="text-xl font-bold">{value}</div>
-    </div>
-);
-
-const BooleanStat = ({ label, active, icon }) => (
-    <div className="flex flex-col items-center gap-1">
-        <div className={`p-2 rounded-full ${active ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-            {React.cloneElement(icon, { size: 16 })}
-        </div>
-        <span className="text-[10px] font-bold uppercase text-muted-foreground">{label}</span>
-    </div>
-);
-
-const InfoStat = ({ label, value }) => (
-    <div className="text-center">
-        <p className="text-lg font-bold">{value}</p>
-        <p className="text-[10px] font-bold uppercase text-muted-foreground leading-tight">{label}</p>
-    </div>
-);
 
 export default RuntimeStats;

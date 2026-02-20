@@ -291,39 +291,35 @@ const Sidebar = () => {
           </div>
         </nav>
 
-        {/* Footer Version Area */}
-        <div className="mt-auto p-4 flex flex-col items-center bg-theme-hover/5">
-          
-          {/* External Links Section */}
-          <div className={`flex items-center gap-4 mb-4 ${isCollapsed ? "flex-col" : "flex-row"}`}>
-            {externalLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={link.name}
-                className="text-theme-muted hover:text-theme-primary transition-colors duration-200"
-              >
-                <link.icon className="w-5 h-5" />
-              </a>
-            ))}
-          </div>
+        {/* Footer Area */}
+        {!isCollapsed && (
+          <div className="mt-auto p-6 flex flex-col items-center gap-4 animate-in fade-in duration-500">
+            
+            {/* External Links Section */}
+            <div className="flex items-center gap-5">
+              {externalLinks.map((link) => (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={link.name}
+                  className="text-theme-muted hover:text-theme-primary transition-colors duration-200"
+                >
+                  <link.icon className="w-4.5 h-4.5" />
+                </a>
+              ))}
+            </div>
 
-          {/* Divider - only visible when expanded */}
-          {!isCollapsed && <div className="w-12 h-px bg-theme-border mb-4" />}
+            {/* Subtle Divider */}
+            <div className="w-full h-px bg-gradient-to-r from-transparent via-theme-border to-transparent opacity-50" />
 
-          {/* Version Badge */}
-          {!isCollapsed ? (
-            <div className="transform scale-90 origin-center">
+            {/* Version Badge - integrated as simple text */}
+            <div className="flex items-center justify-center">
               <VersionBadge />
             </div>
-          ) : (
-            <div className="flex justify-center items-center">
-              <VersionBadge compact={true} />
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Mobile Menu */}
