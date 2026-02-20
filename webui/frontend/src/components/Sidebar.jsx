@@ -292,10 +292,10 @@ const Sidebar = () => {
         </nav>
 
         {!isCollapsed && (
-          <div className="mt-auto p-6 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="mt-auto p-4 flex flex-col items-center bg-theme-hover/5">
             
             {/* External Links Section */}
-            <div className="flex items-center gap-5 mb-4">
+            <div className="flex items-center gap-4 mb-4">
               {externalLinks.map((link) => (
                 <a
                   key={link.name}
@@ -303,9 +303,9 @@ const Sidebar = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   title={link.name}
-                  className="text-theme-muted hover:text-theme-primary transition-all duration-200 hover:scale-110"
+                  className="text-theme-muted hover:text-theme-primary transition-colors duration-200"
                 >
-                  <link.icon className="w-4.5 h-4.5" />
+                  <link.icon className="w-5 h-5" />
                 </a>
               ))}
             </div>
