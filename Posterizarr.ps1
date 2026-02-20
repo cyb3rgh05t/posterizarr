@@ -51,7 +51,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.2.24"
+$CurrentScriptVersion = "2.2.25"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 
