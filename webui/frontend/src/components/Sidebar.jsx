@@ -291,12 +291,11 @@ const Sidebar = () => {
           </div>
         </nav>
 
-        {/* Footer Area */}
         {!isCollapsed && (
-          <div className="mt-auto p-6 flex flex-col items-center gap-4 animate-in fade-in duration-500">
+          <div className="mt-auto p-6 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 duration-500">
             
             {/* External Links Section */}
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-5 mb-4">
               {externalLinks.map((link) => (
                 <a
                   key={link.name}
@@ -304,20 +303,18 @@ const Sidebar = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   title={link.name}
-                  className="text-theme-muted hover:text-theme-primary transition-colors duration-200"
+                  className="text-theme-muted hover:text-theme-primary transition-all duration-200 hover:scale-110"
                 >
                   <link.icon className="w-4.5 h-4.5" />
                 </a>
               ))}
             </div>
 
-            {/* Subtle Divider */}
-            <div className="w-full h-px bg-gradient-to-r from-transparent via-theme-border to-transparent opacity-50" />
+            {/* Subtle Integrated Divider */}
+            <div className="w-12 h-px bg-theme-border/40 mb-4" />
 
-            {/* Version Badge - integrated as simple text */}
-            <div className="flex items-center justify-center">
-              <VersionBadge />
-            </div>
+            {/* Minimalist Version Badge */}
+            <VersionBadge />
           </div>
         )}
       </div>
