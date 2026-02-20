@@ -432,7 +432,7 @@ function FolderView() {
                   <CheckSquare className="w-4 h-4" />
                 )}
                 <span>
-                  {selectMode ? t("folderView.cancel") : t("folderView.select")}
+                  {selectMode ? t("folderView.cancelSelect") : t("folderView.select")}
                 </span>
               </button>
             )}

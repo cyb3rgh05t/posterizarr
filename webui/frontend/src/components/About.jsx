@@ -272,12 +272,12 @@ function About() {
           <Heart className="w-4 h-4 text-red-400 inline" />
           {t("about.by")}
           <a
-            href="https://github.com/cyb3rgh05t"
+            href="https://github.com/fscorrupt/posterizarr"
             target="_blank"
             rel="noopener noreferrer"
             className="text-theme-primary hover:underline font-medium"
           >
-            cyb3rgh05t
+            cyb3rgh05t & fscorrupt
           </a>
           {t("about.forTheCommunity")}
         </p>
