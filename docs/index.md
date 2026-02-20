@@ -13,8 +13,8 @@
   <br />
   <p>
   <a href="https://ko-fi.com/R6R81S6SC" target="_blank">
-    <img src="https://storage.ko-fi.com/cdn/brandasset/logo_white_stroke_small.png" alt="Buy Me A Coffee" style="height: 35px; width: auto;">
-  </a>
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me A Coffee" style="height: 35px; width: auto;">
+  </a><br />
   <a href="https://discord.gg/fYyJQSGt54" target="_blank">
     <img src="https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a6a49cf127bf92de1e2_icon_clyde_blurple_RGB.png" alt="Discord" style="height: 35px; width: auto;">
   </a>
