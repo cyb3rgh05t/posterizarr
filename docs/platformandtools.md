@@ -90,6 +90,14 @@ In order to view the `16:9` episode posters without getting cropped to `3:2`, yo
   height: 9vw;
 }
 ```
+## Container Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| RUN_TIME | disabled | A comma-separated list of 24-hour times (e.g., 03:00,15:00) for scheduled runs. If set to `disabled`, the UI will handle scheduling. |
+| APP_PORT | 8000 | The Web UI Port. |
+| DISABLE_UI | false | Set to true to disable the Web UI. |
+| ARR_WAIT_TIME | 300 | The time in seconds to wait after an Arr trigger to allow media servers (Jellyfin/Plex) to finish scanning. |
 
 ### CSS Client side How-To
 

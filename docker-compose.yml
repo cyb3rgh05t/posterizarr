@@ -11,6 +11,7 @@ services:
       #- APP_PORT=9000      
       # OPTIONAL: Disable UI
       #- DISABLE_UI=true   
+      #- ARR_WAIT_TIME=300 # OPTIONAL: Default is 300 seconds (5 minutes). This is the time Posterizarr will wait for the media server to be ready before starting its own startup process.
     image: "ghcr.io/fscorrupt/posterizarr:latest"
     restart: "unless-stopped"
     user: "1000:1000"
