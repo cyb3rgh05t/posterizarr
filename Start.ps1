@@ -135,9 +135,16 @@ function ScriptSchedule {
                         # Convert to datetime
                         $fileTime = [datetime]::ParseExact($timestamp14, "yyyyMMddHHmmss", $null)
 
+                        # Default to 300 seconds if ARR_WAIT_TIME is not set or invalid
+                        $customWait = 300
+                        if ($env:ARR_WAIT_TIME -as [int]) {
+                            $customWait = [int]$env:ARR_WAIT_TIME
+                            write-host "User defined wait time: $customWait seconds."
+                        }
+
                         # Calculate age in seconds
                         $fileAge = (Get-Date) - $fileTime
-                        $waitTime = [Math]::Max(0, 300 - $fileAge.TotalSeconds)  # 5 min buffer
+                        $waitTime = [Math]::Max(0, $customWait - $fileAge.TotalSeconds)  # x min buffer (default 5 min) minus age of file, so if file is already 3 min old, wait only 2 min, if file is already 5 min or older, don't wait at all
 
                         if ($waitTime -gt 0) {
                             write-host "Waiting $([math]::Round($waitTime)) seconds for media server..."
