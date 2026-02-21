@@ -179,34 +179,30 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
       }
     } else {
       // For movies/posters/backgrounds: extract from the main folder/file
-      // Find folder with year pattern (ignoring ALL tags)
+      // Find folder with year pattern
       if (pathSegments && pathSegments.length > 0) {
         for (let i = pathSegments.length - 1; i >= 0; i--) {
           const segment = pathSegments[i];
           // Check if this segment has a year pattern
-          if (segment.match(/\(\d{4}\)/)) {
-            folderName = segment;
+          if (segment.match(/\(\d{4}\)/) || segment.match(/\s\d{4}$/)) {
+            folderName = segment; // Preserve the original folder name
 
-            // Clean the folder name from ALL ID tags in various formats:
-            // {tmdb-123}, [tvdb-456], (imdb-tt123), (xxx-yyy), etc.
+            // Clean the folder name from ALL ID tags in various formats for title/year extraction
             let cleanSegment = segment
-              .replace(/\s*\{[^}]+\}/g, "") // Remove {xxx-yyy}
-              .replace(/\s*\[[^\]]+\]/g, "") // Remove [xxx-yyy]
-              .replace(/\s*\((tmdb|tvdb|imdb)-[^)]+\)/gi, "") // Remove (tmdb-xxx), (tvdb-xxx), (imdb-xxx)
-              .replace(/\s*\([a-z]+-[^)]+\)/gi, "") // Remove generic (xxx-yyy) format
+              .replace(/\s*\{[^}]+\}/g, "")
+              .replace(/\s*\[[^\]]+\]/g, "")
+              .replace(/\s*\((tmdb|tvdb|imdb)-[^)]+\)/gi, "")
               .trim();
 
-            // Extract title and year
             const match = cleanSegment.match(/^(.+?)\s*\((\d{4})\)\s*$/);
             if (match) {
               title = match[1].trim();
               year = parseInt(match[2]);
             } else {
-              // Fallback
-              const yearMatch = cleanSegment.match(/\((\d{4})\)/);
+              const yearMatch = cleanSegment.match(/\(?(\d{4})\)?/);
               if (yearMatch) {
                 year = parseInt(yearMatch[1]);
-                title = cleanSegment.replace(/\s*\(\d{4}\)\s*/, "").trim();
+                title = cleanSegment.replace(/\s*\(?\d{4}\)?/, "").trim();
               } else {
                 title = cleanSegment;
               }
@@ -215,38 +211,15 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
           }
         }
 
-        // If no folder with year found, try fallback
-        if (!folderName) {
-          const yearMatch = asset.path?.match(/\((\d{4})\)/);
-          if (yearMatch) {
-            year = parseInt(yearMatch[1]);
-          }
-
-          // Try to extract title from last folder/file segment
-          if (pathSegments && pathSegments.length > 0) {
-            const lastSegment = pathSegments[pathSegments.length - 1];
-            // Check if it's a file (has extension)
-            const isFile = lastSegment.match(/\.[^.]+$/);
-            const folderSegment =
-              isFile && pathSegments.length > 1
-                ? pathSegments[pathSegments.length - 2]
-                : lastSegment;
-
-            folderName = folderSegment;
-
-            // Remove year and ALL ID tags (in various bracket formats), and file extension
-            // Filters: {tmdb-123}, [tvdb-456], (imdb-tt123), (xxx-yyy), etc.
-            const cleanTitle = folderSegment
-              .replace(/\s*\(\d{4}\)\s*/, "")
-              .replace(/\s*\{[^}]+\}/g, "") // Remove {xxx-yyy}
-              .replace(/\s*\[[^\]]+\]/g, "") // Remove [xxx-yyy]
-              .replace(/\s*\((tmdb|tvdb|imdb)-[^)]+\)/gi, "") // Remove (tmdb-xxx), (tvdb-xxx), (imdb-xxx)
-              .replace(/\s*\([a-z]+-[^)]+\)/gi, "") // Remove generic (xxx-yyy) format
-              .replace(/\.[^.]+$/, "")
-              .trim();
-            if (cleanTitle) {
-              title = cleanTitle;
-            }
+        // Ensure folderName is never empty if path exists
+        if (!folderName && pathSegments.length > 1) {
+          const lastSegment = pathSegments[pathSegments.length - 1];
+          const isFile = !!lastSegment.match(/\.[^.]+$/);
+          // If the last segment is a file, the folder name is the previous segment
+          folderName = isFile ? pathSegments[pathSegments.length - 2] : lastSegment;
+          
+          if (!title) {
+            title = folderName.replace(/\s*\(\d{4}\)\s*/, "").trim();
           }
         }
       }
