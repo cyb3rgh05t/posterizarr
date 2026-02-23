@@ -4144,17 +4144,24 @@ function Push-ObjectToDiscord {
         $response = $_.Exception.Response
         if ($response) {
             $statusCode = $response.StatusCode
-            if ($statusCode -eq 'NotFound'){
+            if ($statusCode -eq 'NotFound') {
                 $errorMessage = "Unable to send to Discord. Status: $statusCode. Reason: Wrong Webhook Url"
-            }Else {
-                $stream = $response.GetResponseStream()
-                $reader = New-Object System.IO.StreamReader($stream)
-                $discordErrorBody = $reader.ReadToEnd() # This is the JSON error from Discord
+            } else {
+                # Modern PowerShell (Core/7+) uses .Content.ReadAsStringAsync()
+                if ($response.Content) {
+                    $discordErrorBody = $response.Content.ReadAsStringAsync().Result
+                }
+                # Fallback for older .NET Framework responses if necessary
+                elseif ($response.CanSeek -or $response.GetResponseStream) {
+                    $stream = $response.GetResponseStream()
+                    $reader = New-Object System.IO.StreamReader($stream)
+                    $discordErrorBody = $reader.ReadToEnd()
+                }
+
                 $errorMessage = "Unable to send to Discord. Status: $statusCode. Reason: $discordErrorBody"
             }
         }
         else {
-            # This was a general network error (e.g., DNS failure)
             $errorMessage = "Unable to send to Discord. Error: $($_.Exception.Message)"
         }
         Write-Entry -Message $errorMessage -Path $global:configLogging -Color Red -log Error
