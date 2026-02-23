@@ -4131,39 +4131,52 @@ function Push-ObjectToDiscord {
     )
 
     try {
-        $null = Invoke-RestMethod -Method Post -Uri $strDiscordWebhook -Body $objPayload -ContentType 'Application/Json'
+        $response = Invoke-RestMethod -Method Post -Uri $strDiscordWebhook -Body $objPayload -ContentType 'Application/Json' -ResponseHeadersVariable "resHeaders"
 
-        # This is a good, simple way to help avoid rate limits.
-        Start-Sleep -Seconds 1
+        # Smart Rate Limiting: Discord returns 'x-ratelimit-reset-after' in seconds
+        if ($resHeaders.'x-ratelimit-remaining' -eq 0) {
+            $waitTime = $resHeaders.'x-ratelimit-reset-after'
+            Write-Verbose "Rate limit reached. Sleeping for $waitTime seconds."
+            Start-Sleep -Seconds [math]::Ceiling($waitTime)
+        } else {
+            # Default safety gap
+            Start-Sleep -Milliseconds 500
+        }
     }
     catch {
         $errorMessage = "Unable to send to Discord."
         $discordErrorBody = "N/A"
         $statusCode = "N/A"
 
-        $response = $_.Exception.Response
-        if ($response) {
+        # Check if we have a response object
+        if ($_.Exception.Response) {
+            $response = $_.Exception.Response
             $statusCode = $response.StatusCode
+
             if ($statusCode -eq 'NotFound') {
                 $errorMessage = "Unable to send to Discord. Status: $statusCode. Reason: Wrong Webhook Url"
-            } else {
-                # Modern PowerShell (Core/7+) uses .Content.ReadAsStringAsync()
-                if ($response.Content) {
-                    $discordErrorBody = $response.Content.ReadAsStringAsync().Result
+            }
+            else {
+                # Handle PowerShell 7+ (HttpResponseMessage)
+                if ($response.GetType().Name -eq 'HttpResponseMessage') {
+                    $task = $response.Content.ReadAsStringAsync()
+                    $discordErrorBody = $task.Result
                 }
-                # Fallback for older .NET Framework responses if necessary
-                elseif ($response.CanSeek -or $response.GetResponseStream) {
+                # Handle Windows PowerShell 5.1 (HttpWebResponse)
+                elseif ($response.GetResponseStream) {
                     $stream = $response.GetResponseStream()
                     $reader = New-Object System.IO.StreamReader($stream)
                     $discordErrorBody = $reader.ReadToEnd()
+                    $reader.Close()
                 }
-
                 $errorMessage = "Unable to send to Discord. Status: $statusCode. Reason: $discordErrorBody"
             }
         }
         else {
-            $errorMessage = "Unable to send to Discord. Error: $($_.Exception.Message)"
+            $errorMessage = "Network/DNS Error: $($_.Exception.Message)"
         }
+
+        # Logging to Posterizarr globals
         Write-Entry -Message $errorMessage -Path $global:configLogging -Color Red -log Error
         Write-Entry -Message "Failing Payload: $objPayload" -Path $global:configLogging -Color Red -log Error
     }
