@@ -11774,11 +11774,10 @@ async def replace_asset_from_url(
         logger.error(f"Error replacing asset from URL: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 async def trigger_manual_run_internal(request: ManualModeRequest):
     """
-    Internal function to trigger manual run without HTTP overhead
-    This is called from replace_asset_from_url
+    Internal function to trigger manual run without HTTP overhead.
+    Includes a sanity check to prevent TV switches on Movie libraries.
     """
     global current_process, current_mode, current_start_time
 
@@ -11789,9 +11788,13 @@ async def trigger_manual_run_internal(request: ManualModeRequest):
     if not SCRIPT_PATH.exists():
         raise ValueError("Posterizarr.ps1 not found")
 
+    # 1. SANITY CHECK: Determine actual library type from DB/Cache
+    # This prevents Movie libraries from using TitleCard logic [cite: 41, 42]
+    lib_type = get_library_type_from_db(request.libraryName.strip())
+    logger.info(f"[SanityCheck] Library '{request.libraryName}' is identified as: {lib_type}")
+
     # Determine PowerShell command
     import platform
-
     if platform.system() == "Windows":
         ps_command = "pwsh"
         try:
@@ -11802,7 +11805,7 @@ async def trigger_manual_run_internal(request: ManualModeRequest):
     else:
         ps_command = "pwsh"
 
-    # Build command based on poster type
+    # Build base command
     command = [
         ps_command,
         "-File",
@@ -11812,79 +11815,63 @@ async def trigger_manual_run_internal(request: ManualModeRequest):
         request.picturePath.strip(),
     ]
 
-    # Add poster type specific switches and parameters
-    if request.posterType == "titlecard":
-        command.extend(
-            [
+    # 2. Build command based on poster type with Library Type Gating
+    # Only allow TV-specific switches if the library is NOT a movie library
+    if lib_type != 'movie':
+        if request.posterType == "titlecard":
+            command.extend([
                 "-TitleCard",
-                "-Titletext",
-                request.epTitleName.strip(),
-                "-FolderName",
-                request.folderName.strip(),
-                "-LibraryName",
-                request.libraryName.strip(),
-                "-EPTitleName",
-                request.epTitleName.strip(),
-                "-EpisodeNumber",
-                request.episodeNumber.strip(),
-                "-SeasonPosterName",
-                request.seasonPosterName.strip(),
-            ]
-        )
-    elif request.posterType == "season":
-        command.extend(
-            [
+                "-Titletext", request.epTitleName.strip(),
+                "-FolderName", request.folderName.strip(),
+                "-LibraryName", request.libraryName.strip(),
+                "-EPTitleName", request.epTitleName.strip(),
+                "-EpisodeNumber", request.episodeNumber.strip(),
+                "-SeasonPosterName", request.seasonPosterName.strip(),
+            ])
+        elif request.posterType == "season":
+            command.extend([
                 "-SeasonPoster",
-                "-Titletext",
-                request.titletext.strip(),
-                "-FolderName",
-                request.folderName.strip(),
-                "-LibraryName",
-                request.libraryName.strip(),
-                "-SeasonPosterName",
-                request.seasonPosterName.strip(),
-            ]
-        )
-    elif request.posterType == "background":
-        command.extend(
-            [
-                "-BackgroundCard",
-                "-Titletext",
-                request.titletext.strip(),
-                "-FolderName",
-                request.folderName.strip(),
-                "-LibraryName",
-                request.libraryName.strip(),
-            ]
-        )
-    else:  # standard poster
-        command.extend(
-            [
-                "-Titletext",
-                request.titletext.strip(),
-                "-FolderName",
-                request.folderName.strip(),
-                "-LibraryName",
-                request.libraryName.strip(),
-            ]
-        )
+                "-Titletext", request.titletext.strip(),
+                "-FolderName", request.folderName.strip(),
+                "-LibraryName", request.libraryName.strip(),
+                "-SeasonPosterName", request.seasonPosterName.strip(),
+            ])
+        else: # Standard TV Poster or Background
+            switches = ["-BackgroundCard"] if request.posterType == "background" else []
+            command.extend(switches + [
+                "-Titletext", request.titletext.strip(),
+                "-FolderName", request.folderName.strip(),
+                "-LibraryName", request.libraryName.strip(),
+            ])
+    else:
+        # 3. MOVIE FORCE: Strip all TV switches regardless of request.posterType
+        # This fixes the issue where Emby movies try to run as TitleCards [cite: 27, 28]
+        if request.posterType == "background":
+            command.append("-BackgroundCard")
+
+        command.extend([
+            "-Titletext", request.titletext.strip(),
+            "-FolderName", request.folderName.strip(),
+            "-LibraryName", request.libraryName.strip(),
+        ])
+        if request.posterType == "titlecard" or request.posterType == "season":
+            logger.warning(f"Intercepted incorrect {request.posterType} request for Movie library. Forcing standard run.")
 
     logger.info(f"Starting Manual Run: {' '.join(command)}")
 
     # Start the process in background
-    # IMPORTANT: Do NOT redirect stdout/stderr to PIPE if we're not reading them!
-    # This prevents the process from hanging when the buffer fills up
     current_process = subprocess.Popen(
         command,
         cwd=str(BASE_DIR),
-        stdout=None,  # Let output go to console/log
-        stderr=None,  # Let output go to console/log
+        stdout=None,
+        stderr=None,
         text=True,
     )
     current_mode = "manual"
     current_start_time = datetime.now().isoformat()
 
     logger.info(f"Manual Run process started (PID: {current_process.pid})")
+
 
 async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
     """
