@@ -3811,63 +3811,62 @@ async def validate_discord(request: DiscordValidationRequest):
 
 @app.post("/api/validate/apprise")
 async def validate_apprise(request: AppriseValidationRequest):
-    """Validate Apprise URL (basic format check)"""
+    """Validate Apprise URL dynamically and send a test message"""
     logger.info("=" * 60)
-    logger.info("APPRISE URL VALIDATION STARTED")
+    logger.info("APPRISE VALIDATION & TEST MESSAGE STARTED")
     logger.info(f"[URL] URL: {request.url}")
 
     try:
-        valid_prefixes = [
-            "discord://",
-            "telegram://",
-            "slack://",
-            "email://",
-            "mailto://",
-            "pushover://",
-            "gotify://",
-            "ntfy://",
-            "pushbullet://",
-            "rocket://",
-            "mattermost://",
-        ]
+        # Local import to prevent startup crashes if library is missing
+        import apprise
 
-        is_valid = any(request.url.startswith(prefix) for prefix in valid_prefixes)
+        apobj = apprise.Apprise()
 
-        if is_valid:
-            detected_service = next(
-                (prefix for prefix in valid_prefixes if request.url.startswith(prefix)),
-                None,
-            )
-            logger.info(
-                f"Apprise URL format valid! Detected service: {detected_service}"
-            )
-            logger.info("=" * 60)
-            return {
-                "valid": True,
-                "message": " Apprise URL format looks valid!",
-                "details": {"format_check": True, "service": detected_service},
-            }
-        else:
-            logger.warning(f"Apprise URL format invalid!")
-            logger.warning(
-                f"   URL must start with: {', '.join(valid_prefixes[:5])}..."
-            )
-            logger.info("=" * 60)
+        # Dynamically validate the protocol (supports ntfys://, discord://, etc.)
+        if not apobj.add(request.url):
+            logger.warning(f"Apprise URL rejected (Unsupported or Invalid): {request.url}")
             return {
                 "valid": False,
-                "message": f" Invalid Apprise URL format. Must start with a valid service prefix (discord://, telegram://, etc.)",
+                "message": "Invalid Apprise URL or unsupported protocol.",
                 "details": {"format_check": False},
             }
-    except Exception as e:
-        logger.error(f"[ERROR] Apprise URL validation error: {str(e)}")
-        logger.exception("Full traceback:")
-        logger.info("=" * 60)
+
+        # Send the Test Notification
+        logger.info("Sending test notification...")
+        test_success = apobj.notify(
+            body="[SUCCESS] Posterizarr WebUI - Apprise notification validation successful!",
+            title="Posterizarr Test Message",
+        )
+
+        if test_success:
+            detected_service = request.url.split('://')[0]
+            logger.info(f"Apprise validation successful! Service: {detected_service}")
+            return {
+                "valid": True,
+                "message": f"Success! {detected_service.upper()} URL is valid and test message sent.",
+                "details": {"service": detected_service, "notification_sent": True},
+            }
+        else:
+            return {
+                "valid": False,
+                "message": "URL format is valid, but the test message failed to send. Check your credentials.",
+                "details": {"format_check": True, "notification_sent": False},
+            }
+
+    except ImportError:
+        logger.error("Apprise library not found. Please install it with 'pip install apprise'")
         return {
             "valid": False,
-            "message": f" Error validating Apprise URL: {str(e)}",
+            "message": "Apprise library is not installed on the server.",
+            "details": {"error": "ImportError"},
+        }
+    except Exception as e:
+        logger.error(f"[ERROR] Apprise validation error: {str(e)}")
+        return {
+            "valid": False,
+            "message": f"Error validating Apprise: {str(e)}",
             "details": {"error": str(e)},
         }
-
 
 @app.post("/api/validate/uptimekuma")
 async def validate_uptimekuma(request: UptimeKumaValidationRequest):
