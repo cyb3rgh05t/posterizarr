@@ -194,7 +194,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
               .replace(/\s*\((tmdb|tvdb|imdb)-[^)]+\)/gi, "")
               .trim();
 
-            const match = cleanSegment.match(/^(.+?)\s*\((\d{4})\)\s*$/);
+            const match = cleanSegment.match(/^(.+?)\s*\(?(\d{4})\)?$/);
             if (match) {
               title = match[1].trim();
               year = parseInt(match[2]);
@@ -217,7 +217,7 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
           const isFile = !!lastSegment.match(/\.[^.]+$/);
           // If the last segment is a file, the folder name is the previous segment
           folderName = isFile ? pathSegments[pathSegments.length - 2] : lastSegment;
-          
+
           if (!title) {
             title = folderName.replace(/\s*\(\d{4}\)\s*/, "").trim();
           }
