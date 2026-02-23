@@ -11559,57 +11559,46 @@ async def trigger_manual_run_internal(request: ManualModeRequest):
     else:
         ps_command = "pwsh"
 
-    # Build base command
+    # Build base command that applies to ALL runs
     command = [
         ps_command,
-        "-File",
-        str(SCRIPT_PATH),
+        "-File", str(SCRIPT_PATH),
         "-Manual",
-        "-PicturePath",
-        request.picturePath.strip(),
+        "-PicturePath", request.picturePath.strip(),
     ]
 
-    # 2. Build command based on poster type with Library Type Gating
-    # Only allow TV-specific switches if the library is NOT a movie library
-    if lib_type != 'movie':
-        if request.posterType == "titlecard":
-            command.extend([
-                "-TitleCard",
-                "-Titletext", request.epTitleName.strip(),
-                "-FolderName", request.folderName.strip(),
-                "-LibraryName", request.libraryName.strip(),
-                "-EPTitleName", request.epTitleName.strip(),
-                "-EpisodeNumber", request.episodeNumber.strip(),
-                "-SeasonPosterName", request.seasonPosterName.strip(),
-            ])
-        elif request.posterType == "season":
-            command.extend([
-                "-SeasonPoster",
-                "-Titletext", request.titletext.strip(),
-                "-FolderName", request.folderName.strip(),
-                "-LibraryName", request.libraryName.strip(),
-                "-SeasonPosterName", request.seasonPosterName.strip(),
-            ])
-        else: # Standard TV Poster or Background
-            switches = ["-BackgroundCard"] if request.posterType == "background" else []
-            command.extend(switches + [
-                "-Titletext", request.titletext.strip(),
-                "-FolderName", request.folderName.strip(),
-                "-LibraryName", request.libraryName.strip(),
-            ])
-    else:
-        # 3. MOVIE FORCE: Strip all TV switches regardless of request.posterType
-        # This fixes the issue where Emby movies try to run as TitleCards [cite: 27, 28]
-        if request.posterType == "background":
-            command.append("-BackgroundCard")
+    # Dynamically add core parameters ONLY if they contain a value
+    if request.titletext and request.titletext.strip():
+        command.extend(["-Titletext", request.titletext.strip()])
 
-        command.extend([
-            "-Titletext", request.titletext.strip(),
-            "-FolderName", request.folderName.strip(),
-            "-LibraryName", request.libraryName.strip(),
-        ])
-        if request.posterType == "titlecard" or request.posterType == "season":
-            logger.warning(f"Intercepted incorrect {request.posterType} request for Movie library. Forcing standard run.")
+    command.extend([
+        "-FolderName", request.folderName.strip(),
+        "-LibraryName", request.libraryName.strip()
+    ])
+
+    # Apply type-specific switches and TV parameters safely
+    if request.posterType == "season":
+        command.append("-SeasonPoster")
+        # Only add the Season switch if a value actually exists and it's not a movie
+        if request.seasonPosterName and request.seasonPosterName.strip() and lib_type != 'movie':
+            command.extend(["-SeasonPosterName", request.seasonPosterName.strip()])
+
+    elif request.posterType == "titlecard":
+        command.append("-TitleCard")
+        # Only allow TV-specific switches if the library is NOT a movie library
+        if lib_type != 'movie':
+            if request.epTitleName and request.epTitleName.strip():
+                command.extend(["-EPTitleName", request.epTitleName.strip()])
+            if request.episodeNumber and request.episodeNumber.strip():
+                command.extend(["-EpisodeNumber", request.episodeNumber.strip()])
+            if request.seasonPosterName and request.seasonPosterName.strip():
+                command.extend(["-SeasonPosterName", request.seasonPosterName.strip()])
+
+    elif request.posterType == "background":
+        command.append("-BackgroundCard")
+
+    elif request.posterType == "collection":
+        command.append("-CollectionCard")
 
     logger.info(f"Starting Manual Run: {' '.join(command)}")
 
