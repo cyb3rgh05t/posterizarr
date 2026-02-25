@@ -715,8 +715,13 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
   // Fetch database data if not provided (e.g., when opened from FolderView)
   useEffect(() => {
+    // Determine what kind of asset we are dealing with based on the path
+    const assetPathLower = asset?.path?.toLowerCase() || "";
+    const isTitleCard = assetPathLower.includes("titlecard") || /s\d+e\d+/i.test(assetPathLower);
+    const isSeason = assetPathLower.includes("season") && !isTitleCard;
+    const isBackground = assetPathLower.includes("background");
+
     // Helper function to find a match in a list of records
-    // Handles both ImageChoices (Rootfolder) and MediaExport (root_foldername)
     const findMatch = (records, libraryName, rootfolder) => {
       // 1. Filter by LibraryName
       const libraryMatchingRecords = records.filter(
@@ -725,22 +730,6 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
           (r.library_name && r.library_name === libraryName)
       );
 
-      // Debug: Show a few sample records from the library
-      const sampleRecords = libraryMatchingRecords
-        .slice(0, 3)
-        .map((r) => ({
-          LibraryName: r.LibraryName || r.library_name,
-          Rootfolder: r.Rootfolder || r.root_foldername,
-          Type: r.Type || r.library_type,
-        }));
-
-      if (sampleRecords.length > 0) {
-        console.log(
-          `Sample records from "${libraryName}" library:`,
-          sampleRecords
-        );
-      }
-
       // 2. Filter THAT list by Rootfolder
       const rootfolderMatchingRecords = libraryMatchingRecords.filter(
         (r) =>
@@ -748,40 +737,49 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
           (r.root_foldername && r.root_foldername === rootfolder)
       );
 
-      // If no records match the root folder, we can't proceed.
       if (rootfolderMatchingRecords.length === 0) {
-        console.log(
-          `...No records found matching rootfolder: "${rootfolder}"`
-        );
         return null;
       }
 
-      // 3. Prioritize based on the SPECIFIC root folder matches
-      // Prioritize: Show/Movie records > Season records > Episode records
+      // 3. Prioritize dynamically based on the SPECIFIC asset type!
+      if (isTitleCard) {
+        return (
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Episode") || r.Type?.includes("TitleCard")) ||
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Show") || r.Type?.includes("Movie") || r.library_type?.includes("show")) ||
+          rootfolderMatchingRecords[0]
+        );
+      } else if (isSeason) {
+        return (
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Season") && !r.Type?.includes("Episode")) ||
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Show") || r.Type?.includes("Movie") || r.library_type?.includes("show")) ||
+          rootfolderMatchingRecords[0]
+        );
+      } else if (isBackground) {
+        return (
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Background")) ||
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Show") || r.Type?.includes("Movie") || r.library_type?.includes("show")) ||
+          rootfolderMatchingRecords[0]
+        );
+      }
+
+      // Default fallback (Posters) -> Prioritize Show/Movie
       return (
         rootfolderMatchingRecords.find(
           (r) =>
             (r.Type?.includes("Show") || r.Type?.includes("Movie")) ||
             (r.library_type?.includes("show") || r.library_type?.includes("movie"))
         ) ||
-        rootfolderMatchingRecords.find(
-          (r) =>
-            (r.Type?.includes("Season") && !r.Type?.includes("Episode")) ||
-            (r.library_type === "show" && r.season_number) // Approximate
-        ) ||
-        rootfolderMatchingRecords.find((r) => r.Type?.includes("Background")) ||
-        rootfolderMatchingRecords[0] // Fallback to first match in the rootfolder list
+        rootfolderMatchingRecords[0]
       );
     };
 
-    // Helper to normalize data from media_export.db to match ImageChoices.db format
     const normalizeMediaExportData = (record) => {
       if (!record) return null;
       return {
         LibraryName: record.library_name,
         Rootfolder: record.root_foldername,
         Title: record.title,
-        Type: record.library_type, // 'show' or 'movie'
+        Type: record.library_type,
         tmdbid: record.tmdbid,
         tvdbid: record.tvdbid,
         imdbid: record.imdbid,
@@ -790,62 +788,44 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     };
 
     const fetchDatabaseData = async () => {
-      if (dbData !== null) {
-        // Already have database data
-        console.log("Already have database data, skipping fetch");
+      // Check if we have Show data, but we are a titlecard missing the EpisodeTitle.
+      const needsEpisodeTitle = isTitleCard && dbData && !dbData.EpisodeTitle && !dbData._attemptedEpisodeFetch;
+
+      if (dbData !== null && !needsEpisodeTitle) {
+        console.log("Already have adequate database data, skipping fetch");
         return;
       }
 
       // --- Parse Path ---
       const pathParts = asset.path?.split(/[\/\\]/).filter(Boolean);
       if (!pathParts || pathParts.length < 2) {
-        console.log("✗ Cannot parse path:", pathParts);
         return;
       }
       const libraryName = pathParts[0];
       const rootfolder = pathParts[1];
-      console.log(
-        `Fetching DB data for: LibraryName="${libraryName}", Rootfolder="${rootfolder}"`
-      );
       // --- End Parse Path ---
 
       try {
-        let response; // Declare response once
+        let response;
 
-        // --- 1. Try Plex Export (media_export.db) ---
-        console.log("Checking Plex Export DB (/api/plex-export/library)...");
-        response = await fetch(`${API_URL}/plex-export/library`);
-        if (response.ok) {
-          const plexData = await response.json();
-          if (plexData.success && plexData.data) {
-            const matchingRecord = findMatch(plexData.data, libraryName, rootfolder);
-            if (matchingRecord) {
-              console.log("✓ Found matching record in Plex Export DB:", matchingRecord);
-              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
-              return; // Found it!
+        // Only check Plex Export if we don't already have dbData
+        if (!dbData) {
+          console.log("Checking Plex Export DB (/api/plex-export/library)...");
+          response = await fetch(`${API_URL}/plex-export/library`);
+          if (response.ok) {
+            const plexData = await response.json();
+            if (plexData.success && plexData.data) {
+              const matchingRecord = findMatch(plexData.data, libraryName, rootfolder);
+              if (matchingRecord) {
+                setDbData(normalizeMediaExportData(matchingRecord));
+                if (!isTitleCard) return;
+              }
             }
           }
         }
-        console.log("...Not found in Plex Export DB.");
 
-        // --- 2. Try Other Media Export (media_export.db) ---
-        console.log("Checking Other Media Export DB (/api/other-media-export/library)...");
-        response = await fetch(`${API_URL}/other-media-export/library`);
-        if (response.ok) {
-          const otherData = await response.json();
-          if (otherData.success && otherData.data) {
-            const matchingRecord = findMatch(otherData.data, libraryName, rootfolder);
-            if (matchingRecord) {
-              console.log("✓ Found matching record in Other Media Export DB:", matchingRecord);
-              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
-              return; // Found it!
-            }
-          }
-        }
-        console.log("...Not found in Other Media Export DB.");
-
-        // --- 3. Try ImageChoices (Posterizarr DB) ---
-        console.log("Checking ImageChoices DB (/api/imagechoices)...");
+        // --- Try ImageChoices (Posterizarr DB) ---
+        console.log("Checking ImageChoices DB for Asset specific info...");
         response = await fetch(`${API_URL}/imagechoices`);
         if (response.ok) {
           const allRecords = await response.json();
@@ -853,17 +833,20 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
           if (matchingRecord) {
             console.log("✓ Found matching record in ImageChoices DB:", matchingRecord);
-            setDbData(matchingRecord); // Already in correct format
-            return; // Found it!
+            // Merge records: Keeps Show IDs but injects the specific asset info
+            setDbData((prev) => ({
+                ...prev,
+                ...matchingRecord,
+                _attemptedEpisodeFetch: true
+            }));
+            return;
           }
         }
-        console.log("...Not found in ImageChoices DB.");
 
-        // --- 4. Final Failure ---
-        console.log("✗ No matching database record found in ANY source for:", {
-          libraryName,
-          rootfolder,
-        });
+        // Mark as attempted even if we fail so we don't get stuck in a loop
+        if (needsEpisodeTitle) {
+            setDbData(prev => ({ ...prev, _attemptedEpisodeFetch: true }));
+        }
 
       } catch (error) {
         console.error("Error fetching database data:", error);
@@ -917,12 +900,19 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
       let episodeTitleName = "";
       const dbTitle = dbData?.Title || "";
+
+      // Try to parse from the "S01E01 | The Title" format
       if (dbTitle && dbTitle.includes("|")) {
         const parts = dbTitle.split("|");
         if (parts.length >= 2) {
           episodeTitleName = parts[1].trim();
-          console.log(`Episode title from DB: '${episodeTitleName}'`);
+          console.log(`Episode title parsed from DB Title: '${episodeTitleName}'`);
         }
+      }
+      // Fallback: Check if it's explicitly stored as EpisodeTitle
+      else if (dbData?.EpisodeTitle) {
+        episodeTitleName = dbData.EpisodeTitle;
+        console.log(`Episode title from DB field: '${episodeTitleName}'`);
       }
 
       setManualForm((prev) => ({
