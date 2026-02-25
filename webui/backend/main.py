@@ -6757,147 +6757,413 @@ async def run_manual_mode_upload(
     """Run manual mode with uploaded file"""
     global current_process, current_mode, current_start_time
 
-    # 1. Clean and Sanitize Inputs (Essential for both Queue and Run)
-    titletext = titletext.strip()
-    folderName = folderName.strip()
-    libraryName = libraryName.strip()
-    seasonPosterName = seasonPosterName.strip()
-    epTitleName = epTitleName.strip()
-    episodeNumber = episodeNumber.strip()
+    with process_lock:
+        logger.info(f"Manual mode upload request received")
+        logger.info(f"  File: {file.filename if file else 'None'}")
+        logger.info(f"  File content type: {file.content_type if file else 'None'}")
+        logger.info(f"  Poster Type: {posterType}")
+        logger.info(f"  Title Text: '{titletext}'")
+        logger.info(f"  Folder Name: '{folderName}'")
+        logger.info(f"  Library Name: '{libraryName}'")
+        logger.info(f"  Season Poster Name: '{seasonPosterName}'")
+        logger.info(f"  Episode Title Name: '{epTitleName}'")
+        logger.info(f"  Episode Number: '{episodeNumber}'")
+        logger.info(f"  Add to Queue: {add_to_queue}")
 
-    # 2. Validation
-    if not file:
-        raise HTTPException(status_code=400, detail="No file uploaded")
+        # Check if already running (ONLY block if we are NOT queuing)
+        if current_process and current_process.poll() is None:
+            if not add_to_queue:
+                error_msg = "Script is already running. Please stop the script first."
+                logger.error(f"Manual upload rejected: {error_msg}")
+                raise HTTPException(status_code=400, detail=error_msg)
+            else:
+                logger.info("Script is currently running, but request is to queue. Proceeding with upload.")
 
-    if not folderName or not libraryName:
-        raise HTTPException(status_code=400, detail="Folder name and Library name are required")
+        if not SCRIPT_PATH.exists() and not add_to_queue:
+            error_msg = "Posterizarr.ps1 not found"
+            logger.error(f"Manual upload failed: {error_msg}")
+            raise HTTPException(status_code=404, detail=error_msg)
 
-    # Specific Validation for Seasons/Titlecards
-    if posterType == "season" and not seasonPosterName:
-        raise HTTPException(status_code=400, detail="Season poster name is required")
-    if posterType == "titlecard":
-        if not epTitleName or not episodeNumber or not seasonPosterName:
-            raise HTTPException(status_code=400, detail="Episode details and Season name are required")
+        # Validate file upload
+        if not file:
+            error_msg = "No file uploaded"
+            logger.error(f"Manual upload validation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
 
-    # 3. File Handling (Save the file regardless of whether we Queue or Run)
-    try:
-        UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_name = "".join(c for c in file.filename if c.isalnum() or c in "._- ").strip() or "upload.jpg"
-        upload_path = UPLOADS_DIR / f"{timestamp}_{safe_name}"
+        # Validate file type
+        allowed_extensions = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"]
+        file_extension = Path(file.filename).suffix.lower()
+        if file_extension not in allowed_extensions:
+            error_msg = f"Invalid file type '{file_extension}'. Allowed: {', '.join(allowed_extensions)}"
+            logger.error(f"Manual upload validation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
 
-        content = await file.read()
-        if len(content) == 0:
-            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+        # Validate required fields
+        if not folderName.strip():
+            error_msg = "Folder name is required"
+            logger.error(f"Manual upload validation failed: {error_msg} (posterType: {posterType})")
+            raise HTTPException(status_code=400, detail=error_msg)
 
-        # --- Your Aspect Ratio Validation Logic (Preserved) ---
+        if not libraryName.strip():
+            error_msg = "Library name is required"
+            logger.error(f"Manual upload validation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        if posterType == "season" and not seasonPosterName.strip():
+            error_msg = "Season poster name is required for season posters"
+            logger.error(f"Manual upload validation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        if posterType == "titlecard":
+            if not epTitleName.strip():
+                error_msg = "Episode title name is required for title cards"
+                logger.error(f"Manual upload validation failed: {error_msg}")
+                raise HTTPException(status_code=400, detail=error_msg)
+            if not episodeNumber.strip():
+                error_msg = "Episode number is required for title cards"
+                logger.error(f"Manual upload validation failed: {error_msg}")
+                raise HTTPException(status_code=400, detail=error_msg)
+            if not seasonPosterName.strip():
+                error_msg = "Season name is required for title cards"
+                logger.error(f"Manual upload validation failed: {error_msg}")
+                raise HTTPException(status_code=400, detail=error_msg)
+
         try:
-            from PIL import Image
-            import io
-            img = Image.open(io.BytesIO(content))
-            width, height = img.size
-            POSTER_RATIO, BACKGROUND_RATIO, TOLERANCE = 2/3, 16/9, 0.05
-            image_ratio = width / height if height > 0 else 0
-            if posterType in ["standard", "season", "collection"] and abs(image_ratio - POSTER_RATIO) > TOLERANCE:
-                raise HTTPException(status_code=400, detail="Invalid aspect ratio for poster (must be 2:3)")
-            elif posterType in ["background", "titlecard"] and abs(image_ratio - BACKGROUND_RATIO) > TOLERANCE:
-                raise HTTPException(status_code=400, detail="Invalid aspect ratio for background (must be 16:9)")
-        except HTTPException: raise
-        except Exception as e: logger.warning(f"Ratio check skipped: {e}")
+            # Create uploads directory if it doesn't exist with permission check
+            try:
+                UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+                # Verify write permissions
+                test_file = UPLOADS_DIR / ".write_test"
+                test_file.touch()
+                test_file.unlink()
+            except PermissionError as e:
+                logger.error(f"No write permission for uploads directory: {UPLOADS_DIR}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"No write permission for uploads directory. This may be a Docker/NAS permission issue. Please check folder permissions.",
+                )
+            except Exception as e:
+                logger.error(f"Error creating uploads directory: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Cannot create uploads directory: {str(e)}",
+                )
 
-        with open(upload_path, "wb") as buffer:
-            buffer.write(content)
+            # Generate unique filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # Sanitize filename to prevent path traversal and special characters
+            safe_name = "".join(
+                c for c in file.filename if c.isalnum() or c in "._- "
+            ).strip()
+            if not safe_name:
+                safe_name = "upload.jpg"
+            safe_filename = f"{timestamp}_{safe_name}"
+            upload_path = UPLOADS_DIR / safe_filename
 
-    except HTTPException: raise
-    except Exception as e:
-        logger.error(f"File save failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+            # Save uploaded file to uploads directory
+            logger.info(f"Saving uploaded file to: {upload_path}")
+            logger.info(f"Upload directory: {UPLOADS_DIR.resolve()}")
+            logger.info(f"Is Docker: {IS_DOCKER}")
 
-    # ============================================================
-    # PATH A: QUEUE LOGIC (Separated)
-    # ============================================================
-    if add_to_queue:
-        try:
-            logger.info(f"Queuing manual upload for: {folderName}")
-            overlay_params = {
-                "library_name": libraryName,
-                "folder_name": folderName,
-                "title_text": epTitleName if posterType == "titlecard" else titletext,
-                "poster_type": posterType,
-                "season_number": seasonPosterName if posterType in ["season", "titlecard"] else None,
-                "episode_number": episodeNumber if posterType == "titlecard" else None,
-                "episode_title": epTitleName if posterType == "titlecard" else None,
-                "process_with_overlays": True,
-                "asset_type": posterType,
+            try:
+                content = await file.read()
+                if len(content) == 0:
+                    raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+                # Validate image aspect ratio
+                try:
+                    from PIL import Image
+                    import io
+
+                    # Open image from bytes
+                    img = Image.open(io.BytesIO(content))
+                    width, height = img.size
+                    logger.info(f"Manual upload image dimensions: {width}x{height} pixels")
+
+                    # Define target ratios and tolerance
+                    POSTER_RATIO = 2 / 3  # 0.666...
+                    BACKGROUND_RATIO = 16 / 9  # 1.777...
+                    # Tolerance allows for minor pixel deviations
+                    TOLERANCE = 0.05
+
+                    # Check for zero height
+                    if height == 0:
+                        error_msg = "Image height cannot be zero."
+                        logger.error(error_msg)
+                        raise HTTPException(status_code=400, detail=error_msg)
+
+                    image_ratio = width / height
+                    logger.info(f"Image ratio calculated as: {image_ratio}")
+
+                    # Check aspect ratio based on poster type
+                    if posterType in ["standard", "season", "collection"]:
+                        # Check for 2:3 ratio
+                        if abs(image_ratio - POSTER_RATIO) > TOLERANCE:
+                            error_msg = (
+                                f"Invalid aspect ratio for poster. Image is {width}x{height} "
+                                f"(ratio ~{image_ratio:.2f}), but must be 2:3 "
+                                f"(ratio ~{POSTER_RATIO:.2f})."
+                            )
+                            logger.error(error_msg)
+                            raise HTTPException(status_code=400, detail=error_msg)
+                        logger.info("Image aspect ratio validated as 2:3.")
+
+                    elif posterType in ["background", "titlecard"]:
+                        # Check for 16:9 ratio
+                        if abs(image_ratio - BACKGROUND_RATIO) > TOLERANCE:
+                            error_msg = (
+                                f"Invalid aspect ratio for background/title card. Image is {width}x{height} "
+                                f"(ratio ~{image_ratio:.2f}), but must be 16:9 "
+                                f"(ratio ~{BACKGROUND_RATIO:.2f})."
+                            )
+                            logger.error(error_msg)
+                            raise HTTPException(status_code=400, detail=error_msg)
+                        logger.info("Image aspect ratio validated as 16:9.")
+
+                except HTTPException:
+                    # Re-raise HTTP exceptions (ratio validation failures)
+                    raise
+                except Exception as e:
+                    logger.warning(
+                        f"Could not validate image dimensions for manual upload: {e}"
+                    )
+                    # Don't fail upload if dimension check itself fails
+
+                with open(upload_path, "wb") as buffer:
+                    buffer.write(content)
+
+                # Verify file was written
+                if not upload_path.exists():
+                    raise HTTPException(
+                        status_code=500, detail="File was not saved successfully"
+                    )
+
+                actual_size = upload_path.stat().st_size
+                if actual_size != len(content):
+                    logger.warning(
+                        f"File size mismatch: expected {len(content)}, got {actual_size}"
+                    )
+
+            except PermissionError as e:
+                logger.error(f"Permission denied writing file: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Permission denied: Unable to write uploaded file. Check Docker/NAS/Unraid volume permissions.",
+                )
+            except OSError as e:
+                logger.error(f"OS error writing file: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"File system error: {str(e)}. This may be a Docker volume mount issue.",
+                )
+
+            logger.info(f"File saved successfully: {upload_path} ({len(content)} bytes)")
+
+            # ==========================================
+            # NEW QUEUE LOGIC INJECTED HERE
+            # ==========================================
+            if add_to_queue:
+                logger.info("Queuing manual upload")
+
+                # Construct parameters for queue
+                overlay_params = {
+                    "library_name": libraryName,
+                    "folder_name": folderName,
+                    "title_text": titletext,
+                    "poster_type": posterType,
+                    "season_number": seasonPosterName if posterType == "season" else None,
+                    "episode_number": episodeNumber if posterType == "titlecard" else None,
+                    "episode_title": epTitleName if posterType == "titlecard" else None,
+                    "process_with_overlays": True,
+                    "asset_type": posterType,
+                }
+
+                # Construct a reference asset path
+                filename = Path(file.filename).name
+                import re
+                filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+                asset_path = f"{libraryName}/{folderName}/{filename}"
+
+                try:
+                    queue_manager.add_item(
+                        asset_path=asset_path,
+                        source_type="upload",
+                        source_data=str(upload_path), # Path to the file we just saved
+                        overlay_params=overlay_params
+                    )
+                    return {
+                         "success": True,
+                         "message": "Manual run queued successfully",
+                         "upload_path": str(upload_path)
+                    }
+                except Exception as e:
+                    logger.error(f"Failed to add to queue: {e}")
+                    raise HTTPException(status_code=500, detail=f"Failed to queue: {str(e)}")
+            # ==========================================
+
+            # ==========================================
+            # OLD MANUAL EXECUTION LOGIC (runs if not queued)
+            # ==========================================
+            
+            # Determine PowerShell command
+            import platform
+
+            if platform.system() == "Windows":
+                ps_command = "pwsh"
+                try:
+                    subprocess.run([ps_command, "-v"], capture_output=True, check=True)
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    ps_command = "powershell"
+                    logger.info("pwsh not found, using powershell instead")
+            else:
+                ps_command = "pwsh"
+
+            # Build command with uploaded file path
+            command = [
+                ps_command,
+                "-File",
+                str(SCRIPT_PATH),
+                "-Manual",
+                "-PicturePath",
+                str(upload_path),  # Use the uploaded file path
+            ]
+
+            # Add poster type specific switches and parameters
+            if posterType == "season":
+                command.extend(
+                    [
+                        "-SeasonPoster",
+                        "-Titletext",
+                        titletext.strip(),
+                        "-FolderName",
+                        folderName.strip(),
+                        "-LibraryName",
+                        libraryName.strip(),
+                        "-SeasonPosterName",
+                        seasonPosterName.strip(),
+                    ]
+                )
+            elif posterType == "collection":
+                command.extend(
+                    [
+                        "-CollectionCard",
+                        "-Titletext",
+                        titletext.strip(),
+                        "-FolderName",
+                        folderName.strip(),
+                        "-LibraryName",
+                        libraryName.strip(),
+                    ]
+                )
+            elif posterType == "background":
+                command.extend(
+                    [
+                        "-BackgroundCard",
+                        "-Titletext",
+                        titletext.strip(),
+                        "-FolderName",
+                        folderName.strip(),
+                        "-LibraryName",
+                        libraryName.strip(),
+                    ]
+                )
+            elif posterType == "titlecard":
+                command.extend(
+                    [
+                        "-TitleCard",
+                        "-Titletext",
+                        epTitleName.strip(),
+                        "-FolderName",
+                        folderName.strip(),
+                        "-LibraryName",
+                        libraryName.strip(),
+                        "-EPTitleName",
+                        epTitleName.strip(),
+                        "-SeasonPosterName",
+                        seasonPosterName.strip(),
+                        "-EpisodeNumber",
+                        episodeNumber.strip(),
+                    ]
+                )
+            else:  # standard
+                command.extend(
+                    [
+                        "-Titletext",
+                        titletext.strip(),
+                        "-FolderName",
+                        folderName.strip(),
+                        "-LibraryName",
+                        libraryName.strip(),
+                    ]
+                )
+
+            logger.info(f"Running manual mode with uploaded file:")
+            logger.info(f"  Picture Path: {upload_path}")
+            logger.info(f"  Type: {posterType}")
+            logger.info(f"Running command: {' '.join(command)}")
+
+            # Run the manual mode command
+            current_process = subprocess.Popen(
+                command,
+                cwd=str(BASE_DIR),
+                stdout=None,
+                stderr=None,
+                text=True,
+            )
+            current_mode = "manual"
+            current_start_time = datetime.now().isoformat()
+
+            logger.info(f"Started manual mode with PID {current_process.pid}")
+
+            # Schedule cleanup after process completes (in background)
+            async def cleanup_upload():
+                """Cleanup uploaded file after process completes"""
+                try:
+                    # Wait for process to complete
+                    while current_process.poll() is None:
+                        await asyncio.sleep(1)
+
+                    # Wait a bit more to ensure file operations are complete
+                    await asyncio.sleep(5)
+
+                    # Delete the uploaded file
+                    if upload_path.exists():
+                        upload_path.unlink()
+                        logger.info(f"Cleaned up uploaded file: {upload_path}")
+                except Exception as e:
+                    logger.error(f"Error cleaning up uploaded file: {e}")
+
+            # Start cleanup task in background
+            asyncio.create_task(cleanup_upload())
+
+            poster_type_display = {
+                "standard": "standard poster",
+                "season": "season poster",
+                "collection": "collection poster",
+                "titlecard": "episode title card",
+                "background": "background poster",
             }
 
-            # Add to your queue manager instance
-            queue_manager.add_item(
-                asset_path=f"{libraryName}/{folderName}/{file.filename}",
-                source_type="upload",
-                source_data=str(upload_path),
-                overlay_params=overlay_params
-            )
-            # Return immediately so we don't try to run it below
-            return {"success": True, "message": "Manual run added to queue", "upload_path": str(upload_path)}
+            return {
+                "success": True,
+                "message": f"Started manual mode for {poster_type_display.get(posterType, 'poster')}",
+                "pid": current_process.pid,
+                "upload_path": str(upload_path),
+            }
+        except HTTPException:
+            # Re-raise HTTPExceptions as they are already properly formatted
+            raise
+        except FileNotFoundError as e:
+            error_msg = f"PowerShell not found. Please install PowerShell 7+ (pwsh) or ensure Windows PowerShell is in PATH."
+            logger.error(f"Manual upload failed: {error_msg}")
+            logger.error(f"Exception details: {e}")
+            raise HTTPException(status_code=500, detail=error_msg)
         except Exception as e:
-            logger.error(f"Failed to add to queue: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to queue: {str(e)}")
+            error_msg = f"Error running manual mode with uploaded file: {str(e)}"
+            logger.error(error_msg)
+            logger.exception("Full traceback:")
+            raise HTTPException(status_code=500, detail=str(e))
 
-    # ============================================================
-    # PATH B: YOUR ORIGINAL RUN LOGIC (Preserved)
-    # ============================================================
-    with process_lock:
-        if current_process and current_process.poll() is None:
-            raise HTTPException(status_code=400, detail="Script is already running. Please stop it first.")
-
-        import platform
-        ps_command = "pwsh"
-        if platform.system() == "Windows":
-            try:
-                subprocess.run([ps_command, "-v"], capture_output=True, check=True)
-            except: ps_command = "powershell"
-
-        # Build Command
-        command = [ps_command, "-File", str(SCRIPT_PATH), "-Manual", "-PicturePath", str(upload_path)]
-
-        if posterType == "season":
-            command.extend(["-SeasonPoster", "-Titletext", titletext, "-FolderName", folderName,
-                           "-LibraryName", libraryName, "-SeasonPosterName", seasonPosterName])
-        elif posterType == "collection":
-            command.extend(["-CollectionCard", "-Titletext", titletext, "-FolderName", folderName, "-LibraryName", libraryName])
-        elif posterType == "background":
-            command.extend(["-BackgroundCard", "-Titletext", titletext, "-FolderName", folderName, "-LibraryName", libraryName])
-        elif posterType == "titlecard":
-            command.extend(["-TitleCard", "-Titletext", epTitleName, "-FolderName", folderName, "-LibraryName", libraryName,
-                           "-EPTitleName", epTitleName, "-SeasonPosterName", seasonPosterName, "-EpisodeNumber", episodeNumber])
-        else: # standard
-            command.extend(["-Titletext", titletext, "-FolderName", folderName, "-LibraryName", libraryName])
-
-        logger.info(f"Running command: {' '.join(command)}")
-
-        current_process = subprocess.Popen(command, cwd=str(BASE_DIR), stdout=None, stderr=None, text=True)
-        current_mode = "manual"
-        current_start_time = datetime.now().isoformat()
-
-        # Background cleanup
-        async def cleanup_upload():
-            proc = current_process
-            while proc and proc.poll() is None:
-                await asyncio.sleep(2)
-            await asyncio.sleep(5)
-            if upload_path.exists():
-                upload_path.unlink()
-                logger.info(f"Cleaned up uploaded file: {upload_path}")
-
-        asyncio.create_task(cleanup_upload())
-
-        return {
-            "success": True,
-            "message": f"Started manual mode",
-            "pid": current_process.pid,
-            "upload_path": str(upload_path)
-        }
 
 # ============================================================================
 # GENERIC RUN ENDPOINT - Must be defined AFTER specific endpoints like /api/run-manual
@@ -10692,23 +10958,27 @@ async def upload_asset_replacement(
             )
             raise HTTPException(
                 status_code=409,
-                detail="Cannot replace assets while Posterizarr is currently running. Please wait or use 'Add to Queue'.",
+                detail="Cannot replace assets while Posterizarr is running. Please wait until all processing is completed before using the replace or manual update options.",
             )
 
         logger.info(f"Asset replacement upload request received")
         logger.info(f"  Asset path: {asset_path}")
         logger.info(f"  File: {file.filename}")
+        logger.info(f"  Content type: {file.content_type}")
         logger.info(f"  Process with overlays: {process_with_overlays}")
         logger.info(f"  Add to queue: {add_to_queue}")
 
         # Validate file upload
         if not file or not file.filename:
+            logger.error("No file uploaded")
             raise HTTPException(status_code=400, detail="No file uploaded")
 
-        # Validate file type
+        # Validate file type - check both content type and extension
         allowed_extensions = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"]
         file_extension = Path(file.filename).suffix.lower()
+
         if file_extension not in allowed_extensions:
+            logger.error(f"Invalid file extension: {file_extension}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}",
@@ -10716,22 +10986,30 @@ async def upload_asset_replacement(
 
         # Validate content type
         if not file.content_type or not file.content_type.startswith("image/"):
+            logger.error(f"Invalid content type: {file.content_type}")
             raise HTTPException(status_code=400, detail="File must be an image")
 
         # Read uploaded file
         try:
             contents = await file.read()
+            logger.info(f"File read successfully: {len(contents)} bytes")
         except Exception as e:
+            logger.error(f"Error reading uploaded file: {e}")
             raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
 
+        # Validate file size
         if len(contents) == 0:
+            logger.error("Uploaded file is empty")
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-        # QUEUE LOGIC
+        # ==========================================
+        # NEW QUEUE LOGIC INJECTED HERE
+        # ==========================================
         if add_to_queue:
+            import time
             try:
                 # Ensure staging directory exists
-                QUEUE_STAGING_DIR.mkdir(exist_ok=True)
+                QUEUE_STAGING_DIR.mkdir(parents=True, exist_ok=True)
 
                 # Create a unique filename for the staged file
                 timestamp = int(time.time() * 1000)
@@ -10777,6 +11055,11 @@ async def upload_asset_replacement(
             except Exception as e:
                 logger.error(f"Error adding to queue: {e}")
                 raise HTTPException(status_code=500, detail=f"Failed to add to queue: {str(e)}")
+        # ==========================================
+
+        # ==========================================
+        # OLD MANUAL EXECUTION LOGIC (runs if not queued)
+        # ==========================================
 
         # Validate and sanitize asset path
         try:
@@ -10817,130 +11100,280 @@ async def upload_asset_replacement(
             else:
                 logger.info(f"Creating new asset: {full_asset_path}")
 
+            logger.info(f"Full asset path: {full_asset_path}")
+            logger.info(f"Is Docker: {IS_DOCKER}, Target Dir: {target_base_dir}")
+
         except (ValueError, OSError) as e:
             logger.error(f"Invalid asset path '{asset_path}': {e}")
             raise HTTPException(status_code=400, detail=f"Invalid asset path: {str(e)}")
 
-        # Ensure parent directory exists
+        # Ensure parent directory exists with permission check
         try:
             full_asset_path.parent.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Cannot access directory: {str(e)}")
+            # Test write permissions in parent directory
+            test_file = full_asset_path.parent / ".write_test"
+            test_file.touch()
+            test_file.unlink()
+        except PermissionError as e:
+            logger.error(
+                f"No write permission for asset directory: {full_asset_path.parent}"
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"No write permission for asset directory. On Docker/NAS/Unraid, ensure volume is mounted with write permissions (e.g., /assets:/assets:rw).",
+            )
+        except OSError as e:
+            logger.error(f"OS error accessing asset directory: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Cannot access asset directory: {str(e)}. Check if the path exists and is accessible.",
+            )
 
-        # Validate image aspect ratio (Keep logic but simplify exception handling for brevity)
+        # Validate image aspect ratio instead of dimensions
         try:
             from PIL import Image
             import io
+
             img = Image.open(io.BytesIO(contents))
             width, height = img.size
-            if height == 0: raise Exception("Height is zero")
+            logger.info(f"Manual upload image dimensions: {width}x{height} pixels")
 
-            # (Keeping existing validation logic implicitly by not changing it significantly,
-            # effectively just re-implementing it here for the immediate path)
-            # Shortened for this edit block to fit, assuming standard checks
+            # Determine asset type from path/filename
+            asset_path_lower = asset_path.lower()
+            is_poster = (
+                "poster" in asset_path_lower
+                or asset_path_lower.endswith((".jpg", ".png"))
+                and "background" not in asset_path_lower
+                and "titlecard" not in asset_path_lower
+                and not re.search(r"s\d+e\d+", asset_path_lower, re.IGNORECASE)
+            )
+            is_background = "background" in asset_path_lower
+            is_titlecard = "titlecard" in asset_path_lower or re.search(
+                r"s\d+e\d+", asset_path_lower, re.IGNORECASE
+            )
+            is_season = (
+                re.search(r"season\s*\d+", asset_path_lower, re.IGNORECASE)
+                and not is_titlecard
+            )
 
+            # Check for zero height
+            if height == 0:
+                error_msg = "Image height cannot be zero."
+                logger.error(error_msg)
+                raise HTTPException(status_code=400, detail=error_msg)
+
+            # Calculate ratio
+            ratio = width / height
+            logger.info(f"Image aspect ratio: {ratio:.3f}")
+
+            # Define expected ratios
+            POSTER_RATIO = 2 / 3  # ˜ 0.667
+            BG_TC_RATIO = 16 / 9  # ˜ 1.778
+            TOLERANCE = 0.05  # ±5% tolerance
+
+            def ratio_within_tolerance(actual, expected, tolerance):
+                return abs(actual - expected) / expected <= tolerance
+
+            # Validate based on type
+            if is_poster or is_season:
+                if not ratio_within_tolerance(ratio, POSTER_RATIO, TOLERANCE):
+                    error_msg = (
+                        f"Invalid aspect ratio ({ratio:.3f}). Expected approximately 2:3 "
+                        f"({POSTER_RATIO:.3f} ± {TOLERANCE*100:.0f}%)."
+                    )
+                    logger.error(error_msg)
+                    raise HTTPException(status_code=400, detail=error_msg)
+
+            elif is_background or is_titlecard:
+                if not ratio_within_tolerance(ratio, BG_TC_RATIO, TOLERANCE):
+                    error_msg = (
+                        f"Invalid aspect ratio ({ratio:.3f}). Expected approximately 16:9 "
+                        f"({BG_TC_RATIO:.3f} ± {TOLERANCE*100:.0f}%)."
+                    )
+                    logger.error(error_msg)
+                    raise HTTPException(status_code=400, detail=error_msg)
+
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning(f"Could not validate image ratio: {e}")
+            # Don't fail upload if dimension check itself fails, just log it
 
-        # Check alternate location
+        # Check if asset exists in alternate location (for moving between folders)
         alternate_base_dir = (
             ASSETS_DIR if not process_with_overlays else MANUAL_ASSETS_DIR
         )
         alternate_asset_path = alternate_base_dir / normalized_path
+        asset_exists_in_alternate = alternate_asset_path.exists()
 
-        if alternate_asset_path.exists():
+        # Track if this is a replacement or new asset in target location
+        is_replacement = full_asset_path.exists()
+
+        # Delete old asset from alternate location if moving between folders
+        if asset_exists_in_alternate:
             try:
+                logger.info(
+                    f"Deleting old asset from alternate location: {alternate_asset_path}"
+                )
                 alternate_asset_path.unlink()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(
+                    f"Could not delete old asset from alternate location: {e}"
+                )
 
         # Save new image
         try:
             with open(full_asset_path, "wb") as f:
                 f.write(contents)
 
-            is_replacement = True # Simplify for now
+            # Verify file was written correctly
+            if not full_asset_path.exists():
+                raise HTTPException(
+                    status_code=500, detail="File was not saved successfully"
+                )
 
+            actual_size = full_asset_path.stat().st_size
+            if actual_size != len(contents):
+                logger.error(
+                    f"File size mismatch: expected {len(contents)}, got {actual_size}"
+                )
+                raise HTTPException(
+                    status_code=500, detail="File was not saved completely"
+                )
+
+            action = "Replaced" if is_replacement else "Created"
+            logger.info(
+                f"{action} asset: {asset_path} (size: {len(contents)} bytes, target: {target_base_dir.name})"
+            )
+        except PermissionError as e:
+            logger.error(f"Permission denied writing to {full_asset_path}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Permission denied: Unable to write to file. On Docker/NAS/Unraid, check that user has write permissions (uid/gid mapping).",
+            )
+        except OSError as e:
+            logger.error(f"OS error writing to {full_asset_path}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"File system error: {str(e)}. Check disk space, mount points, and file system health (especially on NAS/RAID systems).",
+            )
         except Exception as e:
+            logger.error(f"Unexpected error writing file: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
 
         result = {
             "success": True,
-            "message": f"Asset saved successfully",
+            "message": f"Asset {'replaced' if is_replacement else 'created'} successfully",
             "path": asset_path,
             "size": len(contents),
-            "queued": False
+            "was_replacement": is_replacement,
         }
 
-        # Trigger Manual Run if requested
+        # If process_with_overlays is enabled, trigger Manual Run
         if process_with_overlays:
+            logger.info(f"Processing with overlays enabled for: {asset_path}")
+
             try:
-                # We need to reuse the manual run trigger logic.
-                # Ideally this should be a helper function, but for now we inline/call existing logic.
-                # Actually, earlier I saw 'trigger_manual_run_internal'. I should use that.
-
-                # Logic to extract params and build ManualModeRequest
-                # (This mimics the previous existing logic)
-
+                # Parse asset path to extract info
+                # Format: LibraryName/FolderName/poster.jpg, Season01.jpg, or S01E01.jpg
                 path_parts = Path(asset_path).parts
+                logger.info(f"Path parts: {path_parts} (length: {len(path_parts)})")
+
                 if len(path_parts) >= 3:
+                    # Use provided library_name and folder_name if available, otherwise extract from path
                     extracted_library_name = path_parts[0]
                     extracted_folder_name = path_parts[1]
-                    filename = path_parts[-1]
 
                     final_library_name = library_name or extracted_library_name
                     final_folder_name = folder_name or extracted_folder_name
+                    final_title_text = title_text or extracted_folder_name
 
-                    # Title Text Logic
-                    final_title_text = title_text
-                    if not final_title_text:
-                         title_match = re.match(r"^(.+?)\s*\(\d{4}\)", final_folder_name)
-                         final_title_text = title_match.group(1).strip() if title_match else final_folder_name
-
-                    # Determine type
-                    poster_type = "standard"
-                    season_poster_name = ""
-                    ep_number = ""
-                    ep_title_name = ""
-
-                    if "background" in filename: poster_type = "background"
-                    elif "season" in filename.lower():
-                        poster_type = "season"
-                        season_poster_name = season_number or re.search(r"(\d+)", filename).group(1)
-                    elif "s" in filename.lower() and "e" in filename.lower():
-                        poster_type = "titlecard"
-                        ep_title_name = episode_title
-                        ep_number = episode_number
-
-                    manual_request = ManualModeRequest(
-                        picturePath=str(full_asset_path),
-                        titletext=final_title_text,
-                        folderName=final_folder_name,
-                        libraryName=final_library_name,
-                        posterType=poster_type,
-                        seasonPosterName=season_poster_name or "",
-                        epTitleName=ep_title_name or "",
-                        episodeNumber=ep_number or ""
+                    logger.info(
+                        f"Overlay parameters - Library: {final_library_name}, Folder: {final_folder_name}, Title: {final_title_text}"
                     )
 
-                    await trigger_manual_run_internal(manual_request)
+                    # Determine poster type from filename
+                    filename = Path(asset_path).name.lower()
+
+                    # Build Manual Run command
+                    command = [
+                        "pwsh" if os.name == "nt" else "pwsh",
+                        "-File",
+                        str(SCRIPT_PATH),
+                        "-manual",
+                        "-PicturePath",
+                        str(full_asset_path),
+                        "-Titletext",
+                        final_title_text,
+                        "-FolderName",
+                        final_folder_name,
+                        "-LibraryName",
+                        final_library_name,
+                    ]
+
+                    # Handle Season posters (Season01.jpg, Season 01.jpg, etc.)
+                    if season_number or "season" in filename:
+                        command.extend(["-SeasonPoster"])
+                        if season_number:
+                            command.extend(["-SeasonPosterName", season_number])
+
+                    # Handle TitleCards (S01E01.jpg, etc.)
+                    elif episode_number and episode_title:
+                        command.extend(["-TitleCards"])
+                        command.extend(["-EpisodeNumber", episode_number])
+                        command.extend(["-EpisodeTitleName", episode_title])
+
+                    # Handle Background cards (background.jpg, backdrop.jpg, etc.)
+                    elif "background" in filename or "backdrop" in filename:
+                        command.extend(["-BackgroundCard"])
+
+                    # Default: Standard poster
+                    # No additional flags needed
+
+                    logger.info(
+                        f"Starting Manual Run for overlay processing: {' '.join(command)}"
+                    )
+
+                    # Start the Manual Run process
+                    global current_process, current_mode, current_start_time
+                    current_process = subprocess.Popen(
+                        command,
+                        cwd=str(BASE_DIR),
+                        stdout=None,
+                        stderr=None,
+                        text=True,
+                    )
+                    current_mode = "manual"
+                    current_start_time = datetime.now().isoformat()
+
+                    logger.info(
+                        f"Manual Run started (PID: {current_process.pid}) for overlay processing"
+                    )
+
                     result["manual_run_triggered"] = True
-                    result["message"] = "Asset replaced and queued for overlay processing"
+                    result["message"] = (
+                        "Asset replaced and queued for overlay processing"
+                    )
+
                 else:
+                    logger.warning(
+                        f"Invalid path structure for overlay processing: {asset_path}"
+                    )
                     result["manual_run_triggered"] = False
+                    result["message"] = (
+                        "Asset replaced but overlay processing skipped (invalid path structure)"
+                    )
 
             except Exception as e:
-                logger.error(f"Error triggering manual run: {e}")
+                logger.error(f"Error triggering Manual Run: {e}")
                 result["manual_run_triggered"] = False
                 result["error"] = str(e)
 
         return result
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
@@ -11421,12 +11854,12 @@ async def replace_asset_from_url(
 
                     if filename == "poster.jpg":
                         poster_type = "standard"
-                    elif "background" in filename:
+                    elif filename == "background.jpg":
                         poster_type = "background"
-                    elif re.match(r"^seas.*", filename.lower()) or "season" in filename.lower():
+                    elif re.match(r"^Season(\d+)\.jpg$", filename):
                         poster_type = "season"
                         # Extract season number from filename or use provided one
-                        season_match = re.search(r"(\d+)", filename)
+                        season_match = re.match(r"^Season(\d+)\.jpg$", filename)
                         if season_match:
                             extracted_season = season_match.group(1)
                             # Use provided season_number as-is (user controls the text)
@@ -11438,12 +11871,13 @@ async def replace_asset_from_url(
                             # Use whatever the user provided as-is
                             season_poster_name = season_number
                         else:
-                             # Try to parse if format is "Season 01.jpg"
-                             pass
-                    elif "s" in filename.lower() and "e" in filename.lower():
+                            raise ValueError(
+                                f"Could not determine season number for: {filename}"
+                            )
+                    elif re.match(r"^S(\d+)E(\d+)\.jpg$", filename):
                         poster_type = "titlecard"
                         # Extract season/episode from filename or use provided values
-                        ep_match = re.search(r"s(\d+)e(\d+)", filename.lower())
+                        ep_match = re.match(r"^S(\d+)E(\d+)\.jpg$", filename)
                         if ep_match:
                             extracted_season = ep_match.group(1)
                             extracted_episode = ep_match.group(2)
@@ -11458,11 +11892,16 @@ async def replace_asset_from_url(
                             season_poster_name = season_number
                             ep_number = episode_number
 
-                        # Episode title must be provided for title cards usually, using provided or empty
+                        # Episode title must be provided
+                        if not episode_title:
+                            raise ValueError(
+                                f"Episode title is required for title card processing"
+                            )
                         ep_title_name = episode_title
                     else:
-                        # Default fallback
-                        poster_type = "standard"
+                        raise ValueError(
+                            f"Unsupported file type for overlay processing: {filename}"
+                        )
 
                     # Extract title text from folder name if not provided
                     # Remove year and TMDB/TVDB ID from folder name
@@ -11479,6 +11918,10 @@ async def replace_asset_from_url(
                     logger.info(
                         f"Manual Run params - Library: {final_library_name}, Folder: {final_folder_name}, Type: {poster_type}, Title: {final_title_text}"
                     )
+                    if season_poster_name:
+                        logger.info(f"Season: {season_poster_name}")
+                    if ep_number and ep_title_name:
+                        logger.info(f"Episode: {ep_number} - {ep_title_name}")
 
                     # Build ManualModeRequest
                     manual_request = ManualModeRequest(
@@ -11486,7 +11929,7 @@ async def replace_asset_from_url(
                         titletext=(
                             final_title_text
                             if poster_type != "titlecard"
-                            else ep_title_name or final_title_text
+                            else ep_title_name
                         ),
                         folderName=final_folder_name,
                         libraryName=final_library_name,
@@ -11527,10 +11970,11 @@ async def replace_asset_from_url(
         logger.error(f"Error replacing asset from URL: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 async def trigger_manual_run_internal(request: ManualModeRequest):
     """
-    Internal function to trigger manual run without HTTP overhead.
-    Includes a sanity check to prevent TV switches on Movie libraries.
+    Internal function to trigger manual run without HTTP overhead
+    This is called from replace_asset_from_url
     """
     global current_process, current_mode, current_start_time
 
@@ -11541,13 +11985,9 @@ async def trigger_manual_run_internal(request: ManualModeRequest):
     if not SCRIPT_PATH.exists():
         raise ValueError("Posterizarr.ps1 not found")
 
-    # 1. SANITY CHECK: Determine actual library type from DB/Cache
-    # This prevents Movie libraries from using TitleCard logic [cite: 41, 42]
-    lib_type = get_library_type_from_db(request.libraryName.strip())
-    logger.info(f"[SanityCheck] Library '{request.libraryName}' is identified as: {lib_type}")
-
     # Determine PowerShell command
     import platform
+
     if platform.system() == "Windows":
         ps_command = "pwsh"
         try:
@@ -11558,62 +11998,89 @@ async def trigger_manual_run_internal(request: ManualModeRequest):
     else:
         ps_command = "pwsh"
 
-    # Build base command that applies to ALL runs
+    # Build command based on poster type
     command = [
         ps_command,
-        "-File", str(SCRIPT_PATH),
+        "-File",
+        str(SCRIPT_PATH),
         "-Manual",
-        "-PicturePath", request.picturePath.strip(),
+        "-PicturePath",
+        request.picturePath.strip(),
     ]
 
-    # Dynamically add core parameters ONLY if they contain a value
-    if request.titletext and request.titletext.strip():
-        command.extend(["-Titletext", request.titletext.strip()])
-
-    command.extend([
-        "-FolderName", request.folderName.strip(),
-        "-LibraryName", request.libraryName.strip()
-    ])
-
-    # Apply type-specific switches and TV parameters safely
-    if request.posterType == "season":
-        command.append("-SeasonPoster")
-        # Only add the Season switch if a value actually exists and it's not a movie
-        if request.seasonPosterName and request.seasonPosterName.strip() and lib_type != 'movie':
-            command.extend(["-SeasonPosterName", request.seasonPosterName.strip()])
-
-    elif request.posterType == "titlecard":
-        command.append("-TitleCard")
-        # Only allow TV-specific switches if the library is NOT a movie library
-        if lib_type != 'movie':
-            if request.epTitleName and request.epTitleName.strip():
-                command.extend(["-EPTitleName", request.epTitleName.strip()])
-            if request.episodeNumber and request.episodeNumber.strip():
-                command.extend(["-EpisodeNumber", request.episodeNumber.strip()])
-            if request.seasonPosterName and request.seasonPosterName.strip():
-                command.extend(["-SeasonPosterName", request.seasonPosterName.strip()])
-
+    # Add poster type specific switches and parameters
+    if request.posterType == "titlecard":
+        command.extend(
+            [
+                "-TitleCard",
+                "-Titletext",
+                request.epTitleName.strip(),
+                "-FolderName",
+                request.folderName.strip(),
+                "-LibraryName",
+                request.libraryName.strip(),
+                "-EPTitleName",
+                request.epTitleName.strip(),
+                "-EpisodeNumber",
+                request.episodeNumber.strip(),
+                "-SeasonPosterName",
+                request.seasonPosterName.strip(),
+            ]
+        )
+    elif request.posterType == "season":
+        command.extend(
+            [
+                "-SeasonPoster",
+                "-Titletext",
+                request.titletext.strip(),
+                "-FolderName",
+                request.folderName.strip(),
+                "-LibraryName",
+                request.libraryName.strip(),
+                "-SeasonPosterName",
+                request.seasonPosterName.strip(),
+            ]
+        )
     elif request.posterType == "background":
-        command.append("-BackgroundCard")
-
-    elif request.posterType == "collection":
-        command.append("-CollectionCard")
+        command.extend(
+            [
+                "-BackgroundCard",
+                "-Titletext",
+                request.titletext.strip(),
+                "-FolderName",
+                request.folderName.strip(),
+                "-LibraryName",
+                request.libraryName.strip(),
+            ]
+        )
+    else:  # standard poster
+        command.extend(
+            [
+                "-Titletext",
+                request.titletext.strip(),
+                "-FolderName",
+                request.folderName.strip(),
+                "-LibraryName",
+                request.libraryName.strip(),
+            ]
+        )
 
     logger.info(f"Starting Manual Run: {' '.join(command)}")
 
     # Start the process in background
+    # IMPORTANT: Do NOT redirect stdout/stderr to PIPE if we're not reading them!
+    # This prevents the process from hanging when the buffer fills up
     current_process = subprocess.Popen(
         command,
         cwd=str(BASE_DIR),
-        stdout=None,
-        stderr=None,
+        stdout=None,  # Let output go to console/log
+        stderr=None,  # Let output go to console/log
         text=True,
     )
     current_mode = "manual"
     current_start_time = datetime.now().isoformat()
 
     logger.info(f"Manual Run process started (PID: {current_process.pid})")
-
 
 async def _find_and_delete_asset(record_id: int) -> Dict[str, any]:
     """
