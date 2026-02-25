@@ -7004,7 +7004,7 @@ async def run_manual_mode_upload(
             # ==========================================
             # OLD MANUAL EXECUTION LOGIC (runs if not queued)
             # ==========================================
-            
+
             # Determine PowerShell command
             import platform
 
@@ -11167,9 +11167,9 @@ async def upload_asset_replacement(
             logger.info(f"Image aspect ratio: {ratio:.3f}")
 
             # Define expected ratios
-            POSTER_RATIO = 2 / 3  # ˜ 0.667
-            BG_TC_RATIO = 16 / 9  # ˜ 1.778
-            TOLERANCE = 0.05  # ±5% tolerance
+            POSTER_RATIO = 2 / 3  # â‰ˆ 0.667
+            BG_TC_RATIO = 16 / 9  # â‰ˆ 1.778
+            TOLERANCE = 0.05  # Â±5% tolerance
 
             def ratio_within_tolerance(actual, expected, tolerance):
                 return abs(actual - expected) / expected <= tolerance
@@ -11179,7 +11179,7 @@ async def upload_asset_replacement(
                 if not ratio_within_tolerance(ratio, POSTER_RATIO, TOLERANCE):
                     error_msg = (
                         f"Invalid aspect ratio ({ratio:.3f}). Expected approximately 2:3 "
-                        f"({POSTER_RATIO:.3f} ± {TOLERANCE*100:.0f}%)."
+                        f"({POSTER_RATIO:.3f} Â± {TOLERANCE*100:.0f}%)."
                     )
                     logger.error(error_msg)
                     raise HTTPException(status_code=400, detail=error_msg)
@@ -11188,7 +11188,7 @@ async def upload_asset_replacement(
                 if not ratio_within_tolerance(ratio, BG_TC_RATIO, TOLERANCE):
                     error_msg = (
                         f"Invalid aspect ratio ({ratio:.3f}). Expected approximately 16:9 "
-                        f"({BG_TC_RATIO:.3f} ± {TOLERANCE*100:.0f}%)."
+                        f"({BG_TC_RATIO:.3f} Â± {TOLERANCE*100:.0f}%)."
                     )
                     logger.error(error_msg)
                     raise HTTPException(status_code=400, detail=error_msg)
