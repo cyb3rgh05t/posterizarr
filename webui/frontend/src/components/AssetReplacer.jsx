@@ -302,56 +302,38 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     console.log(`Derived mediaType: '${mediaType}'`);
 
     // Extract season/episode numbers
-    // Priority 1: From DB Title field (if asset comes from AssetOverview)
-    // Priority 2: From asset path
-    // Note: Season 0 or 00 represents Special Seasons
+    // Priority 1: From asset path (absolute truth for specific files like S01E01)
+    // Priority 2: From DB Title field (fallback)
     let seasonNumber = null;
     let episodeNumber = null;
 
-    // Check if we have DB data (from AssetOverview)
-    const dbTitle = dbData?.Title || "";
+    // First try the path
+    const pathSeasonMatch = asset.path?.match(/Season\s*(\d+)/i);
+    const pathEpisodeMatch = asset.path?.match(/S(\d+)E(\d+)/i);
 
-    if (dbTitle) {
-      // Extract from DB Title field
-      // Format: "Show Name | Season04" or "S04E01 | Episode Title"
-      // Support Season 0/00 (Special Seasons) - match 0+ digits to allow Season0, Season00, etc.
-      const dbSeasonMatch = dbTitle.match(/Season\s*(\d+)/i);
-      const dbEpisodeMatch = dbTitle.match(/S(\d+)E(\d+)/i);
-
-      if (dbSeasonMatch) {
-        seasonNumber = parseInt(dbSeasonMatch[1]);
-        console.log(
-          `Season number from DB Title '${dbTitle}': ${seasonNumber}${seasonNumber === 0 ? " (Special Season)" : ""
-          }`
-        );
-      }
-
-      if (dbEpisodeMatch) {
-        seasonNumber = parseInt(dbEpisodeMatch[1]);
-        episodeNumber = parseInt(dbEpisodeMatch[2]);
-        console.log(
-          `Episode info from DB Title '${dbTitle}': S${seasonNumber}E${episodeNumber}${seasonNumber === 0 ? " (Special Season)" : ""
-          }`
-        );
-      }
+    if (pathSeasonMatch) {
+      seasonNumber = parseInt(pathSeasonMatch[1]);
+    }
+    if (pathEpisodeMatch) {
+      if (seasonNumber === null) seasonNumber = parseInt(pathEpisodeMatch[1]);
+      episodeNumber = parseInt(pathEpisodeMatch[2]);
     }
 
-    // Fallback: Extract from path if not found in DB
+    // Fallback: Extract from DB Title field if path didn't have it
     if (seasonNumber === null || episodeNumber === null) {
-      // Support Season 0/00 (Special Seasons) - match 0+ digits to allow Season0, Season00, etc.
-      const pathSeasonMatch = asset.path?.match(/Season(\d+)/i);
-      const pathEpisodeMatch = asset.path?.match(/S(\d+)E(\d+)/i);
+      const dbTitle = dbData?.Title || "";
+      if (dbTitle) {
+        const dbSeasonMatch = dbTitle.match(/Season\s*(\d+)/i);
+        const dbEpisodeMatch = dbTitle.match(/S(\d+)E(\d+)/i);
 
-      if (pathSeasonMatch && seasonNumber === null) {
-        seasonNumber = parseInt(pathSeasonMatch[1]);
-      }
-
-      if (pathEpisodeMatch) {
-        if (seasonNumber === null) {
-          seasonNumber = parseInt(pathEpisodeMatch[1]);
+        if (dbSeasonMatch && seasonNumber === null) {
+          seasonNumber = parseInt(dbSeasonMatch[1]);
+          console.log(`Season number from DB Title '${dbTitle}': ${seasonNumber}`);
         }
-        if (episodeNumber === null) {
-          episodeNumber = parseInt(pathEpisodeMatch[2]);
+        if (dbEpisodeMatch) {
+          if (seasonNumber === null) seasonNumber = parseInt(dbEpisodeMatch[1]);
+          if (episodeNumber === null) episodeNumber = parseInt(dbEpisodeMatch[2]);
+          console.log(`Episode info from DB Title '${dbTitle}': S${seasonNumber}E${episodeNumber}`);
         }
       }
     }
@@ -715,73 +697,85 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
   // Fetch database data if not provided (e.g., when opened from FolderView)
   useEffect(() => {
+    // Determine what kind of asset we are dealing with based on the path
+    const assetPathLower = asset?.path?.toLowerCase() || "";
+    const isTitleCard = assetPathLower.includes("titlecard") || /s\d+e\d+/i.test(assetPathLower);
+    const isSeason = assetPathLower.includes("season") && !isTitleCard;
+    const isBackground = assetPathLower.includes("background");
+
+    // Extract target season and episode from path to find EXACT matches
+    const targetSeason = assetPathLower.match(/s(\d+)e\d+/i)?.[1] || assetPathLower.match(/season\s*(\d+)/i)?.[1];
+    const targetEpisode = assetPathLower.match(/s\d+e(\d+)/i)?.[1];
+
     // Helper function to find a match in a list of records
-    // Handles both ImageChoices (Rootfolder) and MediaExport (root_foldername)
     const findMatch = (records, libraryName, rootfolder) => {
-      // 1. Filter by LibraryName
       const libraryMatchingRecords = records.filter(
         (r) =>
           (r.LibraryName && r.LibraryName === libraryName) ||
           (r.library_name && r.library_name === libraryName)
       );
 
-      // Debug: Show a few sample records from the library
-      const sampleRecords = libraryMatchingRecords
-        .slice(0, 3)
-        .map((r) => ({
-          LibraryName: r.LibraryName || r.library_name,
-          Rootfolder: r.Rootfolder || r.root_foldername,
-          Type: r.Type || r.library_type,
-        }));
-
-      if (sampleRecords.length > 0) {
-        console.log(
-          `Sample records from "${libraryName}" library:`,
-          sampleRecords
-        );
-      }
-
-      // 2. Filter THAT list by Rootfolder
       const rootfolderMatchingRecords = libraryMatchingRecords.filter(
         (r) =>
           (r.Rootfolder && r.Rootfolder === rootfolder) ||
           (r.root_foldername && r.root_foldername === rootfolder)
       );
 
-      // If no records match the root folder, we can't proceed.
-      if (rootfolderMatchingRecords.length === 0) {
-        console.log(
-          `...No records found matching rootfolder: "${rootfolder}"`
+      if (rootfolderMatchingRecords.length === 0) return null;
+
+      // Prioritize dynamically based on the SPECIFIC asset type!
+      if (isTitleCard) {
+        // 1. EXACT EPISODE MATCH
+        if (targetSeason !== undefined && targetEpisode !== undefined) {
+           const exactMatch = rootfolderMatchingRecords.find(r => {
+             const title = r.Title || "";
+             const match = title.match(/S(\d+)E(\d+)/i);
+             if (match) {
+                return parseInt(match[1]) === parseInt(targetSeason) && parseInt(match[2]) === parseInt(targetEpisode);
+             }
+             return false;
+           });
+           if (exactMatch) return exactMatch;
+        }
+
+        // 2. Fallback
+        return (
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Episode") || r.Type?.includes("TitleCard")) ||
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Show") || r.Type?.includes("Movie") || r.library_type?.includes("show")) ||
+          rootfolderMatchingRecords[0]
         );
-        return null;
+      } else if (isSeason) {
+        return (
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Season") && !r.Type?.includes("Episode")) ||
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Show") || r.Type?.includes("Movie") || r.library_type?.includes("show")) ||
+          rootfolderMatchingRecords[0]
+        );
+      } else if (isBackground) {
+        return (
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Background")) ||
+          rootfolderMatchingRecords.find((r) => r.Type?.includes("Show") || r.Type?.includes("Movie") || r.library_type?.includes("show")) ||
+          rootfolderMatchingRecords[0]
+        );
       }
 
-      // 3. Prioritize based on the SPECIFIC root folder matches
-      // Prioritize: Show/Movie records > Season records > Episode records
+      // Default fallback (Posters) -> Prioritize Show/Movie
       return (
         rootfolderMatchingRecords.find(
           (r) =>
             (r.Type?.includes("Show") || r.Type?.includes("Movie")) ||
             (r.library_type?.includes("show") || r.library_type?.includes("movie"))
         ) ||
-        rootfolderMatchingRecords.find(
-          (r) =>
-            (r.Type?.includes("Season") && !r.Type?.includes("Episode")) ||
-            (r.library_type === "show" && r.season_number) // Approximate
-        ) ||
-        rootfolderMatchingRecords.find((r) => r.Type?.includes("Background")) ||
-        rootfolderMatchingRecords[0] // Fallback to first match in the rootfolder list
+        rootfolderMatchingRecords[0]
       );
     };
 
-    // Helper to normalize data from media_export.db to match ImageChoices.db format
     const normalizeMediaExportData = (record) => {
       if (!record) return null;
       return {
         LibraryName: record.library_name,
         Rootfolder: record.root_foldername,
         Title: record.title,
-        Type: record.library_type, // 'show' or 'movie'
+        Type: record.library_type,
         tmdbid: record.tmdbid,
         tvdbid: record.tvdbid,
         imdbid: record.imdbid,
@@ -790,62 +784,53 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
     };
 
     const fetchDatabaseData = async () => {
-      if (dbData !== null) {
-        // Already have database data
-        console.log("Already have database data, skipping fetch");
+      // Detect if the DB data we currently hold is for the WRONG episode
+      let isWrongEpisode = false;
+      if (isTitleCard && dbData && targetSeason !== undefined && targetEpisode !== undefined) {
+        const dbEpMatch = (dbData.Title || "").match(/S(\d+)E(\d+)/i);
+        if (dbEpMatch) {
+           if (parseInt(dbEpMatch[1]) !== parseInt(targetSeason) || parseInt(dbEpMatch[2]) !== parseInt(targetEpisode)) {
+              isWrongEpisode = true;
+           }
+        }
+      }
+
+      // We need data if we have the wrong episode, OR if we are missing the EpisodeTitle
+      const needsEpisodeData = isTitleCard && (isWrongEpisode || !dbData?.EpisodeTitle) && !dbData?._attemptedEpisodeFetch;
+
+      if (dbData !== null && !needsEpisodeData) {
+        console.log("Already have adequate database data, skipping fetch");
         return;
       }
 
       // --- Parse Path ---
       const pathParts = asset.path?.split(/[\/\\]/).filter(Boolean);
-      if (!pathParts || pathParts.length < 2) {
-        console.log("✗ Cannot parse path:", pathParts);
-        return;
-      }
+      if (!pathParts || pathParts.length < 2) return;
       const libraryName = pathParts[0];
       const rootfolder = pathParts[1];
-      console.log(
-        `Fetching DB data for: LibraryName="${libraryName}", Rootfolder="${rootfolder}"`
-      );
       // --- End Parse Path ---
 
       try {
-        let response; // Declare response once
+        let response;
 
-        // --- 1. Try Plex Export (media_export.db) ---
-        console.log("Checking Plex Export DB (/api/plex-export/library)...");
-        response = await fetch(`${API_URL}/plex-export/library`);
-        if (response.ok) {
-          const plexData = await response.json();
-          if (plexData.success && plexData.data) {
-            const matchingRecord = findMatch(plexData.data, libraryName, rootfolder);
-            if (matchingRecord) {
-              console.log("✓ Found matching record in Plex Export DB:", matchingRecord);
-              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
-              return; // Found it!
+        // Only check Plex Export if we don't already have dbData
+        if (!dbData) {
+          console.log("Checking Plex Export DB (/api/plex-export/library)...");
+          response = await fetch(`${API_URL}/plex-export/library`);
+          if (response.ok) {
+            const plexData = await response.json();
+            if (plexData.success && plexData.data) {
+              const matchingRecord = findMatch(plexData.data, libraryName, rootfolder);
+              if (matchingRecord) {
+                setDbData(normalizeMediaExportData(matchingRecord));
+                if (!isTitleCard) return;
+              }
             }
           }
         }
-        console.log("...Not found in Plex Export DB.");
 
-        // --- 2. Try Other Media Export (media_export.db) ---
-        console.log("Checking Other Media Export DB (/api/other-media-export/library)...");
-        response = await fetch(`${API_URL}/other-media-export/library`);
-        if (response.ok) {
-          const otherData = await response.json();
-          if (otherData.success && otherData.data) {
-            const matchingRecord = findMatch(otherData.data, libraryName, rootfolder);
-            if (matchingRecord) {
-              console.log("✓ Found matching record in Other Media Export DB:", matchingRecord);
-              setDbData(normalizeMediaExportData(matchingRecord)); // Normalize fields
-              return; // Found it!
-            }
-          }
-        }
-        console.log("...Not found in Other Media Export DB.");
-
-        // --- 3. Try ImageChoices (Posterizarr DB) ---
-        console.log("Checking ImageChoices DB (/api/imagechoices)...");
+        // --- Try ImageChoices (Posterizarr DB) ---
+        console.log("Checking ImageChoices DB for Asset specific info...");
         response = await fetch(`${API_URL}/imagechoices`);
         if (response.ok) {
           const allRecords = await response.json();
@@ -853,17 +838,19 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
           if (matchingRecord) {
             console.log("✓ Found matching record in ImageChoices DB:", matchingRecord);
-            setDbData(matchingRecord); // Already in correct format
-            return; // Found it!
+            // Merge records to overwrite the wrong episode title with the newly found correct one
+            setDbData((prev) => ({
+                ...prev,
+                ...matchingRecord,
+                _attemptedEpisodeFetch: true
+            }));
+            return;
           }
         }
-        console.log("...Not found in ImageChoices DB.");
 
-        // --- 4. Final Failure ---
-        console.log("✗ No matching database record found in ANY source for:", {
-          libraryName,
-          rootfolder,
-        });
+        if (needsEpisodeData) {
+            setDbData(prev => ({ ...prev, _attemptedEpisodeFetch: true }));
+        }
 
       } catch (error) {
         console.error("Error fetching database data:", error);
@@ -917,12 +904,19 @@ function AssetReplacer({ asset, onClose, onSuccess }) {
 
       let episodeTitleName = "";
       const dbTitle = dbData?.Title || "";
+
+      // Try to parse from the "S01E01 | The Title" format
       if (dbTitle && dbTitle.includes("|")) {
         const parts = dbTitle.split("|");
         if (parts.length >= 2) {
           episodeTitleName = parts[1].trim();
-          console.log(`Episode title from DB: '${episodeTitleName}'`);
+          console.log(`Episode title parsed from DB Title: '${episodeTitleName}'`);
         }
+      }
+      // Fallback: Check if it's explicitly stored as EpisodeTitle
+      else if (dbData?.EpisodeTitle) {
+        episodeTitleName = dbData.EpisodeTitle;
+        console.log(`Episode title from DB field: '${episodeTitleName}'`);
       }
 
       setManualForm((prev) => ({
