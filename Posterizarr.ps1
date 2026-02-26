@@ -7092,7 +7092,7 @@ if (-not (Get-Variable -Name tsMs   -Scope Script -ErrorAction SilentlyContinue)
 # -----------------------------------------
 #region Variables
 # Set Branch
-if ($dev) {
+if ($dev -or $env:APP_VERSION -match '-dev') {
     $Branch = 'dev'
 }
 Else {
