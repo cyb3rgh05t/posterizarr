@@ -65,6 +65,13 @@ jobs:
           CLEANED_TAG=$(echo "$RAW_TAG" | sed -E 's/^[vV]\.?//')
           echo "CLEAN_TAG=$CLEANED_TAG" >> $GITHUB_ENV
 
+      - name: Read Base Version from Release.txt
+        id: read_version
+        run: |
+          # Read the version from the file and remove whitespace
+          VERSION_FROM_FILE=$(cat Release.txt | tr -d '[:space:]')
+          echo "FILE_VERSION=$VERSION_FROM_FILE" >> $GITHUB_ENV
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -88,7 +95,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ env.CLEAN_TAG || github.event.inputs.version || 'dev' }}
+            VERSION=${{ env.CLEAN_TAG || format('{0}-dev', env.FILE_VERSION) }}
           cache-from: |
             type=gha,scope=${{ github.ref_name }}
             type=gha,scope=dev
