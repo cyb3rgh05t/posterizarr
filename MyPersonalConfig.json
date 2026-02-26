@@ -219,7 +219,8 @@
     "AddBorder": "true",
     "bordercolor": "black",
     "borderwidth": "30",
-    "BackgroundFallback": "true"
+    "BackgroundFallback": "true",
+    "SkipWords": ["TBA","Episode ","Folge "]
   },
   "TitleCardTitleTextPart": {
     "fontAllCaps": "true",

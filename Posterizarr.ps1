@@ -51,7 +51,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.2.27"
+$CurrentScriptVersion = "2.2.28"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 
@@ -7663,6 +7663,7 @@ $AddTitleCardBorder = $config.TitleCardOverlayPart.AddBorder.tolower()
 $TitleCardborderwidth = $config.TitleCardOverlayPart.borderwidth
 $TitleCardbordercolor = $config.TitleCardOverlayPart.bordercolor
 $BackgroundFallback = $config.TitleCardOverlayPart.BackgroundFallback.tolower()
+$SkipWords = $config.TitleCardOverlayPart.SkipWords
 
 # Title Card Title Text Part
 $TitleCardEPTitlefontAllCaps = $config.TitleCardTitleTextPart.fontAllCaps.tolower()
@@ -13434,8 +13435,18 @@ Elseif ($Tautulli) {
 
                                     $EpisodeTempImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\temp.jpg"
                                     $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                    if ($SkipTBA -eq 'true' -and $global:EPTitle -eq 'TBA') {
-                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                    # Pre-check the title against skipwords
+                                    $matchedWord = $null
+                                    foreach ($word in $SkipWords) {
+                                        if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                            $matchedWord = $word
+                                            break # Stop checking once we find a match
+                                        }
+                                    }
+
+                                    if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                         $SkipTBACount++
                                     }
                                     Elseif ($SkipJapTitle -eq 'true' -and $global:EPTitle -match $cjkTitlePattern) {
@@ -13443,7 +13454,6 @@ Elseif ($Tautulli) {
                                         $SkipJapTitleCount++
                                     }
                                     Else {
-
                                         if (($FileTestOnTrigger -eq 'false') -or (-not $directoryHashtable.ContainsKey("$hashtestpath"))) {
                                             $Arturl = $null
                                             if ($global:PlexTitleCardUrl -like "/library/*") {
@@ -14074,8 +14084,18 @@ Elseif ($Tautulli) {
                                     $EpisodeImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$($entry.RootFoldername)_$global:FileNaming.jpg"
                                     $EpisodeImage = $EpisodeImage.Replace('[', '_').Replace(']', '_').Replace('{', '_').Replace('}', '_')
                                     $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                    if ($SkipTBA -eq 'true' -and $global:EPTitle -eq 'TBA') {
-                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                    # Pre-check the title against skipwords
+                                    $matchedWord = $null
+                                    foreach ($word in $SkipWords) {
+                                        if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                            $matchedWord = $word
+                                            break # Stop checking once we find a match
+                                        }
+                                    }
+
+                                    if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                         $SkipTBACount++
                                     }
                                     Elseif ($SkipJapTitle -eq 'true' -and $global:EPTitle -match $cjkTitlePattern) {
@@ -18590,8 +18610,18 @@ Elseif ($ArrTrigger) {
 
                                         $EpisodeTempImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\temp.jpg"
                                         $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                        if ($SkipTBA -eq 'True' -and $global:EPTitle -eq 'TBA') {
-                                            Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                        # Pre-check the title against skipwords
+                                        $matchedWord = $null
+                                        foreach ($word in $SkipWords) {
+                                            if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                                $matchedWord = $word
+                                                break # Stop checking once we find a match
+                                            }
+                                        }
+
+                                        if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                            Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                             $SkipTBACount++
                                         }
                                         Elseif ($SkipJapTitle -eq 'True' -and $global:EPTitle -match $cjkTitlePattern) {
@@ -19108,8 +19138,18 @@ Elseif ($ArrTrigger) {
                                         $EpisodeImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$($entry.RootFoldername)_$global:FileNaming.jpg"
                                         $EpisodeImage = $EpisodeImage.Replace('[', '_').Replace(']', '_').Replace('{', '_').Replace('}', '_')
                                         $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                        if ($SkipTBA -eq 'True' -and $global:EPTitle -eq 'TBA') {
-                                            Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                        # Pre-check the title against skipwords
+                                        $matchedWord = $null
+                                        foreach ($word in $SkipWords) {
+                                            if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                                $matchedWord = $word
+                                                break # Stop checking once we find a match
+                                            }
+                                        }
+
+                                        if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                            Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                             $SkipTBACount++
                                         }
                                         Elseif ($SkipJapTitle -eq 'True' -and $global:EPTitle -match $cjkTitlePattern) {
@@ -23525,8 +23565,18 @@ Elseif ($ArrTrigger) {
 
                                         $EpisodeTempImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\temp.jpg"
                                         $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                        if ($SkipTBA -eq 'true' -and $global:EPTitle -eq 'TBA') {
-                                            Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                        # Pre-check the title against skipwords
+                                        $matchedWord = $null
+                                        foreach ($word in $SkipWords) {
+                                            if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                                $matchedWord = $word
+                                                break # Stop checking once we find a match
+                                            }
+                                        }
+
+                                        if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                            Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                             $SkipTBACount++
                                         }
                                         Elseif ($SkipJapTitle -eq 'true' -and $global:EPTitle -match $cjkTitlePattern) {
@@ -24165,8 +24215,18 @@ Elseif ($ArrTrigger) {
                                         $EpisodeImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$($entry.RootFoldername)_$global:FileNaming.jpg"
                                         $EpisodeImage = $EpisodeImage.Replace('[', '_').Replace(']', '_').Replace('{', '_').Replace('}', '_')
                                         $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                        if ($SkipTBA -eq 'true' -and $global:EPTitle -eq 'TBA') {
-                                            Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                        # Pre-check the title against skipwords
+                                        $matchedWord = $null
+                                        foreach ($word in $SkipWords) {
+                                            if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                                $matchedWord = $word
+                                                break # Stop checking once we find a match
+                                            }
+                                        }
+
+                                        if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                            Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                             $SkipTBACount++
                                         }
                                         Elseif ($SkipJapTitle -eq 'true' -and $global:EPTitle -match $cjkTitlePattern) {
@@ -29876,8 +29936,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
 
                                     $EpisodeTempImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\temp.jpg"
                                     $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                    if ($SkipTBA -eq 'True' -and $global:EPTitle -eq 'TBA') {
-                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                    # Pre-check the title against skipwords
+                                    $matchedWord = $null
+                                    foreach ($word in $SkipWords) {
+                                        if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                            $matchedWord = $word
+                                            break # Stop checking once we find a match
+                                        }
+                                    }
+
+                                    if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                         $SkipTBACount++
                                     }
                                     Elseif ($SkipJapTitle -eq 'True' -and $global:EPTitle -match $cjkTitlePattern) {
@@ -30394,8 +30464,18 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                     $EpisodeImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$($entry.RootFoldername)_$global:FileNaming.jpg"
                                     $EpisodeImage = $EpisodeImage.Replace('[', '_').Replace(']', '_').Replace('{', '_').Replace('}', '_')
                                     $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                    if ($SkipTBA -eq 'True' -and $global:EPTitle -eq 'TBA') {
-                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                    # Pre-check the title against skipwords
+                                    $matchedWord = $null
+                                    foreach ($word in $SkipWords) {
+                                        if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                            $matchedWord = $word
+                                            break # Stop checking once we find a match
+                                        }
+                                    }
+
+                                    if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                         $SkipTBACount++
                                     }
                                     Elseif ($SkipJapTitle -eq 'True' -and $global:EPTitle -match $cjkTitlePattern) {
@@ -35581,8 +35661,18 @@ else {
 
                                     $EpisodeTempImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\temp.jpg"
                                     $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                    if ($SkipTBA -eq 'true' -and $global:EPTitle -eq 'TBA') {
-                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                    # Pre-check the title against skipwords
+                                    $matchedWord = $null
+                                    foreach ($word in $SkipWords) {
+                                        if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                            $matchedWord = $word
+                                            break # Stop checking once we find a match
+                                        }
+                                    }
+
+                                    if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                         $SkipTBACount++
                                     }
                                     Elseif ($SkipJapTitle -eq 'true' -and $global:EPTitle -match $cjkTitlePattern) {
@@ -36286,8 +36376,18 @@ else {
                                     $EpisodeImage = Join-Path -Path $global:ScriptRoot -ChildPath "temp\$($entry.RootFoldername)_$global:FileNaming.jpg"
                                     $EpisodeImage = $EpisodeImage.Replace('[', '_').Replace(']', '_').Replace('{', '_').Replace('}', '_')
                                     $cjkTitlePattern = '[\p{IsHiragana}\p{IsKatakana}\p{IsCJKUnifiedIdeographs}\p{IsThai}]'
-                                    if ($SkipTBA -eq 'true' -and $global:EPTitle -eq 'TBA') {
-                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title is 'TBA'" -Path $global:configLogging -Color Yellow -log Warning
+
+                                    # Pre-check the title against skipwords
+                                    $matchedWord = $null
+                                    foreach ($word in $SkipWords) {
+                                        if ($global:EPTitle -match "^$([regex]::Escape($word))") {
+                                            $matchedWord = $word
+                                            break # Stop checking once we find a match
+                                        }
+                                    }
+
+                                    if ($SkipTBA -eq 'true' -and $matchedWord) {
+                                        Write-Entry -Subtext "Skipping $global:FileNaming of $global:show_name because Title matches '$matchedWord'" -Path $global:configLogging -Color Yellow -log Warning
                                         $SkipTBACount++
                                     }
                                     Elseif ($SkipJapTitle -eq 'true' -and $global:EPTitle -match $cjkTitlePattern) {

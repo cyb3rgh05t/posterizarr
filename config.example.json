@@ -280,7 +280,8 @@
     "AddOverlay": "true",
     "AddBorder": "true",
     "bordercolor": "black",
-    "borderwidth": "30"
+    "borderwidth": "30",
+    "SkipWords": ["TBA"]
   },
   "TitleCardTitleTextPart": {
     "fontAllCaps": "true",

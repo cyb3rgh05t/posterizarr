@@ -603,10 +603,12 @@ function ConfigEditor() {
     if (["EmbyUrl", "EmbyAPIKey", "EmbyLibstoExclude"].includes(key) && !embyEnabled && !useEmbySync) return true;
     if (["EmbyUploadExistingAssets", "EmbyReplaceThumbwithBackdrop"].includes(key) && !embyEnabled) return true;
 
-    // Text Formatting
+    // Text Formatting & Skip Logic
     if (key === "SymbolsToKeepOnNewLine" && !getValue("NewLineOnSpecificSymbols")) return true;
     if (key === "NewLineSymbols" && !getValue("NewLineOnSpecificSymbols")) return true;
     if (key === "NewLineWords" && !getValue("NewLineOnSpecificWords")) return true;
+    if (key === "SkipWords" && !getValue("SkipTBA")) return true;
+
     // Logo Logic
     if (["UseClearlogo", "UseClearart", "LogoTextFallback", "ConvertLogoColor"].includes(key)) {
         const useLogo = getValue("UseLogo");
@@ -891,8 +893,9 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
         if (settingKey === "tmdbtoken") return renderValidate("tmdb", "Enter TMDB Token");
         if (settingKey === "tvdbapi") return renderValidate("tvdb", "Enter TVDB API Key");
         if (settingKey === "FanartTvAPIKey") return renderValidate("fanart", "Enter Fanart API Key");
-        if (settingKey === "NewLineSymbols" || settingKey === "SymbolsToKeepOnNewLine") {
+        if (settingKey === "NewLineSymbols" || settingKey === "SymbolsToKeepOnNewLine" || settingKey === "SkipWords") {
             const symbols = Array.isArray(value) ? value : [];
+            const isSkipWord = settingKey === "SkipWords";
 
             const handleUpdateSymbol = (index, newValue) => {
                 const newSymbols = [...symbols];
@@ -921,7 +924,7 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
                                     disabled={disabled}
                                     className="bg-transparent border-none focus:ring-0 p-0 text-xs font-mono text-theme-primary min-w-[20px]"
                                     style={{ width: `${Math.max(symbol.length, 1) + 0.5}ch` }}
-                                    placeholder="⎵"
+                                    placeholder={isSkipWord ? "Word" : "⎵"}
                                 />
                                 {!disabled && (
                                     <button
@@ -934,14 +937,14 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
                                 )}
                             </div>
                         ))}
-                        {symbols.length === 0 && <span className="text-xs text-theme-muted italic py-1">No symbols defined</span>}
+                        {symbols.length === 0 && <span className="text-xs text-theme-muted italic py-1">{isSkipWord ? "No words defined" : "No symbols defined"}</span>}
                     </div>
                     {!disabled && (
                         <button
                             onClick={handleAddSymbol}
                             className="flex items-center gap-2 px-3 py-1.5 text-xs bg-theme-primary/10 text-theme-primary border border-theme-primary/20 rounded-lg hover:bg-theme-primary/20 transition-all"
                         >
-                            <Plus className="w-3 h-3" /> Add Symbol
+                            <Plus className="w-3 h-3" /> {isSkipWord ? "Add Word" : "Add Symbol"}
                         </button>
                     )}
                     <p className="text-[10px] text-theme-muted italic">
