@@ -540,7 +540,6 @@ UI_GROUPS = {
         "AssetCleanup",
         "FollowSymlink",
         "SkipTBA",
-        "SkipWords",
         "SkipJapTitle",
         "SkipAddText",
         "SkipLocalPosterTextAdd",
@@ -718,6 +717,7 @@ UI_GROUPS = {
         "TitleCardBordercolor",
         "TitleCardBorderwidth",
         "TitleCardBackgroundFallback",
+        "SkipWords",
     ],
     "Title Card Title Text": [
         "TitleCardTitleFontAllCaps",
