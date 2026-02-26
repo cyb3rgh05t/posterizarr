@@ -436,7 +436,7 @@ CONFIG_GROUPS = {
     "TitleCardBordercolor": "TitleCardOverlayPart",
     "TitleCardBorderwidth": "TitleCardOverlayPart",
     "TitleCardBackgroundFallback": "TitleCardOverlayPart",
-    "SkipWords": "TitleCardOverlayPart",
+    "TitleCardSkipWords": "TitleCardOverlayPart",
     # TitleCardTitleTextPart
     "TitleCardTitleFontAllCaps": "TitleCardTitleTextPart",
     "TitleCardTitleAddEPTitleText": "TitleCardTitleTextPart",
