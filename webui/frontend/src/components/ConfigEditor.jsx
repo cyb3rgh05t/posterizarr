@@ -214,7 +214,7 @@ function ConfigEditor() {
     if (["assetpath", "backuppath", "manualassetpath", "libraryfolders"].some(s => k === s)) return "Paths & Storage";
     if (["posters", "seasonposters", "backgroundposters", "titlecards"].some(s => k === s)) return "Generators";
     if (["assetcleanup", "followsymlink", "disablehashvalidation", "disableonlineassetfetch", "force_running_deletion"].some(s => k.includes(s))) return "Logic & System";
-    if (k.startsWith("skip")) return "Skipping Logic";
+    if (k.startsWith("skip") || k === "titlecardskipwords") return "Skipping Logic";
 
     // WebUI
     if (k.includes("auth")) return "Authentication";
@@ -607,7 +607,7 @@ function ConfigEditor() {
     if (key === "SymbolsToKeepOnNewLine" && !getValue("NewLineOnSpecificSymbols")) return true;
     if (key === "NewLineSymbols" && !getValue("NewLineOnSpecificSymbols")) return true;
     if (key === "NewLineWords" && !getValue("NewLineOnSpecificWords")) return true;
-    if (key === "SkipWords" && !getValue("SkipTBA")) return true;
+    if (key === "TitleCardSkipWords" && !getValue("SkipTBA")) return true;
 
     // Logo Logic
     if (["UseClearlogo", "UseClearart", "LogoTextFallback", "ConvertLogoColor"].includes(key)) {
