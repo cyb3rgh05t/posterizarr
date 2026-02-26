@@ -265,6 +265,7 @@
     - `AddBorder`: Set to `true` to add a border to the TitleCard image.
     - `borderwidth`: Border width.
     - `bordercolor`: Color of border.
+    - `SkipWords`: List of words to be skipped for TC, e.g 'TBA, Episode...'. (SkipTBA has to be true)
 
     #### TitleCardTitleTextPart
 
