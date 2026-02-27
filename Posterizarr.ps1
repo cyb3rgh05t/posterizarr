@@ -3881,44 +3881,51 @@ function GetTVDBShowBackground {
 
             }
             if ($response) {
-                if ($response.data) {
-                    $defaultImageurltemp = $response.data.artworks | Where-Object { $_.type -eq '3' }
-                    if ($defaultImageurltemp) {
-                        $defaultImageurl = $defaultImageurltemp[0].image
-                    }
-                    if ($global:WidthHeightFilter -eq 'true') {
-                        $NoLangImageUrl = $response.data.artworks | Where-Object { $_.language -eq $null -and $_.type -eq '3' -and $_.width -ge $global:BgTcMinWidth -and $_.height -ge $global:BgTcMinHeight }
-                    }
-                    Else {
-                        $NoLangImageUrl = $response.data.artworks | Where-Object { $_.language -eq $null -and $_.type -eq '3' }
-                    }
-                    if ($NoLangImageUrl) {
-                        $global:posterurl = $NoLangImageUrl[0].image
-                        if ($global:WidthHeightFilter -eq 'true') {
-                            Write-Entry -Subtext "Found a poster sized at - width: $($NoLangImageUrl[0].width) | height: $($NoLangImageUrl[0].height)" -Path $global:configLogging -Color White -log Info
+                if ($response.data -and $response.data.artworks) {
+                    $artworksOfType3 = $response.data.artworks | Where-Object { $_.type -eq '3' }
+                    if ($artworksOfType3) {
+                        $defaultImageurltemp = $artworksOfType3
+                        if ($defaultImageurltemp) {
+                            $defaultImageurl = $defaultImageurltemp[0].image
                         }
-                        Write-Entry -Subtext "Found Textless background on TVDB" -Path $global:configLogging -Color Blue -log Info
-                        $global:TextlessPoster = $true
-                        $global:PosterWithText = $null
-                        $global:TVDBAssetChangeUrl = "https://thetvdb.com/series/$($response.data.slug)/#artwork"
-                    }
-                    Else {
-                        Write-Entry -Subtext "PreferTextless Value: $global:BackgroundPreferTextless" -Path $global:configLogging -Color Cyan -log Debug
-                        Write-Entry -Subtext "OnlyTextless Value: $global:BackgroundOnlyTextless" -Path $global:configLogging -Color Cyan -log Debug
-                        if ($global:BackgroundOnlyTextless -eq $false) {
-                            $global:posterurl = $defaultImageurl
-                            Write-Entry -Subtext "Found background with text on TVDB" -Path $global:configLogging -Color Blue -log Info
+                        if ($global:WidthHeightFilter -eq 'true') {
+                            $NoLangImageUrl = $response.data.artworks | Where-Object { $_.language -eq $null -and $_.type -eq '3' -and $_.width -ge $global:BgTcMinWidth -and $_.height -ge $global:BgTcMinHeight }
+                        }
+                        Else {
+                            $NoLangImageUrl = $response.data.artworks | Where-Object { $_.language -eq $null -and $_.type -eq '3' }
+                        }
+                        if ($NoLangImageUrl) {
+                            $global:posterurl = $NoLangImageUrl[0].image
+                            if ($global:WidthHeightFilter -eq 'true') {
+                                Write-Entry -Subtext "Found a poster sized at - width: $($NoLangImageUrl[0].width) | height: $($NoLangImageUrl[0].height)" -Path $global:configLogging -Color White -log Info
+                            }
+                            Write-Entry -Subtext "Found Textless background on TVDB" -Path $global:configLogging -Color Blue -log Info
+                            $global:TextlessPoster = $true
+                            $global:PosterWithText = $null
                             $global:TVDBAssetChangeUrl = "https://thetvdb.com/series/$($response.data.slug)/#artwork"
                         }
                         Else {
-                            Write-Entry -Subtext "Found Poster with text on TVDB, skipping because you only want textless..." -Path $global:configLogging -Color Yellow -log Info
-                            $global:TVDBAssetChangeUrl = "https://thetvdb.com/series/$($response.data.slug)/#artwork"
+                            Write-Entry -Subtext "PreferTextless Value: $global:BackgroundPreferTextless" -Path $global:configLogging -Color Cyan -log Debug
+                            Write-Entry -Subtext "OnlyTextless Value: $global:BackgroundOnlyTextless" -Path $global:configLogging -Color Cyan -log Debug
+                            if ($global:BackgroundOnlyTextless -eq $false) {
+                                $global:posterurl = $defaultImageurl
+                                Write-Entry -Subtext "Found background with text on TVDB" -Path $global:configLogging -Color Blue -log Info
+                                $global:TVDBAssetChangeUrl = "https://thetvdb.com/series/$($response.data.slug)/#artwork"
+                            }
+                            Else {
+                                Write-Entry -Subtext "Found Poster with text on TVDB, skipping because you only want textless..." -Path $global:configLogging -Color Yellow -log Info
+                                $global:TVDBAssetChangeUrl = "https://thetvdb.com/series/$($response.data.slug)/#artwork"
+                            }
                         }
+                        return $global:posterurl
                     }
-                    return $global:posterurl
+                    Else {
+                        Write-Entry -Subtext "No background found on TVDB" -Path $global:configLogging -Color Yellow -log Warning
+                        $global:TVDBAssetChangeUrl = "https://thetvdb.com/series/$($response.data.slug)/#artwork"
+                    }
                 }
                 Else {
-                    Write-Entry -Subtext "No background found on TVDB" -Path $global:configLogging -Color Yellow -log Warning
+                    Write-Entry -Subtext "No data returned from API at all" -Path $global:configLogging -Color Yellow -log Warning
                     $global:TVDBAssetChangeUrl = "https://thetvdb.com/series/$($response.data.slug)/#artwork"
                 }
             }
