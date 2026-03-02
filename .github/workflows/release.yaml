@@ -76,7 +76,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ env.REPO_NAME_LOWERCASE }}
+          images:
+          flavor: |
+            latest=auto
           tags: |
             type=semver,pattern={{version}},value=${{ env.CLEAN_TAG }},enable=${{ github.event_name == 'release' }}
             type=semver,pattern={{major}}.{{minor}},value=${{ env.CLEAN_TAG }},enable=${{ github.event_name == 'release' }}
@@ -85,6 +87,8 @@ jobs:
             type=raw,value=dev,enable=${{ github.event_name == 'push' && github.ref_name == 'dev' }}
             type=sha,prefix=dev-,enable=${{ github.event_name == 'push' && github.ref_name == 'dev' }}
             type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+          labels: |
+            org.opencontainers.image.version=${{ env.CLEAN_TAG || format('{0}-dev', env.FILE_VERSION) }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
