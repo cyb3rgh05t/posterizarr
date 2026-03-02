@@ -76,7 +76,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images:
+          images: ghcr.io/${{ env.REPO_NAME_LOWERCASE }}
           flavor: |
             latest=auto
           tags: |
