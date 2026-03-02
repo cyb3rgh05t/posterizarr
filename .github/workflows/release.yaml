@@ -96,6 +96,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ env.CLEAN_TAG || format('{0}-dev', env.FILE_VERSION) }}
+            BUILD_DATE=${{ github.event.repository.updated_at || fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
           cache-from: |
             type=gha,scope=${{ github.ref_name }}
             type=gha,scope=dev

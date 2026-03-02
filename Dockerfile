@@ -17,6 +17,7 @@ FROM python:3.13-alpine
 ARG TARGETARCH
 ARG VENDOR
 ARG VERSION
+ARG BUILD_DATE
 
 ENV APP_VERSION=$VERSION \
     TZ="Europe/Berlin" \
@@ -122,6 +123,7 @@ LABEL org.opencontainers.image.source="https://github.com/fscorrupt/posterizarr"
 LABEL org.opencontainers.image.description="Posterizarr - Automated poster generation with integrated Web UI"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
 LABEL org.opencontainers.image.version="${APP_VERSION}"
+LABEL org.opencontainers.image.created=$BUILD_DATE
 
 # Expose backend + frontend ports
 EXPOSE 8000
