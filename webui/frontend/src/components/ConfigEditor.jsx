@@ -893,9 +893,11 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
         if (settingKey === "tmdbtoken") return renderValidate("tmdb", "Enter TMDB Token");
         if (settingKey === "tvdbapi") return renderValidate("tvdb", "Enter TVDB API Key");
         if (settingKey === "FanartTvAPIKey") return renderValidate("fanart", "Enter Fanart API Key");
-        if (settingKey === "NewLineSymbols" || settingKey === "SymbolsToKeepOnNewLine" || settingKey === "SkipWords") {
-            const symbols = Array.isArray(value) ? value : [];
-            const isSkipWord = settingKey === "SkipWords";
+        if (settingKey === "NewLineSymbols" || settingKey === "SymbolsToKeepOnNewLine" || settingKey === "SkipWords" || settingKey === "TitleCardSkipWords") {
+            const symbols = Array.isArray(value)
+                ? value
+                : (typeof value === "string" && value ? value.split(",") : []);
+            const isSkipWord = settingKey === "SkipWords" || settingKey === "TitleCardSkipWords";
 
             const handleUpdateSymbol = (index, newValue) => {
                 const newSymbols = [...symbols];
@@ -948,7 +950,7 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
                         </button>
                     )}
                     <p className="text-[10px] text-theme-muted italic">
-                        Spaces are preserved exactly as typed inside the boxes.
+                        {isSkipWord ? "Words are preserved exactly as typed inside the boxes." : "Spaces are preserved exactly as typed inside the boxes."}
                     </p>
                 </div>
             );
