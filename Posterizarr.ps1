@@ -219,45 +219,27 @@ function GetFanartLogo {
     $entrytemp = $null
 
     foreach ($id in $ids) {
-        if ($id) {
-            $entrytemp = Get-FanartTv -Type $Type -id $id -ErrorAction SilentlyContinue
-            if ($global:UseClearart -eq 'true'){
-                if ($Type -eq 'tv'){
-                    $field = "hdclearart"
-                }
-                Else {
-                    $field = "hdmovieclearart"
-                }
+        if (-not $id) { continue }
 
-                if ($entrytemp -and $entrytemp.$field) {
-                    foreach ($lang in $global:LogoLanguageOrder) {
-                        if (($entrytemp.$field | Where-Object lang -eq "$lang")) {
-                            $global:LogoUrl = ($entrytemp.$field)[0].url
-                            Write-Entry -Subtext "Found Clear Art Logo  with Language '$lang' on FANART" -Path $global:configLogging -Color Blue -log Info
-                            $global:LogoLanguage = $lang
-                            return $global:LogoUrl
-                            continue
-                        }
-                    }
-                }
-            }
-            elseif ($global:UseClearlogo -eq 'true'){
-                if ($Type -eq 'tv'){
-                    $field = "hdtvlogo"
-                }
-                Else {
-                    $field = "hdmovielogo"
-                }
-                if ($entrytemp -and $entrytemp.$field) {
-                    foreach ($lang in $global:LogoLanguageOrder) {
-                        if (($entrytemp.$field | Where-Object lang -eq "$lang")) {
-                            $global:LogoUrl = ($entrytemp.$field)[0].url
-                            Write-Entry -Subtext "Found Clear Logo with Language '$lang' on FANART" -Path $global:configLogging -Color Blue -log Info
-                            $global:LogoLanguage = $lang
-                            return $global:LogoUrl
-                            continue
-                        }
-                    }
+        $entrytemp = Get-FanartTv -Type $Type -id $id -ErrorAction SilentlyContinue
+        if (-not $entrytemp) { continue }
+
+        $field = if ($global:UseClearart -eq 'true') {
+            if ($Type -eq 'tv') { "hdclearart" } else { "hdmovieclearart" }
+        }
+        elseif ($global:UseClearlogo -eq 'true') {
+            if ($Type -eq 'tv') { "hdtvlogo" } else { "hdmovielogo" }
+        }
+
+        if ($field -and $entrytemp.$field) {
+            foreach ($lang in $global:LogoLanguageOrder) {
+                $matchedLogos = $entrytemp.$field | Where-Object { $_.lang -eq $lang }
+                
+                if ($matchedLogos) {
+                    $global:LogoUrl = $matchedLogos[0].url
+                    $global:LogoLanguage = $lang
+                    Write-Entry -Subtext "Found $field with Language '$lang' on FANART" -Path $global:configLogging -Color Blue -log Info
+                    return $global:LogoUrl
                 }
             }
         }
