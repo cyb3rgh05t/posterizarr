@@ -51,7 +51,7 @@ for ($i = 0; $i -lt $ExtraArgs.Count; $i++) {
     }
 }
 
-$CurrentScriptVersion = "2.2.28"
+$CurrentScriptVersion = "2.2.29"
 $global:HeaderWritten = $false
 $ProgressPreference = 'SilentlyContinue'
 
@@ -234,7 +234,7 @@ function GetFanartLogo {
         if ($field -and $entrytemp.$field) {
             foreach ($lang in $global:LogoLanguageOrder) {
                 $matchedLogos = $entrytemp.$field | Where-Object { $_.lang -eq $lang }
-                
+
                 if ($matchedLogos) {
                     $global:LogoUrl = $matchedLogos[0].url
                     $global:LogoLanguage = $lang

@@ -97,7 +97,7 @@ CONFIG_TOOLTIPS = {
     "SeasonPosters": "Set to true to also create season posters",
     "BackgroundPosters": "Set to true to also create background posters",
     "TitleCards": "Set to true to also create title cards",
-    "SkipTBA": "Set to true to skip TitleCard creation if the Title text is 'TBA'",
+    "SkipTBA": "Set to true to skip TitleCard creation if the Title text contains words from SkipWords",
     "SkipWords": "List of words to be skipped for TC, e.g 'TBA, Episode...'",
     "SkipJapTitle": "Set to true to skip TitleCard creation if the Title text is Japanese or Chinese",
     "AssetCleanup": "Set to true to cleanup Assets that are no longer in Plex. IMPORTANT: Risk of data loss from excluded libraries - ensure all active asset libraries are included",
