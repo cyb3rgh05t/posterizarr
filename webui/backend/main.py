@@ -13572,7 +13572,7 @@ async def finalize_asset_replacement(
     overlay_params: dict
 ):
     try:
-        explicit_asset_type = overlay_params.get("asset_type", "").lower()
+        explicit_asset_type = str(overlay_params.get("asset_type", "")).lower()
 
         if not process_with_overlays:
             target_base_dir = MANUAL_ASSETS_DIR
@@ -13581,39 +13581,33 @@ async def finalize_asset_replacement(
 
         if explicit_asset_type == "collection":
             path_obj = Path(asset_path)
-            if len(path_obj.parts) >= 2:
-                library_part = path_obj.parts[0]
-                rest_of_path = Path(*path_obj.parts[1:])
-                adjusted_path = Path(library_part) / "Collections" / rest_of_path
-                full_asset_path = target_base_dir / adjusted_path
-            else:
-                full_asset_path = target_base_dir / asset_path
+            full_asset_path = target_base_dir / "Collections" / path_obj
         else:
             full_asset_path = target_base_dir / asset_path
 
         # Ensure parent directory exists
         full_asset_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Check alternate location cleanup
+        # Cleanup alternate location if exists
         alternate_base_dir = ASSETS_DIR if not process_with_overlays else MANUAL_ASSETS_DIR
         alternate_asset_path = alternate_base_dir / asset_path
         if alternate_asset_path.exists():
             try:
                 alternate_asset_path.unlink()
-            except Exception:
+            except:
                 pass
 
-        # Save file
+        # Save the file to the new corrected path
         with open(full_asset_path, "wb") as f:
             f.write(file_content)
 
         logger.info(f"Queue Processor: Saved asset to {full_asset_path}")
 
-        # Update DB (Mark as Manual)
+        # Update DB
         try:
             await update_asset_db_entry_as_manual(
                 asset_path,
-                "Queue Processing", # Source URL/Info
+                "Queue Processing",
                 overlay_params.get("library_name"),
                 overlay_params.get("folder_name"),
                 overlay_params.get("title_text")
@@ -13621,11 +13615,10 @@ async def finalize_asset_replacement(
         except Exception as e:
             logger.warning(f"Queue Processor: DB update warning: {e}")
 
-        # Trigger Manual Run if needed
+        # Trigger Manual Run
         if process_with_overlays:
             logger.info(f"Queue Processor: Triggering Manual Run for {asset_path}")
 
-            # Logic similar to endpoints to determine params if not provided
             path_parts = Path(asset_path).parts
             filename = Path(asset_path).name.lower()
 
@@ -13634,17 +13627,13 @@ async def finalize_asset_replacement(
             final_title_text = overlay_params.get("title_text")
 
             if len(path_parts) >= 2:
-                extracted_library_name = path_parts[0]
-                extracted_folder_name = path_parts[1]
-
-                final_library_name = final_library_name or extracted_library_name
-                final_folder_name = final_folder_name or extracted_folder_name
+                final_library_name = final_library_name or path_parts[0]
+                final_folder_name = final_folder_name or path_parts[1]
 
                 if not final_title_text:
                      title_match = re.match(r"^(.+?)\s*\(\d{4}\)", final_folder_name)
                      final_title_text = title_match.group(1).strip() if title_match else final_folder_name
 
-            # Determine type
             poster_type = "standard"
             season_poster_name = overlay_params.get("season_number", "")
             ep_number = overlay_params.get("episode_number", "")
@@ -13652,47 +13641,29 @@ async def finalize_asset_replacement(
 
             if explicit_asset_type:
                 logger.info(f"Using explicit asset type: {explicit_asset_type}")
-                if explicit_asset_type == "titlecard":
-                     poster_type = "titlecard"
-                elif explicit_asset_type == "season":
-                     poster_type = "season"
-                elif explicit_asset_type == "background":
-                     poster_type = "background"
-                elif explicit_asset_type == "collection":
-                     poster_type = "collection"
-                else:
-                     poster_type = "standard"
-            else:
-                # Regex patterns for auto-detection
-                title_card_regex = r"(?i)s(\d+)e(\d+)"
-                season_regex = r"(?i)season\s*?-?_?(\d+)"
-
-                if "background" in filename: poster_type = "background"
-                elif (ep_number and ep_title_name) or re.search(title_card_regex, filename):
+                if explicit_asset_type == "collection":
+                    poster_type = "collection"
+                elif explicit_asset_type == "titlecard":
                     poster_type = "titlecard"
-                    if not season_poster_name or not ep_number:
-                        tc_match = re.search(title_card_regex, filename)
-                        if tc_match:
-                            if not season_poster_name: season_poster_name = tc_match.group(1)
-                            if not ep_number: ep_number = tc_match.group(2)
+                elif explicit_asset_type == "season":
+                    poster_type = "season"
+                elif explicit_asset_type == "background":
+                    poster_type = "background"
+            else:
+                # Auto-detection logic
+                if "background" in filename:
+                    poster_type = "background"
+                elif (ep_number and ep_title_name) or re.search(r"(?i)s(\d+)e(\d+)", filename):
+                    poster_type = "titlecard"
                 elif season_poster_name or "season" in filename:
                     poster_type = "season"
-                    if not season_poster_name:
-                        s_match = re.search(season_regex, filename)
-                        if s_match:
-                            season_poster_name = s_match.group(1)
-                        else:
-                            num_match = re.search(r"(\d+)", filename)
-                            if num_match: season_poster_name = num_match.group(1)
 
-            # Clean up numbers (remove leading zeros)
+            # Clean up numbers
             if season_poster_name and str(season_poster_name).isdigit():
                 season_poster_name = str(int(season_poster_name))
-
             if ep_number and str(ep_number).isdigit():
                 ep_number = str(int(ep_number))
 
-            # Construct the request for trigger_manual_run_internal
             manual_request = ManualModeRequest(
                 picturePath=str(full_asset_path),
                 titletext=final_title_text or "",
@@ -13706,7 +13677,7 @@ async def finalize_asset_replacement(
 
             await trigger_manual_run_internal(manual_request)
 
-            # WAIT for the process to finish
+            # Sequential execution wait
             global current_process
             proc = current_process
             if proc is not None:
@@ -13714,17 +13685,14 @@ async def finalize_asset_replacement(
                     logger.info(f"Queue Processor: Waiting for Manual Run (PID {proc.pid}) to finish...")
                     while proc.poll() is None:
                         await asyncio.sleep(1)
-                    logger.info("Queue Processor: Manual Run finished.")
                 except Exception as e:
-                    logger.error(f"Queue Processor: Error while polling process: {e}")
+                    logger.error(f"Queue Processor: Error while polling: {e}")
                 finally:
                     if current_process == proc:
                         current_process = None
 
     except Exception as e:
-        logger.error(f"Queue Processor Error finalizing {asset_path}: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+        logger.error(f"Queue Processor Error: {e}")
         raise e
 
 class RunQueueRequest(BaseModel):
