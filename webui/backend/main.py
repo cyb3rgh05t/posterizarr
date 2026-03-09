@@ -13571,18 +13571,25 @@ async def finalize_asset_replacement(
     process_with_overlays: bool,
     overlay_params: dict
 ):
-    """
-    Finalize the replacement process: save file, update DB, and trigger manual run.
-    Reused by both immediate endpoints and Queue Processor.
-    """
     try:
-        # Determine target directory
+        explicit_asset_type = overlay_params.get("asset_type", "").lower()
+
         if not process_with_overlays:
             target_base_dir = MANUAL_ASSETS_DIR
         else:
             target_base_dir = ASSETS_DIR
 
-        full_asset_path = target_base_dir / asset_path
+        if explicit_asset_type == "collection":
+            path_obj = Path(asset_path)
+            if len(path_obj.parts) >= 2:
+                library_part = path_obj.parts[0]
+                rest_of_path = Path(*path_obj.parts[1:])
+                adjusted_path = Path(library_part) / "Collections" / rest_of_path
+                full_asset_path = target_base_dir / adjusted_path
+            else:
+                full_asset_path = target_base_dir / asset_path
+        else:
+            full_asset_path = target_base_dir / asset_path
 
         # Ensure parent directory exists
         full_asset_path.parent.mkdir(parents=True, exist_ok=True)
@@ -13626,7 +13633,7 @@ async def finalize_asset_replacement(
             final_folder_name = overlay_params.get("folder_name")
             final_title_text = overlay_params.get("title_text")
 
-            if len(path_parts) >= 3:
+            if len(path_parts) >= 2:
                 extracted_library_name = path_parts[0]
                 extracted_folder_name = path_parts[1]
 
@@ -13642,39 +13649,32 @@ async def finalize_asset_replacement(
             season_poster_name = overlay_params.get("season_number", "")
             ep_number = overlay_params.get("episode_number", "")
             ep_title_name = overlay_params.get("episode_title", "")
-            explicit_asset_type = overlay_params.get("asset_type")
 
             if explicit_asset_type:
                 logger.info(f"Using explicit asset type: {explicit_asset_type}")
-                if explicit_asset_type.lower() == "titlecard":
+                if explicit_asset_type == "titlecard":
                      poster_type = "titlecard"
-                elif explicit_asset_type.lower() == "season":
+                elif explicit_asset_type == "season":
                      poster_type = "season"
-                elif explicit_asset_type.lower() == "background":
+                elif explicit_asset_type == "background":
                      poster_type = "background"
+                elif explicit_asset_type == "collection":
+                     poster_type = "collection"
                 else:
                      poster_type = "standard"
             else:
-                # Regex patterns
-                # Matches S01E01, s01e01, etc.
+                # Regex patterns for auto-detection
                 title_card_regex = r"(?i)s(\d+)e(\d+)"
-                # Matches Season 01, Season01, etc.
                 season_regex = r"(?i)season\s*?-?_?(\d+)"
 
                 if "background" in filename: poster_type = "background"
-
-                # Check for Title Card (Explicit params OR Regex match)
                 elif (ep_number and ep_title_name) or re.search(title_card_regex, filename):
                     poster_type = "titlecard"
-                    # If params missing, try to extract from filename
-                    if not ep_number or not season_poster_name:
+                    if not season_poster_name or not ep_number:
                         tc_match = re.search(title_card_regex, filename)
                         if tc_match:
-                            # If we extracted it, populate it if missing
                             if not season_poster_name: season_poster_name = tc_match.group(1)
                             if not ep_number: ep_number = tc_match.group(2)
-
-                # Check for Season Poster (Explicit params OR Regex match)
                 elif season_poster_name or "season" in filename:
                     poster_type = "season"
                     if not season_poster_name:
@@ -13682,9 +13682,8 @@ async def finalize_asset_replacement(
                         if s_match:
                             season_poster_name = s_match.group(1)
                         else:
-                             # Fallback for just number extraction if "season" is in name
-                             num_match = re.search(r"(\d+)", filename)
-                             if num_match: season_poster_name = num_match.group(1)
+                            num_match = re.search(r"(\d+)", filename)
+                            if num_match: season_poster_name = num_match.group(1)
 
             # Clean up numbers (remove leading zeros)
             if season_poster_name and str(season_poster_name).isdigit():
@@ -13693,6 +13692,7 @@ async def finalize_asset_replacement(
             if ep_number and str(ep_number).isdigit():
                 ep_number = str(int(ep_number))
 
+            # Construct the request for trigger_manual_run_internal
             manual_request = ManualModeRequest(
                 picturePath=str(full_asset_path),
                 titletext=final_title_text or "",
@@ -13706,8 +13706,7 @@ async def finalize_asset_replacement(
 
             await trigger_manual_run_internal(manual_request)
 
-            # WAIT for the process to finish!
-            # Queue execution must be sequential.
+            # WAIT for the process to finish
             global current_process
             proc = current_process
             if proc is not None:
@@ -13719,7 +13718,6 @@ async def finalize_asset_replacement(
                 except Exception as e:
                     logger.error(f"Queue Processor: Error while polling process: {e}")
                 finally:
-                    # Only clear the global if it's still pointing to our process
                     if current_process == proc:
                         current_process = None
 
@@ -13728,8 +13726,6 @@ async def finalize_asset_replacement(
         import traceback
         logger.error(traceback.format_exc())
         raise e
-
-
 
 class RunQueueRequest(BaseModel):
     item_ids: Optional[List[int]] = None
