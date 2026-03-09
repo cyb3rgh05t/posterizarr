@@ -140,7 +140,7 @@
     - `SeasonPosters`: Set to `true` to also create season posters.
     - `BackgroundPosters`: Set to `true` to also create background posters.
     - `TitleCards` : Set to `true` to also create title cards.
-    - `SkipTBA` : Set to `true` to skip TitleCard creation if the Titletext is `TBA`.
+    - `SkipTBA` : If set to `true`, TitleCard creation will be skipped when TitleText contains any word from `SkipWords`.
     - `SkipJapTitle` : Set to `true` to skip TitleCard creation if the Titletext is `Jap or Chinese`.
     - `AssetCleanup` : Set to `true` to cleanup Assets that are no longer in Plex.
     - `UseLogo` : Set to `true` to apply logos instead of title text to Posters.
