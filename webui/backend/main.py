@@ -13426,7 +13426,7 @@ async def finalize_asset_replacement(
                 picturePath=str(full_asset_path),
                 titletext=final_title_text or "",
                 # Only use 'Collections/' prefix for folderName if it's a collection
-                folderName=f"Collections/{final_folder_name}" if poster_type == "collection" else final_folder_name,
+                folderName=final_folder_name or "",
                 libraryName=final_library_name or "",
                 posterType=poster_type,
                 seasonPosterName=season_poster_name or "",
