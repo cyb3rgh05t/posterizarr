@@ -214,7 +214,7 @@ function ConfigEditor() {
     if (["assetpath", "backuppath", "manualassetpath", "libraryfolders"].some(s => k === s)) return "Paths & Storage";
     if (["posters", "seasonposters", "backgroundposters", "titlecards"].some(s => k === s)) return "Generators";
     if (["assetcleanup", "followsymlink", "disablehashvalidation", "disableonlineassetfetch", "force_running_deletion"].some(s => k.includes(s))) return "Logic & System";
-    if (k.startsWith("skip")) return "Skipping Logic";
+    if (k.startsWith("skip") || k === "titlecardskipwords") return "Skipping Logic";
 
     // WebUI
     if (k.includes("auth")) return "Authentication";
@@ -603,10 +603,12 @@ function ConfigEditor() {
     if (["EmbyUrl", "EmbyAPIKey", "EmbyLibstoExclude"].includes(key) && !embyEnabled && !useEmbySync) return true;
     if (["EmbyUploadExistingAssets", "EmbyReplaceThumbwithBackdrop"].includes(key) && !embyEnabled) return true;
 
-    // Text Formatting
+    // Text Formatting & Skip Logic
     if (key === "SymbolsToKeepOnNewLine" && !getValue("NewLineOnSpecificSymbols")) return true;
     if (key === "NewLineSymbols" && !getValue("NewLineOnSpecificSymbols")) return true;
     if (key === "NewLineWords" && !getValue("NewLineOnSpecificWords")) return true;
+    if (key === "TitleCardSkipWords" && !getValue("SkipTBA")) return true;
+
     // Logo Logic
     if (["UseClearlogo", "UseClearart", "LogoTextFallback", "ConvertLogoColor"].includes(key)) {
         const useLogo = getValue("UseLogo");
@@ -891,8 +893,11 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
         if (settingKey === "tmdbtoken") return renderValidate("tmdb", "Enter TMDB Token");
         if (settingKey === "tvdbapi") return renderValidate("tvdb", "Enter TVDB API Key");
         if (settingKey === "FanartTvAPIKey") return renderValidate("fanart", "Enter Fanart API Key");
-        if (settingKey === "NewLineSymbols" || settingKey === "SymbolsToKeepOnNewLine") {
-            const symbols = Array.isArray(value) ? value : [];
+        if (settingKey === "NewLineSymbols" || settingKey === "SymbolsToKeepOnNewLine" || settingKey === "SkipWords" || settingKey === "TitleCardSkipWords") {
+            const symbols = Array.isArray(value)
+                ? value
+                : (typeof value === "string" && value ? value.split(",") : []);
+            const isSkipWord = settingKey === "SkipWords" || settingKey === "TitleCardSkipWords";
 
             const handleUpdateSymbol = (index, newValue) => {
                 const newSymbols = [...symbols];
@@ -921,7 +926,7 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
                                     disabled={disabled}
                                     className="bg-transparent border-none focus:ring-0 p-0 text-xs font-mono text-theme-primary min-w-[20px]"
                                     style={{ width: `${Math.max(symbol.length, 1) + 0.5}ch` }}
-                                    placeholder="⎵"
+                                    placeholder={isSkipWord ? "Word" : "⎵"}
                                 />
                                 {!disabled && (
                                     <button
@@ -934,18 +939,18 @@ const SettingCard = ({ settingKey, groupName, config, usingFlatStructure, webuiL
                                 )}
                             </div>
                         ))}
-                        {symbols.length === 0 && <span className="text-xs text-theme-muted italic py-1">No symbols defined</span>}
+                        {symbols.length === 0 && <span className="text-xs text-theme-muted italic py-1">{isSkipWord ? "No words defined" : "No symbols defined"}</span>}
                     </div>
                     {!disabled && (
                         <button
                             onClick={handleAddSymbol}
                             className="flex items-center gap-2 px-3 py-1.5 text-xs bg-theme-primary/10 text-theme-primary border border-theme-primary/20 rounded-lg hover:bg-theme-primary/20 transition-all"
                         >
-                            <Plus className="w-3 h-3" /> Add Symbol
+                            <Plus className="w-3 h-3" /> {isSkipWord ? "Add Word" : "Add Symbol"}
                         </button>
                     )}
                     <p className="text-[10px] text-theme-muted italic">
-                        Spaces are preserved exactly as typed inside the boxes.
+                        {isSkipWord ? "Words are preserved exactly as typed inside the boxes." : "Spaces are preserved exactly as typed inside the boxes."}
                     </p>
                 </div>
             );

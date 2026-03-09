@@ -18,7 +18,8 @@ ARG TARGETARCH
 ARG VENDOR
 ARG VERSION
 
-ENV TZ="Europe/Berlin" \
+ENV APP_VERSION=$VERSION \
+    TZ="Europe/Berlin" \
     POWERSHELL_DISTRIBUTION_CHANNEL="PSDocker" \
     FONTS_GID=5555 \
     POSTERIZARR_NON_ROOT="TRUE" \
@@ -116,12 +117,15 @@ WORKDIR /config
 USER nobody:nogroup
 VOLUME ["/config"]
 
-# Expose backend + frontend ports
-EXPOSE 8000
-
-ENTRYPOINT ["/app/start.sh"]
+ARG VERSION
 
 # Labels
 LABEL org.opencontainers.image.source="https://github.com/fscorrupt/posterizarr"
 LABEL org.opencontainers.image.description="Posterizarr - Automated poster generation with integrated Web UI"
 LABEL org.opencontainers.image.licenses="GPL-3.0"
+LABEL org.opencontainers.image.version=$VERSION
+
+# Expose backend + frontend ports
+EXPOSE 8000
+
+ENTRYPOINT ["/app/start.sh"]

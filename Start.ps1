@@ -269,6 +269,7 @@ function CompareScriptVersion {
 
                         if ($isGreater) {
                             $displayVersion = "$version-dev"
+                            $global:IsDev = 'true'
                             Write-Host "Current Script Version: $displayVersion | Latest Script Version: $LatestScriptVersion (Development version ahead of release)" -ForegroundColor Yellow
                         }
                         else {
@@ -667,7 +668,12 @@ if (-not (Test-Path $configFile)) {
 
 # Run advanced CheckJson to fix/update keys
 Write-Host "Verifying configuration file integrity..." -ForegroundColor Cyan
-CheckJson -jsonExampleUrl "https://github.com/fscorrupt/posterizarr/raw/main/config.example.json" -jsonFilePath $configFile
+if ($global:IsDev -eq 'true'){
+    CheckJson -jsonExampleUrl "https://github.com/fscorrupt/posterizarr/raw/dev/config.example.json" -jsonFilePath $configFile
+}
+Else {
+    CheckJson -jsonExampleUrl "https://github.com/fscorrupt/posterizarr/raw/main/config.example.json" -jsonFilePath $configFile
+}
 
 # Ensure WebUI config
 Ensure-WebUIConfig -jsonFilePath $configFile

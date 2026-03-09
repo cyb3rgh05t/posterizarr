@@ -65,11 +65,20 @@ jobs:
           CLEANED_TAG=$(echo "$RAW_TAG" | sed -E 's/^[vV]\.?//')
           echo "CLEAN_TAG=$CLEANED_TAG" >> $GITHUB_ENV
 
+      - name: Read Base Version from Release.txt
+        id: read_version
+        run: |
+          # Read the version from the file and remove whitespace
+          VERSION_FROM_FILE=$(cat Release.txt | tr -d '[:space:]')
+          echo "FILE_VERSION=$VERSION_FROM_FILE" >> $GITHUB_ENV
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ env.REPO_NAME_LOWERCASE }}
+          flavor: |
+            latest=auto
           tags: |
             type=semver,pattern={{version}},value=${{ env.CLEAN_TAG }},enable=${{ github.event_name == 'release' }}
             type=semver,pattern={{major}}.{{minor}},value=${{ env.CLEAN_TAG }},enable=${{ github.event_name == 'release' }}
@@ -78,6 +87,8 @@ jobs:
             type=raw,value=dev,enable=${{ github.event_name == 'push' && github.ref_name == 'dev' }}
             type=sha,prefix=dev-,enable=${{ github.event_name == 'push' && github.ref_name == 'dev' }}
             type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+          labels: |
+            org.opencontainers.image.version=${{ env.CLEAN_TAG || format('{0}-dev', env.FILE_VERSION) }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -87,6 +98,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ env.CLEAN_TAG || format('{0}-dev', env.FILE_VERSION) }}
           cache-from: |
             type=gha,scope=${{ github.ref_name }}
             type=gha,scope=dev

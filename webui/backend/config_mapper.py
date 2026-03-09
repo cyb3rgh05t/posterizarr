@@ -436,6 +436,7 @@ CONFIG_GROUPS = {
     "TitleCardBordercolor": "TitleCardOverlayPart",
     "TitleCardBorderwidth": "TitleCardOverlayPart",
     "TitleCardBackgroundFallback": "TitleCardOverlayPart",
+    "TitleCardSkipWords": "TitleCardOverlayPart",
     # TitleCardTitleTextPart
     "TitleCardTitleFontAllCaps": "TitleCardTitleTextPart",
     "TitleCardTitleAddEPTitleText": "TitleCardTitleTextPart",
@@ -539,6 +540,7 @@ UI_GROUPS = {
         "AssetCleanup",
         "FollowSymlink",
         "SkipTBA",
+        "TitleCardSkipWords",
         "SkipJapTitle",
         "SkipAddText",
         "SkipLocalPosterTextAdd",
@@ -1035,6 +1037,7 @@ DISPLAY_NAMES = {
     "BackgroundPosters": "Generate Backgrounds",
     "TitleCards": "Generate Title Cards",
     "SkipTBA": "Skip TBA Episodes",
+    "TitleCardSkipWords": "List of words to be skipped for TC, e.g 'TBA, Episode...'",
     "SkipJapTitle": "Skip Japanese Titles",
     "AssetCleanup": "Asset Cleanup",
     "AutoUpdateIM": "Auto-Update ImageMagick",
