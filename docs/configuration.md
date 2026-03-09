@@ -266,6 +266,7 @@
     - `borderwidth`: Border width.
     - `bordercolor`: Color of border.
     - `SkipWords`: List of words to be skipped for TC, e.g 'TBA, Episode...'. (SkipTBA has to be true)
+     - **Any already created TitleCards that match these words will be deleted.**
 
     #### TitleCardTitleTextPart
 
