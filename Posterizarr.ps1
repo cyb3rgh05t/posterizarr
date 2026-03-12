@@ -8423,12 +8423,21 @@ if ($Manual) {
             $Posteroverlay = $Seasonoverlay
             if ($AddShowTitletoSeason -eq 'true') {
                 if ($fontAllCaps -eq 'true') {
-                    $joinedTitle = $SeasonPosterName.ToUpper()
+                    if ($global:ExtractedTitle) {
+                        $joinedTitle = $global:ExtractedTitle.ToUpper()
+                    }
+                    else {
+                        $joinedTitle = $SeasonPosterName.ToUpper()
+                    }
                 }
                 Else {
-                    $joinedTitle = $SeasonPosterName
+                    if ($global:ExtractedTitle) {
+                        $joinedTitle = $global:ExtractedTitle
+                    }
+                    else {
+                        $joinedTitle = $SeasonPosterName
+                    }
                 }
-
                 if ($ShowOnSeasonfontAllCaps -eq 'true') {
                     $ShowjoinedTitle = $titletext.ToUpper()
                 }
