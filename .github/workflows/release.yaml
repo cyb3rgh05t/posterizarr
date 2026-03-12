@@ -1,9 +1,5 @@
 name: Release Posterizarr
 
-env:
-  # This tells GitHub to run all actions on Node 24, silencing the deprecation warning.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 on:
   # Production releases
   release:
@@ -125,7 +121,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 9.0.x
 
       - name: Restore dependencies
         run: dotnet restore modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj
@@ -156,15 +152,43 @@ jobs:
           cd ..
           mv Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip release_package/
 
+      #- name: Push to Builds Branch (Dev Only)
+      #  if: github.event_name != 'release'
+      #  uses: s0/git-publish-subdir-action@develop
+      #  env:
+      #    REPO: self
+      #    BRANCH: builds
+      #    FOLDER: release_package
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #    MESSAGE: "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
+
       - name: Push to Builds Branch (Dev Only)
         if: github.event_name != 'release'
-        uses: s0/git-publish-subdir-action@develop
-        env:
-          REPO: self
-          BRANCH: builds
-          FOLDER: release_package
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MESSAGE: "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
+        run: |
+          # 1. Setup Git Identity
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 2. Use a temporary directory to avoid workspace pollution
+          TEMP_DIR=$(mktemp -d)
+          cp -r release_package/* $TEMP_DIR/
+
+          # 3. Checkout the target branch into a fresh folder
+          git clone --single-branch --branch builds https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} builds_repo
+
+          # 4. Sync files
+          rm -rf builds_repo/*
+          cp -r $TEMP_DIR/* builds_repo/
+
+          # 5. Commit and Push
+          cd builds_repo
+          git add .
+          if ! git diff --cached --quiet; then
+            git commit -m "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
+            git push origin builds
+          else
+            echo "No changes to builds branch. Skipping push."
+          fi
 
       - name: Run Manifest Update Script
         run: python3 update_manifest.py
