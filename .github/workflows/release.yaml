@@ -1,5 +1,10 @@
 name: Release Posterizarr
 
+env:
+  # This silences the warning for softprops/action-gh-release,
+  # actions/checkout, and others by forcing the runner to use Node 24.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   # Production releases
   release:
@@ -152,35 +157,19 @@ jobs:
           cd ..
           mv Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip release_package/
 
-      #- name: Push to Builds Branch (Dev Only)
-      #  if: github.event_name != 'release'
-      #  uses: s0/git-publish-subdir-action@develop
-      #  env:
-      #    REPO: self
-      #    BRANCH: builds
-      #    FOLDER: release_package
-      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #    MESSAGE: "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
-
       - name: Push to Builds Branch (Dev Only)
         if: github.event_name != 'release'
         run: |
-          # 1. Setup Git Identity
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          # 2. Use a temporary directory to avoid workspace pollution
           TEMP_DIR=$(mktemp -d)
           cp -r release_package/* $TEMP_DIR/
 
-          # 3. Checkout the target branch into a fresh folder
           git clone --single-branch --branch builds https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} builds_repo
 
-          # 4. Sync files
           rm -rf builds_repo/*
           cp -r $TEMP_DIR/* builds_repo/
 
-          # 5. Commit and Push
           cd builds_repo
           git add .
           if ! git diff --cached --quiet; then
