@@ -38,16 +38,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -74,7 +74,7 @@ jobs:
 
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ env.REPO_NAME_LOWERCASE }}
           flavor: |
@@ -91,7 +91,7 @@ jobs:
             org.opencontainers.image.version=${{ env.CLEAN_TAG || format('{0}-dev', env.FILE_VERSION) }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -113,15 +113,15 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.ref_name }}
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 9.0.x
 
       - name: Restore dependencies
         run: dotnet restore modules/Posterizarr.Plugin/Posterizarr.Plugin.csproj
@@ -152,15 +152,43 @@ jobs:
           cd ..
           mv Posterizarr.Plugin_v${{ steps.vars.outputs.VERSION }}.zip release_package/
 
+      #- name: Push to Builds Branch (Dev Only)
+      #  if: github.event_name != 'release'
+      #  uses: s0/git-publish-subdir-action@develop
+      #  env:
+      #    REPO: self
+      #    BRANCH: builds
+      #    FOLDER: release_package
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #    MESSAGE: "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
+
       - name: Push to Builds Branch (Dev Only)
         if: github.event_name != 'release'
-        uses: s0/git-publish-subdir-action@develop
-        env:
-          REPO: self
-          BRANCH: builds
-          FOLDER: release_package
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MESSAGE: "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
+        run: |
+          # 1. Setup Git Identity
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 2. Use a temporary directory to avoid workspace pollution
+          TEMP_DIR=$(mktemp -d)
+          cp -r release_package/* $TEMP_DIR/
+
+          # 3. Checkout the target branch into a fresh folder
+          git clone --single-branch --branch builds https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} builds_repo
+
+          # 4. Sync files
+          rm -rf builds_repo/*
+          cp -r $TEMP_DIR/* builds_repo/
+
+          # 5. Commit and Push
+          cd builds_repo
+          git add .
+          if ! git diff --cached --quiet; then
+            git commit -m "build: update dev zip v${{ steps.vars.outputs.VERSION }}"
+            git push origin builds
+          else
+            echo "No changes to builds branch. Skipping push."
+          fi
 
       - name: Run Manifest Update Script
         run: python3 update_manifest.py

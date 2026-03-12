@@ -92,6 +92,7 @@ ORIGINAL_KEYS = {
     "TitleCardAddBorder": "AddBorder",
     "TitleCardBordercolor": "bordercolor",
     "TitleCardBorderwidth": "borderwidth",
+    "TitleCardSkipWords": "SkipWords",
     # TitleCardTitleTextPart
     "TitleCardTitleFontAllCaps": "fontAllCaps",
     "TitleCardTitleAddEPTitleText": "AddEPTitleText",
