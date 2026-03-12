@@ -1,5 +1,9 @@
 name: Release Posterizarr
 
+env:
+  # This tells GitHub to run all actions on Node 24, silencing the deprecation warning.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   # Production releases
   release:
