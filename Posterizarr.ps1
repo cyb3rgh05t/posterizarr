@@ -4668,6 +4668,7 @@ function InvokeMagickCommand {
         [string]$Command,
         [string]$Arguments
     )
+
     $global:ImageMagickError = $null
     if ([string]::IsNullOrWhiteSpace($Arguments)) {
         Write-Entry -Subtext "Skipping: No arguments provided for magick command." -Path $global:configLogging -Color Cyan -log Debug
@@ -10477,13 +10478,37 @@ Elseif ($Tautulli) {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                        # Add Stroke
-                                                        if ($AddTextStroke -eq 'true') {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
+                                                        }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
                                                         }
 
                                                         Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -11089,13 +11114,37 @@ Elseif ($Tautulli) {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                        # Add Stroke
-                                                        if ($AddBackgroundTextStroke -eq 'true') {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
+                                                        }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
                                                         }
 
                                                         Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -11798,13 +11847,37 @@ Elseif ($Tautulli) {
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                 if ($global:IsTruncated -ne $true) {
                                                     Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                    $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                    $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                    # Add Stroke
-                                                    if ($AddTextStroke -eq 'true') {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    $superSize = [int]($optimalFontSize * 0.55)
+                                                    $yNudge    = [int]($optimalFontSize * 0.3)
+                                                    $gap       = 20
+
+                                                    if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                        # SUPERSCRIPT + STROKE MODE
+                                                        $Arguments = "`"$PosterImage`" ( -background none " +
+                                                            "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    elseif ($supChar -ne "") {
+                                                        # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                        $Arguments = "`"$PosterImage`" ( -background none " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                            ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
+                                                    }
+                                                    else {
+                                                        # STANDARD MODE (Normal caption logic)
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
                                                     }
 
                                                     Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -12420,13 +12493,37 @@ Elseif ($Tautulli) {
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                 if ($global:IsTruncated -ne $true) {
                                                     Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                    $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                    $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                    # Add Stroke
-                                                    if ($AddBackgroundTextStroke -eq 'true') {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    $superSize = [int]($optimalFontSize * 0.55)
+                                                    $yNudge    = [int]($optimalFontSize * 0.3)
+                                                    $gap       = 20
+
+                                                    if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                        # SUPERSCRIPT + STROKE MODE
+                                                        $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                            "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    elseif ($supChar -ne "") {
+                                                        # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                        $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                            ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
+                                                    }
+                                                    else {
+                                                        # STANDARD MODE (Normal caption logic)
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
                                                     }
 
                                                     Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -15999,13 +16096,39 @@ Elseif ($ArrTrigger) {
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                         if ($global:IsTruncated -ne $true) {
                                                             Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
-                                                            # Add Stroke
-                                                            if ($AddTextStroke -eq 'true') {
-                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                            $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
+
+                                                            $superSize = [int]($optimalFontSize * 0.55)
+                                                            $yNudge    = [int]($optimalFontSize * 0.3)
+                                                            $gap       = 20
+
+                                                            if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                                # SUPERSCRIPT + STROKE MODE
+                                                                $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                    "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                    "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                    "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                             }
-                                                            Else {
-                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            elseif ($supChar -ne "") {
+                                                                # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                                $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                    "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                    ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                             }
+                                                            else {
+                                                                # STANDARD MODE (Normal caption logic)
+                                                                if ($AddTextStroke -eq 'true') {
+                                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                                }
+                                                                Else {
+                                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                                }
+                                                            }
+
                                                             Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
                                                             $logEntry = "`"$magick`" $Arguments"
                                                             $logEntry | Out-File $magickLog -Append
@@ -16548,13 +16671,37 @@ Elseif ($ArrTrigger) {
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                         if ($global:IsTruncated -ne $true) {
                                                             Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                            $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                            $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                            # Add Stroke
-                                                            if ($AddBackgroundTextStroke -eq 'true') {
-                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            $superSize = [int]($optimalFontSize * 0.55)
+                                                            $yNudge    = [int]($optimalFontSize * 0.3)
+                                                            $gap       = 20
+
+                                                            if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                                # SUPERSCRIPT + STROKE MODE
+                                                                $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                    "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                    "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                    "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                             }
-                                                            Else {
-                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            elseif ($supChar -ne "") {
+                                                                # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                                $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                    "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                    ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
+                                                            }
+                                                            else {
+                                                                # STANDARD MODE (Normal caption logic)
+                                                                if ($AddTextStroke -eq 'true') {
+                                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                                }
+                                                                Else {
+                                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                                }
                                                             }
 
                                                             Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -17189,14 +17336,38 @@ Elseif ($ArrTrigger) {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
-                                                        # Add Stroke
-                                                        if ($AddTextStroke -eq 'true') {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                        }
-                                                        Else {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
-                                                        }
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
+                                                        }
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
+                                                        }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                        }
                                                         Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $magickLog -Append
@@ -17750,13 +17921,39 @@ Elseif ($ArrTrigger) {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
-                                                        # Add Stroke
-                                                        if ($AddBackgroundTextStroke -eq 'true') {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
+
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                         }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+                                                        }
+
                                                         Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $magickLog -Append
@@ -20609,13 +20806,37 @@ Elseif ($ArrTrigger) {
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                         if ($global:IsTruncated -ne $true) {
                                                             Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                            $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                            $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                            # Add Stroke
-                                                            if ($AddTextStroke -eq 'true') {
-                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            $superSize = [int]($optimalFontSize * 0.55)
+                                                            $yNudge    = [int]($optimalFontSize * 0.3)
+                                                            $gap       = 20
+
+                                                            if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                                # SUPERSCRIPT + STROKE MODE
+                                                                $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                    "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                    "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                    "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                             }
-                                                            Else {
-                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            elseif ($supChar -ne "") {
+                                                                # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                                $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                    "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                    ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
+                                                            }
+                                                            else {
+                                                                # STANDARD MODE (Normal caption logic)
+                                                                if ($AddTextStroke -eq 'true') {
+                                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                                }
+                                                                Else {
+                                                                    $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                                }
                                                             }
 
                                                             Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -21220,13 +21441,37 @@ Elseif ($ArrTrigger) {
                                                         $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                         if ($global:IsTruncated -ne $true) {
                                                             Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                            $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                            $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                            # Add Stroke
-                                                            if ($AddBackgroundTextStroke -eq 'true') {
-                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            $superSize = [int]($optimalFontSize * 0.55)
+                                                            $yNudge    = [int]($optimalFontSize * 0.3)
+                                                            $gap       = 20
+
+                                                            if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                                # SUPERSCRIPT + STROKE MODE
+                                                                $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                    "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                    "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                    "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                             }
-                                                            Else {
-                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            elseif ($supChar -ne "") {
+                                                                # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                                $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                    "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                                    "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                    ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
+                                                            }
+                                                            else {
+                                                                # STANDARD MODE (Normal caption logic)
+                                                                if ($AddTextStroke -eq 'true') {
+                                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                                }
+                                                                Else {
+                                                                    $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                                }
                                                             }
 
                                                             Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -21929,13 +22174,37 @@ Elseif ($ArrTrigger) {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                        # Add Stroke
-                                                        if ($AddTextStroke -eq 'true') {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
+                                                        }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
                                                         }
 
                                                         Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -22551,13 +22820,37 @@ Elseif ($ArrTrigger) {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                        # Add Stroke
-                                                        if ($AddBackgroundTextStroke -eq 'true') {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
+                                                        }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
                                                         }
 
                                                         Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -27341,13 +27634,39 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
-                                                        # Add Stroke
-                                                        if ($AddTextStroke -eq 'true') {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
+
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                         }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                        }
+
                                                         Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
                                                         $logEntry = "`"$magick`" $Arguments"
                                                         $logEntry | Out-File $magickLog -Append
@@ -27890,13 +28209,37 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                        # Add Stroke
-                                                        if ($AddBackgroundTextStroke -eq 'true') {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
+                                                        }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
                                                         }
 
                                                         Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -28531,12 +28874,37 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                 if ($global:IsTruncated -ne $true) {
                                                     Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
-                                                    # Add Stroke
-                                                    if ($AddTextStroke -eq 'true') {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                    $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
+
+                                                    $superSize = [int]($optimalFontSize * 0.55)
+                                                    $yNudge    = [int]($optimalFontSize * 0.3)
+                                                    $gap       = 20
+
+                                                    if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                        # SUPERSCRIPT + STROKE MODE
+                                                        $Arguments = "`"$PosterImage`" ( -background none " +
+                                                            "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    elseif ($supChar -ne "") {
+                                                        # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                        $Arguments = "`"$PosterImage`" ( -background none " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                            ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
+                                                    }
+                                                    else {
+                                                        # STANDARD MODE (Normal caption logic)
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
                                                     }
 
                                                     Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -29092,13 +29460,39 @@ Elseif ($OtherMediaServerUrl -and $OtherMediaServerApiKey -and $UseOtherMediaSer
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                 if ($global:IsTruncated -ne $true) {
                                                     Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
-                                                    # Add Stroke
-                                                    if ($AddBackgroundTextStroke -eq 'true') {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                    $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
+
+                                                    $superSize = [int]($optimalFontSize * 0.55)
+                                                    $yNudge    = [int]($optimalFontSize * 0.3)
+                                                    $gap       = 20
+
+                                                    if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                        # SUPERSCRIPT + STROKE MODE
+                                                        $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                            "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    elseif ($supChar -ne "") {
+                                                        # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                        $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                            ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                     }
+                                                    else {
+                                                        # STANDARD MODE (Normal caption logic)
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                    }
+
                                                     Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
                                                     $logEntry = "`"$magick`" $Arguments"
                                                     $logEntry | Out-File $magickLog -Append
@@ -32416,15 +32810,40 @@ else {
                                                     }
                                                     $joinedTitlePointSize = $joinedTitle -replace '""', '""""'
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
+
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                        # Add Stroke
-                                                        if ($AddTextStroke -eq 'true') {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$PosterImage`" ( -background none " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
+                                                        }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                            }
                                                         }
 
                                                         Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -33096,13 +33515,37 @@ else {
                                                     $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                     if ($global:IsTruncated -ne $true) {
                                                         Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                        $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                        $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                        # Add Stroke
-                                                        if ($AddBackgroundTextStroke -eq 'true') {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        $superSize = [int]($optimalFontSize * 0.55)
+                                                        $yNudge    = [int]($optimalFontSize * 0.3)
+                                                        $gap       = 20
+
+                                                        if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                            # SUPERSCRIPT + STROKE MODE
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                                "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                         }
-                                                        Else {
-                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        elseif ($supChar -ne "") {
+                                                            # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                            $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                                "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                                ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
+                                                        }
+                                                        else {
+                                                            # STANDARD MODE (Normal caption logic)
+                                                            if ($AddTextStroke -eq 'true') {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
+                                                            Else {
+                                                                $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                            }
                                                         }
 
                                                         Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -33874,13 +34317,37 @@ else {
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $fontImagemagick -box_width $MaxWidth  -box_height $MaxHeight -min_pointsize $minPointSize -max_pointsize $maxPointSize -lineSpacing $lineSpacing
                                                 if ($global:IsTruncated -ne $true) {
                                                     Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                    $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                    $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                    # Add Stroke
-                                                    if ($AddTextStroke -eq 'true') {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    $superSize = [int]($optimalFontSize * 0.55)
+                                                    $yNudge    = [int]($optimalFontSize * 0.3)
+                                                    $gap       = 20
+
+                                                    if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                        # SUPERSCRIPT + STROKE MODE
+                                                        $Arguments = "`"$PosterImage`" ( -background none " +
+                                                            "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth $strokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "( ( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "-gravity center -composite ) -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                    elseif ($supChar -ne "") {
+                                                        # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                        $Arguments = "`"$PosterImage`" ( -background none " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $optimalFontSize -fill `"$fontcolor`" label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$fontImagemagick`" -pointsize $superSize -fill `"$fontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                            ") -gravity south -geometry +0`"$text_offset`" -composite `"$PosterImage`""
+                                                    }
+                                                    else {
+                                                        # STANDARD MODE (Normal caption logic)
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten `( -size `"$boxsize`" -background none `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$strokecolor`" -stroke `"$strokecolor`" -strokewidth `"$strokewidth`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) `( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -stroke none -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$boxsize`" `) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$PosterImage`" -gravity center -background None -layers Flatten ( -font `"$fontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$fontcolor`" -size `"$boxsize`" -background none -interline-spacing `"$lineSpacing`" -gravity `"$textgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$boxsize`" ) -gravity south -geometry +0`"$text_offset`" -quality $global:outputQuality -composite `"$PosterImage`""
+                                                        }
                                                     }
 
                                                     Write-Entry -Subtext "Applying Poster text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
@@ -34566,13 +35033,37 @@ else {
                                                 $optimalFontSize = Get-OptimalPointSize -text $joinedTitlePointSize -font $backgroundfontImagemagick -box_width $BackgroundMaxWidth  -box_height $BackgroundMaxHeight -min_pointsize $BackgroundminPointSize -max_pointsize $BackgroundmaxPointSize -lineSpacing $BackgroundlineSpacing
                                                 if ($global:IsTruncated -ne $true) {
                                                     Write-Entry -Subtext ("Optimal font size set to: '{0}' [{1}]" -f $optimalFontSize, $(if ($null -eq $script:CurrentTextSizeSource) { 'calculated' } else { $script:CurrentTextSizeSource })) -Path $global:configLogging -Color White -log Info
+                                                    $cleanTitle = $joinedTitle -replace '³', '' -replace '²', ''
+                                                    $supChar = if ($joinedTitle -match '³') { "3" } elseif ($joinedTitle -match '²') { "2" } else { "" }
 
-                                                    # Add Stroke
-                                                    if ($AddBackgroundTextStroke -eq 'true') {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -strokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    $superSize = [int]($optimalFontSize * 0.55)
+                                                    $yNudge    = [int]($optimalFontSize * 0.3)
+                                                    $gap       = 20
+
+                                                    if ($supChar -ne "" -and $AddTextStroke -eq 'true') {
+                                                        # SUPERSCRIPT + STROKE MODE
+                                                        $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                            "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth $Backgroundstrokewidth label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "( ( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" -stroke none label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap ) " +
+                                                            "-gravity center -composite ) -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
                                                     }
-                                                    Else {
-                                                        $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                    elseif ($supChar -ne "") {
+                                                        # SUPERSCRIPT ONLY MODE (No Stroke)
+                                                        $Arguments = "`"$backgroundImage`" ( -background none " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $optimalFontSize -fill `"$Backgroundfontcolor`" label:`"$cleanTitle`" ) " +
+                                                            "( -font `"$backgroundfontImagemagick`" -pointsize $superSize -fill `"$Backgroundfontcolor`" label:`"$supChar`" -repage +0-$yNudge ) +smush +$gap " +
+                                                            ") -gravity south -geometry +0`"$Backgroundtext_offset`" -composite `"$backgroundImage`""
+                                                    }
+                                                    else {
+                                                        # STANDARD MODE (Normal caption logic)
+                                                        if ($AddTextStroke -eq 'true') {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten `( -size `"$Backgroundboxsize`" -background none `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundstrokecolor`" -stroke `"$Backgroundstrokecolor`" -Backgroundstrokewidth `"$Backgroundstrokewidth`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) `( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -stroke none -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" `) -gravity center -composite -trim +repage -extent `"$Backgroundboxsize`" `) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
+                                                        Else {
+                                                            $Arguments = "`"$backgroundImage`" -gravity center -background None -layers Flatten ( -font `"$backgroundfontImagemagick`" -pointsize `"$optimalFontSize`" -fill `"$Backgroundfontcolor`" -size `"$Backgroundboxsize`" -background none -interline-spacing `"$BackgroundlineSpacing`" -gravity `"$Backgroundtextgravity`" caption:`"$joinedTitle`" -trim +repage -extent `"$Backgroundboxsize`" ) -gravity south -geometry +0`"$Backgroundtext_offset`" -quality $global:outputQuality -composite `"$backgroundImage`""
+                                                        }
                                                     }
 
                                                     Write-Entry -Subtext "Applying Background text: `"$joinedTitle`"" -Path $global:configLogging -Color White -log Info
